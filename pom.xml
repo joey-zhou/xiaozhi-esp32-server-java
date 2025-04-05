@@ -114,13 +114,13 @@
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
-            <version>5.0.0-alpha.14</version>
+            <version>4.9.3</version>
         </dependency>
         <!-- Kotlin 运行时 -->
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
-            <version>1.9.0</version> <!-- 使用与OkHttp 5.0.0-alpha.14兼容的版本 -->
+            <version>1.4.10</version>
         </dependency>
     </dependencies>
 

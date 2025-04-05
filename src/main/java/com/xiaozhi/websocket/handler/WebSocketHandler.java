@@ -12,14 +12,6 @@ import com.xiaozhi.websocket.service.AudioService;
 import com.xiaozhi.websocket.service.MessageService;
 import com.xiaozhi.websocket.service.SpeechToTextService;
 import com.xiaozhi.websocket.service.TextToSpeechService;
-import java.io.IOException;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import javax.annotation.Resource;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +22,13 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import javax.annotation.Resource;
+import java.io.IOException;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class WebSocketHandler extends TextWebSocketHandler {
 
@@ -78,7 +77,8 @@ public class WebSocketHandler extends TextWebSocketHandler {
         Map<String, List<String>> headers = session.getHandshakeHeaders();
 
         // 从请求头中获取设备ID
-        String deviceId = headers.get("device-id").get(0);
+        List<String> deviceIds = headers.get("device-id");
+        String deviceId = ObjectUtils.isEmpty(deviceIds) ? "web_test_device": deviceIds.get(0);
 
         List<SysDevice> devices = deviceService.query(new SysDevice().setDeviceId(deviceId));
         SysDevice device;
@@ -244,11 +244,11 @@ public class WebSocketHandler extends TextWebSocketHandler {
         logger.info("收到hello消息 - SessionId: {}", session.getId());
 
         // 验证客户端hello消息
-        if (!jsonNode.path("transport").asText().equals("websocket")) {
+        /*if (!jsonNode.path("transport").asText().equals("websocket")) {
             logger.warn("不支持的传输方式: {}", jsonNode.path("transport").asText());
             session.close(CloseStatus.NOT_ACCEPTABLE);
             return;
-        }
+        }*/
 
         // 解析音频参数
         JsonNode audioParams = jsonNode.path("audio_params");
@@ -264,6 +264,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
         ObjectNode response = objectMapper.createObjectNode();
         response.put("type", "hello");
         response.put("transport", "websocket");
+        response.put("session_id", session.getId());
 
         // 添加音频参数（可以根据服务器配置调整）
         ObjectNode responseAudioParams = response.putObject("audio_params");
