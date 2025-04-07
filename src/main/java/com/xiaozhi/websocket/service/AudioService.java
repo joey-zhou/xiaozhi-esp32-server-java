@@ -1,6 +1,7 @@
 package com.xiaozhi.websocket.service;
 
 import com.xiaozhi.utils.OpusProcessor;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -196,12 +197,14 @@ public class AudioService {
      * @return 处理结果，包含opus数据和持续时间
      */
     public AudioProcessResult processAudioFile(String audioFilePath, int sampleRate, int channels) {
+        AudioProcessResult emptyAudioProcessResult = new AudioProcessResult();
+        if (StringUtils.isEmpty(audioFilePath)) { return emptyAudioProcessResult; }
         try {
             // 从音频文件获取PCM数据
             byte[] pcmData = extractPcmFromAudio(audioFilePath);
             if (pcmData == null) {
                 logger.error("无法从文件提取PCM数据: {}", audioFilePath);
-                return new AudioProcessResult();
+                return emptyAudioProcessResult;
             }
 
             // 计算音频时长
@@ -213,7 +216,7 @@ public class AudioService {
             return new AudioProcessResult(opusFrames, durationMs);
         } catch (Exception e) {
             logger.error("处理音频文件失败: {}", audioFilePath, e);
-            return new AudioProcessResult();
+            return emptyAudioProcessResult;
         }
     }
 

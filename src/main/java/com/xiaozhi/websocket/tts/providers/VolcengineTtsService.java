@@ -68,6 +68,11 @@ public class VolcengineTtsService implements TtsService {
             logger.warn("文本内容为空！");
             return null;
         }
+		
+        if (!containsLetter(text)) {
+            logger.warn("文本不包含文字！\"{}\"", text);
+            return "";
+        }
 
         try {
             // 生成音频文件名
@@ -86,6 +91,17 @@ public class VolcengineTtsService implements TtsService {
             logger.error("语音合成时发生错误！", e);
             throw e;
         }
+    }
+	
+    public static boolean containsLetter(String s) {
+        for (int i = 0; i < s.length(); ) {
+            int codepoint = s.codePointAt(i);
+            if (Character.isIdeographic(codepoint) || Character.isLetter(codepoint)) {
+                return true;
+            }
+            i += Character.charCount(codepoint);
+        }
+        return false;
     }
 
     /**
@@ -143,7 +159,7 @@ public class VolcengineTtsService implements TtsService {
             try (Response response = client.newCall(request).execute()) {
                 if (!response.isSuccessful()) {
                     String errorBody = response.body() != null ? response.body().string() : "无响应体";
-                    logger.error("TTS请求失败: {} {}, 错误信息: {}", response.code(), response.message(), errorBody);
+                    logger.error("TTS请求失败: text: {}, code: {}, response: {}, 错误信息: {}", text, response.code(), response.message(), errorBody);
                     return false;
                 }
 
