@@ -2,6 +2,9 @@ package com.xiaozhi.websocket.service;
 
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.utils.OpusProcessor;
+import org.bytedeco.ffmpeg.global.avutil;
+import org.bytedeco.javacv.FFmpegFrameGrabber;
+import org.bytedeco.javacv.Frame;
 import com.xiaozhi.websocket.tts.factory.TtsServiceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +21,9 @@ import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ShortBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -190,7 +196,7 @@ public class AudioService {
 
     /**
      * 初始化会话的音频处理
-     * 
+     *
      * @param sessionId WebSocket会话ID
      */
     public void initializeSession(String sessionId) {
@@ -203,7 +209,7 @@ public class AudioService {
 
     /**
      * 清理会话的音频处理状态
-     * 
+     *
      * @param sessionId WebSocket会话ID
      */
     public void cleanupSession(String sessionId) {
@@ -258,11 +264,12 @@ public class AudioService {
         sessionStreamingQueues.remove(sessionId);
         sessionStreamingFlags.remove(sessionId);
 
+        logger.debug("音频处理会话已清理 - SessionId: {}", sessionId);
     }
 
     /**
      * 处理音频文件，提取PCM数据并转换为Opus格式
-     * 
+     *
      * @param audioFilePath 音频文件路径
      * @param sampleRate    采样率
      * @param channels      通道数
@@ -292,7 +299,7 @@ public class AudioService {
 
     /**
      * 从音频文件中提取PCM数据
-     * 
+     *
      * @param audioFilePath 音频文件路径
      * @return PCM格式的音频数据
      */
@@ -300,30 +307,47 @@ public class AudioService {
         try {
             // 创建临时PCM文件
             File tempPcmFile = File.createTempFile("temp_pcm_extract_", ".pcm");
-            String tempPcmPath = tempPcmFile.getAbsolutePath();
-            try {
-                // 使用FFmpeg直接将音频转换为PCM
-                String[] command = {
-                        "ffmpeg",
-                        "-i", audioFilePath,
-                        "-f", "s16le", // 16位有符号小端格式
-                        "-acodec", "pcm_s16le",
-                        "-y",
-                        tempPcmPath
-                };
 
-                ProcessBuilder pb = new ProcessBuilder(command);
-                pb.redirectErrorStream(true);
-                Process process = pb.start();
-                // 等待进程完成
-                int exitCode = process.waitFor();
-                if (exitCode != 0) {
-                    logger.error("FFmpeg提取PCM数据失败，退出码: {}", exitCode);
-                    return null;
+            try (FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(audioFilePath);
+                 FileOutputStream fileOut = new FileOutputStream(tempPcmFile)){
+
+                // 基本配置
+                grabber.setAudioChannels(DEFAULT_CHANNELS);
+                grabber.setSampleRate(DEFAULT_SAMPLE_RATE);
+                grabber.setSampleFormat(avutil.AV_SAMPLE_FMT_S16);
+                // 设置输出格式为16位有符号小端PCM
+                grabber.setAudioOption("acodec", "pcm_s16le");
+                grabber.setOption("ar", String.valueOf(DEFAULT_SAMPLE_RATE)); // 采样率
+                grabber.setOption("ac", String.valueOf(DEFAULT_CHANNELS));    // 通道数
+                // 启动grabber
+                grabber.start();
+
+                Frame audioFrame;
+                // 读取所有音频帧
+                while ((audioFrame = grabber.grabFrame(true, false, true, false)) != null) {
+                    if (audioFrame.samples == null || audioFrame.samples.length == 0) {
+                        continue;
+                    }
+                    // 处理ShortBuffer
+                    for (int i = 0; i < audioFrame.samples.length; i++) {
+                        ShortBuffer shortBuffer = (ShortBuffer) audioFrame.samples[i];
+                        shortBuffer.rewind();
+
+                        // 转换为字节数组
+                        ByteBuffer byteBuffer = ByteBuffer.allocate(shortBuffer.capacity() * 2);
+                        byteBuffer.order(java.nio.ByteOrder.LITTLE_ENDIAN); // 确保小端字节序
+
+                        while (shortBuffer.hasRemaining()) {
+                            byteBuffer.putShort(shortBuffer.get());
+                        }
+                        // 写入文件
+                        fileOut.write(byteBuffer.array());
+                    }
                 }
-
+                // 关闭输出流
+                fileOut.close();
                 // 读取PCM文件内容
-                return Files.readAllBytes(Paths.get(tempPcmPath));
+                return Files.readAllBytes(tempPcmFile.toPath());
             } finally {
                 // 删除临时文件
                 tempPcmFile.delete();
@@ -336,7 +360,7 @@ public class AudioService {
 
     /**
      * 计算音频时长
-     * 
+     *
      * @param pcmData    PCM格式的音频数据
      * @param sampleRate 采样率
      * @param channels   通道数
@@ -350,7 +374,7 @@ public class AudioService {
 
     /**
      * 发送音频消息
-     * 
+     *
      * @param session       WebSocket会话
      * @param audioFilePath 音频文件路径
      * @param text          文本内容
@@ -381,13 +405,19 @@ public class AudioService {
                             audioFilePath,
                             sequenceNumber);
 
+                    logger.info("[消息#{}-入队] 添加到音频队列 - 文本: {}, 是否开始: {}, 是否结束: {}, 帧数: {}",
+                            sequenceNumber, text, isStart, isEnd, audioResult.getOpusFrames().size());
+
                     Queue<AudioMessageTask> queue = sessionAudioQueues.get(sessionId);
                     queue.add(task);
 
                     // 如果当前没有正在处理的任务，开始处理队列
                     AtomicBoolean isProcessing = sessionProcessingFlags.get(sessionId);
                     if (isProcessing.compareAndSet(false, true)) {
+                        logger.info("[消息#{}-处理] 开始处理音频队列 - 当前队列大小: {}", sequenceNumber, queue.size());
                         return processAudioQueue(session, sessionId);
+                    } else {
+                        logger.info("[消息#{}-等待] 已有任务在处理中，等待处理 - 当前队列大小: {}", sequenceNumber, queue.size());
                     }
 
                     // 如果已经有任务在处理，直接返回
@@ -401,7 +431,7 @@ public class AudioService {
 
     /**
      * 处理流式音频数据并发送
-     * 
+     *
      * @param session   WebSocket会话
      * @param text      文本内容
      * @param isStart   是否是对话开始
@@ -439,7 +469,7 @@ public class AudioService {
 
     /**
      * 处理流式音频队列中的任务
-     * 
+     *
      * @param session   WebSocket会话
      * @param sessionId 会话ID
      * @return 处理结果
@@ -565,7 +595,7 @@ public class AudioService {
 
     /**
      * 处理音频队列中的任务
-     * 
+     *
      * @param session   WebSocket会话
      * @param sessionId 会话ID
      * @return 处理结果
@@ -576,6 +606,8 @@ public class AudioService {
 
         // 如果队列为空或会话已关闭，结束处理
         if (queue.isEmpty() || !session.isOpen()) {
+            logger.info("[队列处理-结束] 队列为空或会话已关闭 - SessionId: {}, 队列为空: {}, 会话开启: {}",
+                    sessionId, queue.isEmpty(), session.isOpen());
             isProcessing.set(false);
             return Mono.empty();
         }
@@ -584,16 +616,21 @@ public class AudioService {
         AudioMessageTask task = queue.poll();
         int sequenceNumber = task.getSequenceNumber();
 
+        logger.info("[消息#{}-开始处理] 从队列取出任务 - 文本: {}, 是否开始: {}, 是否结束: {}, 剩余队列大小: {}",
+                sequenceNumber, task.getText(), task.isFirstMessage(), task.isLastMessage(), queue.size());
+
         // 创建消息序列
         List<Mono<Void>> messageSequence = new ArrayList<>();
 
         // 1. 如果是第一条消息，发送开始标记
         if (task.isFirstMessage()) {
+            logger.info("[消息#{}-TTS开始] 发送TTS开始标记", sequenceNumber);
             messageSequence.add(sendTtsStartMessage(session, sequenceNumber));
         }
 
         // 2. 如果有文本，发送句子开始标记
         if (task.getText() != null && !task.getText().isEmpty()) {
+            logger.info("[消息#{}-句子开始] 发送句子开始标记 - 文本: {}", sequenceNumber, task.getText());
             messageSequence.add(sendSentenceStartMessage(session, task.getText(), sequenceNumber));
         }
 
@@ -606,6 +643,7 @@ public class AudioService {
 
         // 4. 添加音频发送操作到序列
         if (!audioMessages.isEmpty()) {
+            logger.info("[消息#{}-音频数据] 准备发送音频数据 - 帧数: {}", sequenceNumber, audioMessages.size());
             messageSequence.add(
                     session.send(
                             Flux.fromIterable(audioMessages)
@@ -614,6 +652,7 @@ public class AudioService {
 
         // 6. 如果是最后一条消息，发送结束标记
         if (task.isLastMessage()) {
+            logger.info("[消息#{}-TTS结束] 发送TTS结束标记", sequenceNumber);
             messageSequence.add(sendTtsStopMessage(session, sequenceNumber));
         }
 
@@ -623,13 +662,16 @@ public class AudioService {
                 .doFinally(signalType -> {
                     // 删除音频文件
                     deleteAudioFiles(task.getAudioFilePath());
+                    logger.info("[消息#{}-清理] 音频文件已删除: {}", sequenceNumber, task.getAudioFilePath());
 
                     // 继续处理队列中的下一个任务
                     if (!queue.isEmpty() && session.isOpen()) {
+                        logger.info("[消息#{}-继续] 继续处理队列中的下一个任务 - 剩余任务数: {}", sequenceNumber, queue.size());
                         processAudioQueue(session, sessionId)
                                 .subscribe();
                     } else {
                         // 队列为空，重置处理状态
+                        logger.info("[消息#{}-队列空] 队列处理完毕，重置处理状态", sequenceNumber);
                         isProcessing.set(false);
                     }
                 });
@@ -637,7 +679,7 @@ public class AudioService {
 
     /**
      * 删除音频文件及其相关文件（如同名的VTT文件）
-     * 
+     *
      * @param audioPath 音频文件路径
      * @return 是否成功删除
      */
@@ -678,7 +720,7 @@ public class AudioService {
 
     /**
      * 发送TTS句子开始消息（包含文本）
-     * 
+     *
      * @param session WebSocket会话
      * @param text    句子文本
      * @return 操作结果
@@ -693,6 +735,7 @@ public class AudioService {
             jsonBuilder.append("}");
 
             String message = jsonBuilder.toString();
+            logger.info("[消息#{}-发送] 发送句子开始消息: {}", sequenceNumber, message);
 
             return session.send(Mono.just(session.textMessage(message)));
         } catch (Exception e) {
@@ -703,27 +746,30 @@ public class AudioService {
 
     /**
      * 发送TTS开始消息
-     * 
+     *
      * @param session WebSocket会话
      * @return 操作结果
      */
     public Mono<Void> sendTtsStartMessage(WebSocketSession session, int sequenceNumber) {
         try {
             String message = "{\"type\":\"tts\",\"state\":\"start\"}";
+            logger.info("[消息#{}-发送] 发送TTS开始消息: {}", sequenceNumber, message);
             return session.send(Mono.just(session.textMessage(message)));
         } catch (Exception e) {
+            logger.error("[消息#{}-错误] 发送TTS开始消息失败", sequenceNumber, e);
             return Mono.empty();
         }
     }
 
     /**
      * 发送TTS停止消息
-     * 
+     *
      * @param session WebSocket会话
      * @return 操作结果
      */
     public Mono<Void> sendTtsStopMessage(WebSocketSession session, int sequenceNumber) {
         if (session == null || !session.isOpen()) {
+            logger.warn("[消息#{}-错误] 尝试发送停止指令到无效的WebSocket会话", sequenceNumber);
             return Mono.empty();
         }
 
@@ -742,9 +788,11 @@ public class AudioService {
 
             // 清空队列
             queue.clear();
+            logger.info("[消息#{}-清空队列] 清空音频队列 - 清除任务数: {}", sequenceNumber, queueSize);
 
             // 异步删除文件
             if (!filesToDelete.isEmpty()) {
+                logger.info("[消息#{}-清理文件] 异步删除音频文件 - 文件数: {}", sequenceNumber, filesToDelete.size());
                 Mono.fromRunnable(() -> filesToDelete.forEach(this::deleteAudioFiles))
                         .subscribeOn(Schedulers.boundedElastic())
                         .subscribe();
@@ -754,6 +802,7 @@ public class AudioService {
         // 发送停止指令
         try {
             String message = "{\"type\":\"tts\",\"state\":\"stop\"}";
+            logger.info("[消息#{}-发送] 发送TTS停止消息: {}", sequenceNumber, message);
             return session.send(Mono.just(session.textMessage(message)));
         } catch (Exception e) {
             logger.error("[消息#{}-错误] 发送TTS停止消息失败", sequenceNumber, e);
@@ -763,7 +812,7 @@ public class AudioService {
 
     /**
      * 立即停止音频发送，用于处理中断请求
-     * 
+     *
      * @param session WebSocket会话
      * @return 操作结果
      */
