@@ -4,36 +4,17 @@
       <div class="layout-content-margin">
         <!-- 查询框 -->
         <div class="table-search">
-          <a-form
-            layout="horizontal"
-            :colon="false"
-            :labelCol="{ span: 6 }"
-            :wrapperCol="{ span: 16 }"
-          >
+          <a-form layout="horizontal" :colon="false" :labelCol="{ span: 6 }" :wrapperCol="{ span: 16 }">
             <a-row class="filter-flex">
-              <a-col
-                :xl="6"
-                :lg="12"
-                :xs="24"
-                v-for="item in queryFilter"
-                :key="item.index"
-              >
+              <a-col :xl="6" :lg="12" :xs="24" v-for="item in queryFilter" :key="item.index">
                 <a-form-item :label="item.label">
-                  <a-input-search
-                    v-model="query[item.index]"
-                    placeholder="请输入"
-                    allow-clear
-                    @search="getData()"
-                  />
+                  <a-input-search v-model="query[item.index]" placeholder="请输入" allow-clear @search="getData()" />
                 </a-form-item>
               </a-col>
               <a-col :xxl="6" :xl="6" :lg="12" :xs="24">
                 <a-form-item label="状态">
                   <a-select v-model="query.state" @change="getData()">
-                    <a-select-option
-                      v-for="item in stateItems"
-                      :key="item.value"
-                    >
+                    <a-select-option v-for="item in stateItems" :key="item.value">
                       <span>{{ item.label }}</span>
                     </a-select-option>
                   </a-select>
@@ -44,57 +25,22 @@
         </div>
         <!-- 表格数据 -->
         <a-card title="查询表格" :bodyStyle="{ padding: 0 }" :bordered="false">
-          <a-input-search
-            slot="extra"
-            enter-button="添加设备"
-            autoFocus
-            placeholder="请输入设备码"
-            @search="addDevice"
-          />
-          <a-table
-            rowKey="deviceId"
-            :columns="tableColumns"
-            :data-source="data"
-            :loading="loading"
-            :pagination="pagination"
-            :scroll="{ x: 1200 }"
-            size="middle"
-          >
-            <a-button
-              slot="footer"
-              :loading="exportLoading"
-              :disabled="true"
-              @click=""
-            >
+          <a-input-search slot="extra" enter-button="添加设备" autoFocus placeholder="请输入设备码" @search="addDevice" />
+          <a-table rowKey="deviceId" :columns="tableColumns" :data-source="data" :loading="loading"
+            :pagination="pagination" :scroll="{ x: 1200 }" size="middle">
+            <a-button slot="footer" :loading="exportLoading" :disabled="true" @click="">
               导出
             </a-button>
             <!-- deviceName部分保持不变 -->
-            <template
-              v-for="col in ['deviceName']"
-              :slot="col"
-              slot-scope="text, record"
-            >
+            <template v-for="col in ['deviceName']" :slot="col" slot-scope="text, record">
               <div :key="col">
-                <a-input
-                  v-if="record.editable"
-                  style="margin: -5px 0; text-align: center"
-                  :value="text"
-                  @change="
-                    (e) => inputEdit(e.target.value, record.deviceId, col)
-                  "
-                  @keyup.enter="(e) => update(record, record.deviceId)"
-                  @keyup.esc="(e) => cancel(record.deviceId)"
-                />
-                <span
-                  v-else-if="editingKey === ''"
-                  @click="edit(record.deviceId)"
-                  style="cursor: pointer"
-                >
+                <a-input v-if="record.editable" style="margin: -5px 0; text-align: center" :value="text" @change="
+                  (e) => inputEdit(e.target.value, record.deviceId, col)
+                " @keyup.enter="(e) => update(record, record.deviceId)" @keyup.esc="(e) => cancel(record.deviceId)" />
+                <span v-else-if="editingKey === ''" @click="edit(record.deviceId)" style="cursor: pointer">
                   <a-tooltip title="点击编辑" :mouseEnterDelay="0.5">
                     <span v-if="text">{{ text }}</span>
-                    <span v-else style="padding: 0 50px"
-                      >&nbsp;&nbsp;&nbsp;</span
-                    >
+                    <span v-else style="padding: 0 50px">&nbsp;&nbsp;&nbsp;</span>
                   </a-tooltip>
                 </span>
                 <span v-else>{{ text }}</span>
@@ -103,32 +49,16 @@
 
             <!-- roleName 下拉框 -->
             <template slot="roleName" slot-scope="text, record">
-              <a-select
-                v-if="record.editable"
-                style="margin: -5px 0; text-align: center; width: 100%"
-                :value="record.roleId"
-                @change="
+              <a-select v-if="record.editable" style="margin: -5px 0; text-align: center; width: 100%"
+                :value="record.roleId" @change="
                   (value) => handleSelectChange(value, record.deviceId, 'role')
-                "
-              >
-                <a-select-option
-                  v-for="item in roleItems"
-                  :key="item.roleId"
-                  :value="item.roleId"
-                >
+                ">
+                <a-select-option v-for="item in roleItems" :key="item.roleId" :value="item.roleId">
                   <div style="text-align: center">{{ item.roleName }}</div>
                 </a-select-option>
               </a-select>
-              <span
-                v-else-if="editingKey === ''"
-                @click="edit(record.deviceId)"
-                style="cursor: pointer"
-              >
-                <a-tooltip
-                  :title="record.roleDesc"
-                  :mouseEnterDelay="1"
-                  placement="right"
-                >
+              <span v-else-if="editingKey === ''" @click="edit(record.deviceId)" style="cursor: pointer">
+                <a-tooltip :title="record.roleDesc" :mouseEnterDelay="1" placement="right">
                   <span v-if="text">{{ text }}</span>
                   <span v-else style="padding: 0 50px">&nbsp;&nbsp;&nbsp;</span>
                 </a-tooltip>
@@ -137,78 +67,48 @@
             </template>
 
             <!-- modelName 下拉框 -->
+            <!-- modelName 下拉框 -->
             <template slot="modelName" slot-scope="text, record">
-              <a-select
-                v-if="record.editable"
-                style="margin: -5px 0; text-align: center; width: 100%"
-                :value="record.modelId"
-                @change="
-                  (value) => handleSelectChange(value, record.deviceId, 'model')
-                "
-              >
-                <a-select-option
-                  v-for="item in modelItems"
-                  :key="item.modelId"
-                  :value="item.modelId"
-                >
-                  <div style="text-align: center">{{ item.modelName }}</div>
-                </a-select-option>
-              </a-select>
-              <span
-                v-else-if="editingKey === ''"
-                @click="edit(record.deviceId)"
-                style="cursor: pointer"
-              >
+              <a-cascader v-if="record.editable" style="margin: -5px 0; text-align: center; width: 100%"
+                :options="modelOptions" :value="getCascaderValue(record)"
+                @change="(value) => handleModelChange(value, record.deviceId)" placeholder="请选择模型"
+                expandTrigger="hover" />
+              <span v-else-if="editingKey === ''" @click="edit(record.deviceId)" style="cursor: pointer">
                 <a-tooltip :title="record.modelDesc" :mouseEnterDelay="0.5">
-                  <span v-if="record.modelId">{{
-                    getItemName(
-                      modelItems,
-                      "modelId",
-                      record.modelId,
-                      "modelName"
-                    )
-                  }}</span>
+                  <span v-if="record.modelId">
+                    {{ record.modelName }}
+                    <a-tag v-if="record.modelType === 'agent'" color="blue" size="small">智能体</a-tag>
+                  </span>
                   <span v-else style="padding: 0 50px">&nbsp;&nbsp;&nbsp;</span>
                 </a-tooltip>
               </span>
-              <span v-else>{{
-                getItemName(modelItems, "modelId", record.modelId, "modelName")
-              }}</span>
+              <span v-else>
+                {{ record.modelName }}
+                <a-tag v-if="record.modelType === 'agent'" color="blue" size="small">智能体</a-tag>
+              </span>
             </template>
 
             <!-- sttName 下拉框 -->
             <template slot="sttName" slot-scope="text, record">
-              <a-select
-                v-if="record.editable"
-                style="margin: -5px 0; text-align: center; width: 100%"
-                :value="record.sttId"
-                @change="
+              <a-select v-if="record.editable" style="margin: -5px 0; text-align: center; width: 100%"
+                :value="record.sttId" @change="
                   (value) => handleSelectChange(value, record.deviceId, 'stt')
-                "
-              >
-                <a-select-option
-                  v-for="item in sttItems"
-                  :key="item.sttId"
-                  :value="item.sttId"
-                >
+                ">
+                <a-select-option v-for="item in sttItems" :key="item.sttId" :value="item.sttId">
                   <div style="text-align: center">{{ item.sttName }}</div>
                 </a-select-option>
               </a-select>
-              <span
-                v-else-if="editingKey === ''"
-                @click="edit(record.deviceId)"
-                style="cursor: pointer"
-              >
+              <span v-else-if="editingKey === ''" @click="edit(record.deviceId)" style="cursor: pointer">
                 <a-tooltip :title="record.sttDesc" :mouseEnterDelay="0.5">
                   <span v-if="record.sttId">{{
                     getItemName(sttItems, "sttId", record.sttId, "sttName")
-                  }}</span>
+                    }}</span>
                   <span v-else style="padding: 0 50px">Vosk本地识别</span>
                 </a-tooltip>
               </span>
               <span v-else>{{
                 getItemName(sttItems, "sttId", record.sttId, "sttName")
-              }}</span>
+                }}</span>
             </template>
 
             <!-- 其他模板保持不变 -->
@@ -219,11 +119,7 @@
 
             <template slot="operation" slot-scope="text, record">
               <a-space v-if="record.editable">
-                <a-popconfirm
-                  href="javascript:;"
-                  title="确定保存？"
-                  @confirm="update(record, record.deviceId)"
-                >
+                <a-popconfirm href="javascript:;" title="确定保存？" @confirm="update(record, record.deviceId)">
                   <a>保存</a>
                 </a-popconfirm>
                 <a href="javascript:;" @click="cancel(record.deviceId)">取消</a>
@@ -239,7 +135,8 @@
     </a-layout-content>
     <a-back-top />
 
-    <DeviceEditDialog @submit="update" @close="editVisible = false" :visible="editVisible" :current="currentDevice" :model-items="modelItems" :stt-items="sttItems" :role-items="roleItems"></DeviceEditDialog>
+    <DeviceEditDialog @submit="update" @close="editVisible = false" :visible="editVisible" :current="currentDevice"
+      :model-items="modelItems" :stt-items="sttItems" :role-items="roleItems"></DeviceEditDialog>
   </a-layout>
 </template>
 
@@ -250,13 +147,13 @@ import mixin from "@/mixins/index";
 import { message } from "ant-design-vue";
 import DeviceEditDialog from "@/components/DeviceEditDialog.vue";
 export default {
-  components: {DeviceEditDialog},
+  components: { DeviceEditDialog },
   mixins: [mixin],
   data() {
     return {
       // 查询框
       editVisible: false,
-      currentDevice:{},
+      currentDevice: {},
       query: {
         state: "",
       },
@@ -387,6 +284,19 @@ export default {
       ],
       roleItems: [],
       modelItems: [],
+      agentItems: [],
+      modelOptions: [
+        {
+          value: "llm",
+          label: "LLM模型",
+          children: [],
+        },
+        {
+          value: "agent",
+          label: "智能体",
+          children: [],
+        },
+      ],
       ttsItems: [],
       sttItems: [],
       data: [],
@@ -395,12 +305,22 @@ export default {
       editingKey: "",
       // 审核链接
       verifyCode: "",
+      // 加载状态标志
+      configLoaded: false,
+      agentsLoaded: false,
     };
   },
   mounted() {
-    this.getData();
+    // 并行加载配置和智能体数据
     this.getRole();
-    this.getConfig();
+
+    Promise.all([
+      this.getConfig(),
+      this.getAgents()
+    ]).then(() => {
+      // 两者都加载完成后，获取设备数据
+      this.getData();
+    });
   },
   methods: {
     /* 查询参数列表 */
@@ -418,11 +338,24 @@ export default {
         })
         .then((res) => {
           if (res.code === 200) {
-            this.data = res.data.list.map((item) => {
+            // 先保存数据
+            const deviceList = res.data.list.map((item) => {
               item.sttId = item.sttId || -1;
               return item;
             });
-            this.cacheData = this.data.map((item) => ({ ...item }));
+
+            // 确保模型和智能体数据已加载
+            if (this.modelItems.length > 0 && this.agentItems.length > 0) {
+              // 处理每个设备的模型类型
+              deviceList.forEach(device => {
+                this.determineModelType(device);
+              });
+            } else {
+              console.warn('模型或智能体数据尚未加载完成，设备模型信息可能不完整');
+            }
+
+            this.data = deviceList;
+            this.cacheData = deviceList.map((item) => ({ ...item }));
             this.pagination.total = res.data.total;
           } else {
             this.$message.error(res.message);
@@ -435,6 +368,47 @@ export default {
           this.loading = false;
         });
     },
+
+    // 确定模型类型（LLM或智能体）
+    determineModelType(device) {
+      if (!device.modelId) return;
+
+      // 转换为数字进行比较
+      const modelId = device.modelId;
+
+      // 检查是否为智能体
+      const agent = this.agentItems.find(a => a.configId === modelId);
+
+      if (agent) {
+        // 是智能体
+        device.modelType = 'agent';
+        device.modelName = agent.agentName || '未知智能体';
+        device.modelDesc = agent.agentDesc || '';
+        device.provider = 'coze'; // 标记提供商
+      } else {
+        // 检查是否为LLM模型
+        const model = this.modelItems.find(m => m.configId === modelId);
+
+        if (model) {
+          // 是LLM模型
+          device.modelType = 'llm';
+          device.modelName = model.configName || '未知模型';
+          device.modelDesc = model.configDesc || '';
+          device.provider = model.provider || '';
+        } else {
+          // 未找到匹配的模型
+          console.warn(`未找到ID为${modelId}的模型或智能体`);
+          device.modelName = `未知模型(ID:${modelId})`;
+          device.modelDesc = '';
+        }
+      }
+
+      // 确保有modelType字段，即使没有找到匹配的模型
+      if (!device.modelType) {
+        device.modelType = 'unknown';
+      }
+    },
+
     // 添加设备
     addDevice(value, event) {
       if (value === "") {
@@ -496,6 +470,7 @@ export default {
         this.loading = true;
         delete val.editable;
       }
+
       axios
         .post({
           url: api.device.update,
@@ -506,12 +481,12 @@ export default {
             sttId: val.sttId,
             ttsId: val.ttsId,
             roleId: val.roleId,
-          },
+          }
         })
         .then((res) => {
           if (res.code === 200) {
-            this.getData()
-            this.editVisible = false
+            this.getData();
+            this.editVisible = false;
             message.success("修改成功");
           } else {
             this.$message.error(res.message);
@@ -544,38 +519,150 @@ export default {
     },
     // 获取模型列表
     getConfig() {
-      axios
-        .get({
-          url: api.config.query,
-          data: {},
-        })
-        .then((res) => {
-          if (res.code === 200) {
-            this.sttItems.push({
-              sttId: -1,
-              sttName: "Vosk本地识别",
-              sttDesc: "默认Vosk本地语音识别模型",
-            });
-            res.data.list.forEach((item) => {
-              if (item.configType == "llm") {
+      return new Promise((resolve) => {
+        axios
+          .get({
+            url: api.config.query,
+            data: {},
+          })
+          .then((res) => {
+            if (res.code === 200) {
+              this.sttItems.push({
+                sttId: -1,
+                sttName: "Vosk本地识别",
+                sttDesc: "默认Vosk本地语音识别模型",
+              });
+
+              // 清空现有LLM模型子项
+              this.modelOptions[0].children = [];
+
+              res.data.list.forEach((item) => {
+                if (item.configType == "llm") {
+                  // 确保configId是数字类型
+                  item.configId = item.configId;
+                  item.modelId = item.configId;
+                  item.modelName = item.configName;
+                  item.modelDesc = item.configDesc;
+                  this.modelItems.push(item);
+
+                  // 添加到级联选择器的LLM选项
+                  this.modelOptions[0].children.push({
+                    value: item.configId,
+                    label: item.configName,
+                    isLeaf: true,
+                    data: item,
+                  });
+                } else if (item.configType == "stt") {
+                  item.sttId = item.configId;
+                  item.sttName = item.configName;
+                  item.sttDesc = item.configDesc;
+                  this.sttItems.push(item);
+                }
+              });
+
+              this.configLoaded = true;
+              resolve();
+            } else {
+              this.$message.error(res.message);
+              resolve();
+            }
+          })
+          .catch(() => {
+            this.$message.error("服务器维护/重启中，请稍后再试");
+            resolve();
+          });
+      });
+    },
+
+    // 获取智能体列表
+    getAgents() {
+      return new Promise((resolve) => {
+        axios
+          .get({
+            url: api.agent.query,
+            data: {
+              provider: "coze",
+            },
+          })
+          .then((res) => {
+            if (res.code === 200) {
+              // 清空现有智能体子项
+              this.modelOptions[1].children = [];
+
+              // 添加智能体到级联选择器
+              res.data.list.forEach((item) => {
+                // 确保configId是数字类型
+                item.configId = item.configId;
+                // 保存configId作为modelId
                 item.modelId = item.configId;
-                item.modelName = item.configName;
-                item.modelDesc = item.configDesc;
-                this.modelItems.push(item);
-              } else if (item.configType == "stt") {
-                item.sttId = item.configId;
-                item.sttName = item.configName;
-                item.sttDesc = item.configDesc;
-                this.sttItems.push(item);
-              }
-            });
-          } else {
-            this.$message.error(res.message);
-          }
-        })
-        .catch(() => {
-          this.$message.error("服务器维护/重启中，请稍后再试");
-        });
+                this.agentItems.push(item);
+                this.modelOptions[1].children.push({
+                  value: item.configId,
+                  label: item.agentName,
+                  isLeaf: true,
+                  data: item,
+                });
+              });
+
+              this.agentsLoaded = true;
+              resolve();
+            } else {
+              this.$message.error(res.message);
+              resolve();
+            }
+          })
+          .catch(() => {
+            this.$message.error("服务器维护/重启中，请稍后再试");
+            resolve();
+          });
+      });
+    },
+
+    // 处理级联选择器变更
+    handleModelChange(value, deviceId) {
+      if (!value || value.length < 2) return;
+      const modelType = value[0]; // llm 或 agent
+      const modelId = value[1]; // 具体的ID值
+
+      const data = this.editLine(deviceId);
+      data.target.modelId = modelId; // 保存modelId，这是传给后端的值
+      data.target.modelType = modelType; // 保存模型类型，仅前端使用
+
+      // 根据类型设置显示名称和描述
+      if (modelType === "llm") {
+        const model = this.modelItems.find(
+          (item) => item.configId === modelId
+        );
+        if (model) {
+          data.target.modelName = model.configName;
+          data.target.modelDesc = model.configDesc;
+          data.target.provider = model.provider || '';
+        }
+      } else if (modelType === "agent") {
+        // 从智能体列表中找到对应的智能体
+        const agent = this.agentItems.find(
+          (item) => item.configId === modelId
+        );
+        if (agent) {
+          data.target.modelName = agent.agentName;
+          data.target.modelDesc = agent.agentDesc;
+          data.target.provider = 'coze';
+        }
+      }
+
+      this.data = [...this.data]; // 强制更新视图
+    },
+
+    // 获取级联选择器的值
+    getCascaderValue(record) {
+      if (!record.modelId) return [];
+
+      // 使用modelType字段确定类型
+      if (record.modelType === 'agent') {
+        return ["agent", record.modelId];
+      } else {
+        return ["llm", record.modelId];
+      }
     },
 
     // 获取项目名称的辅助方法
@@ -584,10 +671,10 @@ export default {
       return item ? item[nameField] : "";
     },
 
-    editWithDialog(device){
-      this.editVisible = true
-      this.currentDevice = device
-    }
+    editWithDialog(device) {
+      this.editVisible = true;
+      this.currentDevice = device;
+    },
   },
 };
 </script>
@@ -595,13 +682,13 @@ export default {
 /* 使下拉框选项居中 */
 
 /* 确保下拉框中的文本居中 */
->>> .ant-select-selection__rendered .ant-select-selection-selected-value {
+>>>.ant-select-selection__rendered .ant-select-selection-selected-value {
   text-align: center !important;
   width: 100% !important;
 }
 
 /* 查询框中的下拉框保持默认对齐方式 */
->>> .table-search .ant-select-selection-selected-value {
+>>>.table-search .ant-select-selection-selected-value {
   text-align: left !important;
 }
 </style>

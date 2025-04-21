@@ -52,7 +52,14 @@
             sys_config.state = 1
             <if test="userId != null and userId != ''">AND sys_config.userId = #{userId}</if>
             <if test="configType != null and configType != ''">AND configType = #{configType}</if>
-            <if test="provider != null and provider != ''">AND provider = #{provider}</if>
+            <choose>
+                <when test="provider != null and provider != ''">
+                    AND provider = #{provider}
+                </when>
+                <otherwise>
+                    AND provider != 'coze'
+                </otherwise>
+            </choose>
             <if test="configName != null and configName != ''">AND configName LIKE CONCAT('%', #{configName}, '%')</if>
     </select>
 

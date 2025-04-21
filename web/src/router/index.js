@@ -64,7 +64,16 @@ export default new Router({
               path: "/config/tts",
               component: resolve => require(["@/views/page/config/TtsConfig"], resolve),
               meta: { title: "语音合成配置", parent: "配置管理" }
-            }
+            },
+            {
+              path: "/config/agent",
+              component: resolve => require(["@/views/page/config/Agent"], resolve),
+              name: "Agent",
+              meta: {
+                title: "智能体管理",
+                parent: "配置管理",
+              }
+            },
           ]
         },
         {

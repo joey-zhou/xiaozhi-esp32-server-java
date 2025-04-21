@@ -124,7 +124,7 @@ CREATE TABLE `xiaozhi`.`sys_config` (
   `userId` int NOT NULL COMMENT '创建用户ID',
   `configType` varchar(30) NOT NULL COMMENT '配置类型(llm, stt, tts等)',
   `provider` varchar(30) NOT NULL COMMENT '服务提供商(openai, vosk, aliyun, tencent等)',
-  `configName` varchar(50) NOT NULL COMMENT '配置名称',
+  `configName` varchar(50) DEFAULT NULL COMMENT '配置名称',
   `configDesc` TEXT DEFAULT NULL COMMENT '配置描述',
   `appId` varchar(100) DEFAULT NULL COMMENT 'APP ID',
   `apiKey` varchar(255) DEFAULT NULL COMMENT 'API密钥',

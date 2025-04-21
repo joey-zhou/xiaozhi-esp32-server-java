@@ -15,6 +15,12 @@ export default {
     update: "/api/device/update",
     export: "/api/device/export"
   },
+  agent: {
+    add: "/api/agent/add",
+    query: "/api/agent/query",
+    update: "/api/agent/update",
+    delete: "/api/agent/delete"
+  },
   role: {
     add: "/api/role/add",
     query: "/api/role/query",
