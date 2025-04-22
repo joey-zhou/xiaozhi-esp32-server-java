@@ -77,19 +77,22 @@ Server端采用 Spring Boot 框架，前端采用 Vue.js 框架，全局响应�
 
 ## 使用方式
 
-### 1. 本地源码运行（该文档由群友 汇合 提供）
+### 1. 本地源码运行（该文档由群友 **汇合** 提供）
 [点击此处查看Windows部署文档](./docs/WINDOWS_DEVELOPMENT.md)
 
 [点击此处查看Centos部署文档](./docs/CENTOS_DEVELOPMENT.md)
 
 成功运行后，控制台会输出 WebSocket 连接地址，根据下方固件编译文档使设备接入服务使用。
 
-### 2. Docker部署（该文档由群友 💍Mr_li 提供）
+### 2. Docker部署（该文档由群友 **💍Mr_li** 提供）
 [点击此处查看Docker部署文档](./docs/DOCKER.md)
 
 成功启动后，WebSocket 连接要通过宿主IP进行通信，例如：ws://192.168.31.100:8091/ws/xiaozhi/v1/
 
-### 3. 固件编译
+### 3. 也可查看由群友 **苦瓜** 录制的视频部署教程
+[点击此处查看视频部署教程](https://sivita.jiashuaibei.com/article/xiaozhiai-javaserver/)
+
+### 4. 固件编译
 点这里查看[固件编译](./docs/FIRMWARE-BUILD.md)的详细过程。
 
 烧录成功且联网成功后，通过唤醒词唤醒小智，留意server端输出的控制台信息。
@@ -100,7 +103,7 @@ Server端采用 Spring Boot 框架，前端采用 Vue.js 框架，全局响应�
 
 欢迎任何形式的贡献！如果你有好的想法或发现问题，请联系反馈
 
-可以加我微信备注 小智 Server 我拉你进微信群
+微信群超200人无法扫码进群，可以加我微信备注 小智 我拉你进微信群
 
 接各种定制化开发项目，如果你有定制化需求也可以加我微信沟通
 
