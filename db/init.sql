@@ -55,8 +55,8 @@ DROP TABLE IF EXISTS `xiaozhi`.`sys_device`;
 CREATE TABLE `xiaozhi`.`sys_device` (
   `deviceId` varchar(255) NOT NULL COMMENT '设备ID，主键',
   `deviceName` varchar(100) NOT NULL COMMENT '设备名称',
-  `modelId` int DEFAULT NULL COMMENT '模型ID',
-  `sttId` int DEFAULT NULL COMMENT 'STT服务ID',
+  `modelId` int unsigned DEFAULT NULL COMMENT '模型ID',
+  `sttId` int unsigned DEFAULT NULL COMMENT 'STT服务ID',
   `roleId` int unsigned DEFAULT NULL COMMENT '角色ID，主键',
   `ip` varchar(45) DEFAULT NULL COMMENT 'IP地址',
   `wifiName` varchar(100) DEFAULT NULL COMMENT 'WiFi名称',

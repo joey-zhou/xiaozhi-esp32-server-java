@@ -125,7 +125,6 @@ public class RoleController {
                 if (!provider.equals("edge")) {
                     config = configService.selectConfigById(ttsId);
                 }
-
                 String audioFilePath = ttsService.getTtsService(config, voiceName).textToSpeech(message);
                 AjaxResult result = AjaxResult.success();
                 result.put("data", audioFilePath);

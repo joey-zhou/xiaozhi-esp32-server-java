@@ -41,7 +41,7 @@ public class AliyunTokenManager implements TokenManager {
     /**
      * 系统启动时初始化所有Token
      */
-    @PostConstruct
+    // @PostConstruct
     public void init() {
         logger.info("初始化阿里云Token管理器");
         initializeAllTokens();

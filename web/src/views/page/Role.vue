@@ -600,28 +600,57 @@ export default {
       this.voiceLoadFailed = false;
       
       // 创建一个函数来解析HTML并提取语音数据
-      const parseAliyunVoicesFromHTML = (htmlContent) => {
+      const parseAliyunCosyVoiceFromHTML = (htmlContent) => {
         // 创建一个临时DOM元素来解析HTML
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlContent, 'text/html');
         const voicesData = [];
         // 查找id为5186fe1abb7ag的section元素
-        const sectionElement = doc.getElementById('5186fe1abb7ag');
+        const sectionElement = doc.getElementById('033d50de1bb45');
         if (sectionElement) {
           // 查找section元素内的第一个tr元素
-          const trElements = Array.from(sectionElement.querySelectorAll('tr')).slice(2)
+          const trElements = Array.from(sectionElement.querySelectorAll('tr')).slice(1)
 
           trElements.forEach(trElement => {
             const childNodes = trElement.childNodes;
-            const label = childNodes[0].innerText
+            const label = childNodes[2].innerText
             const value = childNodes[1].innerText
-            const gender = childNodes[2].innerText.includes('女') ? 'female' : 'male';
-            const type = childNodes[2].innerText
-            const language = childNodes[4].innerText
+            const gender = 'unknown';
+            const language = childNodes[5].innerText
             voicesData.push({
-              name: label,
+              label: label,
               value: value,
               gender: gender,
+              language: language
+            })
+          })
+        }
+        return voicesData;
+      };
+
+      // 创建一个函数来解析HTML并提取语音数据
+      const parseAliyunSambertFromHTML = (htmlContent) => {
+        // 创建一个临时DOM元素来解析HTML
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlContent, 'text/html');
+        const voicesData = [];
+        // 查找id为5186fe1abb7ag的section元素
+        const sectionElement = doc.getElementById('eca844883b0ox');
+        if (sectionElement) {
+          // 查找section元素内的第一个tr元素
+          const trElements = Array.from(sectionElement.querySelectorAll('tr')).slice(1)
+
+          trElements.forEach(trElement => {
+            const childNodes = trElement.childNodes;
+            const label = childNodes[1].innerText
+            const value = childNodes[0].innerText
+            const gender = childNodes[5].innerText
+            const type = childNodes[5].innerText
+            const language = childNodes[6].innerText
+            voicesData.push({
+              label: label,
+              value: value,
+              gender: gender.includes('女') ? 'female' : 'male',
               type: type,
               language: language
             })
@@ -631,7 +660,7 @@ export default {
       };
 
       const corsProxy = 'https://api.allorigins.win/raw?url=';
-      const aliyunDocsUrl = 'https://help.aliyun.com/zh/isi/developer-reference/overview-of-speech-synthesis';
+      const aliyunDocsUrl = 'https://help.aliyun.com/zh/model-studio/text-to-speech';
 
       fetch(`${corsProxy}${encodeURIComponent(aliyunDocsUrl)}`)
         .then(response => {
@@ -642,12 +671,20 @@ export default {
         })
         .then(htmlContent => {
           // 解析HTML并提取语音数据
-          const voicesData = parseAliyunVoicesFromHTML(htmlContent);
+          const cosyVoicesData = parseAliyunCosyVoiceFromHTML(htmlContent);
+          const sambertVoicesData = parseAliyunSambertFromHTML(htmlContent);
+          const qwenVoicesData = [
+            {label: 'Chelsie', value: 'Chelsie', gender: 'female', type: 'qwen'},
+            {label: 'Cherry', value: 'Cherry', gender: 'female', type: 'qwen'},
+            {label: 'Serena', value: 'Serena', gender: 'female', type: 'qwen'},
+            {label: 'Ethan', value: 'Ethan', gender: 'male', type: 'qwen'},
+          ]
+          const combinevoices = cosyVoicesData.concat(sambertVoicesData).concat(qwenVoicesData)
 
           // 处理阿里云语音列表
-          const voices = voicesData.map(voice => {
+          const voices = combinevoices.map(voice => {
             return {
-              label: `${voice.name} (${voice.type})`,
+              label: voice.type ? `${voice.label} (${voice.type})` : voice.label,
               value: voice.value,
               gender: voice.gender.toLowerCase(),
               provider: 'aliyun'

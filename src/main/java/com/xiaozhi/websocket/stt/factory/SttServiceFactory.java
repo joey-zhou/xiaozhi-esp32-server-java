@@ -163,10 +163,7 @@ public class SttServiceFactory {
     if ("tencent".equals(provider)) {
       return new TencentSttService(config);
     } else if ("aliyun".equals(provider)) {
-      // 创建阿里云TTS服务并设置TokenManager
-      AliyunSttService aliyunSttService = new AliyunSttService(config);
-      aliyunSttService.setTokenManager(tokenManager);
-      return aliyunSttService;
+      return new AliyunSttService(config);
     }
     // 可以添加其他服务提供商的支持
 

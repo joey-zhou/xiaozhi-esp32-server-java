@@ -37,13 +37,13 @@
                 sys_message
                 LEFT JOIN sys_device ON sys_device.deviceId = sys_message.deviceId AND sys_device.userId = sys_user.userId
             WHERE
-                1=1
+                1 = 1
                 <if test="startTime != null and startTime != ''">
                     AND sys_message.createTime &gt;= #{startTime} AND sys_message.createTime &lt;= #{endTime}
                 </if>
         ) AS totalMessage,
         (
-            SELECT count(*) FROM sys_device WHERE sys_device.userId = sys_user.userId and sys_device.state = 1
+            SELECT count(*) FROM sys_device WHERE sys_device.userId = sys_user.userId
         ) AS aliveNumber
         FROM
             sys_user

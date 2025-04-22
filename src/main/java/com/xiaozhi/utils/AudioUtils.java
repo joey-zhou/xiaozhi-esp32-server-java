@@ -16,6 +16,10 @@ import org.slf4j.Logger;
 public class AudioUtils {
     public static final String AUDIO_PATH = "audio/";
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(AudioUtils.class);
+    public static final int SAMPLE_RATE = 16000; // 采样率
+    public static final int CHANNELS = 1; // 单声道
+    public static final int BITRATE = 128000; // 128kbps比特率
+    public static final int SAMPLE_FORMAT = avutil.AV_SAMPLE_FMT_S16; // 16位PCM
 
     /**
      * 将原始音频数据保存为MP3文件
@@ -28,17 +32,15 @@ public class AudioUtils {
         String uuid = UUID.randomUUID().toString().replace("-", "");
         String fileName = uuid + ".mp3";
         String filePath = AUDIO_PATH + fileName;
-        int sampleRate = 16000; // 采样率
-        int channels = 1; // 单声道
 
         try {
             // 创建内存中的帧记录器，直接输出到MP3文件
-            FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(filePath, channels);
-            recorder.setAudioChannels(channels);
-            recorder.setSampleRate(sampleRate);
+            FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(filePath, CHANNELS);
+            recorder.setAudioChannels(CHANNELS);
+            recorder.setSampleRate(SAMPLE_RATE);
             recorder.setAudioCodec(avcodec.AV_CODEC_ID_MP3);
             recorder.setAudioQuality(0); // 高质量
-            recorder.setAudioBitrate(128000); // 128kbps比特率
+            recorder.setAudioBitrate(BITRATE); // 128kbps比特率
             recorder.setSampleFormat(avutil.AV_SAMPLE_FMT_S16); // 16位PCM
             recorder.start();
 
@@ -60,8 +62,8 @@ public class AudioUtils {
 
             // 设置音频帧数据
             audioFrame.samples = new java.nio.Buffer[] { shortBuffer };
-            audioFrame.sampleRate = sampleRate;
-            audioFrame.audioChannels = channels;
+            audioFrame.sampleRate = SAMPLE_RATE;
+            audioFrame.audioChannels = CHANNELS;
 
             // 记录音频帧
             recorder.record(audioFrame);

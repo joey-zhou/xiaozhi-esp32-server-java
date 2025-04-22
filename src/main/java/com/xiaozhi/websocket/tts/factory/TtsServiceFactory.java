@@ -5,11 +5,9 @@ import com.xiaozhi.websocket.tts.TtsService;
 import com.xiaozhi.websocket.tts.providers.AliyunTtsService;
 import com.xiaozhi.websocket.tts.providers.EdgeTtsService;
 import com.xiaozhi.websocket.tts.providers.VolcengineTtsService;
-import com.xiaozhi.websocket.token.TokenManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 
@@ -26,10 +24,6 @@ public class TtsServiceFactory {
 
     // 默认 EDGE TTS 服务默认语音名称
     private static final String DEFAULT_VOICE = "zh-CN-XiaoyiNeural";
-
-    // 注入TokenManager
-    @Autowired
-    private TokenManager tokenManager;
 
     /**
      * 获取默认TTS服务
@@ -85,10 +79,7 @@ public class TtsServiceFactory {
         if (DEFAULT_PROVIDER.equals(provider)) {
             return new EdgeTtsService(voiceName, outputPath);
         } else if ("aliyun".equals(provider)) {
-            // 创建阿里云TTS服务并设置TokenManager
-            AliyunTtsService aliyunTtsService = new AliyunTtsService(config, voiceName, outputPath);
-            aliyunTtsService.setTokenManager(tokenManager);
-            return aliyunTtsService;
+            return new AliyunTtsService(config, voiceName, outputPath);
         } else if ("volcengine".equals(provider)) {
             return new VolcengineTtsService(config, voiceName, outputPath);
         } /*
