@@ -108,4 +108,9 @@
         )
     </insert>
 
+    <delete id="delete" parameterType="com.xiaozhi.entity.SysDevice">
+        DELETE FROM sys_device 
+        WHERE deviceId = #{deviceId} AND userId = #{userId}
+    </delete>
+
 </mapper>

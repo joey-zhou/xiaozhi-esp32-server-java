@@ -39,6 +39,18 @@ public class SysDeviceServiceImpl implements SysDeviceService {
     }
 
     /**
+     * 删除设备
+     *
+     * @param device
+     * @return
+     */
+    @Override
+    @Transactional
+    public int delete(SysDevice device) {
+        return deviceMapper.delete(device);
+    }
+
+    /**
      * 查询设备信息
      *
      * @param device

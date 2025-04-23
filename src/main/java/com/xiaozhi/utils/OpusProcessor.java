@@ -92,7 +92,7 @@ public class OpusProcessor {
      * 创建一个新的Opus编码器
      * 
      * @param sampleRate 采样率
-     * @param channels 通道数
+     * @param channels   通道数
      * @return 新创建的Opus编码器
      */
     private OpusEncoder createEncoder(int sampleRate, int channels) {
@@ -109,44 +109,32 @@ public class OpusProcessor {
     /**
      * 将PCM数据转换为Opus格式
      */
-    public List<byte[]> convertPcmToOpus(String sessionId, byte[] pcmData, int sampleRate, int channels,
-            int frameDurationMs) throws OpusException {
-        // 每次都创建新的编码器实例，避免多线程并发问题
+    public List<byte[]> convertPcmToOpus(String sessionId, byte[] pcmData, int sampleRate, int channels, int frameDurationMs)
+            throws OpusException {
+        // 获取或创建Opus编码器
         OpusEncoder encoder = createEncoder(sampleRate, channels);
 
         // 每帧样本数
         int frameSize = sampleRate * frameDurationMs / 1000;
-        int framesCount = (pcmData.length / 2) / (frameSize * channels) + 1;
 
         // 处理PCM数据
-        List<byte[]> opusFrames = new ArrayList<>(framesCount);
+        List<byte[]> opusFrames = new ArrayList<>();
         short[] shortBuffer = new short[frameSize * channels];
         byte[] opusBuffer = new byte[1275]; // 最大Opus帧大小
 
-        // 使用ByteBuffer一次性转换字节数据为short数据
-        ByteBuffer byteBuffer = ByteBuffer.wrap(pcmData).order(ByteOrder.LITTLE_ENDIAN);
-        ShortBuffer shortBufferView = byteBuffer.asShortBuffer();
-
-        // 按帧处理数据
-        int totalShorts = pcmData.length / 2;
-        for (int frameStart = 0; frameStart < totalShorts; frameStart += frameSize * channels) {
-            // 计算当前帧可读取的样本数
-            int samplesToRead = Math.min(frameSize * channels, totalShorts - frameStart);
-            if (samplesToRead <= 0)
-                break;
-
-            // 读取样本
-            shortBufferView.position(frameStart);
-            shortBufferView.get(shortBuffer, 0, samplesToRead);
-
-            // 如果最后一帧不足，用0填充
-            if (samplesToRead < frameSize * channels) {
-                for (int i = samplesToRead; i < frameSize * channels; i++) {
-                    shortBuffer[i] = 0;
+        for (int i = 0; i < pcmData.length / 2; i += frameSize * channels) {
+            // 将字节数据转换为short
+            int samplesRead = 0;
+            for (int j = 0; j < frameSize * channels && (i + j) < pcmData.length / 2; j++) {
+                int byteIndex = (i + j) * 2;
+                if (byteIndex + 1 < pcmData.length) {
+                    shortBuffer[j] = (short) ((pcmData[byteIndex] & 0xFF) | (pcmData[byteIndex + 1] << 8));
+                    samplesRead++;
                 }
             }
 
-            try {
+            // 只有当有足够的样本时才编码
+            if (samplesRead > 0) {
                 // 编码
                 int opusLength = encoder.encode(shortBuffer, 0, frameSize, opusBuffer, 0, opusBuffer.length);
 
@@ -154,10 +142,6 @@ public class OpusProcessor {
                 byte[] opusFrame = new byte[opusLength];
                 System.arraycopy(opusBuffer, 0, opusFrame, 0, opusLength);
                 opusFrames.add(opusFrame);
-            } catch (Exception e) {
-                logger.error("音频编码失败 - SessionId: {}, 帧起始位置: {}, 错误: {}", 
-                        sessionId, frameStart, e.getMessage(), e);
-                throw e;
             }
         }
 

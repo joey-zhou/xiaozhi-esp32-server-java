@@ -22,7 +22,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.text.DecimalFormat;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * 对话处理服务
@@ -68,14 +70,11 @@ public class DialogueService {
     // 添加会话的完整回复内容
     private final Map<String, StringBuilder> sessionFullResponses = new ConcurrentHashMap<>();
     
-    // 使用ConcurrentSkipListMap替代List，自动按序号排序
-    private final Map<String, ConcurrentSkipListMap<Integer, PendingSentence>> sessionPendingSentences = new ConcurrentHashMap<>();
+    // 添加会话的音频生成任务列表，用于跟踪并发生成的音频任务
+    private final Map<String, List<CompletableFuture<String>>> sessionAudioTasks = new ConcurrentHashMap<>();
     
-    // 添加会话的下一个要发送的句子序号
-    private final Map<String, Integer> sessionNextSentenceNumber = new ConcurrentHashMap<>();
-    
-    // 添加会话的发送锁，确保同一会话的发送是串行的
-    private final Map<String, Object> sessionSendLocks = new ConcurrentHashMap<>();
+    // 添加会话的句子顺序列表，确保按顺序发送
+    private final Map<String, List<PendingSentence>> sessionPendingSentences = new ConcurrentHashMap<>();
 
     /**
      * 待处理句子类，用于按顺序发送句子
@@ -86,7 +85,6 @@ public class DialogueService {
         private final boolean isStart;
         private final boolean isEnd;
         private CompletableFuture<String> audioFuture;
-        private boolean isProcessing; // 标记是否正在处理
 
         public PendingSentence(int sentenceNumber, String sentence, boolean isStart, boolean isEnd) {
             this.sentenceNumber = sentenceNumber;
@@ -94,19 +92,10 @@ public class DialogueService {
             this.isStart = isStart;
             this.isEnd = isEnd;
             this.audioFuture = null;
-            this.isProcessing = false;
         }
         
         public void setAudioFuture(CompletableFuture<String> audioFuture) {
             this.audioFuture = audioFuture;
-        }
-        
-        public boolean isProcessing() {
-            return isProcessing;
-        }
-        
-        public void setProcessing(boolean processing) {
-            isProcessing = processing;
         }
     }
 
@@ -266,14 +255,9 @@ public class DialogueService {
                     // 初始化句子计数器
                     sessionSentenceCounters.putIfAbsent(sessionId, new AtomicInteger(0));
                     
-                    // 初始化待处理句子映射
-                    sessionPendingSentences.putIfAbsent(sessionId, new ConcurrentSkipListMap<>());
-                    
-                    // 初始化下一个要发送的句子序号
-                    sessionNextSentenceNumber.put(sessionId, 1);
-                    
-                    // 初始化发送锁
-                    sessionSendLocks.putIfAbsent(sessionId, new Object());
+                    // 初始化音频任务列表和待处理句子列表
+                    sessionAudioTasks.putIfAbsent(sessionId, new ArrayList<>());
+                    sessionPendingSentences.putIfAbsent(sessionId, new ArrayList<>());
 
                     // 发送最终识别结果
                     return messageService.sendMessage(session, "stt", "final", finalText)
@@ -330,9 +314,11 @@ public class DialogueService {
         // 创建待处理句子对象
         PendingSentence pendingSentence = new PendingSentence(sentenceNumber, sentence, isStart, isEnd);
         
-        // 添加到待处理句子映射
-        ConcurrentSkipListMap<Integer, PendingSentence> pendingSentences = sessionPendingSentences.get(sessionId);
-        pendingSentences.put(sentenceNumber, pendingSentence);
+        // 添加到待处理句子列表
+        List<PendingSentence> pendingSentences = sessionPendingSentences.get(sessionId);
+        synchronized (pendingSentences) {
+            pendingSentences.add(pendingSentence);
+        }
         
         // 并发生成音频
         CompletableFuture<String> audioFuture = generateAudioAsync(sessionId, sentence, ttsConfig, voiceName, sentenceNumber, modelResponseTime);
@@ -340,10 +326,14 @@ public class DialogueService {
         // 设置句子的音频Future
         pendingSentence.setAudioFuture(audioFuture);
         
-        // 在音频生成完成后检查是否可以发送句子
-        audioFuture.thenRunAsync(() -> {
-            checkAndSendPendingSentences(session, sessionId);
-        });
+        // 添加到音频任务列表
+        List<CompletableFuture<String>> audioTasks = sessionAudioTasks.get(sessionId);
+        synchronized (audioTasks) {
+            audioTasks.add(audioFuture);
+        }
+        
+        // 检查是否可以发送句子
+        checkAndSendPendingSentences(session, sessionId);
     }
     
     /**
@@ -378,6 +368,9 @@ public class DialogueService {
                 
                 // 完成Future
                 future.complete(audioPath);
+                
+                // 检查是否可以发送句子
+                checkAndSendPendingSentences(null, sessionId);
             } catch (Exception e) {
                 logger.error("生成音频失败 - 句子序号: {}, 错误: {}", sentenceNumber, e.getMessage(), e);
                 future.completeExceptionally(e);
@@ -390,68 +383,39 @@ public class DialogueService {
     /**
      * 检查并发送待处理的句子
      */
-    private void checkAndSendPendingSentences(WebSocketSession session, String sessionId) {
-        // 获取发送锁，确保同一会话的发送是串行的
-        Object sendLock = sessionSendLocks.get(sessionId);
-        if (sendLock == null) {
-            sendLock = new Object();
-            sessionSendLocks.put(sessionId, sendLock);
-        }
-        
-        // 同步锁，确保同一会话的发送是串行的
-        synchronized (sendLock) {
-            // 如果没有提供session，尝试从SessionManager获取
-            if (session == null) {
-                session = sessionManager.getSession(sessionId);
-                if (session == null || !session.isOpen()) {
-                    return;
-                }
-            }
-            
-            // 获取待处理句子映射
-            ConcurrentSkipListMap<Integer, PendingSentence> pendingSentences = sessionPendingSentences.get(sessionId);
-            if (pendingSentences == null || pendingSentences.isEmpty()) {
+    private synchronized void checkAndSendPendingSentences(WebSocketSession session, String sessionId) {
+        // 如果没有提供session，尝试从SessionManager获取
+        if (session == null) {
+            session = sessionManager.getSession(sessionId);
+            if (session == null || !session.isOpen()) {
                 return;
             }
+        }
+        
+        // 获取待处理句子列表
+        List<PendingSentence> pendingSentences = sessionPendingSentences.get(sessionId);
+        if (pendingSentences == null || pendingSentences.isEmpty()) {
+            return;
+        }
+        
+        // 创建最终变量以在lambda中使用
+        final WebSocketSession finalSession = session;
+        
+        // 检查并按顺序发送句子
+        synchronized (pendingSentences) {
+            // 使用迭代器安全地遍历和删除元素
+            Iterator<PendingSentence> iterator = pendingSentences.iterator();
+            List<PendingSentence> processedSentences = new ArrayList<>();
             
-            // 获取下一个要发送的句子序号
-            Integer nextSentenceNumber = sessionNextSentenceNumber.get(sessionId);
-            if (nextSentenceNumber == null) {
-                nextSentenceNumber = 1;
-                sessionNextSentenceNumber.put(sessionId, nextSentenceNumber);
-            }
-            
-            // 创建最终变量以在lambda中使用
-            final WebSocketSession finalSession = session;
-            
-            // 处理句子，直到找不到下一个要处理的句子或者音频未准备好
-            boolean continueSending = true;
-            while (continueSending) {
-                // 获取下一个要发送的句子
-                PendingSentence sentence = pendingSentences.get(nextSentenceNumber);
-                
-                // 如果没有找到下一个句子，停止处理
-                if (sentence == null) {
-                    continueSending = false;
-                    continue;
-                }
-                
-                // 如果句子正在处理中，停止处理
-                if (sentence.isProcessing()) {
-                    continueSending = false;
-                    continue;
-                }
+            while (iterator.hasNext()) {
+                PendingSentence sentence = iterator.next();
                 
                 // 如果音频未准备好，停止处理
                 if (sentence.audioFuture == null || !sentence.audioFuture.isDone()) {
-                    continueSending = false;
-                    continue;
+                    break;
                 }
                 
                 try {
-                    // 标记句子为正在处理
-                    sentence.setProcessing(true);
-                    
                     // 获取音频路径
                     String audioPath = sentence.audioFuture.get();
                     
@@ -464,12 +428,8 @@ public class DialogueService {
                             sentence.isEnd
                     ).subscribe();
                     
-                    // 从映射中移除已处理的句子
-                    pendingSentences.remove(nextSentenceNumber);
-                    
-                    // 增加下一个要发送的句子序号
-                    nextSentenceNumber++;
-                    sessionNextSentenceNumber.put(sessionId, nextSentenceNumber);
+                    // 记录已处理的句子，稍后一次性删除
+                    processedSentences.add(sentence);
                     
                     // 如果是最后一个句子，记录完整回复
                     if (sentence.isEnd) {
@@ -479,16 +439,14 @@ public class DialogueService {
                         }
                     }
                 } catch (Exception e) {
-                    logger.error("处理音频失败 - 句子序号: {}, 错误: {}", nextSentenceNumber, e.getMessage(), e);
-                    
-                    // 从映射中移除失败的句子
-                    pendingSentences.remove(nextSentenceNumber);
-                    
-                    // 增加下一个要发送的句子序号，跳过失败的句子
-                    nextSentenceNumber++;
-                    sessionNextSentenceNumber.put(sessionId, nextSentenceNumber);
+                    logger.error("处理音频失败 - 句子序号: {}, 错误: {}", sentence.sentenceNumber, e.getMessage(), e);
+                    // 记录失败的句子，稍后一次性删除
+                    processedSentences.add(sentence);
                 }
             }
+            
+            // 一次性从列表中删除所有已处理的句子
+            pendingSentences.removeAll(processedSentences);
         }
     }
 
@@ -521,14 +479,9 @@ public class DialogueService {
         // 初始化句子计数器
         sessionSentenceCounters.putIfAbsent(sessionId, new AtomicInteger(0));
         
-        // 初始化待处理句子映射
-        sessionPendingSentences.putIfAbsent(sessionId, new ConcurrentSkipListMap<>());
-        
-        // 初始化下一个要发送的句子序号
-        sessionNextSentenceNumber.put(sessionId, 1);
-        
-        // 初始化发送锁
-        sessionSendLocks.putIfAbsent(sessionId, new Object());
+        // 初始化音频任务列表和待处理句子列表
+        sessionAudioTasks.putIfAbsent(sessionId, new ArrayList<>());
+        sessionPendingSentences.putIfAbsent(sessionId, new ArrayList<>());
 
         // 发送识别结果
         messageService.sendMessage(session, "stt", "start", text).subscribe();
@@ -566,14 +519,26 @@ public class DialogueService {
         sessionManager.closeAudioSink(sessionId);
         sessionManager.setStreamingState(sessionId, false);
         
-        // 清空待处理句子映射
-        ConcurrentSkipListMap<Integer, PendingSentence> pendingSentences = sessionPendingSentences.get(sessionId);
+        // 清空待处理句子列表
+        List<PendingSentence> pendingSentences = sessionPendingSentences.get(sessionId);
         if (pendingSentences != null) {
-            pendingSentences.clear();
+            synchronized (pendingSentences) {
+                pendingSentences.clear();
+            }
         }
         
-        // 重置下一个要发送的句子序号
-        sessionNextSentenceNumber.remove(sessionId);
+        // 取消所有未完成的音频任务
+        List<CompletableFuture<String>> audioTasks = sessionAudioTasks.get(sessionId);
+        if (audioTasks != null) {
+            synchronized (audioTasks) {
+                for (CompletableFuture<String> task : audioTasks) {
+                    if (!task.isDone()) {
+                        task.cancel(true);
+                    }
+                }
+                audioTasks.clear();
+            }
+        }
 
         // 终止语音发送
         return audioService.sendStop(session);
@@ -589,13 +554,18 @@ public class DialogueService {
         sessionSttStartTimes.remove(sessionId);
         sessionLlmStartTimes.remove(sessionId);
         sessionFullResponses.remove(sessionId);
-        sessionNextSentenceNumber.remove(sessionId);
-        sessionSendLocks.remove(sessionId);
         
-        // 清理待处理句子映射
-        ConcurrentSkipListMap<Integer, PendingSentence> pendingSentences = sessionPendingSentences.remove(sessionId);
-        if (pendingSentences != null) {
-            pendingSentences.clear();
+        // 清理音频任务列表
+        List<CompletableFuture<String>> audioTasks = sessionAudioTasks.remove(sessionId);
+        if (audioTasks != null) {
+            for (CompletableFuture<String> task : audioTasks) {
+                if (!task.isDone()) {
+                    task.cancel(true);
+                }
+            }
         }
+
+        // 清理待处理句子列表
+        sessionPendingSentences.remove(sessionId);
     }
 }

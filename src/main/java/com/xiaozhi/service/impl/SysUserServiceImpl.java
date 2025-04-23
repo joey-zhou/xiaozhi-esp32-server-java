@@ -144,6 +144,7 @@ public class SysUserServiceImpl implements SysUserService {
      * @param email
      * @return
      */
+    @Override
     public int queryCaptcha(String code, String email) {
         return userMapper.queryCaptcha(code, email);
     }

@@ -13,6 +13,7 @@ export default {
     add: "/api/device/add",
     query: "/api/device/query",
     update: "/api/device/update",
+    delete: "/api/device/delete",
     export: "/api/device/export"
   },
   agent: {

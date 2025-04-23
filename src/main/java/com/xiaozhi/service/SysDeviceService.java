@@ -51,4 +51,12 @@ public interface SysDeviceService {
    */
   public int update(SysDevice device);
 
+  /**
+   * 删除设备
+   * 
+   * @param device
+   * @return
+   */
+  public int delete(SysDevice device);
+
 }

@@ -23,4 +23,5 @@ public interface DeviceMapper {
 
   int add(SysDevice device);
 
+  int delete(SysDevice device);
 }

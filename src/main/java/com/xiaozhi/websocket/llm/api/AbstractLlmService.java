@@ -197,44 +197,12 @@ public abstract class AbstractLlmService implements LlmService {
 
         // 初始化历史记录缓存
         initializeHistory(modelContext);
-        // 保存用户消息
-        modelContext.addUserMessage(userMessage);
 
         // 获取格式化的历史记录（包含当前用户消息）
         List<Map<String, String>> formattedMessages = getFormattedHistory(modelContext, userMessage);
 
-        // 创建一个包装监听器，在完成时保存响应
-        StreamResponseListener wrappedListener = new StreamResponseListener() {
-            @Override
-            public void onStart() {
-                streamListener.onStart();
-            }
-
-            @Override
-            public void onToken(String token) {
-                streamListener.onToken(token);
-            }
-
-            @Override
-            public void onComplete(String fullResponse) {
-                // 保存AI消息到数据库
-                String response = fullResponse.toString();
-                modelContext.addAssistantMessage(response);
-
-                // 更新缓存
-                updateHistoryCache(modelContext, userMessage, response);
-
-                streamListener.onComplete(fullResponse);
-            }
-
-            @Override
-            public void onError(Throwable e) {
-                streamListener.onError(e);
-            }
-        };
-
         // 调用实际的流式聊天方法
-        chatStream(formattedMessages, wrappedListener);
+        chatStream(formattedMessages, streamListener);
     }
 
     @Override

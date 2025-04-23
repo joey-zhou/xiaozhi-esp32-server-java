@@ -67,15 +67,14 @@
             </template>
 
             <!-- modelName 下拉框 -->
-            <!-- modelName 下拉框 -->
             <template slot="modelName" slot-scope="text, record">
               <a-cascader v-if="record.editable" style="margin: -5px 0; text-align: center; width: 100%"
                 :options="modelOptions" :value="getCascaderValue(record)"
                 @change="(value) => handleModelChange(value, record.deviceId)" placeholder="请选择模型"
                 expandTrigger="hover" />
               <span v-else-if="editingKey === ''" @click="edit(record.deviceId)" style="cursor: pointer">
-                <a-tooltip :title="record.modelDesc" :mouseEnterDelay="0.5">
-                  <span v-if="record.modelId">
+                <a-tooltip :title="record.modelDesc || ''" :mouseEnterDelay="0.5">
+                  <span v-if="record.modelId && record.modelName">
                     {{ record.modelName }}
                     <a-tag v-if="record.modelType === 'agent'" color="blue" size="small">智能体</a-tag>
                   </span>
@@ -83,7 +82,7 @@
                 </a-tooltip>
               </span>
               <span v-else>
-                {{ record.modelName }}
+                {{ record.modelName || '' }}
                 <a-tag v-if="record.modelType === 'agent'" color="blue" size="small">智能体</a-tag>
               </span>
             </template>
@@ -102,13 +101,13 @@
                 <a-tooltip :title="record.sttDesc" :mouseEnterDelay="0.5">
                   <span v-if="record.sttId">{{
                     getItemName(sttItems, "sttId", record.sttId, "sttName")
-                    }}</span>
+                  }}</span>
                   <span v-else style="padding: 0 50px">Vosk本地识别</span>
                 </a-tooltip>
               </span>
               <span v-else>{{
                 getItemName(sttItems, "sttId", record.sttId, "sttName")
-                }}</span>
+              }}</span>
             </template>
 
             <!-- 其他模板保持不变 -->
@@ -127,6 +126,14 @@
               <a-space v-else>
                 <a href="javascript:" @click="edit(record.deviceId)">编辑</a>
                 <a href="javascript:" @click="editWithDialog(record)">详情</a>
+                <a-popconfirm
+                  title="确定要删除此设备吗？"
+                  ok-text="确定"
+                  cancel-text="取消"
+                  @confirm="deleteDevice(record)"
+                >
+                  <a href="javascript:" style="color: #ff4d4f">删除</a>
+                </a-popconfirm>
               </a-space>
             </template>
           </a-table>
@@ -277,7 +284,7 @@ export default {
           title: "操作",
           dataIndex: "operation",
           scopedSlots: { customRender: "operation" },
-          width: 110,
+          width: 150,
           align: "center",
           fixed: "right",
         },
@@ -344,15 +351,11 @@ export default {
               return item;
             });
 
-            // 确保模型和智能体数据已加载
-            if (this.modelItems.length > 0 && this.agentItems.length > 0) {
-              // 处理每个设备的模型类型
-              deviceList.forEach(device => {
-                this.determineModelType(device);
-              });
-            } else {
-              console.warn('模型或智能体数据尚未加载完成，设备模型信息可能不完整');
-            }
+            // 无论模型和智能体数据是否加载完成，都尝试处理设备的模型类型
+            // 移除条件判断，确保始终执行
+            deviceList.forEach(device => {
+              this.determineModelType(device);
+            });
 
             this.data = deviceList;
             this.cacheData = deviceList.map((item) => ({ ...item }));
@@ -361,7 +364,7 @@ export default {
             this.$message.error(res.message);
           }
         })
-        .catch(() => {
+        .catch((e) => {
           this.$message.error("服务器维护/重启中，请稍后再试");
         })
         .finally(() => {
@@ -371,13 +374,19 @@ export default {
 
     // 确定模型类型（LLM或智能体）
     determineModelType(device) {
-      if (!device.modelId) return;
+      if (!device.modelId) {
+        // 确保没有modelId的设备也有基本属性
+        device.modelType = '';
+        device.modelName = '';
+        device.modelDesc = '';
+        return;
+      }
 
-      // 转换为数字进行比较
-      const modelId = device.modelId;
+      // 转换为数字进行比较（确保类型一致）
+      const modelId = Number(device.modelId);
 
       // 检查是否为智能体
-      const agent = this.agentItems.find(a => a.configId === modelId);
+      const agent = this.agentItems.find(a => Number(a.configId) === modelId);
 
       if (agent) {
         // 是智能体
@@ -387,7 +396,7 @@ export default {
         device.provider = 'coze'; // 标记提供商
       } else {
         // 检查是否为LLM模型
-        const model = this.modelItems.find(m => m.configId === modelId);
+        const model = this.modelItems.find(m => Number(m.configId) === modelId);
 
         if (model) {
           // 是LLM模型
@@ -396,16 +405,31 @@ export default {
           device.modelDesc = model.configDesc || '';
           device.provider = model.provider || '';
         } else {
-          // 未找到匹配的模型
+          // 未找到匹配的模型，但仍然设置基本信息
           console.warn(`未找到ID为${modelId}的模型或智能体`);
+          device.modelType = 'unknown';
           device.modelName = `未知模型(ID:${modelId})`;
           device.modelDesc = '';
         }
       }
+    },
 
-      // 确保有modelType字段，即使没有找到匹配的模型
-      if (!device.modelType) {
-        device.modelType = 'unknown';
+    // 获取级联选择器的值
+    getCascaderValue(record) {
+      if (!record.modelId) return [];
+
+      // 转换为数字类型，确保类型一致性
+      const modelId = Number(record.modelId);
+
+      // 使用modelType字段确定类型
+      if (record.modelType === 'agent') {
+        return ["agent", modelId];
+      } else if (record.modelType === 'llm') {
+        return ["llm", modelId];
+      } else {
+        // 默认情况下，尝试在两个列表中查找
+        const isAgent = this.agentItems.some(a => Number(a.configId) === modelId);
+        return isAgent ? ["agent", modelId] : ["llm", modelId];
       }
     },
 
@@ -433,6 +457,32 @@ export default {
           this.$message.error("服务器维护/重启中，请稍后再试");
         });
     },
+    // 添加删除设备方法
+    deleteDevice(record) {
+      this.loading = true;
+      axios
+        .post({
+          url: api.device.delete,
+          data: {
+            deviceId: record.deviceId
+          }
+        })
+        .then((res) => {
+          if (res.code === 200) {
+            this.$message.success("设备删除成功");
+            this.getData();
+          } else {
+            this.$message.error(res.message);
+          }
+        })
+        .catch(() => {
+          this.$message.error("服务器维护/重启中，请稍后再试");
+        })
+        .finally(() => {
+          this.loading = false;
+        });
+    },
+    
     // 选择变更处理函数
     handleSelectChange(value, key, type) {
       // 根据类型确定要使用的数据源和字段名
@@ -622,7 +672,7 @@ export default {
     handleModelChange(value, deviceId) {
       if (!value || value.length < 2) return;
       const modelType = value[0]; // llm 或 agent
-      const modelId = value[1]; // 具体的ID值
+      const modelId = Number(value[1]); // 确保modelId是数字类型
 
       const data = this.editLine(deviceId);
       data.target.modelId = modelId; // 保存modelId，这是传给后端的值
@@ -631,22 +681,30 @@ export default {
       // 根据类型设置显示名称和描述
       if (modelType === "llm") {
         const model = this.modelItems.find(
-          (item) => item.configId === modelId
+          (item) => Number(item.configId) === modelId
         );
         if (model) {
           data.target.modelName = model.configName;
           data.target.modelDesc = model.configDesc;
           data.target.provider = model.provider || '';
+        } else {
+          // 找不到对应模型时设置默认值
+          data.target.modelName = `未知模型(ID:${modelId})`;
+          data.target.modelDesc = '';
         }
       } else if (modelType === "agent") {
         // 从智能体列表中找到对应的智能体
         const agent = this.agentItems.find(
-          (item) => item.configId === modelId
+          (item) => Number(item.configId) === modelId
         );
         if (agent) {
           data.target.modelName = agent.agentName;
           data.target.modelDesc = agent.agentDesc;
           data.target.provider = 'coze';
+        } else {
+          // 找不到对应智能体时设置默认值
+          data.target.modelName = `未知智能体(ID:${modelId})`;
+          data.target.modelDesc = '';
         }
       }
 

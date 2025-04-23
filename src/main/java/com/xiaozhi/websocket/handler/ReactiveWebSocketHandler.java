@@ -65,9 +65,9 @@ public class ReactiveWebSocketHandler implements WebSocketHandler {
         logger.info(session.getHandshakeInfo().getHeaders().toString());
 
         // 尝试从请求头获取设备ID，按优先级顺序尝试不同的头
-        String[] deviceKeys = {"device-Id", "mac_address", "uuid"};
+        String[] deviceKeys = { "device-Id", "mac_address", "uuid" };
         String deviceIdAuth = null;
-        
+
         for (String key : deviceKeys) {
             deviceIdAuth = session.getHandshakeInfo().getHeaders().getFirst(key);
             if (deviceIdAuth != null) {
@@ -86,15 +86,13 @@ public class ReactiveWebSocketHandler implements WebSocketHandler {
                     if (startIdx >= 0) {
                         startIdx += paramPattern.length();
                         int endIdx = query.indexOf('&', startIdx);
-                        deviceIdAuth = endIdx >= 0 ? 
-                            query.substring(startIdx, endIdx) : 
-                            query.substring(startIdx);
+                        deviceIdAuth = endIdx >= 0 ? query.substring(startIdx, endIdx) : query.substring(startIdx);
                         break;
                     }
                 }
             }
         }
-        
+
         if (deviceIdAuth == null) {
             logger.error("设备ID为空");
             return session.close();
@@ -187,33 +185,49 @@ public class ReactiveWebSocketHandler implements WebSocketHandler {
                 return handleHelloMessage(session, jsonNode);
             }
 
-            // 对于其他消息类型，需要检查设备是否已绑定
-            return Mono.fromCallable(
-                    () -> deviceService
-                            .query(new SysDevice().setDeviceId(device.getDeviceId()).setSessionId(sessionId)))
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .flatMap(deviceResult -> {
-                        if (deviceResult.isEmpty() || device.getModelId() == null) {
-                            // 设备未绑定，处理未绑定设备的消息
-                            return handleUnboundDevice(session, device);
-                        } else {
-                            // 设备已绑定，根据消息类型处理
-                            switch (messageType) {
-                                case "listen":
-                                    return handleListenMessage(session, jsonNode);
-                                case "abort":
-                                    return dialogueService.abortDialogue(session, jsonNode.path("reason").asText());
-                                case "iot":
-                                    return handleIotMessage(session, jsonNode);
-                                default:
-                                    logger.warn("未知的消息类型: {}", messageType);
-                                    return Mono.empty();
+            // 对于其他消息类型，检查设备是否已绑定，但避免重复查询
+            if (device == null || device.getModelId() == null) {
+                // 只有在必要时才查询数据库
+                return Mono.fromCallable(
+                        () -> deviceService
+                                .query(new SysDevice().setDeviceId(device.getDeviceId()).setSessionId(sessionId)))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .flatMap(deviceResult -> {
+                            if (deviceResult.isEmpty() ||
+                                    (deviceResult.get(0).getModelId() == null && device.getModelId() == null)) {
+                                // 设备未绑定，处理未绑定设备的消息
+                                return handleUnboundDevice(session, device);
+                            } else {
+                                // 更新缓存的设备信息
+                                SysDevice updatedDevice = deviceResult.get(0);
+                                sessionManager.registerDevice(sessionId, updatedDevice);
+
+                                // 继续处理消息
+                                return handleMessageByType(session, jsonNode, messageType, updatedDevice);
                             }
-                        }
-                    });
+                        });
+            } else {
+                // 设备已绑定且信息已缓存，直接处理消息
+                return handleMessageByType(session, jsonNode, messageType, device);
+            }
         } catch (Exception e) {
             logger.error("处理文本消息失败", e);
             return Mono.empty();
+        }
+    }
+
+    private Mono<Void> handleMessageByType(WebSocketSession session, JsonNode jsonNode,
+            String messageType, SysDevice device) {
+        switch (messageType) {
+            case "listen":
+                return handleListenMessage(session, jsonNode);
+            case "abort":
+                return dialogueService.abortDialogue(session, jsonNode.path("reason").asText());
+            case "iot":
+                return handleIotMessage(session, jsonNode);
+            default:
+                logger.warn("未知的消息类型: {}", messageType);
+                return Mono.empty();
         }
     }
 
