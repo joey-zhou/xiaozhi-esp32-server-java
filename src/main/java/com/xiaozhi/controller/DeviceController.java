@@ -207,10 +207,10 @@ public class DeviceController {
                 if (user != null) {
                     device.setUserId(user.getUserId());
                 }
-                
+
                 // 删除设备
                 int rows = deviceService.delete(device);
-                
+
                 if (rows > 0) {
                     // 如果设备有会话，清除会话
                     String deviceId = device.getDeviceId();
@@ -363,7 +363,8 @@ public class DeviceController {
                                         SysDevice boundDevice = devices.get(0);
 
                                         // 更新设备状态
-                                        deviceService.update(device.setDeviceName(boundDevice.getDeviceName()).setState("1"));
+                                        deviceService.update(
+                                                device.setDeviceName(boundDevice.getDeviceName()).setState("1"));
                                     }
 
                                     // 组装响应数据 - 只包含必要的字段

@@ -4,7 +4,9 @@ import java.util.List;
 
 import com.github.pagehelper.PageHelper;
 import com.xiaozhi.dao.DeviceMapper;
+import com.xiaozhi.dao.MessageMapper;
 import com.xiaozhi.entity.SysDevice;
+import com.xiaozhi.entity.SysMessage;
 import com.xiaozhi.service.SysDeviceService;
 
 import org.springframework.stereotype.Service;
@@ -24,6 +26,9 @@ public class SysDeviceServiceImpl implements SysDeviceService {
 
     @Resource
     private DeviceMapper deviceMapper;
+
+    @Resource
+    private MessageMapper messageMapper;
 
     /**
      * 添加设备
@@ -47,6 +52,11 @@ public class SysDeviceServiceImpl implements SysDeviceService {
     @Override
     @Transactional
     public int delete(SysDevice device) {
+        int row = deviceMapper.delete(device);
+        if (row > 0) {
+            // 清空设备聊天记录
+            messageMapper.update(new SysMessage().setDeviceId(device.getDeviceId()).setState("0"));
+        }
         return deviceMapper.delete(device);
     }
 

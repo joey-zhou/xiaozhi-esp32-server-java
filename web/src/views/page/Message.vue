@@ -36,6 +36,12 @@
         <a-card title="查询表格" :bodyStyle="{ padding: 0 }" :bordered="false">
           <a-table rowKey="messageId" :columns="tableColumns" :data-source="data" :loading="loading"
             :pagination="pagination" :scroll="{ x: 800 }" size="middle">
+            <templace slot="roleName" slot-scope="text, record">
+              <a-tooltip :title="record.roleDesc" :mouseEnterDelay="0.5" placement="leftTop">
+                <span v-if="text">{{ text }}</span>
+                <span v-else style="padding: 0 50px">&nbsp;&nbsp;&nbsp;</span>
+              </a-tooltip>
+            </templace>
             <templace slot="message" slot-scope="text, record">
               <a-tooltip :title="text" :mouseEnterDelay="0.5" placement="leftTop">
                 <span v-if="text">{{ text }}</span>
@@ -52,9 +58,17 @@
               导出
             </a-button>
             <template slot="operation" slot-scope="text, record">
-              <span>
+              <a-space>
                 <a href="javascript:;" @click="edit(record.messageId)" :disabled="true">详情</a>
-              </span>
+                <a-popconfirm
+                  title="确定要删除此消息吗？相关联的对话也将被删除"
+                  ok-text="确定"
+                  cancel-text="取消"
+                  @confirm="deleteMessage(record)"
+                >
+                  <a href="javascript:;" style="color: #ff4d4f">删除</a>
+                </a-popconfirm>
+              </a-space>
             </template>
           </a-table>
         </a-card>
@@ -128,6 +142,7 @@ export default {
         {
           title: "模型角色",
           dataIndex: "roleName",
+          scopedSlots: { customRender: "roleName" },
           width: 100,
           align: "center",
         },

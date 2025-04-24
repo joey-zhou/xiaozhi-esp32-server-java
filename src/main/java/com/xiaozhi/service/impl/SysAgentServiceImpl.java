@@ -1,14 +1,13 @@
 package com.xiaozhi.service.impl;
 
+import com.xiaozhi.dao.ConfigMapper;
 import com.xiaozhi.entity.SysAgent;
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.service.SysAgentService;
-import com.xiaozhi.service.SysConfigService;
 
 import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -19,6 +18,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import javax.annotation.Resource;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,8 +37,8 @@ public class SysAgentServiceImpl implements SysAgentService {
 
     private static final Logger logger = LoggerFactory.getLogger(SysAgentServiceImpl.class);
 
-    @Autowired
-    private SysConfigService configService;
+    @Resource
+    private ConfigMapper configMapper;
 
     private final WebClient webClient = WebClient.builder().build();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -103,7 +104,7 @@ public class SysAgentServiceImpl implements SysAgentService {
      */
     private Mono<List<SysAgent>> getCozeAgents(SysAgent agent) {
         // 获取当前用户的Coze配置
-        List<SysConfig> configs = configService.query(agent);
+        List<SysConfig> configs = configMapper.query(agent);
         if (ObjectUtils.isEmpty(configs)) {
             return Mono.just(new ArrayList<>());
         }
@@ -134,7 +135,7 @@ public class SysAgentServiceImpl implements SysAgentService {
                             queryConfig.setUserId(userId);
                             queryConfig.setConfigType("llm");
                             queryConfig.setProvider("coze");
-                            List<SysConfig> existingConfigs = configService.query(queryConfig);
+                            List<SysConfig> existingConfigs = configMapper.query(queryConfig);
                             
                             // 创建一个Map来存储现有的配置，以botId为键
                             Map<String, SysConfig> existingConfigMap = new HashMap<>();
@@ -187,7 +188,7 @@ public class SysAgentServiceImpl implements SysAgentService {
                                     botAgent.setConfigId(existingConfig.getConfigId());
 
                                     // 使用publishOn将数据库操作调度到适合的线程池
-                                    Mono.fromCallable(() -> configService.update(existingConfig))
+                                    Mono.fromCallable(() -> configMapper.update(existingConfig))
                                         .subscribeOn(Schedulers.boundedElastic())
                                         .subscribe(
                                             result -> logger.debug("更新智能体配置成功: {}", botId),
@@ -205,7 +206,7 @@ public class SysAgentServiceImpl implements SysAgentService {
                                     newConfig.setApiSecret(apiSecret);  // 使用主配置的apiSecret
                                     newConfig.setState("1");  // 默认启用
 
-                                    Mono.fromCallable(() -> configService.add(newConfig))
+                                    Mono.fromCallable(() -> configMapper.add(newConfig))
                                         .subscribeOn(Schedulers.boundedElastic())
                                         .subscribe(
                                             result -> logger.debug("添加智能体配置成功: {}", botId),
@@ -218,7 +219,7 @@ public class SysAgentServiceImpl implements SysAgentService {
                             // for (String existingBotId : existingConfigMap.keySet()) {
                             //     if (!apiBotIds.contains(existingBotId)) {
                             //         SysConfig configToDelete = existingConfigMap.get(existingBotId);
-                            //         Mono.fromCallable(() -> configService.delete(configToDelete.getConfigId()))
+                            //         Mono.fromCallable(() -> configMapper.delete(configToDelete.getConfigId()))
                             //             .subscribeOn(Schedulers.boundedElastic())
                             //             .subscribe(
                             //                 result -> logger.debug("删除智能体配置成功: {}", existingBotId),

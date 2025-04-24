@@ -35,9 +35,9 @@
                 count(*)
             FROM
                 sys_message
-                LEFT JOIN sys_device ON sys_device.deviceId = sys_message.deviceId AND sys_device.userId = sys_user.userId
+                LEFT JOIN sys_device ON sys_device.deviceId = sys_message.deviceId
             WHERE
-                1 = 1
+                sys_device.userId = sys_user.userId
                 <if test="startTime != null and startTime != ''">
                     AND sys_message.createTime &gt;= #{startTime} AND sys_message.createTime &lt;= #{endTime}
                 </if>

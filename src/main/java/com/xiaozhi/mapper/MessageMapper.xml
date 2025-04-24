@@ -3,7 +3,7 @@
 <mapper namespace="com.xiaozhi.dao.MessageMapper">
 
     <sql id="messageSql">
-        sys_message.messageId, sys_message.message, sys_message.sender, sys_message.audioPath, sys_message.state, sys_message.createTime
+        sys_message.messageId, sys_message.message, sys_message.sender, sys_message.roleId, sys_message.audioPath, sys_message.state, sys_message.createTime
     </sql>
 
     <sql id="deviceSql">
@@ -11,7 +11,7 @@
     </sql>
 
     <sql id="roleSql">
-        sys_role.roleId, sys_role.roleName, sys_role.voiceName
+        sys_role.roleId, sys_role.roleName, sys_role.roleDesc, sys_role.voiceName
     </sql>
 
     <select id="query" resultType="com.xiaozhi.entity.SysMessage">
@@ -22,7 +22,7 @@
         FROM
             sys_message
             LEFT JOIN sys_device ON sys_message.deviceId = sys_device.deviceId
-            LEFT JOIN sys_role ON sys_device.roleId = sys_role.roleId
+            LEFT JOIN sys_role ON sys_message.roleId = sys_role.roleId
         WHERE
             sys_message.state = 1
             <if test="userId != null and userId != ''">AND sys_device.userId = #{userId}</if>
@@ -45,5 +45,15 @@
         INSERT INTO sys_message ( deviceId, sessionId, sender, roleId, message, audioPath )
         SELECT #{deviceId}, #{sessionId}, #{sender}, #{roleId}, #{message}, #{audioPath}
     </insert>
+
+    <update id="update" parameterType="com.xiaozhi.entity.SysMessage">
+        UPDATE sys_message SET state = #{state} WHERE 
+        <if test="messageId != null and messageId != ''">
+            AND messageId = #{messageId}
+        </if>
+        <if test="devuceId != null and devuceId != ''">
+            AND devuceId = #{devuceId}
+        </if>
+    </update>
 
 </mapper>
