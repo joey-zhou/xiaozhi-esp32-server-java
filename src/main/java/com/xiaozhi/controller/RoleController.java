@@ -83,6 +83,11 @@ public class RoleController {
     public Mono<AjaxResult> update(SysRole role, ServerWebExchange exchange) {
         return Mono.fromCallable(() -> {
             try {
+                // 从请求属性中获取用户信息
+                SysUser user = exchange.getAttribute(CmsUtils.USER_ATTRIBUTE_KEY);
+                if (user != null) {
+                    role.setUserId(user.getUserId());
+                }
                 roleService.update(role);
                 return AjaxResult.success();
             } catch (Exception e) {

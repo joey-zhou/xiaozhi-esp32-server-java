@@ -24,6 +24,7 @@ import com.xiaozhi.websocket.service.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -57,6 +58,9 @@ public class DeviceController {
 
     @Resource
     private SessionManager sessionManager;
+
+    @Autowired
+    private Environment environment;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -333,8 +337,15 @@ public class DeviceController {
                                     firmwareData.put("url", "");
                                     firmwareData.put("version", "1.0.0");
 
-                                    // 设置WebSocket token和address
-                                    websocketData.put("url", "ws://14.103.233.248/ws/xiaozhi/v1/");
+                                    // 获取服务器IP和端口
+                                    String serverIp = CmsUtils.getServerIp();
+                                    // 获取应用端口
+                                    String portStr = environment.getProperty("server.port");
+                                    int port = Integer.parseInt(portStr);
+
+                                    // 设置WebSocket token和address，包含端口号
+                                    websocketData.put("url",
+                                            "ws://" + serverIp + ":" + port + "/ws/xiaozhi/v1/");
                                     websocketData.put("token", "");
 
                                     // 检查设备是否已绑定

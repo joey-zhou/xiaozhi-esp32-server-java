@@ -3,10 +3,14 @@ package com.xiaozhi.service.impl;
 import java.util.List;
 
 import com.github.pagehelper.PageHelper;
+import com.xiaozhi.dao.ConfigMapper;
 import com.xiaozhi.dao.DeviceMapper;
 import com.xiaozhi.dao.MessageMapper;
+import com.xiaozhi.dao.RoleMapper;
+import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysMessage;
+import com.xiaozhi.entity.SysRole;
 import com.xiaozhi.service.SysDeviceService;
 
 import org.springframework.stereotype.Service;
@@ -30,6 +34,12 @@ public class SysDeviceServiceImpl implements SysDeviceService {
     @Resource
     private MessageMapper messageMapper;
 
+    @Resource
+    private ConfigMapper configMapper;
+
+    @Resource
+    private RoleMapper roleMapper;
+
     /**
      * 添加设备
      *
@@ -39,6 +49,27 @@ public class SysDeviceServiceImpl implements SysDeviceService {
     @Override
     @Transactional
     public int add(SysDevice device) {
+        // 先查询是否有默认配置
+        SysConfig queryConfig = new SysConfig();
+        queryConfig.setUserId(device.getUserId());
+        queryConfig.setIsDefault("1");
+        List<SysConfig> configs = configMapper.query(queryConfig);
+        // 查询是否有默认角色
+        SysRole queryRole = new SysRole();
+        queryRole.setUserId(device.getUserId());
+        queryRole.setIsDefault("1");
+        SysRole role = roleMapper.query(queryRole).get(0);
+        // 遍历查询是否有默认配置
+        for (SysConfig config : configs) {
+            if (config.getConfigType().equals("llm")) {
+                device.setModelId(config.getConfigId());
+            } else if (config.getConfigType().equals("stt")) {
+                device.setSttId(config.getConfigId());
+            }
+        }
+        if (role != null) {
+            device.setRoleId(role.getRoleId());
+        }
         // 添加设备
         return deviceMapper.add(device);
     }
@@ -54,10 +85,13 @@ public class SysDeviceServiceImpl implements SysDeviceService {
     public int delete(SysDevice device) {
         int row = deviceMapper.delete(device);
         if (row > 0) {
+            SysMessage message = new SysMessage();
+            message.setUserId(device.getUserId());
+            message.setDeviceId(device.getDeviceId());
             // 清空设备聊天记录
-            messageMapper.update(new SysMessage().setDeviceId(device.getDeviceId()).setState("0"));
+            messageMapper.delete(message);
         }
-        return deviceMapper.delete(device);
+        return row;
     }
 
     /**

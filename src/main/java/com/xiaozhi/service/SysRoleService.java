@@ -18,7 +18,7 @@ public interface SysRoleService {
    * @param role
    * @return
    */
-  public void add(SysRole role);
+  public int add(SysRole role);
 
   /**
    * 查询角色信息

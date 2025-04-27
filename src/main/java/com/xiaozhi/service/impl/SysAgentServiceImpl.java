@@ -186,6 +186,7 @@ public class SysAgentServiceImpl implements SysAgentService {
                                     existingConfig.setConfigDesc(description);
                                     // 如果数据库已存在，返回对应 ConfigId 为前端设备绑定使用
                                     botAgent.setConfigId(existingConfig.getConfigId());
+                                    botAgent.setIsDefault(existingConfig.getIsDefault());
 
                                     // 使用publishOn将数据库操作调度到适合的线程池
                                     Mono.fromCallable(() -> configMapper.update(existingConfig))

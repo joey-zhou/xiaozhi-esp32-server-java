@@ -59,9 +59,9 @@
             </a-button>
             <template slot="operation" slot-scope="text, record">
               <a-space>
-                <a href="javascript:;" @click="edit(record.messageId)" :disabled="true">详情</a>
+                <!-- <a href="javascript:;" @click="edit(record.messageId)" :disabled="true">详情</a> -->
                 <a-popconfirm
-                  title="确定要删除此消息吗？相关联的对话也将被删除"
+                  title="确定要删除此消息吗？"
                   ok-text="确定"
                   cancel-text="取消"
                   @confirm="deleteMessage(record)"
@@ -182,6 +182,7 @@ export default {
           dataIndex: "operation",
           scopedSlots: { customRender: "operation" },
           width: 110,
+          fixed: "right",
           align: "center",
         },
       ],
@@ -229,6 +230,31 @@ export default {
         .finally(() => {
           this.loading = false
         })
+    },
+    /* 删除消息 */
+    deleteMessage(record) {
+      this.loading = true;
+      axios
+        .post({
+          url: api.message.delete,
+          data: {
+            messageId: record.messageId,
+          },
+        })
+        .then((res) => {
+          if (res.code === 200) {
+            this.$message.success("删除成功");
+            this.getData();
+          } else {
+            this.$message.error(res.message);
+          }
+        })
+        .catch(() => {
+          this.$message.error("服务器维护/重启中,请稍后再试");
+        })
+        .finally(() => {
+          this.loading = false;
+        });
     },
   },
 };

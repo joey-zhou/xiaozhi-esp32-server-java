@@ -3,6 +3,7 @@ package com.xiaozhi.websocket.stt.factory;
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.websocket.stt.SttService;
 import com.xiaozhi.websocket.stt.providers.AliyunSttService;
+import com.xiaozhi.websocket.stt.providers.FunASRSttService;
 import com.xiaozhi.websocket.stt.providers.TencentSttService;
 import com.xiaozhi.websocket.stt.providers.VoskSttService;
 import com.xiaozhi.websocket.token.TokenManager;
@@ -106,21 +107,21 @@ public class SttServiceFactory {
     }
 
     String provider = config.getProvider();
-    
+
     // 如果是Vosk，直接使用全局共享的实例
     if (DEFAULT_PROVIDER.equals(provider)) {
       // 如果Vosk还未初始化，尝试初始化
       if (!voskInitialized && !serviceCache.containsKey(DEFAULT_PROVIDER)) {
         initializeVosk();
       }
-      
+
       // Vosk初始化失败的情况
       if (!voskInitialized) {
         return null;
       }
       return serviceCache.get(DEFAULT_PROVIDER);
     }
-    
+
     // 对于API服务，使用"provider:configId"作为缓存键，确保每个配置使用独立的服务实例
     Integer configId = config.getConfigId();
     String cacheKey = provider + ":" + (configId != null ? configId : "default");
@@ -145,7 +146,7 @@ public class SttServiceFactory {
     } catch (Exception e) {
       logger.error("创建{}服务失败, configId={}", provider, configId, e);
     }
-    
+
     return null;
   }
 
@@ -164,6 +165,8 @@ public class SttServiceFactory {
       return new TencentSttService(config);
     } else if ("aliyun".equals(provider)) {
       return new AliyunSttService(config);
+    } else if ("funasr".equals(provider)) {
+      return new FunASRSttService(config);
     }
     // 可以添加其他服务提供商的支持
 

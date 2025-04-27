@@ -66,7 +66,7 @@
               <span v-else>{{ text }}</span>
             </template>
 
-            <!-- modelName 下拉框 -->
+            <!-- modelName 下拉框 - 修改为三级级联选择器 -->
             <template slot="modelName" slot-scope="text, record">
               <a-cascader v-if="record.editable" style="margin: -5px 0; text-align: center; width: 100%"
                 :options="modelOptions" :value="getCascaderValue(record)"
@@ -77,6 +77,7 @@
                   <span v-if="record.modelId && record.modelName">
                     {{ record.modelName }}
                     <a-tag v-if="record.modelType === 'agent'" color="blue" size="small">智能体</a-tag>
+                    <a-tag v-if="record.provider" color="green" size="small">{{ record.provider }}</a-tag>
                   </span>
                   <span v-else style="padding: 0 50px">&nbsp;&nbsp;&nbsp;</span>
                 </a-tooltip>
@@ -84,6 +85,7 @@
               <span v-else>
                 {{ record.modelName || '' }}
                 <a-tag v-if="record.modelType === 'agent'" color="blue" size="small">智能体</a-tag>
+                <a-tag v-if="record.provider" color="green" size="small">{{ record.provider }}</a-tag>
               </span>
             </template>
 
@@ -142,8 +144,17 @@
     </a-layout-content>
     <a-back-top />
 
-    <DeviceEditDialog @submit="update" @close="editVisible = false" :visible="editVisible" :current="currentDevice"
-      :model-items="modelItems" :stt-items="sttItems" :role-items="roleItems"></DeviceEditDialog>
+    <DeviceEditDialog 
+      @submit="update" 
+      @close="editVisible = false" 
+      @clear-memory="clearMemory"
+      :visible="editVisible" 
+      :current="currentDevice"
+      :model-items="modelItems" 
+      :stt-items="sttItems" 
+      :role-items="roleItems"
+      :agent-items="agentItems"
+      :clearMemoryLoading="clearMemoryLoading"/>
   </a-layout>
 </template>
 
@@ -292,18 +303,26 @@ export default {
       roleItems: [],
       modelItems: [],
       agentItems: [],
+      // 修改为三级级联选择器结构
       modelOptions: [
         {
           value: "llm",
           label: "LLM模型",
-          children: [],
+          children: []
         },
         {
           value: "agent",
           label: "智能体",
-          children: [],
-        },
+          children: [
+            {
+              value: "coze",
+              label: "Coze",
+              children: []
+            }
+          ]
+        }
       ],
+      providerMap: {}, // 用于存储按提供商分组的模型
       ttsItems: [],
       sttItems: [],
       data: [],
@@ -315,6 +334,8 @@ export default {
       // 加载状态标志
       configLoaded: false,
       agentsLoaded: false,
+      // 记忆清除状态
+      clearMemoryLoading: false,
     };
   },
   mounted() {
@@ -352,7 +373,6 @@ export default {
             });
 
             // 无论模型和智能体数据是否加载完成，都尝试处理设备的模型类型
-            // 移除条件判断，确保始终执行
             deviceList.forEach(device => {
               this.determineModelType(device);
             });
@@ -379,6 +399,7 @@ export default {
         device.modelType = '';
         device.modelName = '';
         device.modelDesc = '';
+        device.provider = '';
         return;
       }
 
@@ -414,22 +435,33 @@ export default {
       }
     },
 
-    // 获取级联选择器的值
+    // 获取级联选择器的值 - 修改为三级结构
     getCascaderValue(record) {
       if (!record.modelId) return [];
 
       // 转换为数字类型，确保类型一致性
       const modelId = Number(record.modelId);
 
-      // 使用modelType字段确定类型
+      // 智能体只有一个提供商 - coze
       if (record.modelType === 'agent') {
-        return ["agent", modelId];
-      } else if (record.modelType === 'llm') {
-        return ["llm", modelId];
+        return ["agent", "coze", modelId];
+      } else if (record.modelType === 'llm' && record.provider) {
+        // LLM模型需要提供商信息
+        return ["llm", record.provider, modelId];
       } else {
         // 默认情况下，尝试在两个列表中查找
         const isAgent = this.agentItems.some(a => Number(a.configId) === modelId);
-        return isAgent ? ["agent", modelId] : ["llm", modelId];
+        if (isAgent) {
+          return ["agent", "coze", modelId];
+        } else {
+          // 尝试找到LLM模型的提供商
+          const model = this.modelItems.find(m => Number(m.configId) === modelId);
+          if (model && model.provider) {
+            return ["llm", model.provider, modelId];
+          }
+          // 如果找不到提供商，返回空数组
+          return [];
+        }
       }
     },
 
@@ -567,7 +599,8 @@ export default {
           this.$message.error("服务器维护/重启中，请稍后再试");
         });
     },
-    // 获取模型列表
+    
+    // 获取模型列表 - 修改为按提供商分组
     getConfig() {
       return new Promise((resolve) => {
         axios
@@ -583,10 +616,11 @@ export default {
                 sttDesc: "默认Vosk本地语音识别模型",
               });
 
-              // 清空现有LLM模型子项
-              this.modelOptions[0].children = [];
+              // 初始化提供商映射
+              this.providerMap = {};
 
               res.data.list.forEach((item) => {
+                if (item.provider == 'coze') {return}
                 if (item.configType == "llm") {
                   // 确保configId是数字类型
                   item.configId = item.configId;
@@ -595,13 +629,12 @@ export default {
                   item.modelDesc = item.configDesc;
                   this.modelItems.push(item);
 
-                  // 添加到级联选择器的LLM选项
-                  this.modelOptions[0].children.push({
-                    value: item.configId,
-                    label: item.configName,
-                    isLeaf: true,
-                    data: item,
-                  });
+                  // 按提供商分组
+                  const provider = item.provider || "other";
+                  if (!this.providerMap[provider]) {
+                    this.providerMap[provider] = [];
+                  }
+                  this.providerMap[provider].push(item);
                 } else if (item.configType == "stt") {
                   item.sttId = item.configId;
                   item.sttName = item.configName;
@@ -609,6 +642,9 @@ export default {
                   this.sttItems.push(item);
                 }
               });
+
+              // 重建模型选项结构
+              this.rebuildModelOptions();
 
               this.configLoaded = true;
               resolve();
@@ -624,6 +660,33 @@ export default {
       });
     },
 
+    // 重建模型选项结构 - 新增方法
+    rebuildModelOptions() {
+
+      // 添加LLM模型提供商
+      for (const provider in this.providerMap) {
+        const models = this.providerMap[provider];
+        const providerOption = {
+          value: provider,
+          label: provider.charAt(0).toUpperCase() + provider.slice(1),
+          children: []
+        };
+
+        // 添加该提供商下的所有模型
+        models.forEach(model => {
+          providerOption.children.push({
+            value: model.configId,
+            label: model.configName,
+            isLeaf: true,
+            data: model
+          });
+        });
+
+        // 将提供商选项添加到LLM类别下
+        this.modelOptions[0].children.push(providerOption);
+      }
+    },
+
     // 获取智能体列表
     getAgents() {
       return new Promise((resolve) => {
@@ -637,7 +700,9 @@ export default {
           .then((res) => {
             if (res.code === 200) {
               // 清空现有智能体子项
-              this.modelOptions[1].children = [];
+              if (this.modelOptions[1] && this.modelOptions[1].children[0]) {
+                this.modelOptions[1].children[0].children = [];
+              }
 
               // 添加智能体到级联选择器
               res.data.list.forEach((item) => {
@@ -646,12 +711,16 @@ export default {
                 // 保存configId作为modelId
                 item.modelId = item.configId;
                 this.agentItems.push(item);
-                this.modelOptions[1].children.push({
-                  value: item.configId,
-                  label: item.agentName,
-                  isLeaf: true,
-                  data: item,
-                });
+                
+                // 添加到Coze平台下的智能体列表
+                if (this.modelOptions[1] && this.modelOptions[1].children[0]) {
+                  this.modelOptions[1].children[0].children.push({
+                    value: item.configId,
+                    label: item.agentName,
+                    isLeaf: true,
+                    data: item
+                  });
+                }
               });
 
               this.agentsLoaded = true;
@@ -668,15 +737,18 @@ export default {
       });
     },
 
-    // 处理级联选择器变更
+    // 处理级联选择器变更 - 修改为三级结构
     handleModelChange(value, deviceId) {
-      if (!value || value.length < 2) return;
+      if (!value || value.length < 3) return;
+      
       const modelType = value[0]; // llm 或 agent
-      const modelId = Number(value[1]); // 确保modelId是数字类型
-
+      const provider = value[1];  // 提供商
+      const modelId = Number(value[2]); // 模型ID
+      
       const data = this.editLine(deviceId);
       data.target.modelId = modelId; // 保存modelId，这是传给后端的值
       data.target.modelType = modelType; // 保存模型类型，仅前端使用
+      data.target.provider = provider; // 保存提供商，用于显示和分类
 
       // 根据类型设置显示名称和描述
       if (modelType === "llm") {
@@ -686,7 +758,6 @@ export default {
         if (model) {
           data.target.modelName = model.configName;
           data.target.modelDesc = model.configDesc;
-          data.target.provider = model.provider || '';
         } else {
           // 找不到对应模型时设置默认值
           data.target.modelName = `未知模型(ID:${modelId})`;
@@ -700,7 +771,6 @@ export default {
         if (agent) {
           data.target.modelName = agent.agentName;
           data.target.modelDesc = agent.agentDesc;
-          data.target.provider = 'coze';
         } else {
           // 找不到对应智能体时设置默认值
           data.target.modelName = `未知智能体(ID:${modelId})`;
@@ -709,18 +779,6 @@ export default {
       }
 
       this.data = [...this.data]; // 强制更新视图
-    },
-
-    // 获取级联选择器的值
-    getCascaderValue(record) {
-      if (!record.modelId) return [];
-
-      // 使用modelType字段确定类型
-      if (record.modelType === 'agent') {
-        return ["agent", record.modelId];
-      } else {
-        return ["llm", record.modelId];
-      }
     },
 
     // 获取项目名称的辅助方法
@@ -732,6 +790,32 @@ export default {
     editWithDialog(device) {
       this.editVisible = true;
       this.currentDevice = device;
+    },
+
+    // 清除记忆方法
+    clearMemory(record) {
+      this.clearMemoryLoading = true;
+      axios
+        .post({
+          url: api.message.delete,
+          data: {
+            deviceId: record.deviceId
+          }
+        })
+        .then((res) => {
+          if (res.code === 200) {
+            this.editVisible = false;
+            this.$message.success("记忆清除成功");
+          } else {
+            this.$message.error(res.message);
+          }
+        })
+        .catch(() => {
+          this.$message.error("服务器维护/重启中，请稍后再试");
+        })
+        .finally(() => {
+          this.clearMemoryLoading = false;
+        });
     },
   },
 };

@@ -1,0 +1,159 @@
+name: Semantic Version Update
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'version.properties'
+      - 'pom.xml'
+      - 'CHANGELOG.md'
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    # 添加写入权限
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          # 使用GITHUB_TOKEN进行初始检出
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '8'
+          distribution: 'adopt'
+          
+      - name: Get current version
+        id: current-version
+        run: |
+          if [ -f "version.properties" ]; then
+            CURRENT_VERSION=$(grep "version=" version.properties | cut -d'=' -f2)
+          else
+            # 从pom.xml中提取当前版本
+            CURRENT_VERSION=$(grep -m 1 "<version>" pom.xml | sed 's/.*<version>\(.*\)<\/version>.*/\1/')
+          fi
+          echo "CURRENT_VERSION=${CURRENT_VERSION}" >> $GITHUB_ENV
+          echo "Current version: ${CURRENT_VERSION}"
+          
+      - name: Determine version increment
+        id: version-increment
+        run: |
+          # 获取最近一次提交信息
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: ${COMMIT_MSG}"
+          
+          # 解析当前版本
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${CURRENT_VERSION}"
+          
+          # 根据提交信息决定版本增量
+          if [[ "${COMMIT_MSG}" =~ ^(feat|feature)(\(.*\))?!:.*$ || "${COMMIT_MSG}" =~ ^BREAKING[[:space:]]CHANGE:.*$ ]]; then
+            # 破坏性变更 - 增加主版本号
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+            CHANGE_TYPE="MAJOR"
+          elif [[ "${COMMIT_MSG}" =~ ^feat(\(.*\))?:.*$ ]]; then
+            # 新功能 - 增加次版本号
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            CHANGE_TYPE="MINOR"
+          elif [[ "${COMMIT_MSG}" =~ ^(fix|bugfix|hotfix)(\(.*\))?:.*$ ]]; then
+            # 错误修复 - 增加修订号
+            PATCH=$((PATCH + 1))
+            CHANGE_TYPE="PATCH"
+          elif [[ "${COMMIT_MSG}" =~ ^(refactor|perf|style|test|docs|build|ci|chore)(\(.*\))?:.*$ ]]; then
+            # 重构、性能优化、样式、测试、文档、构建、CI、杂项 - 增加修订号
+            PATCH=$((PATCH + 1))
+            CHANGE_TYPE="PATCH"
+          elif [[ "${COMMIT_MSG}" =~ ^update(\(.*\))?:.*$ ]]; then
+            # 更新 - 增加修订号
+            PATCH=$((PATCH + 1))
+            CHANGE_TYPE="PATCH"
+          else
+            # 默认情况 - 增加修订号
+            PATCH=$((PATCH + 1))
+            CHANGE_TYPE="PATCH"
+          fi
+          
+          # 设置新版本
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_ENV
+          echo "CHANGE_TYPE=${CHANGE_TYPE}" >> $GITHUB_ENV
+          echo "New version will be: ${NEW_VERSION} (${CHANGE_TYPE} change)"
+          
+      - name: Update version files
+        run: |
+          # 更新version.properties文件
+          echo "version=${NEW_VERSION}" > version.properties
+          
+          # 更新Maven版本
+          mvn versions:set -DnewVersion=${NEW_VERSION} -DgenerateBackupPoms=false
+          
+      - name: Commit version changes
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git add version.properties pom.xml
+          if [ -f "src/main/resources/application.properties" ]; then
+            git add src/main/resources/application.properties
+          fi
+          git commit -m "chore: update version to ${NEW_VERSION} [skip ci]"
+          
+      - name: Generate changelog entry
+        run: |
+          # 获取上一个标签以来的所有提交
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --always 2>/dev/null || echo "")
+          
+          if [ -n "${PREVIOUS_TAG}" ]; then
+            echo "## [${NEW_VERSION}] - $(date +'%Y-%m-%d')" > changelog_entry.md
+            echo "" >> changelog_entry.md
+            
+            # 特性
+            FEATURES=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s" --grep="^feat" --grep="^feature")
+            if [ -n "${FEATURES}" ]; then
+              echo "### 新功能" >> changelog_entry.md
+              echo "${FEATURES}" >> changelog_entry.md
+              echo "" >> changelog_entry.md
+            fi
+            
+            # 修复
+            FIXES=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s" --grep="^fix" --grep="^bugfix" --grep="^hotfix")
+            if [ -n "${FIXES}" ]; then
+              echo "### 修复" >> changelog_entry.md
+              echo "${FIXES}" >> changelog_entry.md
+              echo "" >> changelog_entry.md
+            fi
+            
+            # 其他变更
+            OTHERS=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s" --grep="^refactor" --grep="^perf" --grep="^style" --grep="^test" --grep="^docs" --grep="^build" --grep="^ci" --grep="^chore" --grep="^update")
+            if [ -n "${OTHERS}" ]; then
+              echo "### 其他变更" >> changelog_entry.md
+              echo "${OTHERS}" >> changelog_entry.md
+              echo "" >> changelog_entry.md
+            fi
+            
+            # 更新CHANGELOG.md
+            if [ -f "CHANGELOG.md" ]; then
+              # 将新条目插入到CHANGELOG.md的顶部（在标题之后）
+              sed -i '1r changelog_entry.md' CHANGELOG.md
+            else
+              # 创建新的CHANGELOG.md
+              echo "# 变更日志" > CHANGELOG.md
+              echo "" >> CHANGELOG.md
+              cat changelog_entry.md >> CHANGELOG.md
+            fi
+            
+            git add CHANGELOG.md
+            git commit -m "docs: update changelog for v${NEW_VERSION} [skip ci]"
+          fi
+          
+      # 使用 GitHub CLI 直接推送更改
+      - name: Push changes with GitHub CLI
+        run: |
+          # 直接使用 GitHub CLI 推送更改（只推送分支，不推送标签）
+          git push

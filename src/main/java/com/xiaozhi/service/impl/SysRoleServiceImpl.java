@@ -33,12 +33,14 @@ public class SysRoleServiceImpl implements SysRoleService {
      */
     @Override
     @Transactional
-    public void add(SysRole role) {
-        // 添加设备
-        int addRole = roleMapper.add(role);
-        if (0 == addRole) {
-            throw new RuntimeException();
+    public int add(SysRole role) {
+        // 如果当前配置被设置为默认，则将同类型同用户的其他配置设置为非默认
+        if (role.getIsDefault() != null && role.getIsDefault().equals("1")) {
+            roleMapper.resetDefault(role);
         }
+        // 添加角色
+        return roleMapper.add(role);
+
     }
 
     /**
@@ -64,11 +66,14 @@ public class SysRoleServiceImpl implements SysRoleService {
     @Override
     @Transactional
     public int update(SysRole role) {
+        // 如果当前配置被设置为默认，则将同类型同用户的其他配置设置为非默认
+        if (role.getIsDefault() != null && role.getIsDefault().equals("1")) {
+            roleMapper.resetDefault(role);
+        }
         return roleMapper.update(role);
     }
 
     @Override
-    @Transactional
     public SysRole selectRoleById(Integer roleId) {
         return roleMapper.selectRoleById(roleId);
     }

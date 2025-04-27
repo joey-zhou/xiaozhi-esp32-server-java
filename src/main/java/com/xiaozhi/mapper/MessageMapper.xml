@@ -46,13 +46,17 @@
         SELECT #{deviceId}, #{sessionId}, #{sender}, #{roleId}, #{message}, #{audioPath}
     </insert>
 
-    <update id="update" parameterType="com.xiaozhi.entity.SysMessage">
-        UPDATE sys_message SET state = #{state} WHERE 
+    <update id="delete" parameterType="com.xiaozhi.entity.SysMessage">
+        UPDATE sys_message
+        INNER JOIN sys_device ON sys_message.deviceId = sys_device.deviceId
+        SET sys_message.state = '0'
+        WHERE
+            sys_device.userId = #{userId}
         <if test="messageId != null and messageId != ''">
-            AND messageId = #{messageId}
+            AND sys_message.messageId = #{messageId}
         </if>
-        <if test="devuceId != null and devuceId != ''">
-            AND devuceId = #{devuceId}
+        <if test="deviceId != null and deviceId != ''">
+            AND sys_message.deviceId = #{deviceId}
         </if>
     </update>
 

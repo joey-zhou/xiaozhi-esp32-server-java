@@ -3,7 +3,7 @@
 <mapper namespace="com.xiaozhi.dao.RoleMapper">
 
     <sql id="roleSql">
-        sys_role.roleId, sys_role.roleName, sys_role.roleDesc, sys_role.voiceName, sys_role.ttsId, sys_role.userId, sys_role.state, sys_role.createTime
+        sys_role.roleId, sys_role.roleName, sys_role.roleDesc, sys_role.voiceName, sys_role.ttsId, sys_role.userId, sys_role.state, sys_role.isDefault, sys_role.createTime
     </sql>
 
     <sql id="configSql">
@@ -20,8 +20,9 @@
         WHERE
             sys_role.state = 1
             <if test="userId != null and userId != ''">AND sys_role.userId = #{userId}</if>
-            <if test="roleId != null and roleId != ''">AND roleId = #{roleId}</if>
-            <if test="roleName != null and roleName != ''">AND roleName LIKE CONCAT('%', #{roleName}, '%')</if>
+            <if test="roleId != null and roleId != ''">AND sys_role.roleId = #{roleId}</if>
+            <if test="roleName != null and roleName != ''">AND sys_role.roleName LIKE CONCAT('%', #{roleName}, '%')</if>
+            <if test="isDefault != null and isDefault != ''">AND sys_role.isDefault = #{isDefault}</if>
     </select>
 
     <update id="update" parameterType="com.xiaozhi.entity.SysRole">
@@ -31,6 +32,7 @@
             <if test="roleName != null and roleName != ''">roleName = #{roleName},</if>
             <if test="roleDesc != null and roleDesc != ''">roleDesc = #{roleDesc},</if>
             <if test="voiceName != null and voiceName != ''">voiceName = #{voiceName},</if>
+            <if test="isDefault != null and isDefault != ''">isDefault = #{isDefault},</if>
             <if test="ttsId != null and ttsId != ''">
                 <choose>
                     <when test="ttsId == -1">ttsId = null,</when>
@@ -43,9 +45,19 @@
             roleId = #{roleId}
     </update>
 
+    <update id="resetDefault" parameterType="com.xiaozhi.entity.SysRole">
+        UPDATE
+            sys_role
+        <set>
+            isDefault = '0'
+        </set>
+        WHERE
+            userId = #{userId}
+    </update>
+
     <insert id="add" useGeneratedKeys="true" keyProperty="roleName" parameterType="com.xiaozhi.entity.SysRole">
-        INSERT INTO sys_role ( roleName, roleDesc, voiceName, ttsId, userId ) VALUES (
-            #{roleName}, #{roleDesc}, #{voiceName}, #{ttsId}, #{userId}
+        INSERT INTO sys_role ( roleName, roleDesc, voiceName, ttsId, userId, isDefault ) VALUES (
+            #{roleName}, #{roleDesc}, #{voiceName}, #{ttsId}, #{userId}, isDefault
         )
     </insert>
 

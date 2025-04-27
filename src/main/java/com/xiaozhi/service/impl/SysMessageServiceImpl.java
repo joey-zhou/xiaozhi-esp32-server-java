@@ -4,7 +4,6 @@ import java.util.List;
 
 import com.github.pagehelper.PageHelper;
 import com.xiaozhi.dao.MessageMapper;
-import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysMessage;
 import com.xiaozhi.service.SysMessageService;
 
@@ -34,8 +33,8 @@ public class SysMessageServiceImpl implements SysMessageService {
      */
     @Override
     @Transactional
-    public int add(SysDevice device) {
-        return messageMapper.add(device);
+    public int add(SysMessage message) {
+        return messageMapper.add(message);
     }
 
     /**
@@ -50,6 +49,18 @@ public class SysMessageServiceImpl implements SysMessageService {
             PageHelper.startPage(message.getStart(), message.getLimit());
         }
         return messageMapper.query(message);
+    }
+
+    /**
+     * 删除记忆
+     * 
+     * @param message
+     * @return
+     */
+    @Override
+    @Transactional
+    public int delete(SysMessage message) {
+        return messageMapper.delete(message);
     }
 
 }

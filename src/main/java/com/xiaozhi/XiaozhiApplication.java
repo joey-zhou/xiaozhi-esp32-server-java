@@ -1,6 +1,9 @@
 package com.xiaozhi;
 
 import com.xiaozhi.websocket.config.WebFluxWebSocketConfig;
+
+import java.util.Map;
+
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -28,17 +31,19 @@ public class XiaozhiApplication {
             String contextPath = event.getApplicationContext().getEnvironment()
                     .getProperty("spring.webflux.base-path", "");
 
-            try {
-                // 获取本地实际 IP 地址
-                String localIp = CmsUtils.getLocalIPAddress();
+            // 获取最适合的服务器IP地址
+            String serverIp = CmsUtils.getServerIp();
+            String wsAddress = "ws://" + serverIp + ":" + port + contextPath + WebFluxWebSocketConfig.WS_PATH;
+            String otaAddress = "http://" + serverIp + ":" + port + "/api/device/ota";
 
-                logger.info("==========================================================");
-                logger.info("WebFlux WebSocket service is running at:");
-                logger.info("ws://" + localIp + ":" + port + contextPath + WebFluxWebSocketConfig.WS_PATH);
-                logger.info("==========================================================");
-            } catch (Exception e) {
-                logger.error("无法获取本地 IP 地址：" + e.getMessage());
-            }
+            logger.info("==========================================================");
+            logger.info("🚀 小智物联网平台服务已成功启动");
+            logger.info("==========================================================");
+            logger.info("📡 WebSocket服务地址: {}", wsAddress);
+            logger.info("📦 OTA升级服务地址: {}", otaAddress);
+            logger.info("==========================================================");
+            logger.info("祝您使用愉快！");
+            logger.info("==========================================================");
         };
     }
 }

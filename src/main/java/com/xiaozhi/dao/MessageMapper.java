@@ -2,7 +2,6 @@ package com.xiaozhi.dao;
 
 import java.util.List;
 
-import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysMessage;
 
 /**
@@ -13,9 +12,9 @@ import com.xiaozhi.entity.SysMessage;
  */
 public interface MessageMapper {
 
-  int add(SysDevice message);
+  int add(SysMessage message);
 
-  int update(SysMessage message);
+  int delete(SysMessage message);
 
   List<SysMessage> query(SysMessage message);
 }

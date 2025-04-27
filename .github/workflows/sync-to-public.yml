@@ -1,19 +1,26 @@
-name: Sync to Public Repo
+name: Sync to Public Repo and Create Tag
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'version.properties'
+      - 'pom.xml'
+      - 'CHANGELOG.md'
   workflow_dispatch:
 
 jobs:
-  sync:
+  sync-and-tag:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.7.0
@@ -25,7 +32,43 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan github.com >> ~/.ssh/known_hosts
           
+      - name: Get current version
+        id: current-version
+        run: |
+          if [ -f "version.properties" ]; then
+            CURRENT_VERSION=$(grep "version=" version.properties | cut -d'=' -f2)
+          else
+            # 从pom.xml中提取当前版本
+            CURRENT_VERSION=$(grep -m 1 "<version>" pom.xml | sed 's/.*<version>\(.*\)<\/version>.*/\1/')
+          fi
+          echo "CURRENT_VERSION=${CURRENT_VERSION}" >> $GITHUB_ENV
+          echo "Current version: ${CURRENT_VERSION}"
+          
+      - name: Check if tag already exists
+        id: check-tag
+        run: |
+          if git rev-parse "v${CURRENT_VERSION}" >/dev/null 2>&1; then
+            echo "TAG_EXISTS=true" >> $GITHUB_ENV
+            echo "Tag v${CURRENT_VERSION} already exists, skipping tag creation"
+          else
+            echo "TAG_EXISTS=false" >> $GITHUB_ENV
+            echo "Tag v${CURRENT_VERSION} does not exist, will create it"
+          fi
+          
+      - name: Create Git tag
+        if: env.TAG_EXISTS == 'false'
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git tag -a "v${CURRENT_VERSION}" -m "Version ${CURRENT_VERSION}"
+          git push origin "v${CURRENT_VERSION}"
+          
       - name: Push to public repository
         run: |
           git remote add public git@github.com:joey-zhou/xiaozhi-esp32-server-java.git
           git push public main:main
+          
+          # 如果创建了新标签，也推送到公共仓库
+          if [ "$TAG_EXISTS" = "false" ]; then
+            git push public "v${CURRENT_VERSION}"
+          fi

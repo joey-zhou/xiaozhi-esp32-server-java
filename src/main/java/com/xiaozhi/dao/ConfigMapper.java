@@ -15,6 +15,8 @@ public interface ConfigMapper {
 
     int update(SysConfig config);
 
+    int resetDefault(SysConfig config);
+
     List<SysConfig> query(SysConfig config);
 
     SysConfig selectConfigById(Integer configId);

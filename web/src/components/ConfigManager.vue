@@ -31,7 +31,7 @@
           <a-tabs defaultActiveKey="1" :activeKey="activeTabKey" @change="handleTabChange"
             tabBarStyle="margin: 0 0 0 15px">
             <a-tab-pane key="1" :tab="`${configTypeInfo.label}列表`">
-              <a-table :columns="columns" :dataSource="configItems" :loading="loading" :pagination="pagination"
+              <a-table :columns="getColumns" :dataSource="configItems" :loading="loading" :pagination="pagination"
                 rowKey="configId" :scroll="{ x: 800 }" size="middle">
                 <template slot="configDesc" slot-scope="text">
                   <a-tooltip :title="text" :mouseEnterDelay="0.5" placement="leftTop">
@@ -39,11 +39,20 @@
                     <span v-else style="padding: 0 50px">&nbsp;&nbsp;&nbsp;</span>
                   </a-tooltip>
                 </template>
+                <!-- 添加默认标识列的自定义渲染 -->
+                <template slot="isDefault" slot-scope="text">
+                  <a-tag v-if="text == 1" color="green">默认</a-tag>
+                  <span v-else>-</span>
+                </template>
                 <template slot="operation" slot-scope="text, record">
                   <a-space>
-                    <a @click="edit(record)">编辑</a>
-                    <a-popconfirm :title="`确定要删除这个${configTypeInfo.label}配置吗?`" @confirm="update(record.configId)">
-                      <a>删除</a>
+                    <a href="javascript:" @click="edit(record)">编辑</a>
+                    <!-- 添加设为默认按钮，但在TTS中不显示 -->
+                    <a v-if="configType !== 'tts' && record.isDefault != 1" href="javascript:" :disabled="record.isDefault == 1"
+                      @click="setAsDefault(record)">设为默认</a>
+                    <a-popconfirm :title="`确定要删除这个${configTypeInfo.label}配置吗?`"
+                      @confirm="deleteConfig(record.configId)">
+                      <a href="javascript:" style="color: #ff4d4f">删除</a>
                     </a-popconfirm>
                   </a-space>
                 </template>
@@ -68,26 +77,31 @@
                   <a-col :xl="16" :lg="12" :xs="24">
                     <a-form-item :label="`${configTypeInfo.label}名称`">
                       <!-- 修改这里，添加模型名称提示 -->
-                      <a-tooltip 
-                        v-if="configType === 'llm' && currentType && getModelNameTip(currentType)"
-                        :title="getModelNameTip(currentType)"
-                        placement="top">
+                      <a-tooltip v-if="configType === 'llm' && currentType && getModelNameTip(currentType)"
+                        :title="getModelNameTip(currentType)" placement="top">
                         <a-input v-decorator="[
                           'configName',
                           { rules: [{ required: true, message: `请输入${configTypeInfo.label}名称` }] }
                         ]" autocomplete="off" :placeholder="`请输入${configTypeInfo.label}名称`" />
                       </a-tooltip>
-                      <a-input 
-                        v-else
-                        v-decorator="[
-                          'configName',
-                          { rules: [{ required: true, message: `请输入${configTypeInfo.label}名称` }] }
-                        ]" autocomplete="off" :placeholder="`请输入${configTypeInfo.label}名称`" />
+                      <a-input v-else v-decorator="[
+                        'configName',
+                        { rules: [{ required: true, message: `请输入${configTypeInfo.label}名称` }] }
+                      ]" autocomplete="off" :placeholder="`请输入${configTypeInfo.label}名称`" />
                     </a-form-item>
                   </a-col>
                 </a-row>
                 <a-form-item :label="`${configTypeInfo.label}描述`">
                   <a-textarea v-decorator="['configDesc']" :placeholder="`请输入${configTypeInfo.label}描述`" :rows="4" />
+                </a-form-item>
+
+                <!-- 添加是否默认的开关，但在TTS中不显示 -->
+                <a-form-item v-if="configType !== 'tts'" :label="`设为默认${configTypeInfo.label}`">
+                  <a-switch v-decorator="[
+                    'isDefault',
+                    { valuePropName: 'checked', initialValue: false }
+                  ]" />
+                  <span style="margin-left: 8px; color: #999;">设为默认后将优先使用此配置</span>
                 </a-form-item>
 
                 <a-divider>参数配置</a-divider>
@@ -185,7 +199,8 @@ export default {
           typeOptions: [
             { label: 'OpenAI', value: 'openai', key: '0' },
             { label: 'Ollama', value: 'ollama', key: '1' },
-            { label: 'Spark', value: 'spark', key: '2' }
+            { label: 'Spark', value: 'spark', key: '2' },
+            { label: 'Zhipu', value: 'zhipu', key: '3' }
           ],
           // 各类别对应的参数字段定义
           typeFields: {
@@ -197,8 +212,11 @@ export default {
               { name: 'apiUrl', label: 'API URL', required: false, span: 12, suffix: '/api/chat' }
             ],
             spark: [
-              { name: 'apiSecret', label: 'API Secret', required: true, span: 8 },
               { name: 'apiUrl', label: 'API URL', required: false, span: 12, suffix: '/chat/completions', defaultUrl:"https://spark-api-open.xf-yun.com/v2" }
+            ],
+            zhipu: [
+              { name: 'apiSecret', label: 'API Secret', required: true, span: 8 },
+              { name: 'apiUrl', label: 'API URL', required: false, span: 12, suffix: '/chat/completions', defaultUrl:"https://open.bigmodel.cn/api/paas/v4" }
             ]
           }
         },
@@ -206,7 +224,8 @@ export default {
           label: '语音识别',
           typeOptions: [
             { label: 'Tencent', value: 'tencent', key: '0' },
-            { label: 'Aliyun', value: 'aliyun', key: '1' }
+            { label: 'Aliyun', value: 'aliyun', key: '1' },
+            { label: 'FunASR', value: 'funasr', key: '2' }
           ],
           typeFields: {
             tencent: [
@@ -216,6 +235,9 @@ export default {
             ],
             aliyun: [
               { name: 'apiKey', label: 'API Key', required: true, span: 12 },
+            ],
+            funasr: [
+              { name: 'apiUrl', label: 'Websocket URL', required: true, span: 12, defaultUrl:"ws://127.0.0.1:10095" }
             ]
           }
         },
@@ -270,6 +292,15 @@ export default {
           align: 'center',
           ellipsis: true,
         },
+        // 添加默认标识列
+        {
+          title: '默认',
+          dataIndex: 'isDefault',
+          key: 'isDefault',
+          width: 80,
+          align: 'center',
+          scopedSlots: { customRender: 'isDefault' }
+        },
         {
           title: '创建时间',
           dataIndex: 'createTime',
@@ -281,7 +312,7 @@ export default {
           title: '操作',
           dataIndex: 'operation',
           key: 'operation',
-          width: 140,
+          width: 180,
           align: 'center',
           fixed: 'right',
           scopedSlots: { customRender: 'operation' }
@@ -302,6 +333,14 @@ export default {
     currentTypeFields() {
       const typeFieldsMap = this.configTypeInfo.typeFields || {};
       return typeFieldsMap[this.currentType] || [];
+    },
+    // 根据配置类型获取适当的列
+    getColumns() {
+      if (this.configType === 'tts') {
+        // 对于TTS，过滤掉isDefault列
+        return this.columns.filter(col => col.key !== 'isDefault');
+      }
+      return this.columns;
     }
   },
   created() {
@@ -322,7 +361,7 @@ export default {
     getModelNameTip(providerType) {
       return this.configType === 'llm' ? this.modelNameTips[providerType] : null;
     },
-    
+
     // 处理标签页切换
     handleTabChange(key) {
       this.activeTabKey = key;
@@ -345,6 +384,11 @@ export default {
         configName: formValues.configName,
         configDesc: formValues.configDesc
       };
+      
+      // 如果不是TTS，添加isDefault字段
+      if (this.configType !== 'tts') {
+        newValues.isDefault = formValues.isDefault;
+      }
 
       // 清除所有可能的参数字段
       const allParamFields = ['apiKey', 'apiUrl', 'apiSecret', 'appId', 'secretKey', 'region'];
@@ -353,14 +397,19 @@ export default {
       });
 
       //填写llm默认url
-      if(this.configType === 'llm') {
-        newValues.apiUrl = this.configTypeMap.llm.typeFields[value].find(item=>item.name === 'apiUrl').defaultUrl
+      if (this.configType === 'llm') {
+        const apiUrlField = this.configTypeMap.llm.typeFields[value].find(item => item.name === 'apiUrl');
+        if (apiUrlField && apiUrlField.defaultUrl) {
+          newValues.apiUrl = apiUrlField.defaultUrl;
+        }
       }
 
       // 重置表单
       this.$nextTick(() => {
         // 设置新的表单值
-        configForm.setFieldsValue(newValues);
+        setTimeout(() => {
+          configForm.setFieldsValue(newValues);
+        }, 0);
       });
     },
 
@@ -400,6 +449,18 @@ export default {
         if (!err) {
           this.loading = true
 
+          // 将开关值转换为数字，但TTS不需要处理isDefault
+          const formData = {
+            configId: this.editingConfigId,
+            configType: this.configType,
+            ...values
+          };
+
+          // 只有非TTS类型才处理isDefault
+          if (this.configType !== 'tts') {
+            formData.isDefault = values.isDefault ? 1 : 0;
+          }
+
           const url = this.editingConfigId
             ? api.config.update
             : api.config.add
@@ -407,11 +468,7 @@ export default {
           axios
             .post({
               url,
-              data: {
-                configId: this.editingConfigId,
-                configType: this.configType,
-                ...values
-              }
+              data: formData
             })
             .then(res => {
               if (res.code === 200) {
@@ -447,21 +504,68 @@ export default {
       this.$nextTick(() => {
         const { configForm } = this
 
-        // 设置表单值
-        configForm.setFieldsValue({
-          ...record
-        });
+        // 设置表单值，使用setTimeout确保表单已渲染
+        setTimeout(() => {
+          const formValues = {...record};
+          
+          // 只有非TTS类型才设置isDefault
+          if (this.configType !== 'tts') {
+            formValues.isDefault = record.isDefault == 1;
+          }
+          
+          configForm.setFieldsValue(formValues);
+        }, 0);
       })
     },
 
+    // 设置为默认配置
+    setAsDefault(record) {
+      // TTS不应该有这个功能，但为了安全起见，再次检查
+      if (this.configType === 'tts') return;
+      
+      this.$confirm({
+        title: `确定要将此${this.configTypeInfo.label}设为默认吗？`,
+        content: `设为默认后，系统将优先使用此${this.configTypeInfo.label}配置，原默认${this.configTypeInfo.label}将被取消默认状态。`,
+        okText: '确定',
+        cancelText: '取消',
+        onOk: () => {
+          this.loading = true;
+          axios
+            .post({
+              url: api.config.update,
+              data: {
+                configId: record.configId,
+                configType: this.configType,
+                isDefault: 1
+              }
+            })
+            .then(res => {
+              if (res.code === 200) {
+                this.$message.success(`已将"${record.configName}"设为默认${this.configTypeInfo.label}`);
+                this.getData();
+              } else {
+                this.$message.error(res.message);
+              }
+            })
+            .catch(() => {
+              this.$message.error('服务器维护/重启中，请稍后再试');
+            })
+            .finally(() => {
+              this.loading = false;
+            });
+        }
+      });
+    },
+
     // 删除配置
-    update(configId) {
+    deleteConfig(configId) {
       this.loading = true
       axios
         .post({
           url: api.config.update,
           data: {
             configId: configId,
+            configType: this.configType,
             state: 0
           }
         })

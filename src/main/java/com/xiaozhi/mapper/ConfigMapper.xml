@@ -39,6 +39,17 @@
             configId = #{configId}
     </update>
 
+    <update id="resetDefault" parameterType="com.xiaozhi.entity.SysConfig">
+        UPDATE
+            sys_config
+        <set>
+            isDefault = '0'
+        </set>
+        WHERE
+            configType = #{configType}
+            AND userId = #{userId}
+    </update>
+
     <select id="query" parameterType="com.xiaozhi.entity.SysConfig" resultType="com.xiaozhi.entity.SysConfig">
         SELECT
         <include refid="configSql"></include>,
@@ -51,15 +62,9 @@
         WHERE
             sys_config.state = 1
             <if test="userId != null and userId != ''">AND sys_config.userId = #{userId}</if>
+            <if test="isDefault != null and isDefault != ''">AND sys_config.isDefault = #{isDefault}</if>
             <if test="configType != null and configType != ''">AND configType = #{configType}</if>
-            <choose>
-                <when test="provider != null and provider != ''">
-                    AND provider = #{provider}
-                </when>
-                <otherwise>
-                    AND provider != 'coze'
-                </otherwise>
-            </choose>
+            <if test="provider != null and provider != ''">AND provider = #{provider}</if>
             <if test="configName != null and configName != ''">AND configName LIKE CONCAT('%', #{configName}, '%')</if>
     </select>
 

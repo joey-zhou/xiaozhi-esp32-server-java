@@ -15,6 +15,8 @@ public interface RoleMapper {
 
   int update(SysRole role);
 
+  int resetDefault(SysRole role);
+
   int add(SysRole role);
 
   SysRole selectRoleById(Integer roleId);

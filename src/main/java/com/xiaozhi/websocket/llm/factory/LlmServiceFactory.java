@@ -1,11 +1,7 @@
 package com.xiaozhi.websocket.llm.factory;
 
 import com.xiaozhi.websocket.llm.api.LlmService;
-import com.xiaozhi.websocket.llm.providers.CozeService;
-import com.xiaozhi.websocket.llm.providers.OllamaService;
-import com.xiaozhi.websocket.llm.providers.OpenAiService;
-import com.xiaozhi.websocket.llm.providers.SparkService;
-
+import com.xiaozhi.websocket.llm.providers.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,7 +14,7 @@ public class LlmServiceFactory {
 
     /**
      * 创建LLM服务
-     * 
+     *
      * @param provider 提供商
      * @param endpoint API端点
      * @param apiKey   API密钥
@@ -26,7 +22,7 @@ public class LlmServiceFactory {
      * @return LLM服务
      */
     public static LlmService createLlmService(String provider, String endpoint, String appId, String apiKey,
-            String apiSecret, String model) {
+                                              String apiSecret, String model) {
         provider = provider.toLowerCase();
         switch (provider) {
             case "openai":
@@ -37,6 +33,8 @@ public class LlmServiceFactory {
                 return new SparkService(endpoint, appId, apiKey, apiSecret, model);
             case "coze":
                 return new CozeService(endpoint, appId, apiKey, apiSecret, model);
+            case "zhipu":
+                return new ZhiPuService(endpoint, appId, apiKey, apiSecret, model);
             // 可以添加更多提供商的支持
             default:
                 // logger.info("未找到匹配的模型提供商 '{}', 默认使用Ollama", provider);

@@ -57,11 +57,20 @@
                 <span v-else style="padding: 0 50px">&nbsp;&nbsp;&nbsp;</span>
               </a-tooltip>
             </template>
+            <!-- 默认状态 -->
+            <template slot="isDefault" slot-scope="text">
+              <a-tag v-if="text == 1" color="green">默认</a-tag>
+              <span v-else>-</span>
+            </template>
             <!-- 操作 -->
             <template slot="operation" slot-scope="text, record">
-              <a-popconfirm title="确定要删除此智能体吗？" @confirm="handleDelete(record)">
-                <a>删除</a>
-              </a-popconfirm>
+              <a-space>
+                <!-- 添加设为默认按钮 -->
+                <a v-if="record.isDefault != 1" href="javascript:" :disabled="record.isDefault == 1" @click="setAsDefault(record)">设为默认</a>
+                <a-popconfirm title="确定要删除此智能体吗？" @confirm="handleDelete(record)">
+                  <a href="javascript:" style="color: #ff4d4f">删除</a>
+                </a-popconfirm>
+              </a-space>
             </template>
           </a-table>
         </a-card>
@@ -82,6 +91,12 @@
             </a-select-option>
           </a-select>
           <a-input v-else v-model="platformForm[item.field]" :placeholder="item.placeholder" />
+        </a-form-model-item>
+        
+        <!-- 添加设为默认选项 -->
+        <a-form-model-item label="设为默认">
+          <a-switch v-model="platformForm.isDefault" />
+          <span style="margin-left: 8px; color: #999;">设为默认后将优先使用此配置</span>
         </a-form-model-item>
       </a-form-model>
     </a-modal>
@@ -114,8 +129,10 @@ export default {
         { title: '智能体ID', dataIndex: 'botId', width: 180, align: 'center' },
         { title: '平台', dataIndex: 'provider', scopedSlots: { customRender: 'provider' }, width: 80, align: 'center' },
         { title: '智能体描述', dataIndex: 'agentDesc', align: 'center', scopedSlots: { customRender: 'agentDesc' }, ellipsis: true },
+        // 添加默认状态列
+        { title: '默认', dataIndex: 'isDefault', width: 80, align: 'center', scopedSlots: { customRender: 'isDefault' } },
         { title: '发布时间', dataIndex: 'publishTime', width: 180, align: 'center' },
-        { title: '操作', dataIndex: 'operation', scopedSlots: { customRender: 'operation' }, width: 110, align: 'center', fixed: 'right' }
+        { title: '操作', dataIndex: 'operation', scopedSlots: { customRender: 'operation' }, width: 150, align: 'center', fixed: 'right' }
       ],
       // 表格数据
       agentList: [],
@@ -131,7 +148,8 @@ export default {
         configDesc: '',
         appId: '',
         apiKey: '',
-        apiSecret: ''
+        apiSecret: '',
+        isDefault: false
       },
 
       // 表单项配置
@@ -209,7 +227,8 @@ export default {
         configType: 'agent',
         provider: 'COZE',
         appId: '',
-        apiSecret: ''
+        apiSecret: '',
+        isDefault: false
       };
 
       this.platformModalVisible = true;
@@ -226,6 +245,7 @@ export default {
             url: api.config.add,
             data: {
               ...this.platformForm,
+              isDefault: this.platformForm.isDefault ? 1 : 0 // 转换为数字
             }
           })
             .then(res => {
@@ -256,6 +276,43 @@ export default {
       this.platformModalVisible = false;
     },
 
+    // 设置为默认智能体
+    setAsDefault(record) {
+      this.$confirm({
+        title: '确定要将此智能体设为默认吗？',
+        content: '设为默认后，系统将优先使用此智能体，原默认智能体将被取消默认状态。',
+        okText: '确定',
+        cancelText: '取消',
+        onOk: () => {
+          this.loading = true;
+          
+          // 调用后端API更新配置为默认
+          axios.post({
+            url: api.config.update,
+            data: {
+              configId: record.configId,
+              configType: 'llm',
+              isDefault: 1
+            }
+          })
+            .then(res => {
+              if (res.code === 200) {
+                this.$message.success(`已将"${record.agentName}"设为默认智能体`);
+                this.getData();
+              } else {
+                this.$message.error(res.message);
+              }
+            })
+            .catch(error => {
+              this.$message.error('设置默认智能体失败');
+            })
+            .finally(() => {
+              this.loading = false;
+            });
+        }
+      });
+    },
+
     // 删除智能体
     handleDelete(record) {
       axios.post({
@@ -279,6 +336,7 @@ export default {
     getProviderColor(provider) {
       const colorMap = {
         'coze': 'blue',
+        'COZE': 'blue',
         '微信': 'green',
         '飞书': 'orange',
         'Telegram': 'cyan',

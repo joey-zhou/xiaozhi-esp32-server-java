@@ -30,6 +30,8 @@ export default {
   },
   message: {
     query: "/api/message/query",
+    update: "/api/message/update",
+    delete: "/api/message/delete",
     export: "/api/message/export"
   },
   config: {

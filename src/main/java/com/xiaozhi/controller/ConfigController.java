@@ -74,6 +74,11 @@ public class ConfigController {
     public Mono<AjaxResult> update(SysConfig config, ServerWebExchange exchange) {
         return Mono.fromCallable(() -> {
             try {
+                // 从请求属性中获取用户信息
+                SysUser user = exchange.getAttribute(CmsUtils.USER_ATTRIBUTE_KEY);
+                if (user != null) {
+                    config.setUserId(user.getUserId());
+                }
                 configService.update(config);
                 return AjaxResult.success();
             } catch (Exception e) {

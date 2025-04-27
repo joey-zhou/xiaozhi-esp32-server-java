@@ -1,8 +1,6 @@
 package com.xiaozhi.service;
 
 import java.util.List;
-
-import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysMessage;
 
 /**
@@ -16,10 +14,10 @@ public interface SysMessageService {
   /**
    * 新增记录
    * 
-   * @param device
+   * @param message
    * @return
    */
-  public int add(SysDevice device);
+  public int add(SysMessage message);
 
   /**
    * 查询聊天记录
@@ -28,5 +26,13 @@ public interface SysMessageService {
    * @return
    */
   public List<SysMessage> query(SysMessage message);
+
+  /**
+   * 删除记忆
+   * 
+   * @param message
+   * @return
+   */
+  public int delete(SysMessage message);
 
 }

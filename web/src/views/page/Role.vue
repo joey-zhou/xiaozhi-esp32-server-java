@@ -21,17 +21,24 @@
             <a-tab-pane key="1" tab="角色列表">
               <a-table :columns="columns" :dataSource="roleItems" :loading="loading" :pagination="pagination"
                 rowKey="roleId" :scroll="{ x: 800 }" size="middle">
-                <templace slot="roleDesc" slot-scope="text, record">
+                <template slot="roleDesc" slot-scope="text, record">
                   <a-tooltip :title="text" :mouseEnterDelay="0.5" placement="leftTop">
                     <span v-if="text">{{ text }}</span>
                     <span v-else style="padding: 0 50px">&nbsp;&nbsp;&nbsp;</span>
                   </a-tooltip>
-                </templace>
+                </template>
+                <!-- 添加默认状态列的自定义渲染 -->
+                <template slot="isDefault" slot-scope="text">
+                  <a-tag v-if="text == 1" color="green">默认</a-tag>
+                  <span v-else>-</span>
+                </template>
                 <template slot="operation" slot-scope="text, record">
                   <a-space>
                     <a @click="edit(record)">编辑</a>
+                    <!-- 添加设为默认按钮 -->
+                    <a v-if="record.isDefault != 1" href="javascript:" :disabled="record.isDefault == 1" @click="setAsDefault(record)">设为默认</a>
                     <a-popconfirm title="确定要删除这个角色吗?" @confirm="update(record.roleId, '0')">
-                      <a>删除</a>
+                      <a href="javascript:" style="color: #ff4d4f">删除</a>
                     </a-popconfirm>
                   </a-space>
                 </template>
@@ -50,6 +57,15 @@
                     </a-form-item>
                   </a-col>
                 </a-row>
+
+                <!-- 添加是否默认的开关 -->
+                <a-form-item label="设为默认角色">
+                  <a-switch v-decorator="[
+                    'isDefault', 
+                    { valuePropName: 'checked', initialValue: false }
+                  ]" @change="handleDefaultChange" />
+                  <span style="margin-left: 8px; color: #999;">设为默认后将优先使用此角色</span>
+                </a-form-item>
 
                 <a-divider>语音设置</a-divider>
 
@@ -239,6 +255,15 @@ export default {
           align: 'center',
           ellipsis: true
         },
+        // 添加默认标识列
+        {
+          title: '默认',
+          dataIndex: 'isDefault',
+          key: 'isDefault',
+          width: 80,
+          align: 'center',
+          scopedSlots: { customRender: 'isDefault' }
+        },
         {
           title: '创建时间',
           dataIndex: 'createTime',
@@ -250,7 +275,7 @@ export default {
           title: '操作',
           dataIndex: 'operation',
           key: 'operation',
-          width: 180,
+          width: 220,
           align: 'center',
           fixed: 'right',
           scopedSlots: { customRender: 'operation' }
@@ -343,6 +368,64 @@ export default {
     handleTabChange(key) {
       this.activeTabKey = key;
       this.resetForm();
+    },
+
+    // 处理默认开关变化
+    handleDefaultChange(checked) {
+      if (checked) {
+        // 可以在这里添加确认提示
+        this.$confirm({
+          title: '确定要将此角色设为默认吗？',
+          content: '设为默认后，系统将优先使用此角色，原默认角色将被取消默认状态。',
+          okText: '确定',
+          cancelText: '取消',
+          onOk: () => {
+            // 用户确认，不需要做任何事情，表单提交时会处理
+          },
+          onCancel: () => {
+            // 用户取消，将开关状态重置
+            this.roleForm.setFieldsValue({
+              isDefault: false
+            });
+          }
+        });
+      }
+    },
+
+    // 设置为默认角色
+    setAsDefault(record) {
+      this.$confirm({
+        title: '确定要将此角色设为默认吗？',
+        content: '设为默认后，系统将优先使用此角色，原默认角色将被取消默认状态。',
+        okText: '确定',
+        cancelText: '取消',
+        onOk: () => {
+          this.loading = true;
+          
+          // 调用后端API更新角色为默认
+          axios.post({
+            url: api.role.update,
+            data: {
+              roleId: record.roleId,
+              isDefault: 1
+            }
+          })
+            .then(res => {
+              if (res.code === 200) {
+                this.$message.success(`已将"${record.roleName}"设为默认角色`);
+                this.getData();
+              } else {
+                this.$message.error(res.message || '设置默认角色失败');
+              }
+            })
+            .catch(error => {
+              this.$message.error('设置默认角色失败');
+            })
+            .finally(() => {
+              this.loading = false;
+            });
+        }
+      });
     },
 
     // 处理语音提供商选择变化
@@ -830,7 +913,9 @@ export default {
           // 添加语音提供商信息
           const formData = {
             ...values,
-            provider: this.selectedProvider
+            provider: this.selectedProvider,
+            // 将开关的布尔值转换为数字（0或1）
+            isDefault: values.isDefault ? 1 : 0
           };
 
           // 为所有提供商传递TTS配置ID
@@ -922,11 +1007,12 @@ export default {
         // 设置当前选择的性别，以便正确筛选语音
         this.selectedGender = record.gender || '';
 
-        // 设置表单值
+        // 设置表单值，将isDefault从数字转为布尔值
         roleForm.setFieldsValue({
           ...record,
           provider: this.selectedProvider,
-          gender: this.selectedGender
+          gender: this.selectedGender,
+          isDefault: record.isDefault == 1
         });
       });
     },
@@ -978,7 +1064,8 @@ export default {
           provider: 'edge',
           gender: '',
           ttsId: 'edge_default',
-          voiceName: this.defaultVoiceName
+          voiceName: this.defaultVoiceName,
+          isDefault: false
         });
       });
     },
@@ -1036,3 +1123,20 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.layout-content-margin {
+  margin: 24px;
+}
+
+.table-search {
+  margin-bottom: 16px;
+  background: #fff;
+  padding: 16px;
+}
+
+.filter-flex {
+  display: flex;
+  flex-wrap: wrap;
+}
+</style>

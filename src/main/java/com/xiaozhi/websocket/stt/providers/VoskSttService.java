@@ -38,6 +38,18 @@ public class VoskSttService implements SttService {
     @PostConstruct
     public void initialize() throws Exception {
         try {
+            // 检查是否是 macOS 操作系统
+            String osName = System.getProperty("os.name").toLowerCase();
+            // 检查是否是 ARM 架构（用于 M 系列芯片）
+            String osArch = System.getProperty("os.arch").toLowerCase();
+
+            if (osName.contains("mac") && osArch.contains("aarch64")) {
+                // 如果是 macOS 并且是 ARM 架构（M 系列芯片）
+                System.load(System.getProperty("user.dir") + "/models/libvosk.dylib");
+                logger.info("Vosk library loaded for macOS M-series chip.");
+            } else {
+                logger.info("Not macOS M-series chip, skipping Vosk library load.");
+            }
             // 禁用Vosk日志输出
             LibVosk.setLogLevel(LogLevel.WARNINGS);
 
