@@ -17,19 +17,19 @@ const MAX_LOG_HISTORY = 500;
 // 记录日志
 export function log(message, type = 'info') {
   if (LOG_LEVELS[type] < currentLogLevel) return;
-  
+
   const entry = {
     message,
     type,
     time: new Date()
   };
-  
+
   logHistory.push(entry);
-  
+
   if (logHistory.length > MAX_LOG_HISTORY) {
     logHistory = logHistory.slice(-MAX_LOG_HISTORY);
   }
-  
+
   switch (type) {
     case 'error': console.error(message); break;
     case 'warning': console.warn(message); break;
@@ -37,7 +37,7 @@ export function log(message, type = 'info') {
     case 'debug': console.debug(message); break;
     default: console.log(message);
   }
-  
+
   return entry;
 }
 
@@ -68,7 +68,7 @@ export const messages = [];
 // 添加消息
 export function addMessage(message) {
   if (!message.content) return null;
-  
+
   const newMessage = {
     id: message.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
     content: message.content,
@@ -77,11 +77,11 @@ export function addMessage(message) {
     timestamp: message.timestamp || new Date(),
     isLoading: !!message.isLoading
   };
-  
+
   messages.push(newMessage);
-  
+
   log(`添加${newMessage.isUser ? '用户' : 'AI'}消息: ${newMessage.content.substring(0, 50)}${newMessage.content.length > 50 ? '...' : ''}`, 'debug');
-  
+
   return newMessage;
 }
 
@@ -92,16 +92,16 @@ export function updateMessage(id, updates) {
     log(`未找到要更新的消息: ${id}`, 'warning');
     return null;
   }
-  
+
   const updatedMessage = {
     ...messages[index],
     ...updates
   };
-  
+
   messages[index] = updatedMessage;
-  
+
   log(`更新消息 ${id}: ${JSON.stringify(updates)}`, 'debug');
-  
+
   return updatedMessage;
 }
 
@@ -132,7 +132,7 @@ export function addAudioMessage(options) {
     duration: options.duration || '0:00',
     audioData: options.audioData
   };
-  
+
   return addMessage(message);
 }
 
@@ -140,10 +140,10 @@ export function addAudioMessage(options) {
 export function deleteMessage(id) {
   const index = messages.findIndex(msg => msg.id === id);
   if (index === -1) return false;
-  
+
   messages.splice(index, 1);
   log(`删除消息: ${id}`, 'debug');
-  
+
   return true;
 }
 
@@ -151,7 +151,7 @@ export function deleteMessage(id) {
 export function clearMessages() {
   messages.length = 0;
   log('清空所有消息', 'info');
-  
+
   return true;
 }
 
@@ -196,22 +196,22 @@ export async function connectToServer(config) {
     log('WebSocket已连接', 'info');
     return true;
   }
-  
+
   if (isConnecting) {
     log('WebSocket正在连接中...', 'info');
     return false;
   }
-  
+
   try {
     isConnecting = true;
     connectionStatus = '正在连接...';
-    
+
     // 清除之前的重连计时器
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
-    
+
     // 关闭现有连接
     if (webSocket) {
       try {
@@ -220,17 +220,17 @@ export async function connectToServer(config) {
         // 忽略关闭错误
       }
     }
-    
+
     // 构建连接URL
     let url = config.url;
     if (!url.endsWith('/')) {
       url += '/';
     }
-    
+
     // 添加设备ID和名称作为查询参数
     const params = new URLSearchParams();
     if (config.deviceId) {
-      params.append('device-Id', config.deviceId);
+      params.append('device-id', config.deviceId);
     }
     if (config.macAddress) {
       params.append('mac_address', config.deviceName);
@@ -238,20 +238,20 @@ export async function connectToServer(config) {
     if (config.token) {
       params.append('token', config.token);
     }
-    
+
     const queryString = params.toString();
     if (queryString) {
       url += '?' + queryString;
     }
-    
+
     log(`正在连接到: ${url}`, 'info');
-    
+
     // 创建WebSocket连接
     webSocket = new WebSocket(url);
-    
+
     // 设置二进制类型为ArrayBuffer
     webSocket.binaryType = 'arraybuffer';
-    
+
     // 连接打开事件
     webSocket.onopen = () => {
       isConnecting = false;
@@ -261,39 +261,39 @@ export async function connectToServer(config) {
       reconnectAttempts = 0;
       log('WebSocket连接已建立', 'success');
     };
-    
+
     // 接收消息事件
     webSocket.onmessage = (event) => {
       handleWebSocketMessage(event);
     };
-    
+
     // 连接关闭事件
     webSocket.onclose = (event) => {
       isConnecting = false;
       isConnected = false;
-      
+
       if (event.wasClean) {
         connectionStatus = '已断开';
         log(`WebSocket连接已关闭: 代码=${event.code}, 原因=${event.reason}`, 'info');
       } else {
         connectionStatus = '连接已断开';
         log('WebSocket连接意外断开', 'error');
-        
+
         // 尝试重新连接
         scheduleReconnect(config);
       }
     };
-    
+
     // 连接错误事件
     webSocket.onerror = (error) => {
       isConnecting = false;
       isConnected = false;
       connectionStatus = '连接错误';
       log('WebSocket连接错误', 'error');
-      
+
       // 错误时不立即重连，让onclose处理
     };
-    
+
     // 等待连接完成或超时
     return new Promise((resolve) => {
       // 连接超时处理
@@ -302,17 +302,17 @@ export async function connectToServer(config) {
           log('WebSocket连接超时', 'error');
           isConnecting = false;
           connectionStatus = '连接超时';
-          
+
           try {
             webSocket.close();
           } catch (e) {
             // 忽略关闭错误
           }
-          
+
           resolve(false);
         }
       }, 5000); // 5秒超时
-      
+
       // 监听连接状态变化
       const checkConnected = () => {
         if (isConnected) {
@@ -325,7 +325,7 @@ export async function connectToServer(config) {
           setTimeout(checkConnected, 100);
         }
       };
-      
+
       checkConnected();
     });
   } catch (error) {
@@ -344,13 +344,13 @@ function scheduleReconnect(config) {
     connectionStatus = '重连失败';
     return;
   }
-  
+
   // 使用指数退避策略
   const delay = reconnectDelay * Math.pow(1.5, reconnectAttempts);
-  
+
   log(`计划在${delay / 1000}秒后重新连接(尝试${reconnectAttempts + 1}/${maxReconnectAttempts})`, 'info');
   connectionStatus = `${reconnectAttempts + 1}秒后重连...`;
-  
+
   reconnectTimer = setTimeout(() => {
     reconnectAttempts++;
     connectToServer(config);
@@ -372,16 +372,16 @@ function handleWebSocketMessage(event) {
       }
       return;
     }
-    
+
     // 处理文本数据
     const data = JSON.parse(event.data);
-    
+
     // 记录会话ID
     if (data.session_id && !sessionId) {
       sessionId = data.session_id;
       log(`会话ID: ${sessionId}`, 'info');
     }
-    
+
     // 根据消息类型处理
     switch (data.type) {
       case 'stt':
@@ -393,7 +393,7 @@ function handleWebSocketMessage(event) {
       default:
         log(`收到未知类型的消息: ${data.type}`, 'warning');
     }
-    
+
     // 调用所有注册的消息处理函数
     for (const handler of messageHandlers) {
       try {
@@ -433,7 +433,7 @@ function sendJsonMessage(data) {
     log('WebSocket未连接，无法发送消息', 'error');
     return false;
   }
-  
+
   try {
     const message = JSON.stringify(data);
     webSocket.send(message);
@@ -449,14 +449,14 @@ export function sendTextMessage(text) {
   if (!text || !webSocket || webSocket.readyState !== WebSocket.OPEN) {
     return false;
   }
-  
+
   try {
     const message = {
       type: 'listen',
       state: 'text',
       text: text
     };
-    
+
     return sendJsonMessage(message);
   } catch (error) {
     log(`发送文本消息失败: ${error.message}`, 'error');
@@ -469,17 +469,17 @@ export async function startDirectRecording() {
   if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
     throw new Error('WebSocket未连接');
   }
-  
+
   try {
     // 发送开始录音命令
     const startMessage = {
       type: 'stt',
       state: 'start'
     };
-    
+
     sendJsonMessage(startMessage);
     log('已发送开始录音命令', 'info');
-    
+
     return true;
   } catch (error) {
     log(`开始录音失败: ${error.message}`, 'error');
@@ -492,17 +492,17 @@ export async function stopDirectRecording() {
   if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
     throw new Error('WebSocket未连接');
   }
-  
+
   try {
     // 发送停止录音命令
     const stopMessage = {
       type: 'stt',
       state: 'stop'
     };
-    
+
     sendJsonMessage(stopMessage);
     log('已发送停止录音命令', 'info');
-    
+
     return true;
   } catch (error) {
     log(`停止录音失败: ${error.message}`, 'error');
@@ -517,21 +517,21 @@ export function disconnectFromServer() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
-  
+
   if (!webSocket) {
     return true;
   }
-  
+
   try {
     if (webSocket.readyState === WebSocket.OPEN) {
       webSocket.close(1000, '用户主动断开');
     }
-    
+
     webSocket = null;
     isConnected = false;
     connectionStatus = '已断开';
     log('WebSocket连接已断开', 'info');
-    
+
     return true;
   } catch (error) {
     log(`断开WebSocket连接失败: ${error.message}`, 'error');

@@ -1,9 +1,7 @@
 package com.xiaozhi.communication.server.websocket;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.xiaozhi.communication.common.MessageHandler;
-import com.xiaozhi.communication.common.SessionManager;
+import com.xiaozhi.communication.common.*;
+import com.xiaozhi.communication.domain.*;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.service.SysDeviceService;
 import com.xiaozhi.utils.JsonUtil;
@@ -32,12 +30,12 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
     private MessageHandler messageHandler;
 
     @Resource
-    private SysDeviceService sysDeviceService;
+    private SysDeviceService deviceService;
 
     @Override
     public void afterConnectionEstablished(org.springframework.web.socket.WebSocketSession session) {
         Map<String, String> headers = getHeadersFromSession(session);
-        String deviceIdAuth = headers.get("device-Id");
+        String deviceIdAuth = headers.get("device-id");
         String token = headers.get("Authorization");
         if (deviceIdAuth == null || deviceIdAuth.isEmpty()) {
             logger.error("设备ID为空");
@@ -77,23 +75,34 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
         String payload = message.getPayload();
         String deviceId = null;
         if (device == null) {
-            deviceId = getHeadersFromSession(session).get("device-Id");
+            deviceId = getHeadersFromSession(session).get("device-id");
             if (deviceId == null) {
                 logger.error("无法确定设备ID");
                 return;
+            } else {
+                device = deviceService.selectDeviceById(deviceId);
             }
+        }
+        if (device.getModelId() == null) {
+            // 设备未绑定，处理未绑定设备的消息
+            device = new SysDevice();
+            device.setDeviceId(deviceId);
+            messageHandler.handleUnboundDevice(sessionId, device);
+        } else {
+            sessionManager.registerDevice(sessionId, device);
         }
         // 首先尝试解析JSON消息
         try {
-            JsonNode jsonNode = JsonUtil.OBJECT_MAPPER.readTree(payload);
-            String messageType = jsonNode.path("type").asText();
-
-            // hello消息应该始终处理，无论设备是否绑定
-            if ("hello".equals(messageType)) {
-                handleHelloMessage(session, jsonNode);
-                return;
+            var msg = JsonUtil.fromJson(payload, Message.class);
+            var chatSession = sessionManager.getSession(sessionId);
+            switch (msg) {
+                case HelloMessage m -> handleHelloMessage(session, m);
+                case ListenMessage m -> messageHandler.handleListenMessage(chatSession, m);
+                // case IotMessage m -> messageHandler.handleIotMessage(chatSession, m);
+                case IotMessage m -> messageHandler.handleIotMessage(chatSession, JsonUtil.OBJECT_MAPPER.readTree(payload));
+                case AbortMessage m -> messageHandler.handleAbortMessage(chatSession, m);
+                case GoodbyeMessage m -> messageHandler.handleGoodbyeMessage(chatSession, m);
             }
-            messageHandler.handleTextMessage(sessionId, jsonNode, deviceId);
         } catch (Exception e) {
             logger.error("handleTextMessage处理失败", e);
         }
@@ -147,35 +156,26 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
         return false;
     }
 
-    private void handleHelloMessage(org.springframework.web.socket.WebSocketSession session, JsonNode jsonNode) {
-        String sessionId = session.getId();
-        logger.info("收到hello消息 - SessionId: {}, JsonNode: {}", sessionId, jsonNode);
+    private void handleHelloMessage(org.springframework.web.socket.WebSocketSession session, HelloMessage message) {
+        var sessionId = session.getId();
+        logger.info("收到hello消息 - SessionId: {}, JsonNode: {}", sessionId, message);
 
-        // 解析音频参数
-        JsonNode audioParams = jsonNode.path("audio_params");
-        String format = audioParams.path("format").asText();
-        int sampleRate = audioParams.path("sample_rate").asInt();
-        int channels = audioParams.path("channels").asInt();
-        int frameDuration = audioParams.path("frame_duration").asInt();
-
-        logger.info("客户端音频参数 - 格式: {}, 采样率: {}, 声道: {}, 帧时长: {}ms",
-                format, sampleRate, channels, frameDuration);
+        if (message.getAudioParams() != null) {
+            logger.info("客户端音频参数 - 格式: {}, 采样率: {}, 声道: {}, 帧时长: {}ms",
+                    message.getAudioParams().getFormat(),
+                    message.getAudioParams().getSampleRate(),
+                    message.getAudioParams().getChannels(),
+                    message.getAudioParams().getFrameDuration());
+        }
 
         // 回复hello消息
-        ObjectNode response = JsonUtil.OBJECT_MAPPER.createObjectNode();
-        response.put("type", "hello");
-        response.put("transport", "websocket");
-        response.put("session_id", sessionId);
-
-        // 添加音频参数（可以根据服务器配置调整）
-        ObjectNode responseAudioParams = response.putObject("audio_params");
-        responseAudioParams.put("format", format);
-        responseAudioParams.put("sample_rate", sampleRate);
-        responseAudioParams.put("channels", channels);
-        responseAudioParams.put("frame_duration", frameDuration);
+        var resp = new HelloMessageResp()
+                .setTransport("websocket")
+                .setSessionId(sessionId)
+                .setAudioParams(AudioParams.Opus);
 
         try {
-            session.sendMessage(new TextMessage(response.toString()));
+            session.sendMessage(new TextMessage(JsonUtil.toJson(resp)));
         } catch (Exception e) {
             logger.error("发送hello响应失败", e);
         }
@@ -183,7 +183,7 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
 
     private Map<String, String> getHeadersFromSession(org.springframework.web.socket.WebSocketSession session) {
         // 尝试从请求头获取设备ID
-        String[] deviceKeys = { "device-Id", "mac_address", "uuid", "Authorization" };
+        String[] deviceKeys = { "device-id", "mac_address", "uuid", "Authorization" };
 
         Map<String, String> headers = new HashMap<>();
 

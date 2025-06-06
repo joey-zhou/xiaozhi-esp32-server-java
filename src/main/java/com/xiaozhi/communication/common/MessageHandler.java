@@ -1,6 +1,9 @@
 package com.xiaozhi.communication.common;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.xiaozhi.communication.domain.AbortMessage;
+import com.xiaozhi.communication.domain.GoodbyeMessage;
+import com.xiaozhi.communication.domain.ListenMessage;
 import com.xiaozhi.dialogue.llm.ChatService;
 import com.xiaozhi.dialogue.llm.factory.ChatModelFactory;
 import com.xiaozhi.dialogue.llm.tool.ToolsGlobalRegistry;
@@ -13,6 +16,7 @@ import com.xiaozhi.dialogue.stt.factory.SttServiceFactory;
 import com.xiaozhi.dialogue.tts.factory.TtsServiceFactory;
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.entity.SysDevice;
+import com.xiaozhi.enums.ListenState;
 import com.xiaozhi.service.SysDeviceService;
 import com.xiaozhi.service.SysRoleService;
 import jakarta.annotation.Resource;
@@ -120,7 +124,7 @@ public class MessageHandler {
                         // 注册全局函数
                         toolsSessionHolder.registerGlobalFunctionTools(chatSession);
                     }
-                    
+
                     // 更新设备状态
                     deviceService.updateNoRefreshCache(new SysDevice()
                             .setDeviceId(device.getDeviceId())
@@ -174,56 +178,6 @@ public class MessageHandler {
     }
 
     /**
-     * 处理文本消息.
-     * @param sessionId
-     * @param message
-     * @param deviceId 可能为null
-     */
-    public void handleTextMessage(String sessionId, JsonNode message, String deviceId) {
-        ChatSession chatSession = sessionManager.getSession(sessionId);
-        if(chatSession == null || !chatSession.isOpen()){
-            return;
-        }
-
-        try {
-            // 首先尝试解析JSON消息
-            String messageType = message.path("type").asText();
-
-            SysDevice device = sessionManager.getDeviceConfig(sessionId);
-            // 对于其他消息类型，检查设备是否已绑定
-            if (device == null) {
-                // 设备信息不存在，需要查询
-                Thread.startVirtualThread(() -> {
-                    try {
-                        SysDevice queryDevice = deviceService.selectDeviceById(deviceId);
-                        if (ObjectUtils.isEmpty(queryDevice) || queryDevice.getModelId() == null) {
-                            // 设备未绑定，处理未绑定设备的消息
-                            queryDevice = new SysDevice();
-                            queryDevice.setDeviceId(deviceId);
-                            handleUnboundDevice(sessionId, queryDevice);
-                        } else {
-                            // 更新缓存的设备信息
-                            sessionManager.registerDevice(sessionId, queryDevice);
-                            // 继续处理消息
-                            handleMessageByType(sessionId, message, messageType);
-                        }
-                    } catch (Exception e) {
-                        logger.error("处理消息失败", e);
-                    }
-                });
-            } else if (device.getModelId() == null) {
-                // 设备存在但未绑定模型，直接处理未绑定设备
-                handleUnboundDevice(sessionId, device);
-            } else {
-                // 设备已绑定且信息已缓存，直接处理消息
-                handleMessageByType(sessionId, message, messageType);
-            }
-        } catch (Exception e) {
-            logger.error("处理文本消息失败", e);
-        }
-    }
-
-    /**
      * 处理音频数据
      * @param sessionId
      * @param opusData
@@ -238,33 +192,7 @@ public class MessageHandler {
 
     }
 
-    private void handleMessageByType(String sessionId, JsonNode jsonNode, String messageType) {
-        ChatSession chatSession = sessionManager.getSession(sessionId);
-        if(chatSession == null || !chatSession.isOpen()){
-            return;
-        }       try {
-            switch (messageType) {
-                case "listen":
-                    handleListenMessage(chatSession, jsonNode);
-                    break;
-                case "abort":
-                    dialogueService.abortDialogue(chatSession, jsonNode.path("reason").asText());
-                    break;
-                case "iot":
-                    handleIotMessage(chatSession, jsonNode);
-                    break;
-                case "goodbye":
-                    sessionManager.closeSession(chatSession);
-                    break;
-                default:
-                    logger.warn("未知的消息类型: {}", messageType);
-            }
-        } catch (Exception e) {
-            logger.error("处理消息失败 - 类型: " + messageType, e);
-        }
-    }
-
-    private void handleUnboundDevice(String sessionId, SysDevice device) {
+    public void handleUnboundDevice(String sessionId, SysDevice device) {
         String deviceId = device.getDeviceId();
         ChatSession chatSession = sessionManager.getSession(sessionId);
         if(chatSession == null || !chatSession.isOpen()){
@@ -329,27 +257,22 @@ public class MessageHandler {
         });
     }
 
-
-    private void handleListenMessage(ChatSession chatSession, JsonNode jsonNode) {
+    public void handleListenMessage(ChatSession chatSession, ListenMessage message) {
         String sessionId = chatSession.getSessionId();
-        // 解析listen消息中的state和mode字段
-        String state = jsonNode.path("state").asText();
-        String mode = jsonNode.path("mode").asText();
-
-        logger.info("收到listen消息 - SessionId: {}, State: {}, Mode: {}", sessionId, state, mode);
-        sessionManager.setMode(mode);
+        logger.info("收到listen消息 - SessionId: {}, State: {}, Mode: {}", sessionId, message.getState(), message.getMode());
+        chatSession.setMode(message.getMode());
 
         // 根据state处理不同的监听状态
-        switch (state) {
-            case "start":
+        switch (message.getState()) {
+            case ListenState.Start:
                 // 开始监听，准备接收音频数据
-                logger.info("开始监听 - Mode: {}", mode);
+                logger.info("开始监听 - Mode: {}", message.getMode());
 
                 // 初始化VAD会话
                 vadService.initSession(sessionId);
                 break;
 
-            case "stop":
+            case ListenState.Stop:
                 // 停止监听
                 logger.info("停止监听");
 
@@ -360,27 +283,29 @@ public class MessageHandler {
                 vadService.resetSession(sessionId);
                 break;
 
-            case "text":
+            case ListenState.Text:
                 // 检测聊天文本输入
-                String text = jsonNode.path("text").asText();
                 if (audioService.isPlaying(sessionId)) {
-                    dialogueService.abortDialogue(chatSession, mode);
+                    dialogueService.abortDialogue(chatSession, message.getMode().getValue());
                 }
-                dialogueService.handleText(chatSession, text, null);
+                dialogueService.handleText(chatSession, message.getText(), null);
                 break;
 
-            case "detect":
+            case ListenState.Detect:
                 // 检测到唤醒词
-                String wakeWord = jsonNode.path("text").asText();
-                dialogueService.handleWakeWord(chatSession, wakeWord);
+                dialogueService.handleWakeWord(chatSession, message.getText());
                 break;
 
             default:
-                logger.warn("未知的listen状态: {}", state);
+                logger.warn("未知的listen状态: {}", message.getState());
         }
     }
 
-    private void handleIotMessage(ChatSession chatSession, JsonNode jsonNode) {
+    public void handleAbortMessage(ChatSession session, AbortMessage message) {
+        dialogueService.abortDialogue(session, message.getReason());
+    }
+
+    public void handleIotMessage(ChatSession chatSession, JsonNode jsonNode) {
         String sessionId = chatSession.getSessionId();
         logger.info("收到IoT消息 - SessionId: {}", sessionId);
 
@@ -399,5 +324,9 @@ public class MessageHandler {
             // 处理设备状态更新的逻辑
             iotService.handleDeviceStates(sessionId, states);
         }
+    }
+
+    public void handleGoodbyeMessage(ChatSession session, GoodbyeMessage message) {
+        sessionManager.closeSession(session);
     }
 }

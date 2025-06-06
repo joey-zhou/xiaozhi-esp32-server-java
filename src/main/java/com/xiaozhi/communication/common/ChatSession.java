@@ -4,6 +4,8 @@ import com.xiaozhi.dialogue.iot.IotDescriptor;
 import com.xiaozhi.dialogue.llm.tool.ToolsSessionHolder;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysRole;
+import com.xiaozhi.enums.ListenMode;
+import lombok.Data;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.tool.ToolCallback;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Data
 public abstract class ChatSession {
     /**
      * 当前会话的sessionId
@@ -52,7 +55,7 @@ public abstract class ChatSession {
     /**
      * 设备状态（auto, realTime)
      */
-    protected String mode;
+    protected ListenMode mode;
     /**
      * 会话的音频数据流
      */
@@ -109,37 +112,6 @@ public abstract class ChatSession {
         return dialogueId == null ? "": (String) getAttribute("assistantAudioPath_" + dialogueId);
     }
 
-    public String getSessionId() {
-        return sessionId;
-    }
-
-    public void setSessionId(String sessionId) {
-        this.sessionId = sessionId;
-    }
-
-    public SysDevice getSysDevice() {
-        return sysDevice;
-    }
-
-    public void setSysDevice(SysDevice sysDevice) {
-        this.sysDevice = sysDevice;
-    }
-
-    public List<SysRole> getSysRoleList() {
-        return sysRoleList;
-    }
-
-    public void setSysRoleList(List<SysRole> sysRoleList) {
-        this.sysRoleList = sysRoleList;
-    }
-
-    public Map<String, IotDescriptor> getIotDescriptors() {
-        return iotDescriptors;
-    }
-
-    public void setIotDescriptors(Map<String, IotDescriptor> iotDescriptors) {
-        this.iotDescriptors = iotDescriptors;
-    }
 
     public ToolsSessionHolder getFunctionSessionHolder() {
         return toolsSessionHolder;
@@ -151,70 +123,6 @@ public abstract class ChatSession {
 
     public List<ToolCallback> getToolCallbacks() {
         return toolsSessionHolder.getAllFunction();
-    }
-
-    public boolean isCloseAfterChat() {
-        return closeAfterChat;
-    }
-
-    public void setCloseAfterChat(boolean closeAfterChat) {
-        this.closeAfterChat = closeAfterChat;
-    }
-
-    public boolean isMusicPlaying() {
-        return musicPlaying;
-    }
-
-    public void setMusicPlaying(boolean musicPlaying) {
-        this.musicPlaying = musicPlaying;
-    }
-
-    public boolean isPlaying() {
-        return playing;
-    }
-
-    public void setPlaying(boolean playing) {
-        this.playing = playing;
-    }
-
-    public String getMode() {
-        return mode;
-    }
-
-    public void setMode(String mode) {
-        this.mode = mode;
-    }
-
-    public Sinks.Many<byte[]> getAudioSinks() {
-        return audioSinks;
-    }
-
-    public void setAudioSinks(Sinks.Many<byte[]> audioSinks) {
-        this.audioSinks = audioSinks;
-    }
-
-    public boolean isStreamingState() {
-        return streamingState;
-    }
-
-    public void setStreamingState(boolean streamingState) {
-        this.streamingState = streamingState;
-    }
-
-    public Instant getLastActivityTime() {
-        return lastActivityTime;
-    }
-
-    public void setLastActivityTime(Instant lastActivityTime) {
-        this.lastActivityTime = lastActivityTime;
-    }
-
-    public ChatMemory getChatMemory() {
-        return chatMemory;
-    }
-
-    public void setChatMemory(ChatMemory chatMemory) {
-        this.chatMemory = chatMemory;
     }
 
     public void clearMemory() {

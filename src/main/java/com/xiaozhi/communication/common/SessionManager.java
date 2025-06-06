@@ -4,6 +4,7 @@ import com.xiaozhi.dialogue.iot.IotDescriptor;
 import com.xiaozhi.dialogue.llm.tool.ToolsSessionHolder;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysRole;
+import com.xiaozhi.enums.ListenMode;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
@@ -87,7 +88,7 @@ public class SessionManager {
                 if (lastActivity != null) {
                     Duration inactiveDuration = Duration.between(lastActivity, now);
                     if (inactiveDuration.getSeconds() > INACTIVITY_TIMEOUT_SECONDS) {
-                        logger.info("会话 {} 已经 {} 秒没有有效活动，自动关闭", 
+                        logger.info("会话 {} 已经 {} 秒没有有效活动，自动关闭",
                             session.getSessionId(), inactiveDuration.getSeconds());
                         closeSession(session);
                     }
@@ -99,7 +100,7 @@ public class SessionManager {
     /**
      * 更新会话的最后有效活动时间
      * 这个方法应该只在检测到实际的用户活动时调用，如语音输入或明确的交互
-     * 
+     *
      * @param sessionId 会话ID
      */
     public void updateLastActivity(String sessionId) {
@@ -111,7 +112,7 @@ public class SessionManager {
 
     /**
      * 注册新的会话
-     * 
+     *
      * @param sessionId 会话ID
      * @param chatSession  会话
      */
@@ -135,7 +136,7 @@ public class SessionManager {
     /**
      * 关闭并清理WebSocket会话
      * 使用虚拟线程实现异步处理
-     * 
+     *
      * @param chatSession 聊天session
      */
     public void closeSession(ChatSession chatSession) {
@@ -164,7 +165,7 @@ public class SessionManager {
 
     /**
      * 注册设备配置
-     * 
+     *
      * @param sessionId 会话ID
      * @param device    设备信息
      */
@@ -370,7 +371,7 @@ public class SessionManager {
 
     /**
      * 音乐播放状态
-     * 
+     *
      * @param sessionId 会话ID
      * @param isPlaying 是否正在播放音乐
      */
@@ -383,7 +384,7 @@ public class SessionManager {
 
     /**
      * 是否在播放音乐
-     * 
+     *
      * @param sessionId 会话ID
      * @return 是否正在播放音乐
      */
@@ -397,7 +398,7 @@ public class SessionManager {
 
     /**
      * 播放状态
-     * 
+     *
      * @param sessionId 会话ID
      * @param isPlaying 是否正在说话
      */
@@ -410,7 +411,7 @@ public class SessionManager {
 
     /**
      * 是否在播放音乐
-     * 
+     *
      * @param sessionId 会话ID
      * @return 是否正在播放音乐
      */
@@ -424,11 +425,12 @@ public class SessionManager {
 
     /**
      * 设备状态
-     * 
+     *
+     * @param sessionId
      * @param mode  设备状态 auto/realTime
      */
-    public void setMode(String mode) {
-        ChatSession chatSession = sessions.get(mode);
+    public void setMode(String sessionId, ListenMode mode) {
+        ChatSession chatSession = sessions.get(sessionId);
         if (chatSession != null) {
             chatSession.setMode(mode);
         }
@@ -439,17 +441,17 @@ public class SessionManager {
      *
      * @param sessionId
      */
-    public String getMode(String sessionId) {
+    public ListenMode getMode(String sessionId) {
         ChatSession chatSession = sessions.get(sessionId);
         if (chatSession != null) {
             return chatSession.getMode();
         }
-        return "auto";
+        return ListenMode.Auto;
     }
 
     /**
      * 设置流式识别状态
-     * 
+     *
      * @param sessionId   会话ID
      * @param isStreaming 是否正在流式识别
      */
@@ -463,7 +465,7 @@ public class SessionManager {
 
     /**
      * 获取流式识别状态
-     * 
+     *
      * @param sessionId 会话ID
      * @return 是否正在流式识别
      */
@@ -477,7 +479,7 @@ public class SessionManager {
 
     /**
      * 创建音频数据流
-     * 
+     *
      * @param sessionId 会话ID
      */
     public void createAudioStream(String sessionId) {
@@ -490,7 +492,7 @@ public class SessionManager {
 
     /**
      * 获取音频数据流
-     * 
+     *
      * @param sessionId 会话ID
      * @return 音频数据流
      */
@@ -504,7 +506,7 @@ public class SessionManager {
 
     /**
      * 发送音频数据
-     * 
+     *
      * @param sessionId 会话ID
      * @param data 音频数据
      */
@@ -517,7 +519,7 @@ public class SessionManager {
 
     /**
      * 完成音频流
-     * 
+     *
      * @param sessionId 会话ID
      */
     public void completeAudioStream(String sessionId) {
@@ -529,12 +531,12 @@ public class SessionManager {
 
     /**
      * 关闭音频流
-     * 
+     *
      * @param sessionId 会话ID
      */
     public void closeAudioStream(String sessionId) {
         Sinks.Many<byte[]> sink = getAudioStream(sessionId);
-        
+
         ChatSession chatSession = sessions.get(sessionId);
         if (chatSession != null) {
             chatSession.setAudioSinks(null);
@@ -543,7 +545,7 @@ public class SessionManager {
 
     /**
      * 标记设备正在生成验证码
-     * 
+     *
      * @param deviceId 设备ID
      * @return 如果设备之前没有在生成验证码，返回true；否则返回false
      */
@@ -553,7 +555,7 @@ public class SessionManager {
 
     /**
      * 取消设备验证码生成标记
-     * 
+     *
      * @param deviceId 设备ID
      */
     public void unmarkCaptchaGeneration(String deviceId) {
