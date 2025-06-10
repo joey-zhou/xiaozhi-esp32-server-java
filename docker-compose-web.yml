@@ -1,0 +1,14 @@
+services:
+  node:
+    build:
+      context: .
+      dockerfile: Dockerfile-node
+    ports:
+      - "8084:8084"
+    networks:
+      - app-network
+    environment:
+      - API_URL=http://server:8091
+networks:
+  app-network:
+    driver: bridge

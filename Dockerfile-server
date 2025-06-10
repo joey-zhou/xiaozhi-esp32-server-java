@@ -33,31 +33,32 @@ RUN mkdir -p /build/models
 COPY ./models/silero_vad.onnx /build/models/silero_vad.onnx
 
 # 下载并准备Vosk模型
-RUN mkdir -p /vosk_cache && \
-    if [ "$VOSK_MODEL_SIZE" = "small" ]; then \
-        if [ ! -d "/vosk_cache/vosk-model-small-cn-0.22" ]; then \
-            echo "Downloading small Vosk model..." && \
-            cd /vosk_cache && \
-            wget https://alphacephei.com/vosk/models/vosk-model-small-cn-0.22.zip && \
-            unzip vosk-model-small-cn-0.22.zip && \
-            rm vosk-model-small-cn-0.22.zip; \
-        else \
-            echo "Using cached small Vosk model"; \
-        fi && \
-        cp -r /vosk_cache/vosk-model-small-cn-0.22 /build/models/vosk-model; \
-    else \
-        if [ ! -d "/vosk_cache/vosk-model-cn-0.22" ]; then \
-            echo "Downloading standard Vosk model..." && \
-            cd /vosk_cache && \
-            wget https://alphacephei.com/vosk/models/vosk-model-cn-0.22.zip && \
-            unzip vosk-model-cn-0.22.zip && \
-            rm vosk-model-cn-0.22.zip; \
-        else \
-            echo "Using cached standard Vosk model"; \
-        fi && \
-        cp -r /vosk_cache/vosk-model-cn-0.22 /build/models/vosk-model; \
-    fi
-
+#RUN mkdir -p /vosk_cache && \
+#    if [ "$VOSK_MODEL_SIZE" = "small" ]; then \
+#        if [ ! -d "/vosk_cache/vosk-model-small-cn-0.22" ]; then \
+#            echo "Downloading small Vosk model..." && \
+#            cd /vosk_cache && \
+#            wget https://alphacephei.com/vosk/models/vosk-model-small-cn-0.22.zip && \
+#            unzip vosk-model-small-cn-0.22.zip && \
+#            rm vosk-model-small-cn-0.22.zip; \
+#        else \
+#            echo "Using cached small Vosk model"; \
+#        fi && \
+#        cp -r /vosk_cache/vosk-model-small-cn-0.22 /build/models/vosk-model; \
+#    else \
+#        if [ ! -d "/vosk_cache/vosk-model-cn-0.22" ]; then \
+#            echo "Downloading standard Vosk model..." && \
+#            cd /vosk_cache && \
+#            wget https://alphacephei.com/vosk/models/vosk-model-cn-0.22.zip && \
+#            unzip vosk-model-cn-0.22.zip && \
+#            rm vosk-model-cn-0.22.zip; \
+#        else \
+#            echo "Using cached standard Vosk model"; \
+#        fi && \
+#        cp -r /vosk_cache/vosk-model-cn-0.22 /build/models/vosk-model; \
+#    fi
+## 本地下载好了模型使用这个
+COPY ./models/vosk-model /build/models/vosk-model
 # 使用更小的JRE镜像作为运行时环境
 FROM eclipse-temurin:21-jre
 

@@ -1,0 +1,30 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile-server
+      args:
+        - VOSK_MODEL_SIZE=${VOSK_MODEL_SIZE:-small}
+      # 添加构建缓存设置
+      cache_from:
+        - eclipse-temurin:21-jre
+    ports:
+      - "8091:8091"
+    networks:
+      - app-network
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://10.16.32.3:3306/xiaozhi?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=123456
+    volumes:
+      - maven_repo:/root/.m2/repository  # 持久化Maven仓库
+      - vosk_models:/vosk_cache  # 持久化Vosk模型
+    restart: on-failure  # 添加重启策略，如果启动失败会自动重试
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  maven_repo:  # 持久化Maven仓库
+  vosk_models:  # 持久化Vosk模型

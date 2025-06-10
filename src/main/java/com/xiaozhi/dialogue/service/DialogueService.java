@@ -352,6 +352,7 @@ public class DialogueService implements ApplicationListener<ChatSessionCloseEven
             SysDevice device,
             byte[] initialAudio) {
         Assert.notNull(session, "session不能为空");
+        logger.info("startStt={}", sessionId);
         Thread.startVirtualThread(() -> {
             try {
                 // 如果正在播放，先中断音频
@@ -422,6 +423,7 @@ public class DialogueService implements ApplicationListener<ChatSessionCloseEven
                 logger.error("流式识别错误: {}", e.getMessage(), e);
             }
         });
+        logger.info("end Stt={}", sessionId);
     }
 
     /**
@@ -835,6 +837,7 @@ public class DialogueService implements ApplicationListener<ChatSessionCloseEven
      * 在流式处理完成后或非首句音频生成完成后调用
      */
     private void processQueue(ChatSession session, String sessionId) {
+        logger.info("processQueue sessionId={}", sessionId);
         // 获取锁，确保线程安全
         ReentrantLock lock = locks.get(sessionId);
         if (lock == null) {
@@ -862,7 +865,7 @@ public class DialogueService implements ApplicationListener<ChatSessionCloseEven
 
             // 检查当前是否有句子正在播放
             boolean isCurrentlyPlaying = audioService.isPlaying(sessionId);
-
+            logger.info("isCurrentlyPlaying={}", isCurrentlyPlaying);
             // 如果当前正在播放，不处理下一个句子
             if (isCurrentlyPlaying) {
                 return;

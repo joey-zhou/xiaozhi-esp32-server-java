@@ -153,6 +153,7 @@ public class ChatService {
                                 if (!token.isEmpty()) {
                                     streamListener.onToken(token);
                                 }
+                                logger.info("toolName = {},useFunctionCall={}", toolName, useFunctionCall);
                                 if (toolName.isEmpty() && useFunctionCall) {
                                     Generation generation = chatResponse.getResult();
                                     // 注意，不能用chatResponse.hasToolCalls()判断，当前chatResponse工具调用结果的返回，

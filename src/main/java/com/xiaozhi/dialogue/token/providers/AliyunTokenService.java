@@ -86,11 +86,11 @@ public class AliyunTokenService implements TokenService {
             DefaultProfile profile = DefaultProfile.getProfile(REGIONID, ak, sk);
             IAcsClient client = new DefaultAcsClient(profile);
             CommonRequest request = new CommonRequest();
-            request.setDomain(DOMAIN);
-            request.setVersion(API_VERSION);
-            request.setAction(REQUEST_ACTION);
-            request.setMethod(MethodType.POST);
-            request.setProtocol(ProtocolType.HTTPS);
+            request.setSysDomain(DOMAIN);
+            request.setSysVersion(API_VERSION);
+            request.setSysAction(REQUEST_ACTION);
+            request.setSysMethod(MethodType.POST);
+            request.setSysProtocol(ProtocolType.HTTPS);
 
             // 发送请求
             CommonResponse response = client.getCommonResponse(request);
