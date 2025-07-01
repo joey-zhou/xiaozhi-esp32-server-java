@@ -1,0 +1,4 @@
+Version: 2.8.15\n\nChangelog:\n## [2.8.15] - 2025-07-01\n\n### 修复\n- fix:修复tag更新错误问题
+- fix:修复设备在聆听时，修改角色配置导致缓存更新时多次查询数据库的问题
+- fix:修复init初始化确实头像字段\n\n### 其他变更\n- refactor:优化token缓存，减少冗余代码
+- update:阿里巴巴sdk日志级别改为warn\n\n
