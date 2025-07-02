@@ -1,28 +1,26 @@
 package com.xiaozhi.dialogue.stt.providers;
 
-import java.io.ByteArrayInputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-
+import com.xiaozhi.dialogue.stt.SttService;
+import com.xiaozhi.utils.AudioUtils;
 import jakarta.annotation.PostConstruct;
-
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vosk.LibVosk;
 import org.vosk.LogLevel;
 import org.vosk.Model;
 import org.vosk.Recognizer;
-
-import com.xiaozhi.dialogue.stt.SttService;
-import com.xiaozhi.utils.AudioUtils;
-
 import reactor.core.publisher.Sinks;
 
-import org.json.JSONObject;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Vosk STT服务实现
@@ -41,6 +39,7 @@ public class VoskSttService implements SttService {
 
     /**
      * 初始化Vosk模型
+     *
      * @throws Exception 如果模型加载失败
      */
     @PostConstruct
@@ -62,7 +61,7 @@ public class VoskSttService implements SttService {
             LibVosk.setLogLevel(LogLevel.WARNINGS);
 
             // 加载模型，路径为配置的模型目录
-            voskModelPath = System.getProperty("user.dir") + "/models/vosk-model";
+            voskModelPath = System.getProperty("user.dir") + File.separator + Paths.get("models", "vosk-model");
             model = new Model(voskModelPath);
             modelLoaded = true;
             logger.info("Vosk 模型加载成功！路径: {}", voskModelPath);
@@ -75,6 +74,7 @@ public class VoskSttService implements SttService {
 
     /**
      * 检查模型是否成功加载
+     *
      * @return 如果模型加载成功返回true，否则返回false
      */
     public boolean isModelLoaded() {
@@ -138,23 +138,23 @@ public class VoskSttService implements SttService {
             logger.error("Vosk模型未加载，无法进行流式识别！");
             return null;
         }
-        
+
         // 使用阻塞队列存储音频数据
         BlockingQueue<byte[]> audioQueue = new LinkedBlockingQueue<>();
         AtomicBoolean isCompleted = new AtomicBoolean(false);
         List<String> recognizedText = new ArrayList<>();
         StringBuilder finalResult = new StringBuilder();
-        
+
         // 订阅Sink并将数据放入队列
         audioSink.asFlux().subscribe(
-            data -> audioQueue.offer(data),
-            error -> {
-                logger.error("音频流处理错误", error);
-                isCompleted.set(true);
-            },
-            () -> isCompleted.set(true)
+                data -> audioQueue.offer(data),
+                error -> {
+                    logger.error("音频流处理错误", error);
+                    isCompleted.set(true);
+                },
+                () -> isCompleted.set(true)
         );
-        
+
         // 使用虚拟线程处理音频识别
         try {
             Thread.startVirtualThread(() -> {
@@ -175,7 +175,7 @@ public class VoskSttService implements SttService {
                                     }
                                 }
                             }
-                            
+
                             // 如果已完成且队列为空，获取最终结果
                             if (isCompleted.get() && audioQueue.isEmpty()) {
                                 String finalText = recognizer.getFinalResult();
@@ -195,12 +195,12 @@ public class VoskSttService implements SttService {
                             break;
                         }
                     }
-                    
+
                     // 合并所有识别结果
                     for (String text : recognizedText) {
                         finalResult.append(text);
                     }
-                    
+
                 } catch (Exception e) {
                     logger.error("Vosk流式识别过程中发生错误", e);
                 }
@@ -208,7 +208,7 @@ public class VoskSttService implements SttService {
         } catch (Exception e) {
             logger.error("启动虚拟线程失败", e);
         }
-        
+
         return finalResult.toString();
     }
 }
