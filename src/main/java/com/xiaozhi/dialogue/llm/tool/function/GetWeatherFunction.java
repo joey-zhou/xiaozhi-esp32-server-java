@@ -106,10 +106,16 @@ public class GetWeatherFunction implements ToolsGlobalRegistry.GlobalFunction {
             location = getLocationByIP(CmsUtils.getLocalIpAddress());
         }
         log.info("最终的地址是 {}",location);
-        String token="eyJhbGciOiAiRWREU0EiLCAia2lkIjogIkNHNUE2Q1JWOUMifQ==.eyJzdWIiOiAiM0YyREdIOE02UiIsICJpYXQiOiAxNzU4ODgyMTc2LCAiZXhwIjogMTc1ODg4MzA3Nn0=.ThxuTSURFUooVnrmpgdi8RKf7ZUZ4w4vJn4HuEfuP9ahCT2PQ3d0QkQk18W2kCWnmEV7MJYTFph33qAEdx59AA==";
-        String host = "kv6vhf8g58.re.qweatherapi.com";
+       String host = "kv6vhf8g58.re.qweatherapi.com";
 
         String url = "https://"+host+"/geo/v2/city/lookup?location="+location;
+        String token = null;
+        try {
+            token = createToken();
+        }catch (Exception e){
+            log.error("token 获取失败");
+        }
+
         var request = new Request.Builder()
                 .url(url)
                 .addHeader("Authorization","Bearer "+token)
@@ -138,14 +144,12 @@ public class GetWeatherFunction implements ToolsGlobalRegistry.GlobalFunction {
     }
 
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception{
         GetWeatherFunction getWeatherFunction = new GetWeatherFunction();
         getWeatherFunction.fetchCityInfo("上海");
-
-
     }
 
-    public void createToken()throws Exception{
+    public static String createToken()throws Exception{
         // Private key
         String privateKeyString = "-----BEGIN PRIVATE KEY-----\n" +
                 "MC4CAQAwBQYDK2VwBCIEIOqloJ6PrTgH/OGNiHlFcP3RmvoHoYq7F3soAFaRuXu/\n" +
@@ -182,6 +186,7 @@ public class GetWeatherFunction implements ToolsGlobalRegistry.GlobalFunction {
 // Print Token
         System.out.println("Signature:\n" + signatureEncoded);
         System.out.println("JWT:\n" + jwt);
+        return jwt;
     }
 
 

@@ -58,7 +58,7 @@ public class ChatService {
     private static final Pattern EMOJI_PATTERN = Pattern.compile("\\p{So}|\\p{Sk}|\\p{Sm}");
 
     // 最小句子长度（字符数）
-    private static final int MIN_SENTENCE_LENGTH = 5;
+    private static final int MIN_SENTENCE_LENGTH = 15;
 
     // 新句子判断的字符阈值
     private static final int NEW_SENTENCE_TOKEN_THRESHOLD = 8;

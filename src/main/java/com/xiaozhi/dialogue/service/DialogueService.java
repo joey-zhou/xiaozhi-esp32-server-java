@@ -865,7 +865,7 @@ public class DialogueService implements ApplicationListener<ChatSessionCloseEven
 
             // 检查当前是否有句子正在播放
             boolean isCurrentlyPlaying = audioService.isPlaying(sessionId);
-            logger.info("isCurrentlyPlaying={}", isCurrentlyPlaying);
+
             // 如果当前正在播放，不处理下一个句子
             if (isCurrentlyPlaying) {
                 return;
@@ -876,7 +876,7 @@ public class DialogueService implements ApplicationListener<ChatSessionCloseEven
                     .mapToInt(Sentence::getSeq)
                     .min()
                     .orElse(Integer.MAX_VALUE);
-
+            logger.info("isCurrentlyPlaying={},minSeq={}", isCurrentlyPlaying,minSeq);
             // 找出该序号的句子
             Sentence nextSentence = queue.stream()
                     .filter(s -> s.getSeq() == minSeq)
@@ -904,12 +904,16 @@ public class DialogueService implements ApplicationListener<ChatSessionCloseEven
                         // 在播放完成后，递归调用处理下一个句子
                         processQueue(session, sessionId);
                     });
+                }else{
+                    logger.info("句子未准备好或超时");
                 }
                 //logger.info("是否最后一个句子{}, 对话ID: {}",nextSentence.isLast, nextSentence.assistantTimeMillis);
                 // 如果是最后一个句子，合并并存储助手的完整音频
                 if (nextSentence.isLast() && nextSentence.getAssistantTimeMillis() != null) {
                     saveAssistantResponse(session);
                 }
+            }else{
+                logger.info("minSeq 序号获取为null，获取失败");
             }
         } finally {
             lock.unlock();

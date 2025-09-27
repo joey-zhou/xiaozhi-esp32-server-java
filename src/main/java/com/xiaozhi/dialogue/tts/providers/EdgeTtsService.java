@@ -42,6 +42,7 @@ public class EdgeTtsService implements TtsService {
 
     @Override
     public String textToSpeech(String text) throws Exception {
+        logger.info("textToSpeech = {}",text);
         // 获取中文语音
         Voice voiceObj = TTSVoice.provides().stream()
                 .filter(v -> v.getShortName().equals(voiceName))
