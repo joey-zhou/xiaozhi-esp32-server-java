@@ -166,10 +166,11 @@ public class ChatService {
      * 从响应中提取token（单一职责）
      */
     private String extractTokenFromResponse(ChatResponse chatResponse) {
-        if (chatResponse == null || chatResponse.getResult() == null || chatResponse.getResult().getOutput() == null) {
-            return "";
-        }
-        return chatResponse.getResult().getOutput() != null ? chatResponse.getResult().getOutput().getText() : "";
+        String token = chatResponse.getResult() == null
+                || chatResponse.getResult().getOutput() == null
+                || chatResponse.getResult().getOutput().getText() == null ? ""
+                : chatResponse.getResult().getOutput().getText();
+        return token;
     }
 
     /**

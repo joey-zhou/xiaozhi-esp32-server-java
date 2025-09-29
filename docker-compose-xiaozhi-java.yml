@@ -1,0 +1,16 @@
+version: '3.3'
+services:
+  xiaozhi-esp32-server-java-server:
+    container_name: xiaozhi-esp32-server-java-server
+    image: xiaozhi-server-java:2.8.17
+    restart: always
+    ports:
+      - "8091:8091"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://10.16.32.3:3306/xiaozhi?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=123456
+    networks:
+      - default
+networks:
+  default:

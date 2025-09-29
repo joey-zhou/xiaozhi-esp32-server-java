@@ -1,0 +1,15 @@
+FROM eclipse-temurin:21-jre
+
+# 安装必要的运行时依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# 复制模型文件夹
+COPY  ./models /models
+COPY target/*.jar xiaozhi.server-2.8.17.jar
+RUN sh -c 'touch /xiaozhi.server-2.8.17'
+ENV JAVA_OPTS=""
+CMD exec java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar /xiaozhi.server-2.8.17.jar
+EXPOSE 8091
