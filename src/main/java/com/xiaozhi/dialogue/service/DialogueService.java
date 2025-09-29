@@ -551,8 +551,10 @@ public class DialogueService implements ApplicationListener<ChatSessionCloseEven
 
         // 创建句子对象
         Sentence sentence = new Sentence(seq, text, isFirst, isLast);
-        sentence.setModelResponseTime(responseTime / 1000.0); // 记录模型响应时间
-        sentence.setAssistantTimeMillis(assistantTimeMillis); // 设置对话ID
+        // 记录模型响应时间
+        sentence.setModelResponseTime(responseTime / 1000.0);
+        // 设置对话ID
+        sentence.setAssistantTimeMillis(assistantTimeMillis);
 
         logger.info("处理LLM返回的句子: seq={}, text={}, isFirst={}, isLast={}, responseTime={}s", seq, text, isFirst, isLast, responseTime/1000);
 
@@ -564,8 +566,8 @@ public class DialogueService implements ApplicationListener<ChatSessionCloseEven
         // 如果句子为空且是结束状态，直接标记为准备好（不需要生成音频）
         if ((text == null || text.isEmpty()) && isLast) {
             sentence.setAudio(null);
-            sentence.setTtsGenerationTime(0); // 设置TTS生成时间为0
-
+            // 设置TTS生成时间为0
+            sentence.setTtsGenerationTime(0);
             // 如果是首句，需要标记首句处理完成
             if (isFirst) {
                 firstSentDone.get(sessionId).set(true);
@@ -898,8 +900,10 @@ public class DialogueService implements ApplicationListener<ChatSessionCloseEven
                     audioService.sendAudioMessage(
                             session,
                             nextSentence,
-                            false, // 不是开始消息
-                            nextSentence.isLast() // 如果是最后一句，则是结束消息
+                            // 不是开始消息
+                            false,
+                            // 如果是最后一句，则是结束消息
+                            nextSentence.isLast()
                     ).thenRun(() -> {
                         // 在播放完成后，递归调用处理下一个句子
                         processQueue(session, sessionId);
