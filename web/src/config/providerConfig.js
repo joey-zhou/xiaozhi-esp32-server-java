@@ -90,7 +90,7 @@ export const configTypeMap = {
           label: 'API URL',
           required: true,
           inputType: 'text',
-          placeholder: 'https://dashscope.aliyuncs.com/api/v1',
+          placeholder: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
           span: 12,
           suffix: '/chat/completions',
           help: '阿里云通义千问 API 接口地址'
@@ -134,7 +134,7 @@ export const configTypeMap = {
           label: 'API URL',
           required: true,
           inputType: 'text',
-          placeholder: 'https://api.deepseek.com/v1',
+          placeholder: 'https://api.deepseek.com',
           span: 12,
           suffix: '/chat/completions',
           help: 'DeepSeek API 接口地址'

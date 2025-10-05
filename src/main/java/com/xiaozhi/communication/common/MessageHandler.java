@@ -133,7 +133,7 @@ public class MessageHandler {
 
                     // 更新设备状态
                     deviceService.update(new SysDevice()
-                            .setDeviceId(device.getDeviceId())
+                            .setDeviceId(deviceId)
                             .setState(SysDevice.DEVICE_STATE_ONLINE)
                             .setLastLogin(new Date().toString()));
 

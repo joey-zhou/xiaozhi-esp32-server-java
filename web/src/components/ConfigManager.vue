@@ -189,7 +189,7 @@
                     <a-button type="primary" html-type="submit">
                       {{ editingConfigId ? `更新${configTypeInfo.label}` : `创建${configTypeInfo.label}` }}
                     </a-button>
-                    <a-button style="margin-left: 8px" @click="resetForm">
+                    <a-button style="margin-left: 8px" @click="cancel">
                       取消
                     </a-button>
                   </a-form-item>
@@ -535,7 +535,11 @@ export default {
     // 处理标签页切换
     handleTabChange(key) {
       this.activeTabKey = key;
-      this.resetForm();
+      if (key === '1') {
+        this.getData();
+      } else if (key === '2') {
+        this.resetForm();
+      }
     },
 
     // 处理类别变化
@@ -861,6 +865,12 @@ export default {
       this.currentType = ''
       this.modelOptions = []
       this.editingConfigId = null
+    },
+
+    // 取消
+    cancel() {
+      this.resetForm()
+      this.handleTabChange('1')
     }
   }
 }

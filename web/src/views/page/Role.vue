@@ -219,7 +219,7 @@
                 </a-row>
                 
                 <!-- 模型高级设置 -->
-                <a-collapse :bordered="false" style="background: transparent; margin-bottom: 24px;">
+                <a-collapse :bordered="false" style="background: transparent; margin-bottom: 24px;" @change="handleModelCollapseChange">
                   <a-collapse-panel header="模型高级设置" key="1">
                     <a-row :gutter="16">
                       <a-col :xl="8" :lg="12" :xs="24">
@@ -296,7 +296,7 @@
                 </a-row>
                 
                 <!-- VAD高级设置 -->
-                <a-collapse :bordered="false" style="background: transparent; margin-bottom: 24px;">
+                <a-collapse :bordered="false" style="background: transparent; margin-bottom: 24px;" @change="handleVadCollapseChange">
                   <a-collapse-panel header="语音识别高级设置 (VAD参数)" key="1">
                     <a-row :gutter="16">
                       <a-col :xl="6" :lg="12" :xs="24">
@@ -477,7 +477,7 @@
                   <a-button type="primary" html-type="submit" :loading="submitLoading">
                     {{ editingRoleId ? "更新角色" : "创建角色" }}
                   </a-button>
-                  <a-button style="margin-left: 8px" @click="resetForm">
+                  <a-button style="margin-left: 8px" @click="cancel">
                     取消
                   </a-button>
                 </a-form-item>
@@ -654,6 +654,10 @@ export default {
       avatarUrl: '',
       avatarLoading: false,
       avatarFile: null,
+      
+      // 待设置的VAD参数（用于编辑时延迟设置）
+      pendingVadValues: null,
+      pendingModelValues: null,
     };
   },
   
@@ -1370,7 +1374,21 @@ export default {
         this.selectedModelType = record.modelType || MODEL_TYPE.LLM;
         this.selectedModelProvider = record.modelProvider || '';
 
-        // 设置表单值，将isDefault从数字转为布尔值
+        // 准备折叠面板内的VAD参数值（延迟到用户展开时设置）
+        this.pendingVadValues = {
+          vadSpeechTh: record.vadSpeechTh !== null && record.vadSpeechTh !== undefined ? record.vadSpeechTh : this.defaultVadSettings.vadSpeechTh,
+          vadSilenceTh: record.vadSilenceTh !== null && record.vadSilenceTh !== undefined ? record.vadSilenceTh : this.defaultVadSettings.vadSilenceTh,
+          vadEnergyTh: record.vadEnergyTh !== null && record.vadEnergyTh !== undefined ? record.vadEnergyTh : this.defaultVadSettings.vadEnergyTh,
+          vadSilenceMs: record.vadSilenceMs !== null && record.vadSilenceMs !== undefined ? record.vadSilenceMs : this.defaultVadSettings.vadMinSilenceMs,
+        };
+        
+        // 准备折叠面板内的模型参数值（延迟到用户展开时设置）
+        this.pendingModelValues = {
+          temperature: record.temperature !== null && record.temperature !== undefined ? record.temperature : 0.7,
+          topP: record.topP !== null && record.topP !== undefined ? record.topP : 0.9,
+        };
+
+        // 设置表单基础值，将isDefault从数字转为布尔值
         roleForm.setFieldsValue({
           roleName: record.roleName,
           roleDesc: record.roleDesc,
@@ -1385,16 +1403,6 @@ export default {
           
           // 语音识别
           sttId: record.sttId,
-          
-          // VAD参数
-          vadSpeechTh: record.vadSpeechTh || this.defaultVadSettings.vadSpeechTh,
-          vadSilenceTh: record.vadSilenceTh || this.defaultVadSettings.vadSilenceTh,
-          vadEnergyTh: record.vadEnergyTh || this.defaultVadSettings.vadEnergyTh,
-          vadSilenceMs: record.vadSilenceMs || this.defaultVadSettings.vadMinSilenceMs,
-          
-          // 模型参数
-          temperature: record.temperature || 0.7,
-          topP: record.topP || 0.9,
         });
         
         // 在所有数据加载完成后，设置TTS和语音名称
@@ -1470,9 +1478,18 @@ export default {
       this.audioUrl = '';
       this.avatarUrl = ''; // 重置头像
       this.avatarFile = null; // 清空文件对象
-
+      // 清空待设置的折叠面板值
+      this.pendingVadValues = null;
+      this.pendingModelValues = null;
       // 应用默认值
       this.applyDefaultValues();
+    },
+
+    
+    // 取消
+    cancel() {
+      this.resetForm()
+      this.handleTabChange('1')
     },
     
     // 应用默认值
@@ -1767,6 +1784,32 @@ export default {
     // 跳转到模板管理页面
     goToTemplateManager() {
       this.$router.push('/template');
+    },
+    
+    // 处理VAD折叠面板变化
+    handleVadCollapseChange(activeKeys) {
+      // 当折叠面板展开时（activeKeys包含'1'）
+      if (activeKeys && activeKeys.includes('1') && this.pendingVadValues) {
+        // 使用 $nextTick 确保DOM已更新
+        this.$nextTick(() => {
+          this.roleForm.setFieldsValue(this.pendingVadValues);
+          // 清空待设置的值
+          this.pendingVadValues = null;
+        });
+      }
+    },
+    
+    // 处理模型折叠面板变化
+    handleModelCollapseChange(activeKeys) {
+      // 当折叠面板展开时（activeKeys包含'1'）
+      if (activeKeys && activeKeys.includes('1') && this.pendingModelValues) {
+        // 使用 $nextTick 确保DOM已更新
+        this.$nextTick(() => {
+          this.roleForm.setFieldsValue(this.pendingModelValues);
+          // 清空待设置的值
+          this.pendingModelValues = null;
+        });
+      }
     },
     
     // 获取语音显示名称
