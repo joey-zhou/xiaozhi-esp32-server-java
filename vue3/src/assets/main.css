@@ -1,0 +1,13 @@
+@import './base.css';
+
+#app {
+  width: 100%;
+  height: 100%;
+  font-weight: normal;
+}
+
+/* 修复分页箭头对齐问题 */
+.ant-pagination-item-link {
+  display: contents;
+}
+

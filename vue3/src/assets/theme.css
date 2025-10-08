@@ -1,0 +1,56 @@
+/* 全局主题样式 */
+
+/* 亮色主题（默认） */
+:root {
+  --bg-color: #f0f2f5;
+  --text-color: #000000;
+  --border-color: #d9d9d9;
+  --card-bg: #ffffff;
+  --search-form-bg: #ffffff;
+}
+
+/* 暗色主题 */
+html.dark,
+html[data-theme='dark'] {
+  --bg-color: #000000;
+  --text-color: #ffffff;
+  --border-color: #434343;
+  --card-bg: #141414;
+  --search-form-bg: #141414;
+}
+
+/* 暗色主题下的全局样式调整 */
+html.dark body,
+html[data-theme='dark'] body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+html.dark #app,
+html[data-theme='dark'] #app {
+  background-color: var(--bg-color);
+}
+
+/* 登录页面暗色主题适配 */
+html.dark .login-card,
+html.dark .register-card,
+html.dark .forget-card {
+  background: rgba(30, 30, 30, 0.5) !important;
+}
+
+/* 搜索表单暗色主题 */
+html.dark .search-form,
+html[data-theme='dark'] .search-form {
+  background-color: var(--search-form-bg);
+}
+
+/* 卡片暗色主题 */
+html.dark .ant-card,
+html[data-theme='dark'] .ant-card {
+  background-color: var(--card-bg);
+}
+
+/* 平滑过渡 */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}

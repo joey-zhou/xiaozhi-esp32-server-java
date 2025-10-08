@@ -208,10 +208,18 @@ public class UserController extends BaseController {
                 String newPassword = authenticationService.encryptPassword(password);
                 userQuery.setPassword(newPassword);
             }
-            
-            if (!StringUtils.hasText(avatar) && StringUtils.hasText(name)) {
-                userQuery.setAvatar(ImageUtils.GenerateImg(name));
+
+            if (StringUtils.hasText(avatar)) {
+                userQuery.setAvatar(avatar);
             }
+
+            if (StringUtils.hasText(name)) {
+                userQuery.setName(name);
+            }
+            
+            // if (!StringUtils.hasText(avatar) && StringUtils.hasText(name)) {
+            //     userQuery.setAvatar(ImageUtils.GenerateImg(name));
+            // }
 
             if (0 < userService.update(userQuery)) {
                 return AjaxResult.success();

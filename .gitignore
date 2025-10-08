@@ -32,3 +32,5 @@ application-local.properties
 
 .vscode/
 datasets/
+.cursorrules
+.cursor/

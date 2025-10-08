@@ -80,7 +80,11 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
         if (rows > 0) {
             sttServiceFactory.removeCache(config);
             ttsServiceFactory.removeCache(config);
-            tokenService.removeCache(configMapper.query(config).getFirst());
+            List<SysConfig> configs = configMapper.query(config);
+            // 这里可能为 null，
+            if (configs.size() > 0) {
+                tokenService.removeCache(configs.getFirst());
+            }
         }
         return rows;
     }

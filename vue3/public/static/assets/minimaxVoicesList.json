@@ -1,0 +1,278 @@
+[
+  {
+    "label": "青涩青年音色",
+    "value": "male-qn-qingse",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "精英青年音色",
+    "value": "male-qn-jingying",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "霸道青年音色",
+    "value": "male-qn-badao",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "青年大学生音色",
+    "value": "male-qn-daxuesheng",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "少女音色",
+    "value": "female-shaonv",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "御姐音色",
+    "value": "female-yujie",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "成熟女性音色",
+    "value": "female-chengshu",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "甜美女性音色",
+    "value": "female-tianmei",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "男性主持人",
+    "value": "presenter_male",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "女性主持人",
+    "value": "presenter_female",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "男性有声书1",
+    "value": "audiobook_male_1",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "男性有声书2",
+    "value": "audiobook_male_2",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "女性有声书1",
+    "value": "audiobook_female_1",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "女性有声书2",
+    "value": "audiobook_female_2",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "青涩青年音色-beta",
+    "value": "male-qn-qingse-jingpin",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "精英青年音色-beta",
+    "value": "male-qn-jingying-jingpin",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "霸道青年音色-beta",
+    "value": "male-qn-badao-jingpin",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "青年大学生音色-beta",
+    "value": "male-qn-daxuesheng-jingpin",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "少女音色-beta",
+    "value": "female-shaonv-jingpin",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "御姐音色-beta",
+    "value": "female-yujie-jingpin",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "成熟女性音色-beta",
+    "value": "female-chengshu-jingpin",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "甜美女性音色-beta",
+    "value": "female-tianmei-jingpin",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "聪明男童",
+    "value": "clever_boy",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "可爱男童",
+    "value": "cute_boy",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "萌萌女童",
+    "value": "lovely_girl",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "卡通猪小琪",
+    "value": "cartoon_pig",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "病娇弟弟",
+    "value": "bingjiao_didi",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "俊朗男友",
+    "value": "junlang_nanyou",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "纯真学弟",
+    "value": "chunzhen_xuedi",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "冷淡学长",
+    "value": "lengdan_xiongzhang",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "霸道少爷",
+    "value": "badao_shaoye",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "甜心小玲",
+    "value": "tianxin_xiaoling",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "俏皮萌妹",
+    "value": "qiaopi_mengmei",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "妩媚御姐",
+    "value": "wumei_yujie",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "嗲嗲学妹",
+    "value": "diadia_xuemei",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "淡雅学姐",
+    "value": "danya_xuejie",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "SantaClaus",
+    "value": "Santa_Claus",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "Grinch",
+    "value": "Grinch",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "Rudolph",
+    "value": "Rudolph",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "Arnold",
+    "value": "Arnold",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "CharmingSanta",
+    "value": "Charming_Santa",
+    "gender": "male",
+    "provider": "minimax"
+  },
+  {
+    "label": "CharmingLady",
+    "value": "Charming_Lady",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "SweetGirl",
+    "value": "Sweet_Girl",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "CuteElf",
+    "value": "Cute_Elf",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "AttractiveGirl",
+    "value": "Attractive_Girl",
+    "gender": "female",
+    "provider": "minimax"
+  },
+  {
+    "label": "SereneWoman",
+    "value": "Serene_Woman",
+    "gender": "female",
+    "provider": "minimax"
+  }
+]

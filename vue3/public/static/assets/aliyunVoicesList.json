@@ -1,0 +1,704 @@
+[
+  {
+    "label": "龙应催",
+    "value": "longyingcui",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙应答",
+    "value": "longyingda",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙应静",
+    "value": "longyingjing",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙应严",
+    "value": "longyingyan",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙应甜",
+    "value": "longyingtian",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙应冰",
+    "value": "longyingbing",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙应桃",
+    "value": "longyingtao",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙应聆",
+    "value": "longyingling",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "YUMI",
+    "value": "longyumi_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙小淳",
+    "value": "longxiaochun_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙小夏",
+    "value": "longxiaoxia_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙安燃",
+    "value": "longanran",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙安宣",
+    "value": "longanxuan",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙三叔",
+    "value": "longsanshu",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙修",
+    "value": "longxiu_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙妙",
+    "value": "longmiao_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙悦",
+    "value": "longyue_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙楠",
+    "value": "longnan_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙媛",
+    "value": "longyuan_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙安柔",
+    "value": "longanrou",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙嫱",
+    "value": "longqiang_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙寒",
+    "value": "longhan_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙星",
+    "value": "longxing_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙华",
+    "value": "longhua_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙婉",
+    "value": "longwan_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙橙",
+    "value": "longcheng_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙菲菲",
+    "value": "longfeifei_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙小诚",
+    "value": "longxiaocheng_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙哲",
+    "value": "longzhe_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙颜",
+    "value": "longyan_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙天",
+    "value": "longtian_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙泽",
+    "value": "longze_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙邵",
+    "value": "longshao_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙浩",
+    "value": "longhao_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙深",
+    "value": "kabuleshen_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙杰力豆",
+    "value": "longjielidou_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙铃",
+    "value": "longling_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙可",
+    "value": "longke_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙仙",
+    "value": "longxian_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙老铁",
+    "value": "longlaotie_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙嘉怡",
+    "value": "longjiayi_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙桃",
+    "value": "longtao_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙飞",
+    "value": "longfei_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "李白",
+    "value": "libai_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙津",
+    "value": "longjin_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙书",
+    "value": "longshu_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Bella",
+    "value": "loongbella_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙硕",
+    "value": "longshuo_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙小白",
+    "value": "longxiaobai_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "龙婧",
+    "value": "longjing_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Stella",
+    "value": "loongstella_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Eva",
+    "value": "loongeva_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Brian",
+    "value": "loongbrian_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Luna",
+    "value": "loongluna_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Luca",
+    "value": "loongluca_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Emily",
+    "value": "loongemily_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Eric",
+    "value": "loongeric_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Abby",
+    "value": "loongabby_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Annie",
+    "value": "loongannie_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Andy",
+    "value": "loongandy_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Ava",
+    "value": "loongava_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Beth",
+    "value": "loongbeth_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Betty",
+    "value": "loongbetty_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Cindy",
+    "value": "loongcindy_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Cally",
+    "value": "loongcally_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "David",
+    "value": "loongdavid_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Donna",
+    "value": "loongdonna_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Kyong",
+    "value": "loongkyong_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Tomoka",
+    "value": "loongtomoka_v2",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Tomoya",
+    "value": "loongtomoya_v2",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知楠 (广告男声)",
+    "value": "sambert-zhinan-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知琪 (温柔女声)",
+    "value": "sambert-zhiqi-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知厨 (舌尖男声)",
+    "value": "sambert-zhichu-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知德 (新闻男声)",
+    "value": "sambert-zhide-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知佳 (标准女声)",
+    "value": "sambert-zhijia-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知茹 (新闻女声)",
+    "value": "sambert-zhiru-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知倩 (资讯女声)",
+    "value": "sambert-zhiqian-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知祥 (磁性男声)",
+    "value": "sambert-zhixiang-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知薇 (萝莉女声)",
+    "value": "sambert-zhiwei-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知浩 (咨询男声)",
+    "value": "sambert-zhihao-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知婧 (严厉女声)",
+    "value": "sambert-zhijing-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知茗 (诙谐男声)",
+    "value": "sambert-zhiming-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知墨 (情感男声)",
+    "value": "sambert-zhimo-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知娜 (浙普女声)",
+    "value": "sambert-zhina-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知树 (资讯男声)",
+    "value": "sambert-zhishu-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知莎 (知性女声)",
+    "value": "sambert-zhistella-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知婷 (电台女声)",
+    "value": "sambert-zhiting-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知笑 (资讯女声)",
+    "value": "sambert-zhixiao-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知雅 (严厉女声)",
+    "value": "sambert-zhiya-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知晔 (青年男声)",
+    "value": "sambert-zhiye-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知颖 (软萌童声)",
+    "value": "sambert-zhiying-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知媛 (知心姐姐)",
+    "value": "sambert-zhiyuan-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知悦 (温柔女声)",
+    "value": "sambert-zhiyue-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知柜 (直播女声)",
+    "value": "sambert-zhigui-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知硕 (自然男声)",
+    "value": "sambert-zhishuo-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知妙（多情感） (多种情感女声)",
+    "value": "sambert-zhimiao-emo-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知猫 (直播女声)",
+    "value": "sambert-zhimao-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知伦 (悬疑解说)",
+    "value": "sambert-zhilun-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知飞 (激昂解说)",
+    "value": "sambert-zhifei-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "知达 (标准男声)",
+    "value": "sambert-zhida-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Camila (西班牙语女声)",
+    "value": "sambert-camila-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Perla (意大利语女声)",
+    "value": "sambert-perla-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Indah (印尼语女声)",
+    "value": "sambert-indah-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Clara (法语女声)",
+    "value": "sambert-clara-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Hanna (德语女声)",
+    "value": "sambert-hanna-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Beth (咨询女声)",
+    "value": "sambert-beth-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Betty (客服女声)",
+    "value": "sambert-betty-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Cally (自然女声)",
+    "value": "sambert-cally-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Cindy (对话女声)",
+    "value": "sambert-cindy-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Eva (陪伴女声)",
+    "value": "sambert-eva-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Donna (教育女声)",
+    "value": "sambert-donna-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Brian (客服男声)",
+    "value": "sambert-brian-v1",
+    "gender": "male",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Waan (泰语女声)",
+    "value": "sambert-waan-v1",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Chelsie (qwen)",
+    "value": "Chelsie",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Cherry (qwen)",
+    "value": "Cherry",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Serena (qwen)",
+    "value": "Serena",
+    "gender": "female",
+    "provider": "aliyun"
+  },
+  {
+    "label": "Ethan (qwen)",
+    "value": "Ethan",
+    "gender": "male",
+    "provider": "aliyun"
+  }
+]
