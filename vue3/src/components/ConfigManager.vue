@@ -4,7 +4,7 @@ import { message as antMessage } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import type { FormInstance } from 'ant-design-vue'
 import { useConfigManager } from '@/composables/useConfigManager'
-import type { ConfigType, Config, ConfigField } from '@/types/config'
+import type { ConfigType, Config, ConfigField, ModelType } from '@/types/config'
 import { addConfig, updateConfig } from '@/services/config'
 
 const { t } = useI18n()
@@ -36,8 +36,16 @@ const {
 } = useConfigManager(props.configType)
 
 // 表单
+interface FormData extends Record<string, any> {
+  provider?: string
+  configName?: string
+  configDesc?: string
+  modelType?: ModelType
+  isDefault?: boolean | number
+}
+
 const formRef = ref<FormInstance>()
-const formData = ref<any>({
+const formData = ref<FormData>({
   provider: undefined,
   configName: undefined,
   configDesc: undefined,
@@ -53,8 +61,8 @@ const columns = computed(() => {
       dataIndex: 'provider',
       width: 200,
       align: 'center',
-      customRender: ({ text }: any) => {
-        const provider = typeOptions.value.find((item: any) => item.value === text)
+      customRender: ({ text }: { text: string }) => {
+        const provider = typeOptions.value.find((item) => item.value === text)
         return provider ? provider.label : text
       },
     },
@@ -72,8 +80,8 @@ const columns = computed(() => {
       title: t('config.modelType'),
       dataIndex: 'modelType',
       width: 120,
-      align: 'center',
-    } as any)
+      align: 'center' as const,
+    })
   }
 
   baseColumns.push(
@@ -81,23 +89,20 @@ const columns = computed(() => {
       title: t('common.description'),
       dataIndex: 'configDesc',
       width: 200,
-      align: 'center',
-      ellipsis: {
-        showTitle: false
-      },
-    } as any,
+      align: 'center' as const
+    },
     {
       title: t('common.isDefault'),
       dataIndex: 'isDefault',
       width: 80,
-      align: 'center',
-    } as any,
+      align: 'center' as const,
+    },
     {
       title: t('common.createTime'),
       dataIndex: 'createTime',
       width: 180,
-      align: 'center',
-    } as any,
+      align: 'center' as const,
+    },
     {
       title: t('table.action'),
       dataIndex: 'operation',
@@ -162,14 +167,14 @@ function handleTabChange(key: string) {
  * 编辑配置
  */
 function handleEdit(record: Config) {
-  editingConfigId.value = record.configId.toString()
+  editingConfigId.value = record.configId
   currentType.value = record.provider || ''
   activeTabKey.value = '2'
 
   // 设置表单值
-  formData.value = { ...record }
-  if (props.configType !== 'tts') {
-    formData.value.isDefault = record.isDefault === '1'
+  formData.value = { 
+    ...record,
+    isDefault: props.configType !== 'tts' ? record.isDefault === '1' : false
   }
 
   // LLM 更新模型选项
@@ -188,28 +193,31 @@ async function handleSubmit() {
     await formRef.value.validate()
     
     // 准备提交数据
-    const submitData: any = {
+    const submitData: Partial<Config> = {
       configId: editingConfigId.value,
       configType: props.configType,
-      ...formData.value,
+      provider: formData.value.provider,
+      configName: formData.value.configName,
+      configDesc: formData.value.configDesc,
+      modelType: formData.value.modelType
     }
 
     // 处理 isDefault
     if (props.configType !== 'tts') {
-      submitData.isDefault = formData.value.isDefault ? 1 : 0
+      submitData.isDefault = formData.value.isDefault ? '1' : '0'
     }
 
     // LLM 特殊验证
     if (props.configType === 'llm') {
       // 验证模型名称
-      if (/[\u4e00-\u9fa5]/.test(submitData.configName)) {
+      if (submitData.configName && /[\u4e00-\u9fa5]/.test(submitData.configName)) {
         antMessage.error(t('config.modelNameNoChinese'))
         return
       }
 
       const validModels = getModelsByProviderAndType(
-        submitData.provider,
-        submitData.modelType,
+        submitData.provider || '',
+        submitData.modelType || 'chat'
       )
       const isValid = validModels.some((m: any) => m.llm_name === submitData.configName)
       
@@ -233,8 +241,8 @@ async function handleSubmit() {
     } else {
       antMessage.error(res.message || t('common.operationFailed'))
     }
-  } catch (error: any) {
-    if (error.errorFields) {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'errorFields' in error) {
       antMessage.error(t('config.fillRequiredFields'))
     } else {
       console.error('提交配置失败:', error)
@@ -251,7 +259,7 @@ async function handleSubmit() {
 function resetForm() {
   formRef.value?.resetFields()
   currentType.value = ''
-  editingConfigId.value = null
+  editingConfigId.value = undefined
   modelOptions.value = []
   formData.value = {
     provider: undefined,

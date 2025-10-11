@@ -28,15 +28,15 @@ export interface WebSocketConfig {
 export const useUserStore = defineStore('user', () => {
   const userInfo = useStorage<UserInfo | null>('userInfo', null, localStorage, {
     serializer: {
-      read: (v: any) => {
+      read: (v: string) => {
         try {
-          return v ? JSON.parse(v) : null
+          return v ? JSON.parse(v) as UserInfo : null
         } catch (e) {
           console.error('Failed to parse user info:', e)
           return null
         }
       },
-      write: (v: any) => JSON.stringify(v),
+      write: (v: UserInfo | null) => JSON.stringify(v),
     },
   })
 
@@ -44,35 +44,27 @@ export const useUserStore = defineStore('user', () => {
   const token = useStorage<string>('token', '', localStorage)
 
   // WebSocket 配置管理
+  const defaultWsConfig: WebSocketConfig = {
+    url: 'ws://127.0.0.1:8091/ws/xiaozhi/v1/',
+    deviceId: 'web_test',
+    deviceName: 'Web用户',
+    autoConnect: true
+  }
+  
   const wsConfig = useStorage<WebSocketConfig>(
     'wsConfig',
-    {
-      url: 'ws://127.0.0.1:8091/ws/xiaozhi/v1/',
-      deviceId: 'web_test',
-      deviceName: 'Web用户',
-      autoConnect: true
-    },
+    defaultWsConfig,
     localStorage,
     {
       serializer: {
-        read: (v: any) => {
+        read: (v: string) => {
           try {
-            return v ? JSON.parse(v) : {
-              url: 'ws://127.0.0.1:8091/ws/xiaozhi/v1/',
-              deviceId: 'web_test',
-              deviceName: 'Web用户',
-              autoConnect: true
-            }
+            return v ? JSON.parse(v) as WebSocketConfig : defaultWsConfig
           } catch (e) {
-            return {
-              url: 'ws://127.0.0.1:8091/ws/xiaozhi/v1/',
-              deviceId: 'web_test',
-              deviceName: 'Web用户',
-              autoConnect: true
-            }
+            return defaultWsConfig
           }
         },
-        write: (v: any) => JSON.stringify(v),
+        write: (v: WebSocketConfig) => JSON.stringify(v),
       },
     }
   )

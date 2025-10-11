@@ -18,29 +18,29 @@ export interface AgentQueryParams {
  */
 export interface Agent {
   configId: number
-  deviceId?: string | null
-  roleId?: string | null
-  configName?: string | null
-  configDesc?: string | null
-  configType?: string | null
-  modelType?: string | null
+  deviceId?: string
+  roleId?: string
+  configName?: string
+  configDesc?: string
+  configType?: string
+  modelType?: string
   provider: string
-  appId?: string | null
-  apiKey?: string | null
-  apiSecret?: string | null
-  ak?: string | null
-  sk?: string | null
-  apiUrl?: string | null
-  state?: string | null
-  isDefault?: string | null
-  agentId?: string | null
-  agentName?: string | null
-  botId?: string | null
-  agentDesc?: string | null
-  iconUrl?: string | null
-  publishTime?: string | null
-  createTime?: string | null
-  updateTime?: string | null
+  appId?: string
+  apiKey?: string
+  apiSecret?: string
+  ak?: string
+  sk?: string
+  apiUrl?: string
+  state?: string
+  isDefault?: string
+  agentId?: string
+  agentName?: string
+  botId?: string
+  agentDesc?: string
+  iconUrl?: string
+  publishTime?: string
+  createTime?: string
+  updateTime?: string
 }
 
 /**
@@ -72,29 +72,29 @@ export interface AgentListResponse {
  */
 export interface PlatformConfig {
   configId?: number
-  deviceId?: string | null
-  roleId?: string | null
-  configName?: string | null
-  configDesc?: string | null
-  configType?: string | null
-  modelType?: string | null
+  deviceId?: string
+  roleId?: string
+  configName?: string
+  configDesc?: string
+  configType?: string
+  modelType?: string
   provider: string
-  appId?: string | null
-  apiKey?: string | null
-  apiSecret?: string | null
-  ak?: string | null
-  sk?: string | null
-  apiUrl?: string | null
-  state?: string | null
-  isDefault?: string | null
-  agentId?: string | null
-  agentName?: string | null
-  botId?: string | null
-  agentDesc?: string | null
-  iconUrl?: string | null
-  publishTime?: string | null
-  createTime?: string | null
-  updateTime?: string | null
+  appId?: string
+  apiKey?: string
+  apiSecret?: string
+  ak?: string
+  sk?: string
+  apiUrl?: string
+  state?: string
+  isDefault?: string
+  agentId?: string
+  agentName?: string
+  botId?: string
+  agentDesc?: string
+  iconUrl?: string
+  publishTime?: string
+  createTime?: string
+  updateTime?: string
 }
 
 /**

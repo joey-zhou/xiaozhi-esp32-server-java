@@ -42,7 +42,7 @@ const formData = reactive({
 })
 
 const rules = computed(() => {
-  const baseRules: any = {
+  const baseRules: Record<string, import('ant-design-vue/es/form').Rule[]> = {
     email: emailRules,
     verificationCode: verificationCodeRules,
   }

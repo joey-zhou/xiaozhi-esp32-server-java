@@ -550,7 +550,6 @@ export default {
           scopedSlots: { customRender: 'roleDesc' },
           width: 200,
           align: 'center',
-          ellipsis: true
         },
         {
           title: '音色',
@@ -558,7 +557,6 @@ export default {
           scopedSlots: { customRender: 'voiceName' },
           width: 150,
           align: 'center',
-          ellipsis: true
         },
         {
           title: '模型',

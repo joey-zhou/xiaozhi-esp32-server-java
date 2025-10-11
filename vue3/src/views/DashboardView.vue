@@ -136,13 +136,13 @@ const getSentence = () => {
   const day = dayjs().format('YYYY-MM-DD')
   jsonp(`https://sentence.iciba.com/index.php?c=dailysentence&m=getdetail&title=${day}`, {
     param: 'callback'
-  }, (err: any, data: any) => {
+  }, (err: Error | null, data: { content?: string; note?: string } | null) => {
     if (err) {
       console.log(t('dashboard.getSentenceFailed'))
     } else {
       sentence.value = {
-        content: data.content || sentence.value.content,
-        note: data.note || sentence.value.note
+        content: data?.content || sentence.value.content,
+        note: data?.note || sentence.value.note
       }
     }
   })

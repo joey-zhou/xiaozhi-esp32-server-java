@@ -161,7 +161,6 @@ export default {
           scopedSlots: { customRender: "message" },
           align: "center",
           width: 200,
-          ellipsis: true,
         },
         {
           title: "语音",

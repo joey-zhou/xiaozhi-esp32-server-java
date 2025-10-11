@@ -1,7 +1,7 @@
 import { ref, computed, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
-import type { ConfigType, Config, ConfigField, ModelOption } from '@/types/config'
+import type { ConfigType, Config, ConfigField, ModelOption, LLMModel, LLMFactory } from '@/types/config'
 import { queryConfigs, addConfig, updateConfig, getModels } from '@/services/config'
 import { configTypeMap } from '@/config/providerConfig'
 import llmFactoriesData from '@/config/llm_factories.json'
@@ -22,12 +22,18 @@ export function useConfigManager(configType: ConfigType) {
 
   // 状态
   const currentType = ref('')
-  const editingConfigId = ref<string | null>(null)
+  const editingConfigId = ref<number>()
   const activeTabKey = ref('1')
   const modelOptions = ref<ModelOption[]>([])
   
   // LLM 工厂数据
-  const llmFactoryData = ref<Record<string, any>>({})
+  interface LLMFactoryModelInfo {
+    chat?: LLMModel[]
+    vision?: LLMModel[]
+    intent?: LLMModel[]
+    embedding?: LLMModel[]
+  }
+  const llmFactoryData = ref<Record<string, LLMFactoryModelInfo>>({})
   const availableProviders = ref<Array<{ value: string; label: string }>>([])
 
   // 查询表单
@@ -70,10 +76,10 @@ export function useConfigManager(configType: ConfigType) {
       return
     }
 
-    const factoryData: any = {}
+    const factoryData: Record<string, LLMFactoryModelInfo> = {}
     const providers: Array<{ value: string; label: string }> = []
 
-    llmFactoriesData.factory_llm_infos.forEach((factory: any) => {
+    llmFactoriesData.factory_llm_infos.forEach((factory: LLMFactory) => {
       const providerName = factory.name
       providers.push({
         value: providerName,
@@ -81,14 +87,15 @@ export function useConfigManager(configType: ConfigType) {
       })
 
       // 按模型类型分组存储模型
-      const modelsByType: any = {
+      const modelsByType: LLMFactoryModelInfo = {
         chat: [],
         embedding: [],
         vision: [],
+        intent: []
       }
 
       if (factory.llm && Array.isArray(factory.llm)) {
-        factory.llm.forEach((llm: any) => {
+        factory.llm.forEach((llm: LLMModel) => {
           let mappedModelType = llm.model_type
 
           // 映射模型类型
@@ -97,8 +104,8 @@ export function useConfigManager(configType: ConfigType) {
           }
 
           // 只保留需要的模型类型
-          if (['chat', 'embedding', 'vision'].includes(mappedModelType)) {
-            modelsByType[mappedModelType].push({
+          if (['chat', 'embedding', 'vision'].includes(mappedModelType as keyof LLMFactoryModelInfo)) {
+            (modelsByType[mappedModelType as keyof LLMFactoryModelInfo] as LLMModel[]).push({
               llm_name: llm.llm_name,
               model_type: mappedModelType,
               max_tokens: llm.max_tokens,
@@ -119,11 +126,12 @@ export function useConfigManager(configType: ConfigType) {
   /**
    * 根据 provider 和 modelType 获取模型列表
    */
-  function getModelsByProviderAndType(provider: string, modelType: string) {
+  function getModelsByProviderAndType(provider: string, modelType: string): LLMModel[] {
     if (!llmFactoryData.value[provider]) {
       return []
     }
-    return llmFactoryData.value[provider][modelType] || []
+    const providerData = llmFactoryData.value[provider]
+    return (providerData[modelType as keyof LLMFactoryModelInfo] || []) as LLMModel[]
   }
 
   /**
@@ -135,7 +143,7 @@ export function useConfigManager(configType: ConfigType) {
     }
 
     const models = getModelsByProviderAndType(provider, modelType)
-    modelOptions.value = models.map((model: any) => ({
+    modelOptions.value = models.map((model: LLMModel) => ({
       value: model.llm_name,
       label: model.llm_name,
     }))

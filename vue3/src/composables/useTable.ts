@@ -41,12 +41,12 @@ export function useTable<T = any>() {
   /**
    * 加载数据（带错误处理）
    */
-  const loadData = async <R = any>(
+  const loadData = async (
     fetchFn: (params: { start: number; limit: number }) => Promise<{ code: number; data?: { list: T[]; total: number; pageNum: number; pageSize: number }; message?: string }>,
     options?: {
       showError?: boolean
       onSuccess?: () => void
-      onError?: (error: any) => void
+      onError?: (error: unknown) => void
     }
   ) => {
     const { showError = true, onSuccess, onError } = options || {}
@@ -68,10 +68,11 @@ export function useTable<T = any>() {
         }
         onError?.(res)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading data:', error)
       if (showError) {
-        message.error(error?.message || '获取数据失败')
+        const errorMessage = error instanceof Error ? error.message : '获取数据失败'
+        message.error(errorMessage)
       }
       onError?.(error)
     } finally {

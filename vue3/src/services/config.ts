@@ -26,7 +26,7 @@ export function updateConfig(data: Partial<Config>) {
 /**
  * 获取模型列表（从API）
  */
-export function getModels(data: any) {
+export function getModels(data: { configName: string; provider: string; apiKey?: string; ak?: string; sk?: string }) {
   return http.post<string[]>(api.config.getModels, data)
 }
 

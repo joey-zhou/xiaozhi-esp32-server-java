@@ -2,41 +2,41 @@
  * 设备信息接口
  */
 export interface Device {
-  createTime?: string | null
-  updateTime?: string | null
-  roleId?: number | null
-  avatar?: string | null
-  roleName?: string | null
-  roleDesc?: string | null
-  voiceName?: string | null
-  state?: string | null
-  ttsId?: number | null
-  modelId?: number | null
-  modelName?: string | null
-  sttId?: number | null
-  temperature?: number | null
-  topP?: number | null
-  vadEnergyTh?: number | null
-  vadSpeechTh?: number | null
-  vadSilenceTh?: number | null
-  vadSilenceMs?: number | null
-  modelProvider?: string | null
-  ttsProvider?: string | null
-  isDefault?: string | null
-  totalDevice?: number | null
+  createTime?: string
+  updateTime?: string
+  roleId?: number
+  avatar?: string
+  roleName?: string
+  roleDesc?: string
+  voiceName?: string
+  state?: string
+  ttsId?: number
+  modelId?: number
+  modelName?: string
+  sttId?: number
+  temperature?: number
+  topP?: number
+  vadEnergyTh?: number
+  vadSpeechTh?: number
+  vadSilenceTh?: number
+  vadSilenceMs?: number
+  modelProvider?: string
+  ttsProvider?: string
+  isDefault?: string
+  totalDevice?: number
   deviceId: string
-  sessionId?: string | null
-  deviceName?: string | null
-  totalMessage?: number | null
-  audioPath?: string | null
-  lastLogin?: string | null
-  wifiName?: string | null
-  ip?: string | null
-  chipModelName?: string | null
-  type?: string | null
-  version?: string | null
-  functionNames?: string | null
-  location?: string | null
+  sessionId?: string
+  deviceName?: string
+  totalMessage?: number
+  audioPath?: string
+  lastLogin?: string
+  wifiName?: string
+  ip?: string
+  chipModelName?: string
+  type?: string
+  version?: string
+  functionNames?: string
+  location?: string
   editable?: boolean // 表格编辑状态
 }
 
@@ -80,7 +80,7 @@ export interface DeviceListResponse {
  * 角色信息接口
  */
 export interface Role {
-  roleId: string
+  roleId: number
   roleName: string
   roleDesc?: string
   prompt?: string

@@ -7,7 +7,7 @@ interface ErrorInfo {
   message: string
   stack?: string
   componentName?: string
-  propsData?: any
+  propsData?: Record<string, unknown>
   url?: string
   line?: number
   column?: number
@@ -31,12 +31,13 @@ function reportError(error: ErrorInfo) {
 // Vue 错误处理器
 export function setupErrorHandler(app: App) {
   // 1. Vue 组件错误处理
-  app.config.errorHandler = (err: any, instance, info) => {
+  app.config.errorHandler = (err: unknown, instance, info) => {
+    const error = err instanceof Error ? err : new Error(String(err))
     const errorInfo: ErrorInfo = {
-      message: err.message || '未知错误',
-      stack: err.stack,
+      message: error.message || '未知错误',
+      stack: error.stack,
       componentName: instance?.$options.name || instance?.$options.__name,
-      propsData: instance?.$props,
+      propsData: instance?.$props as Record<string, unknown>,
     }
 
     // 保存错误日志
@@ -136,8 +137,14 @@ export function setupErrorHandler(app: App) {
     (event) => {
       const target = event.target as HTMLElement
       if (target.tagName === 'IMG' || target.tagName === 'SCRIPT' || target.tagName === 'LINK') {
+        const resourceUrl = target instanceof HTMLImageElement || target instanceof HTMLScriptElement 
+          ? target.src 
+          : target instanceof HTMLLinkElement 
+          ? target.href 
+          : ''
+        
         const errorInfo: ErrorInfo = {
-          message: `资源加载失败: ${(target as any).src || (target as any).href}`,
+          message: `资源加载失败: ${resourceUrl}`,
         }
 
         errorLogs.push(errorInfo)

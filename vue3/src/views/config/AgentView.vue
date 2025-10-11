@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
-import type { TableColumnsType, FormInstance } from 'ant-design-vue'
+import type { TableColumnsType, FormInstance, TablePaginationConfig } from 'ant-design-vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import { useTable } from '@/composables/useTable'
 import { useConfigManager } from '@/composables/useConfigManager'
@@ -43,10 +43,7 @@ const baseColumns = computed<TableColumnsType>(() => [
     dataIndex: 'agentName',
     width: 150,
     align: 'center',
-    fixed: 'left',
-    ellipsis: {
-      showTitle: false
-    }
+    fixed: 'left'
   },
   {
     title: t('common.platform'),
@@ -57,10 +54,7 @@ const baseColumns = computed<TableColumnsType>(() => [
   {
     title: t('agent.agentDesc'),
     dataIndex: 'agentDesc',
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('common.isDefault'),
@@ -115,7 +109,7 @@ const fetchData = async () => {
 const debouncedSearch = createDebouncedSearch(fetchData, 500)
 
 // 处理表格分页变化
-const onTableChange = (pag: any) => {
+const onTableChange = (pag: TablePaginationConfig) => {
   handleTableChange(pag)
   fetchData()
 }
@@ -209,7 +203,7 @@ const handleConfigPlatform = async () => {
     const res = await queryPlatformConfig('agent', searchForm.value.provider)
     
     if (res.code === 200) {
-      const configs = (res.data as any)?.list || []
+      const configs = (res.data as { list: PlatformConfig[] })?.list || []
       
       // 重置表单
       platformForm.value = {
@@ -227,10 +221,10 @@ const handleConfigPlatform = async () => {
       
       // 如果存在配置，则填充表单
       if (configs.length > 0) {
-        const config = configs[0]
+        const config = configs[0] as PlatformConfig
         isEdit.value = true
-        currentConfigId.value = config.configId
-        
+        currentConfigId.value = config.configId ?? null
+
         // 填充表单数据
         platformForm.value = {
           configType: config.configType || 'agent',
@@ -301,9 +295,9 @@ const handlePlatformModalOk = async () => {
     } else {
       message.error(res.message || (isEdit.value ? t('common.updatePlatformConfigFailed') : t('common.addPlatformConfigFailed')))
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     // 表单验证失败或API调用失败
-    if (error?.errorFields) {
+    if (error && typeof error === 'object' && 'errorFields' in error) {
       // 表单验证错误，不显示错误消息
       return
     }
@@ -326,8 +320,10 @@ const handleSetDefault = async (record: Agent) => {
   const configRecord = {
     configId: record.configId,
     configName: record.agentName || record.configName || '',
-    modelType: 'chat'
-  } as any
+    modelType: 'chat' as const,
+    configType: 'agent' as const,
+    provider: 'coze' as const
+  }
   
   await setAsDefault(configRecord)
   // 刷新数据
@@ -459,7 +455,7 @@ await fetchData()
           :label="item.label"
           :name="item.field"
         >
-          <a-input v-model:value="(platformForm as any)[item.field]" :placeholder="item.placeholder">
+          <a-input v-model:value="platformForm[item.field as keyof PlatformConfig] as string" :placeholder="item.placeholder">
             <template v-if="item.suffix" #suffix>
               <span style="color: #999">{{ item.suffix }}</span>
             </template>

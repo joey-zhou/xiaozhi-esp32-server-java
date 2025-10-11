@@ -164,7 +164,6 @@ export default {
           scopedSlots: { customRender: "templateName" },
           width: 100,
           align: "center",
-          ellipsis: true,
         },
         {
           title: "分类",
@@ -177,7 +176,6 @@ export default {
           dataIndex: "templateContent",
           scopedSlots: { customRender: "templateContent" },
           width: 200,
-          ellipsis: true,
           align: "center",
         },
         // 添加默认标识列

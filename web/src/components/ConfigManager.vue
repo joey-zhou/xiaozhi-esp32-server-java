@@ -258,8 +258,7 @@ export default {
           customRender: (text) => {
             const provider = this.typeOptions.find(item => item.value === text);
             return provider ? provider.label : text;
-          },
-          ellipsis: true,
+          }
         },
         {
           title: '名称',
@@ -282,8 +281,7 @@ export default {
           scopedSlots: { customRender: 'configDesc' },
           key: 'configDesc',
           align: 'center',
-          width: 200,
-          ellipsis: true,
+          width: 200
         },
         // 添加默认标识列
         {

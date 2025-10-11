@@ -7,6 +7,7 @@ import { queryDevices, addDevice, updateDevice, deleteDevice, clearDeviceMemory 
 import { queryRoles } from '@/services/role'
 import DeviceEditDialog from '@/components/DeviceEditDialog.vue'
 import type { Device, DeviceQueryParams, Role } from '@/types/device'
+import type { TablePaginationConfig } from 'ant-design-vue'
 
 const { t } = useI18n()
 
@@ -66,46 +67,31 @@ const columns = computed(() => [
     dataIndex: 'deviceId',
     width: 160,
     fixed: 'left',
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.deviceName'),
     dataIndex: 'deviceName',
     width: 100,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.roleName'),
     dataIndex: 'roleName',
     width: 100,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.wifiName'),
     dataIndex: 'wifiName',
     width: 100,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.location'),
     dataIndex: 'location',
     width: 180,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
       title: t('common.status'),
@@ -117,19 +103,13 @@ const columns = computed(() => [
     title: t('device.productType'),
     dataIndex: 'chipModelName',
     width: 100,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.deviceType'),
     dataIndex: 'type',
     width: 150,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
     {
       title: t('device.version'),
@@ -188,8 +168,8 @@ const debouncedSearch = createDebouncedSearch(fetchData, 500)
 async function getRoles() {
   try {
     const res = await queryRoles({})
-    if (res.code === 200 && res.data && 'list' in res.data) {
-      roleItems.value = (res.data.list || []) as Role[]
+    if (res.code === 200 && res.data) {
+      roleItems.value = res.data.list
     }
   } catch (error) {
     console.error('获取角色列表失败:', error)
@@ -353,12 +333,12 @@ function handleInputEdit(value: string, key: string, field: 'deviceName') {
 /**
  * 角色选择变更
  */
-function handleRoleChange(value: string, key: string) {
+function handleRoleChange(value: number, key: string) {
   const target = data.value.find((item) => item.deviceId === key)
   const role = roleItems.value.find((item) => item.roleId === value)
 
   if (target && role) {
-    target.roleId = parseInt(value)
+    target.roleId = value
     target.roleName = role.roleName
   }
 }
@@ -366,14 +346,14 @@ function handleRoleChange(value: string, key: string) {
 /**
  * 获取角色名称
  */
-function getRoleName(roleId?: string) {
+function getRoleName(roleId?: number) {
   if (!roleId) return ''
   const role = roleItems.value.find((r) => r.roleId === roleId)
   return role ? role.roleName : `角色ID:${roleId}`
 }
 
 // 处理分页变化
-const onTableChange = (pag: any) => {
+const onTableChange = (pag: TablePaginationConfig) => {
   handleTableChange(pag)
   fetchData()
 }
@@ -493,7 +473,7 @@ await fetchData()
               v-if="record.editable"
               :value="record.roleId"
               style="margin: -5px 0; width: 100%"
-              @change="(val: string) => handleRoleChange(val, record.deviceId)"
+              @change="(val: number) => handleRoleChange(val, record.deviceId)"
             >
               <a-select-option
                 v-for="role in roleItems"

@@ -117,14 +117,12 @@ export default {
           dataIndex: "email",
           width: 180,
           align: "center",
-          ellipsis: true
         },
         {
           title: "电话",
           dataIndex: "tel",
           width: 150,
           align: "center",
-          ellipsis: true
         },
         {
           title: "设备数量",

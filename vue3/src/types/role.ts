@@ -13,31 +13,31 @@ export type VoiceGender = '' | 'male' | 'female'
 
 // 角色数据
 export interface Role {
-  createTime?: string | null
-  updateTime?: string | null
-  userId?: number | null
-  startTime?: string | null
-  endTime?: string | null
+  createTime?: string
+  updateTime?: string
+  userId?: number
+  startTime?: string
+  endTime?: string
   roleId: number
-  avatar?: string | null
+  avatar?: string
   roleName: string
-  roleDesc?: string | null
-  voiceName?: string | null
-  state?: string | null
-  ttsId?: number | null
-  modelId?: number | null
-  modelName?: string | null
-  sttId?: number | null
-  temperature?: number | null
-  topP?: number | null
-  vadEnergyTh?: number | null
-  vadSpeechTh?: number | null
-  vadSilenceTh?: number | null
-  vadSilenceMs?: number | null
-  modelProvider?: string | null
-  ttsProvider?: string | null
-  isDefault?: string | null
-  totalDevice?: number | null
+  roleDesc?: string
+  voiceName?: string
+  state?: string
+  ttsId?: number
+  modelId?: number
+  modelName?: string
+  sttId?: number
+  temperature?: number
+  topP?: number
+  vadEnergyTh?: number
+  vadSpeechTh?: number
+  vadSilenceTh?: number
+  vadSilenceMs?: number
+  modelProvider?: string
+  ttsProvider?: string
+  isDefault?: string
+  totalDevice?: number
 }
 
 // 角色查询参数
@@ -76,7 +76,7 @@ export interface VoiceOption {
   value: string
   gender: VoiceGender
   provider: VoiceProvider
-  ttsId?: number | string // 关联的TTS配置ID
+  ttsId?: number // 关联的TTS配置ID
 }
 
 // 模型选项（统一LLM和Agent）
@@ -105,15 +105,17 @@ export interface PromptTemplate {
   templateId: number
   templateName: string
   templateContent: string
-  isDefault?: number
+  isDefault?: boolean |number
 }
 
 // 角色表单数据
 export interface RoleFormData {
+  roleId?: number
   roleName: string
   roleDesc?: string
   avatar?: string
   isDefault: boolean | number // 支持布尔值和数字
+  state?: string
   // 模型相关
   modelType: ModelType
   modelId?: number
@@ -127,14 +129,14 @@ export interface RoleFormData {
   vadSilenceMs?: number
   // 语音合成相关
   voiceName?: string
-  ttsId?: number | string
+  ttsId?: number
   gender?: VoiceGender
 }
 
 // 测试语音参数
 export interface TestVoiceParams {
   voiceName: string
-  ttsId: number | string
+  ttsId: number
   message: string
   provider: string
 }

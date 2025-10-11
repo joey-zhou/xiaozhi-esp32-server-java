@@ -7,14 +7,33 @@ import { message } from 'ant-design-vue'
 import { useLoadingStore } from '@/store/loading'
 import { useDebounceFn } from '@vueuse/core'
 
-interface RequestOptions {
+interface RequestOptions<T = unknown> {
   showLoading?: boolean // 是否显示全局 loading
   loadingText?: string // loading 文本
   showError?: boolean // 是否显示错误提示
   showSuccess?: boolean // 是否显示成功提示
   successText?: string // 成功提示文本
-  onSuccess?: (data: any) => void // 成功回调
-  onError?: (error: any) => void // 错误回调
+  onSuccess?: (data: T) => void // 成功回调
+  onError?: (error: Error) => void // 错误回调
+}
+
+// 错误类型守卫
+function isErrorWithMessage(error: unknown): error is { message: string } {
+  return typeof error === 'object' && error !== null && 'message' in error
+}
+
+function isErrorWithCode(error: unknown): error is { code: string } {
+  return typeof error === 'object' && error !== null && 'code' in error
+}
+
+function getErrorMessage(error: unknown): string {
+  if (isErrorWithMessage(error)) {
+    return error.message
+  }
+  if (typeof error === 'string') {
+    return error
+  }
+  return '操作失败'
 }
 
 /**
@@ -27,9 +46,9 @@ export function useRequest() {
   /**
    * 执行请求
    */
-  const execute = async <T = any>(
+  const execute = async <T = unknown>(
     requestFn: () => Promise<T>,
-    options: RequestOptions = {}
+    options: RequestOptions<T> = {}
   ): Promise<T | undefined> => {
     const {
       showLoading = false,
@@ -58,21 +77,22 @@ export function useRequest() {
       }
 
       return result
-    } catch (error: any) {
+    } catch (error: unknown) {
       // 忽略请求取消错误
-      if (error?.code === 'ERR_CANCELED' || error?.message?.includes('canceled') || error?.message?.includes('aborted')) {
-        console.debug('请求已取消:', error.message)
+      if (isErrorWithCode(error) && (error.code === 'ERR_CANCELED' || 
+          (isErrorWithMessage(error) && (error.message.includes('canceled') || error.message.includes('aborted'))))) {
+        console.debug('请求已取消:', getErrorMessage(error))
         return undefined
       }
 
       console.error('Request error:', error)
 
       if (showError) {
-        const errorMessage = error?.message || error?.response?.data?.message || '操作失败'
+        const errorMessage = getErrorMessage(error)
         message.error(errorMessage)
       }
 
-      if (onError) {
+      if (onError && error instanceof Error) {
         onError(error)
       }
 
@@ -88,10 +108,10 @@ export function useRequest() {
   /**
    * 创建防抖请求函数
    */
-  const createDebouncedRequest = <T = any>(
+  const createDebouncedRequest = <T = unknown>(
     requestFn: () => Promise<T>,
     delay = 500,
-    options: RequestOptions = {}
+    options: RequestOptions<T> = {}
   ) => {
     return useDebounceFn(() => execute(requestFn, options), delay)
   }
@@ -106,7 +126,7 @@ export function useRequest() {
 /**
  * 简化的请求执行器（直接使用，不需要返回值）
  */
-export async function withLoading<T = any>(
+export async function withLoading<T = unknown>(
   requestFn: () => Promise<T>,
   loadingText = '加载中...'
 ): Promise<T | undefined> {
@@ -115,15 +135,16 @@ export async function withLoading<T = any>(
   try {
     loadingStore.showLoading(loadingText)
     return await requestFn()
-  } catch (error: any) {
+  } catch (error: unknown) {
     // 忽略请求取消错误
-    if (error?.code === 'ERR_CANCELED' || error?.message?.includes('canceled') || error?.message?.includes('aborted')) {
-      console.debug('请求已取消:', error.message)
+    if (isErrorWithCode(error) && (error.code === 'ERR_CANCELED' || 
+        (isErrorWithMessage(error) && (error.message.includes('canceled') || error.message.includes('aborted'))))) {
+      console.debug('请求已取消:', getErrorMessage(error))
       return undefined
     }
     
     console.error('Request error:', error)
-    const errorMessage = error?.message || error?.response?.data?.message || '操作失败'
+    const errorMessage = getErrorMessage(error)
     message.error(errorMessage)
     return undefined
   } finally {
@@ -134,21 +155,22 @@ export async function withLoading<T = any>(
 /**
  * 错误处理包装器
  */
-export async function withErrorHandler<T = any>(
+export async function withErrorHandler<T = unknown>(
   requestFn: () => Promise<T>,
   errorMessage = '操作失败'
 ): Promise<T | undefined> {
   try {
     return await requestFn()
-  } catch (error: any) {
+  } catch (error: unknown) {
     // 忽略请求取消错误
-    if (error?.code === 'ERR_CANCELED' || error?.message?.includes('canceled') || error?.message?.includes('aborted')) {
-      console.debug('请求已取消:', error.message)
+    if (isErrorWithCode(error) && (error.code === 'ERR_CANCELED' || 
+        (isErrorWithMessage(error) && (error.message.includes('canceled') || error.message.includes('aborted'))))) {
+      console.debug('请求已取消:', getErrorMessage(error))
       return undefined
     }
     
     console.error('Error:', error)
-    const msg = error?.message || error?.response?.data?.message || errorMessage
+    const msg = getErrorMessage(error) || errorMessage
     message.error(msg)
     return undefined
   }

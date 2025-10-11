@@ -193,15 +193,13 @@ export default {
           title: "WIFI名称",
           dataIndex: "wifiName",
           width: 100,
-          align: "center",
-          ellipsis: true,
+          align: "center"
         },
         {
           title: "地理位置",
           dataIndex: "location",
           width: 180,
-          align: "center",
-          ellipsis: true,
+          align: "center"
         },
         {
           title: "设备状态",
@@ -220,8 +218,7 @@ export default {
           title: "设备类型",
           dataIndex: "type",
           width: 150,
-          align: "center",
-          ellipsis: true,
+          align: "center"
         },
         {
           title: "版本号",

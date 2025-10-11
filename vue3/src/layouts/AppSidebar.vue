@@ -16,7 +16,7 @@ const { openKeys, selectedKeys, menuItems, handleOpenChange, handleMenuClick } =
 // 获取图标组件
 function getIcon(iconName?: string) {
   if (!iconName) return null
-  return (Icons as any)[iconName]
+  return (Icons as Record<string, any>)[iconName]
 }
 
 // 获取菜单标题（支持多语言）

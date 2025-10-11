@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onBeforeUnmount, computed } from 'vue'
-import { message as antMessage } from 'ant-design-vue'
+import { message as antMessage, type TablePaginationConfig } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { useTable } from '@/composables/useTable'
 import { useLoadingStore } from '@/store/loading'
@@ -67,28 +67,19 @@ const columns = computed(() => [
     title: t('device.deviceId'),
     dataIndex: 'deviceId',
     width: 160,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.deviceName'),
     dataIndex: 'deviceName',
     width: 100,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.roleName'),
     dataIndex: 'roleName',
     width: 100,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('message.messageSender'),
@@ -100,10 +91,7 @@ const columns = computed(() => [
     title: t('message.messageContent'),
     dataIndex: 'message',
     width: 200,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('message.voice'),
@@ -176,7 +164,7 @@ function hasValidAudio(audioPath: string | undefined | null): boolean {
 /**
  * 处理音频加载错误
  */
-function handleAudioLoadError(record: any) {
+function handleAudioLoadError(record: Message) {
   // 标记该记录的音频加载失败
   record.audioLoadError = true
   console.debug('音频文件加载失败:', record.audioPath)
@@ -205,7 +193,7 @@ async function handleExport() {
 }
 
 // 处理分页变化
-const onTableChange = (pag: any) => {
+const onTableChange = (pag: TablePaginationConfig) => {
   handleTableChange(pag)
   fetchData()
 }

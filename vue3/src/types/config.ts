@@ -1,7 +1,7 @@
 /**
  * 配置类型
  */
-export type ConfigType = 'llm' | 'stt' | 'tts'
+export type ConfigType = 'llm' | 'stt' | 'tts' | 'agent'
 export type ModelType = 'chat' | 'vision' | 'intent' | 'embedding'
 
 /**

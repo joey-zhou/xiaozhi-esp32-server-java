@@ -18,7 +18,7 @@ import { getResourceUrl } from '@/utils/resource'
 import { useAvatar } from '@/composables/useAvatar'
 import { uploadAvatar } from '@/services/upload'
 import type { Role, RoleFormData, PromptTemplate } from '@/types/role'
-import type { TableColumnsType } from 'ant-design-vue'
+import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
 
 const { t } = useI18n()
 const { getAvatarUrl } = useAvatar()
@@ -96,8 +96,8 @@ const modelAdvancedVisible = ref<string[]>([])
 const vadAdvancedVisible = ref<string[]>([])
 
 // 待设置的折叠面板值
-const pendingVadValues = ref<any>(null)
-const pendingModelValues = ref<any>(null)
+const pendingVadValues = ref<Record<string, number> | null>(null)
+const pendingModelValues = ref<Record<string, number> | null>(null)
 
 // 表格列定义
 const columns = computed<TableColumnsType>(() => [
@@ -111,46 +111,31 @@ const columns = computed<TableColumnsType>(() => [
     title: t('device.roleName'),
     dataIndex: 'roleName',
     width: 120,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.roleDesc'),
     dataIndex: 'roleDesc',
     width: 200,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.voiceName'),
     dataIndex: 'voiceName',
     width: 200,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.modelName'),
     dataIndex: 'modelName',
     width: 200,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.sttName'),
     dataIndex: 'sttName',
     width: 150,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('device.totalDevice'),
@@ -176,32 +161,17 @@ const columns = computed<TableColumnsType>(() => [
 
 // 加载角色列表
 const fetchData = async () => {
-  await loadData(async (params) => {
-    const result = await queryRoles({
-      start: params.start,
-      limit: params.limit,
-      roleName: searchForm.roleName || undefined
-    })
-    // 确保返回正确的数据结构
-    if (result.code === 200 && result.data && 'list' in result.data) {
-      return {
-        code: result.code,
-        data: {
-          list: (result.data.list || []) as Role[],
-          total: ('total' in result.data ? result.data.total : 0) as number
-        },
-        message: result.message
-      }
-    }
-    return result as any
-  })
+  await loadData((params) => queryRoles({
+    ...params,
+    roleName: searchForm.roleName || undefined
+  }))
 }
 
 // 防抖搜索
 const debouncedSearch = createDebouncedSearch(fetchData, 500)
 
 // 处理表格分页变化
-const onTableChange = (pag: any) => {
+const onTableChange = (pag: TablePaginationConfig) => {
   handleTableChange(pag)
   fetchData()
 }
@@ -306,15 +276,12 @@ const handleSubmit = async () => {
     // 获取语音信息以获取ttsId
     const voiceInfo = getVoiceInfo(formData.voiceName || '')
     
-    const submitData: any = {
+    const submitData = {
       ...formData,
       avatar: avatarUrl.value,
       isDefault: formData.isDefault ? 1 : 0,
-      ttsId: voiceInfo?.ttsId || -1
-    }
-
-    if (editingRoleId.value) {
-      submitData.roleId = editingRoleId.value
+      ttsId: voiceInfo?.ttsId || -1,
+      ...(editingRoleId.value ? { roleId: editingRoleId.value } : {})
     }
 
     const res = editingRoleId.value 
@@ -329,9 +296,9 @@ const handleSubmit = async () => {
     } else {
       message.error(res.message || t('device.operationFailed'))
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('提交表单失败:', error)
-    if (error?.errorFields) {
+    if (error && typeof error === 'object' && 'errorFields' in error) {
       message.error(t('device.checkForm'))
     }
   } finally {
@@ -448,7 +415,7 @@ const handlePlayVoice = async (voiceName: string) => {
       }
 
       // 调用测试接口获取音频URL
-      const result: any = await testVoice({
+      const result = await testVoice({
         message: t('device.voiceTestMessage'),
         voiceName: voiceName,
         ttsId: voiceInfo.ttsId || -1,
@@ -492,9 +459,10 @@ const handlePlayVoice = async (voiceName: string) => {
     if (audio) {
       await audio.play()
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('播放音色失败:', error)
-    message.error(error.message || t('device.playVoiceFailed'))
+    const errorMessage = error instanceof Error ? error.message : t('device.playVoiceFailed')
+    message.error(errorMessage)
     playingVoiceId.value = ''
   }
 }
@@ -872,7 +840,7 @@ await fetchData()
     :placeholder="t('device.selectModel')"
     :loading="modelLoading"
     show-search
-    :filter-option="(input: string, option: any) => 
+    :filter-option="(input: string, option: { label: string; value: number }) => 
       option.label.toLowerCase().includes(input.toLowerCase())
     "
     @change="(value: number) => handleModelChange(value)"
@@ -1068,7 +1036,7 @@ await fetchData()
                     :placeholder="t('device.selectVoice')"
                     :loading="voiceLoading"
                     show-search
-                    :filter-option="(input: string, option: any) => 
+                    :filter-option="(input: string, option: { label: string; value: string }) => 
                       option.label.toLowerCase().includes(input.toLowerCase())
                     "
                   >

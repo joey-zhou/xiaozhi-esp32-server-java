@@ -23,8 +23,8 @@ const emit = defineEmits<{
 const formData = ref<Device>({
   deviceId: '',
   deviceName: '',
-  roleId: '',
-  state: 0,
+  roleId: undefined,
+  state: '0',
 })
 
 /**

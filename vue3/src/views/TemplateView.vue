@@ -224,8 +224,7 @@ const columns = computed(() => [
     title: t('template.templateName'),
     dataIndex: 'templateName',
     width: 100,
-    align: 'center',
-    ellipsis: true
+    align: 'center'
   },
   {
     title: t('template.category'),
@@ -238,7 +237,6 @@ const columns = computed(() => [
     dataIndex: 'templateContent',
     key: 'templateContent',
     width: 200,
-    ellipsis: true,
     align: 'center'
   },
   {
@@ -320,12 +318,11 @@ const handleSearch = () => {
 // 加载数据
 const fetchData = async () => {
   await loadData(async ({ start, limit }) => {
-    const params = {
+    const res = await queryTemplates({
       ...searchForm,
       start,
       limit
-    }
-    const res = await queryTemplates(params)
+    })
     
     // 更新分类选项
     if (res.data?.list) {

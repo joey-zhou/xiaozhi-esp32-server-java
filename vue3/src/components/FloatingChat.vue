@@ -595,14 +595,13 @@ const connectionStatusDot = computed(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--border-color);
 }
 
 // 头部
 .chat-header {
   padding: 16px;
-  background: var(--primary-color);
-  color: #fff;
+  background: var(--ant-color-primary);
+  color: var(--ant-color-text-inverse);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -663,14 +662,16 @@ const connectionStatusDot = computed(() => {
   gap: 4px;
 
   :deep(.ant-btn) {
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--ant-color-text-inverse);
+    opacity: 0.85;
     display: flex;
     align-items: center;
     justify-content: center;
 
     &:hover {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.15);
+      color: var(--ant-color-text-inverse);
+      opacity: 1;
+      background: var(--ant-color-primary-hover);
     }
 
     .anticon {
@@ -684,7 +685,7 @@ const connectionStatusDot = computed(() => {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  background: var(--bg-secondary);
+  background: var(--ant-color-bg-layout);
   scroll-behavior: smooth;
 
   &::-webkit-scrollbar {
@@ -722,7 +723,7 @@ const connectionStatusDot = computed(() => {
 .message-timestamp {
   text-align: center;
   margin: 16px 0;
-  color: var(--text-secondary);
+  color: var(--ant-color-text-secondary);
   font-size: 12px;
   position: relative;
 
@@ -733,7 +734,7 @@ const connectionStatusDot = computed(() => {
     top: 50%;
     width: 60px;
     height: 1px;
-    background: var(--border-color);
+    background: var(--ant-color-border);
   }
 
   &::before {
@@ -776,16 +777,16 @@ const connectionStatusDot = computed(() => {
 }
 
 .user-message .message-bubble {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-hover) 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--ant-color-primary) 0%, var(--ant-color-primary-hover) 100%);
+  color: var(--ant-color-text-inverse);
   border-bottom-right-radius: 4px;
 }
 
 .ai-message .message-bubble {
-  background: var(--card-bg);
-  color: var(--text-color);
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
   border-bottom-left-radius: 4px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--ant-color-border);
 }
 
 .message-text {
@@ -813,15 +814,14 @@ const connectionStatusDot = computed(() => {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 8px;
   background: var(--bg-secondary);
-  border-radius: 20px;
+  border-radius: 10px;
   border: 1px solid var(--border-color);
   transition: all 0.3s;
 
   &:focus-within {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+    border-color: var(--ant-color-primary);
+    box-shadow: 0 0 0 2px var(--ant-color-primary-bg);
   }
 }
 
@@ -833,15 +833,15 @@ const connectionStatusDot = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-secondary);
+  color: var(--ant-color-text-secondary);
 
   &.active {
-    color: var(--primary-color);
-    background: rgba(24, 144, 255, 0.1);
+    color: var(--ant-color-primary);
+    background: var(--ant-color-primary-bg);
   }
 
   &:hover {
-    background: var(--bg-hover);
+    background: var(--ant-color-fill-quaternary);
   }
 }
 
@@ -858,7 +858,7 @@ const connectionStatusDot = computed(() => {
   }
 
   &::placeholder {
-    color: var(--text-secondary);
+    color: var(--ant-color-text-placeholder);
   }
 }
 
@@ -867,6 +867,8 @@ const connectionStatusDot = computed(() => {
   width: 36px;
   height: 36px;
   border-radius: 50%;
+  border: none;
+  transform: scale(0.8);
   padding: 0;
   display: flex;
   align-items: center;
@@ -925,7 +927,7 @@ const connectionStatusDot = computed(() => {
 
 // 设置抽屉样式
 .form-tip {
-  color: var(--text-secondary);
+  color: var(--ant-color-text-secondary);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -934,12 +936,12 @@ const connectionStatusDot = computed(() => {
   display: flex;
   justify-content: flex-end;
   padding: 10px 16px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--ant-color-border);
 }
 
 :deep(.ant-drawer) {
   .ant-drawer-header {
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--ant-color-border);
   }
 
   .ant-drawer-body {
@@ -955,16 +957,12 @@ const connectionStatusDot = computed(() => {
 // 深色模式适配
 html.dark,
 html[data-theme='dark'] {
-  .chat-header {
-    background: var(--primary-color-dark);
-  }
-
   .chat-content {
     &::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
+      background: var(--ant-color-fill-quaternary);
 
       &:hover {
-        background: rgba(255, 255, 255, 0.3);
+        background: var(--ant-color-fill-tertiary);
       }
     }
   }

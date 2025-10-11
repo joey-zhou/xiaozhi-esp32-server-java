@@ -9,6 +9,7 @@ import { queryConfigs } from '@/services/config'
 import { queryAgents } from '@/services/agent'
 import type { ModelOption, VoiceOption, SttOption, VoiceProvider } from '@/types/role'
 import type { Config } from '@/types/config'
+import type { Agent } from '@/types/agent'
 
 export function useRoleManager() {
   // 加载状态
@@ -29,7 +30,7 @@ export function useRoleManager() {
 
   // 原始数据存储
   const llmConfigs = ref<Config[]>([])
-  const agentConfigs = ref<any[]>([])
+  const agentConfigs = ref<Agent[]>([])
   const ttsConfigs = ref<Config[]>([])
 
   /**
@@ -68,7 +69,7 @@ export function useRoleManager() {
 
       // 处理Coze Agent
       if (cozeRes.code === 200 && cozeRes.data?.list) {
-        cozeRes.data.list.forEach((agent: any) => {
+        cozeRes.data.list.forEach((agent: Agent) => {
           agentConfigs.value.push(agent)
           models.push({
             label: `${agent.agentName} (Coze智能体)`,
@@ -84,7 +85,7 @@ export function useRoleManager() {
 
       // 处理Dify Agent
       if (difyRes.code === 200 && difyRes.data?.list) {
-        difyRes.data.list.forEach((agent: any) => {
+        difyRes.data.list.forEach((agent: Agent) => {
           agentConfigs.value.push(agent)
           models.push({
             label: `${agent.agentName} (Dify智能体)`,
@@ -185,12 +186,17 @@ export function useRoleManager() {
 
       // 处理Edge特殊格式
       if (provider === 'edge') {
-        return data
-          .filter((voice: any) => voice.Locale && voice.Locale.includes('zh'))
-          .sort((a: any, b: any) => a.Locale.localeCompare(b.Locale))
-          .map((voice: any) => {
+        interface EdgeVoice {
+          Locale: string
+          ShortName: string
+          Gender: string
+        }
+        return (data as EdgeVoice[])
+          .filter((voice) => voice.Locale && voice.Locale.includes('zh'))
+          .sort((a, b) => a.Locale.localeCompare(b.Locale))
+          .map((voice) => {
             const nameParts = voice.ShortName.split('-')
-            let name = nameParts[2]
+            let name = nameParts[2] || ''
             if (name.endsWith('Neural')) {
               name = name.substring(0, name.length - 6)
             }
@@ -204,7 +210,7 @@ export function useRoleManager() {
       }
 
       // 其他提供商直接返回原始label，不添加提供商标识
-      return data.map((voice: any) => ({
+      return (data as Omit<VoiceOption, 'provider'>[]).map((voice) => ({
         ...voice,
         provider
       }))

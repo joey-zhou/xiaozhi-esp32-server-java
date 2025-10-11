@@ -12,9 +12,9 @@ export interface Message {
   audioPath?: string
   state: string
   messageType: string
-  sessionId?: string | null
+  sessionId?: string
   createTime?: string
-  updateTime?: string | null
+  updateTime?: string
   audioLoadError?: boolean
 }
 

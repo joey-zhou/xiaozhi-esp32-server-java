@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { message } from 'ant-design-vue'
+import { message, type TablePaginationConfig } from 'ant-design-vue'
 import { useTable } from '@/composables/useTable'
 import { useLoadingStore } from '@/store/loading'
 import { queryUsers } from '@/services/user'
@@ -45,10 +45,7 @@ const columns = computed(() => [
     dataIndex: 'name',
     width: 100,
     fixed: 'left',
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('common.avatar'),
@@ -61,19 +58,13 @@ const columns = computed(() => [
     title: t('user.email'),
     dataIndex: 'email',
     width: 180,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('user.phone'),
     dataIndex: 'tel',
     width: 150,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
   {
     title: t('user.deviceCount'),
@@ -115,10 +106,7 @@ const columns = computed(() => [
     title: t('user.lastLoginIp'),
     dataIndex: 'loginIp',
     width: 150,
-    align: 'center',
-    ellipsis: {
-      showTitle: false
-    }
+    align: 'center'
   },
 ])
 
@@ -164,7 +152,7 @@ function getAvatar(avatar?: string) {
 }
 
 // 处理分页变化
-const onTableChange = (pag: any) => {
+const onTableChange = (pag: TablePaginationConfig) => {
   handleTableChange(pag)
   fetchData()
 }
