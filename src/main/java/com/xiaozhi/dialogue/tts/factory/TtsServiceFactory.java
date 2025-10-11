@@ -56,6 +56,7 @@ public class TtsServiceFactory {
 
         // 如果提供商为空，则使用默认提供商
         var provider = config.getProvider();
+        logger.info("tts provider={}",provider);
         var cacheKey = createCacheKey(config, provider, voiceName);
 
         // 检查是否已有该配置的服务实例
@@ -88,7 +89,9 @@ public class TtsServiceFactory {
 
     private void ensureOutputPath(String outputPath) {
         File dir = new File(outputPath);
-        if (!dir.exists()) dir.mkdirs();
+        if (!dir.exists()){
+            dir.mkdirs();
+        }
     }
 
     public void removeCache(SysConfig config) {

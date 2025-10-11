@@ -2,6 +2,7 @@ package com.xiaozhi.dialogue.llm.tool.function;
 
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import com.xiaozhi.common.config.RedisCache;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.dialogue.llm.ChatService;
 import com.xiaozhi.dialogue.llm.tool.ToolCallStringResultConverter;
@@ -21,6 +22,7 @@ import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.ai.tool.metadata.ToolMetadata;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -37,11 +39,16 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Base64;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
 public class GetWeatherFunction implements ToolsGlobalRegistry.GlobalFunction {
 
+    @Autowired
+    private RedisCache redisCache;
+
+    private static final String TOOLS_WEATHER = "TOOLS_WEATHER:";
 
     @Override
     public ToolCallback getFunctionCallTool(ChatSession chatSession) {
@@ -50,10 +57,18 @@ public class GetWeatherFunction implements ToolsGlobalRegistry.GlobalFunction {
 
     ToolCallback toolCallback = FunctionToolCallback
             .builder("func_getWeather", (Map<String, String> params, ToolContext toolContext) -> {
-                ChatSession chatSession = (ChatSession)toolContext.getContext().get(ChatService.TOOL_CONTEXT_SESSION_KEY);
+                ChatSession chatSession = (ChatSession) toolContext.getContext().get(ChatService.TOOL_CONTEXT_SESSION_KEY);
                 String location = params.get("location");
-                log.info("从聊天记录中获取的地址参数{}",location);
-                String result = fetchCityInfo(location);
+                log.info("从聊天记录中获取的地址参数{}", location);
+                if (StringUtils.isBlank(location)) {
+                    location = getLocationByIP(CmsUtils.getLocalIpAddress());
+                }
+                log.info("最终的地址是 {}", location);
+                String result = redisCache.getCacheObject(TOOLS_WEATHER+location);
+                if(StringUtils.isBlank(result)) {
+                    result = fetchCityInfo(location);
+                    redisCache.setCacheObject(TOOLS_WEATHER+location, result,1800, TimeUnit.SECONDS);
+                }
                 return result;
             })
             .toolMetadata(ToolMetadata.builder().returnDirect(true).build())
@@ -76,7 +91,7 @@ public class GetWeatherFunction implements ToolsGlobalRegistry.GlobalFunction {
             .build();
 
 
-    public static JSONObject parseWeatherInfo(String url){
+    public static JSONObject parseWeatherInfo(String url) {
         JSONObject result = new JSONObject();
         // 发送 GET 请求
         Document document = null;
@@ -89,36 +104,28 @@ public class GetWeatherFunction implements ToolsGlobalRegistry.GlobalFunction {
 
             Elements currentBasicElements = document.select(".c-city-weather-current .current-basic .current-basic___item");
             result.put("cityName", cityName);
-            System.out.println(currentAbstract);
             result.put("currentAbstract", currentAbstract);
-            System.out.println(currentBasicElements);
             return result;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        //System.out.println(document.title());
     }
 
     private final OkHttpClient client = HttpUtil.client;
 
     public String fetchCityInfo(String location) {
-        if (StringUtils.isBlank(location)){
-            location = getLocationByIP(CmsUtils.getLocalIpAddress());
-        }
-        log.info("最终的地址是 {}",location);
-       String host = "kv6vhf8g58.re.qweatherapi.com";
-
-        String url = "https://"+host+"/geo/v2/city/lookup?location="+location;
+        String host = "kv6vhf8g58.re.qweatherapi.com";
+        String url = "https://" + host + "/geo/v2/city/lookup?location=" + location;
         String token = null;
         try {
             token = createToken();
-        }catch (Exception e){
+        } catch (Exception e) {
             log.error("token 获取失败");
         }
 
         var request = new Request.Builder()
                 .url(url)
-                .addHeader("Authorization","Bearer "+token)
+                .addHeader("Authorization", "Bearer " + token)
                 .addHeader("Content-Type", "application/json")
                 .get()
                 .build();
@@ -127,8 +134,8 @@ public class GetWeatherFunction implements ToolsGlobalRegistry.GlobalFunction {
                 JSONObject jsonObject = JsonUtil.fromJson(resp.body().string(), JSONObject.class);
                 log.info(jsonObject.toString());
                 JSONArray jsonArray = (JSONArray) jsonObject.getJSONArray("location");
-                JSONObject locationObject = (JSONObject)jsonArray.getJSONObject(0);
-                String fxLink = (String)locationObject.get("fxLink");
+                JSONObject locationObject = (JSONObject) jsonArray.getJSONObject(0);
+                String fxLink = (String) locationObject.get("fxLink");
                 //HttpResponse fxLinkResponse  = HttpRequest.get(fxLink).execute();
                 //System.out.println(fxLinkResponse.body());
                 JSONObject result = parseWeatherInfo(fxLink);
@@ -144,12 +151,12 @@ public class GetWeatherFunction implements ToolsGlobalRegistry.GlobalFunction {
     }
 
 
-    public static void main(String[] args) throws Exception{
+    public static void main(String[] args) throws Exception {
         GetWeatherFunction getWeatherFunction = new GetWeatherFunction();
         getWeatherFunction.fetchCityInfo("上海");
     }
 
-    public static String createToken()throws Exception{
+    public static String createToken() throws Exception {
         // Private key
         String privateKeyString = "-----BEGIN PRIVATE KEY-----\n" +
                 "MC4CAQAwBQYDK2VwBCIEIOqloJ6PrTgH/OGNiHlFcP3RmvoHoYq7F3soAFaRuXu/\n" +
@@ -178,30 +185,24 @@ public class GetWeatherFunction implements ToolsGlobalRegistry.GlobalFunction {
         signer.initSign(privateKey);
         signer.update(data.getBytes(StandardCharsets.UTF_8));
         byte[] signature = signer.sign();
-
         String signatureEncoded = Base64.getUrlEncoder().encodeToString(signature);
-
-        String jwt = data + "." + signatureEncoded;
-
-// Print Token
-        System.out.println("Signature:\n" + signatureEncoded);
-        System.out.println("JWT:\n" + jwt);
-        return jwt;
+        return data + "." + signatureEncoded;
     }
 
 
     public static String getLocationByIP(String ip) {
-        log.info("ip= {}",ip);
-        if (ip == null || ip.length() == 0 || "127.0.0.1".equalsIgnoreCase(ip)){
+        log.info("ip= {}", ip);
+        if (ip == null || ip.isEmpty() || "127.0.0.1".equalsIgnoreCase(ip)) {
             return "上海";
         }
-        String apiUrl = "http://ip-api.com/json/" + ip + "?lang=zh-CN"; // 中文地址
+        // 中文地址
+        String apiUrl = "http://ip-api.com/json/" + ip + "?lang=zh-CN";
         try {
             URL url = new URL(apiUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
 
-            BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
             String inputLine;
             StringBuilder content = new StringBuilder();
 
