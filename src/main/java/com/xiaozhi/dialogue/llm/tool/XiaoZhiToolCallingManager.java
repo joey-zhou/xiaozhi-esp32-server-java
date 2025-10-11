@@ -1,6 +1,7 @@
 package com.xiaozhi.dialogue.llm.tool;
 
 import io.micrometer.observation.ObservationRegistry;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -133,8 +134,9 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager {
         }
         AssistantMessage assistantMessage = toolCallGeneration.get().getOutput();
         AssistantMessage.ToolCall toolCall = new AssistantMessage.ToolCall(
-                toolId.toString(),
-                toolType.toString(),
+                //ollama为toolId为空的情况
+                StringUtils.isBlank(toolId) ?"":toolId,
+                toolType,
                 functionName.toString(),
                 functionParam.toString()
         );

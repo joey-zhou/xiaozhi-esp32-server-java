@@ -3,3 +3,10 @@
 3：会话总结能力，定期总结，删除历史会话
 4: 增加分布式缓存redis
 5：记忆功能需要完善，将chatmemory和现有的融合
+
+
+
+docker build -f ./Dockerfile-server-java . -t xiaozhi-esp32-server-java-server:20251011
+docker save -o D:\docker-project\xiaozhi-esp32-server-java-server.tar xiaozhi-esp32-server-java-server:20251011
+docker save -o D:\docker-project\xiaozhi-esp32-server-java-server-node.tar xiaozhi-esp32-server-java-server-node
+docker load -i ./xiaozhi-esp32-server-java-server.tar

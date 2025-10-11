@@ -1,0 +1,16 @@
+version: '3.3'
+services:
+  xiaozhi-esp32-server-java-node:
+    container_name: xiaozhi-esp32-server-java-node
+    image: xiaozhi-esp32-server-java-node
+    restart: always
+    ports:
+      - "8084:8084"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8084
+      - API_URL=http://xiaozhi-esp32-server-java-server:8091
+    networks:
+      - default
+networks:
+  default:
