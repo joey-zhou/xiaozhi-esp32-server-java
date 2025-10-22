@@ -1,7 +1,7 @@
 <template>
   <div class="chat-component" :style="{ height: height }">
     <!-- 聊天内容区域 -->
-    <div class="chat-content" ref="chatContentRef" :style="{ maxHeight: contentMaxHeight }">
+    <div class="chat-content" ref="chatContentRef">
       <div v-if="messages.length === 0" class="empty-chat">
         <a-empty :description="emptyText" />
       </div>
@@ -16,7 +16,8 @@
           <div class="message-wrapper" :class="message.isUser ? 'user-message' : 'ai-message'">
             <!-- 头像 -->
             <div class="avatar">
-              <a-avatar :src="message.isUser ? userAvatar : aiAvatar" :size="avatarSize" />
+              <a-avatar v-if="message.isUser" :src="userAvatar" :size="avatarSize" />
+              <AiAvatar v-else :size="avatarSize" />
             </div>
             
             <!-- 消息气泡 -->
@@ -57,56 +58,22 @@
     <div v-if="showInput" class="chat-input-area">
       <!-- 文本输入 -->
       <div class="text-input-wrapper">
-        <!-- 切换按钮移到左侧 -->
-        <div class="input-left-actions" v-if="showVoiceToggle">
-          <a-tooltip :title="isVoiceMode ? '切换到文字输入' : '切换到语音输入'" placement="top">
-            <a-button
-              shape="circle"
-              class="mode-toggle-button"
-              :type="isVoiceMode ? 'primary' : 'default'"
-              @click="toggleInputMode"
-            >
-              <a-icon :type="isVoiceMode ? 'audio' : 'message'" />
-            </a-button>
-          </a-tooltip>
-        </div>
-
         <a-textarea
-          v-if="!isVoiceMode"
           v-model="inputMessage"
           :placeholder="inputPlaceholder"
           :auto-size="{ minRows: 1, maxRows: 4 }"
           @keypress.enter="handleEnterKey"
         />
 
-        <!-- 语音输入按钮 -->
-        <a-button
-          v-else
-          class="record-button"
-          :class="{ recording: isRecording }"
-          type="primary"
-          @touchstart="startRecording"
-          @touchend="stopRecording"
-          @mousedown="startRecording"
-          @mouseup="stopRecording"
-          @mouseleave="isRecording && stopRecording"
-        >
-          {{ isRecording ? '松开结束录音' : '按住说话' }}
-        </a-button>
-
         <!-- 发送按钮 -->
-        <div class="input-right-actions">
-          <a-button
-            v-if="!isVoiceMode"
-            type="primary"
-            class="send-button"
-            shape="circle"
-            :disabled="!inputMessage.trim()"
-            @click="sendTextMessage"
-          >
-            <a-icon type="right" style="font-size: 16px;" />
-          </a-button>
-        </div>
+        <a-button
+          type="primary"
+          class="send-button"
+          :disabled="!inputMessage.trim()"
+          @click="sendTextMessage"
+        >
+          发送
+        </a-button>
       </div>
     </div>
   </div>
@@ -130,9 +97,15 @@ import {
 // 引入WebSocket mixin
 import websocketMixin from '@/mixins/websocketMixin';
 
+// 引入AI头像组件
+import AiAvatar from '@/components/AiAvatar';
+
 export default {
   name: 'ChatComponent',
   mixins: [websocketMixin],
+  components: {
+    AiAvatar
+  },
   props: {
     // 是否显示输入框
     showInput: {
@@ -374,8 +347,8 @@ export default {
 .chat-component {
   display: flex;
   flex-direction: column;
-  background-color: #ededed;
-  border-radius: 8px;
+  background-color: #f5f5f5;
+  border-radius: 0;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
@@ -383,9 +356,9 @@ export default {
 .chat-content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 16px 8px 16px;
+  padding: 16px 12px 8px 12px;
   scroll-behavior: smooth;
-  background: linear-gradient(180deg, #ededed 0%, #e6e6e6 100%);
+  background: #f5f5f5;
 }
 
 .empty-chat {
@@ -436,15 +409,15 @@ export default {
   line-height: 1.4;
 }
 
-.empty-chat :deep(.ant-empty) {
+.empty-chat >>> .ant-empty {
   color: inherit;
 }
 
-.empty-chat :deep(.ant-empty-image) {
+.empty-chat >>> .ant-empty-image {
   margin-bottom: 16px;
 }
 
-.empty-chat :deep(.ant-empty-description) {
+.empty-chat >>> .ant-empty-description {
   color: inherit;
 }
 
@@ -478,7 +451,7 @@ export default {
   display: flex;
   margin-bottom: 0;
   width: 100%;
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .user-message {
@@ -490,8 +463,8 @@ export default {
   flex-shrink: 0;
 }
 
-.avatar :deep(.ant-avatar) {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+.avatar >>> .ant-avatar {
+  box-shadow: none;
 }
 
 .message-content {
@@ -502,18 +475,18 @@ export default {
 }
 
 .message-bubble {
-  padding: 10px 15px;
-  border-radius: 18px;
+  padding: 9px 12px;
+  border-radius: 4px;
   position: relative;
   word-break: break-word;
   width: auto;
   display: inline-block;
   min-height: 0;
   height: auto;
-  line-height: 1.4;
+  line-height: 1.5;
   box-sizing: border-box;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: 15px;
+  transition: all 0.1s ease;
 }
 
 .message-bubble.clickable {
@@ -522,30 +495,24 @@ export default {
 }
 
 .user-message .message-bubble {
-  background: linear-gradient(135deg, #95ec69 0%, #7ed321 100%);
-  color: #333;
-  border-bottom-right-radius: 4px;
-  box-shadow: 0 1px 3px rgba(149, 236, 105, 0.3);
+  background: #95ec69;
+  color: #000;
+  box-shadow: none;
 }
 
 .user-message .message-bubble.clickable:hover {
-  background: linear-gradient(135deg, #8ee55f 0%, #73c41f 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(149, 236, 105, 0.4);
+  background: #8de65b;
 }
 
 .ai-message .message-bubble {
   background-color: #fff;
-  color: #333;
-  border-bottom-left-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  color: #000;
+  box-shadow: none;
+  border: none;
 }
 
 .ai-message .message-bubble.clickable:hover {
-  background-color: #fafafa;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  background-color: #f5f5f5;
 }
 
 .message-text {
@@ -639,262 +606,142 @@ export default {
   align-self: flex-end;
 }
 
-.loading-indicator :deep(.ant-spin-dot) {
+.loading-indicator >>> .ant-spin-dot {
   color: #95ec69;
 }
 
 .chat-input-area {
-  padding: 16px;
-  background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
-  border-top: 1px solid #e1e4e8;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+  padding: 8px 12px;
+  background: #f7f7f7;
+  border-top: 1px solid #d6d6d6;
+  box-shadow: none;
 }
 
 .text-input-wrapper {
   display: flex;
   width: 100%;
-  align-items: center;
-  gap: 12px;
-  padding: 4px;
-  background: #fff;
-  border-radius: 24px;
-  border: 1px solid #e1e4e8;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
-}
-
-.text-input-wrapper:hover {
-  border-color: #c1c7cd;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-}
-
-.text-input-wrapper:focus-within {
-  border-color: #95ec69;
-  box-shadow: 0 2px 12px rgba(149, 236, 105, 0.25);
-}
-
-/* 输入框左侧操作区 */
-.input-left-actions {
-  display: flex;
-  align-items: center;
-  padding-left: 4px;
-}
-
-/* 输入框右侧操作区 */
-.input-right-actions {
-  display: flex;
-  align-items: center;
-  padding-right: 4px;
-}
-
-.text-input-wrapper :deep(.ant-input) {
-  flex: 1;
-  border: none;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
   border-radius: 0;
-  padding: 10px 16px;
-  background-color: transparent;
-  font-size: 14px;
-  line-height: 1.5;
-  min-height: 40px;
+  border: none;
+  box-shadow: none;
+  transition: all 0.2s ease;
+}
+
+.text-input-wrapper >>> .ant-input {
+  flex: 1;
+  border: 1px solid #d6d6d6;
+  border-radius: 6px;
+  padding: 7px 12px;
+  background-color: #fff;
+  font-size: 15px;
+  line-height: 20px;
+  height: 36px;
+  min-height: 36px;
+  max-height: 120px;
   resize: none;
   outline: none;
   box-shadow: none;
   transition: all 0.2s ease;
 }
 
-.text-input-wrapper :deep(.ant-input):focus {
-  border: none;
+.text-input-wrapper >>> .ant-input:focus {
+  border-color: #07c160;
   box-shadow: none;
   outline: none;
 }
 
-.text-input-wrapper :deep(.ant-input)::placeholder {
-  color: #9ca3af;
-  font-size: 14px;
+.text-input-wrapper >>> .ant-input::placeholder {
+  color: #999;
+  font-size: 15px;
 }
 
-.mode-toggle-button {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border-radius: 50%;
-  background: #f8f9fa;
-  border: none;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-.mode-toggle-button:hover {
-  background: #e9ecef;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.mode-toggle-button.ant-btn-primary {
-  background: linear-gradient(135deg, #95ec69 0%, #7ed321 100%);
-  color: #333;
-  box-shadow: 0 2px 6px rgba(149, 236, 105, 0.3);
-}
-
-.mode-toggle-button.ant-btn-primary:hover {
-  background: linear-gradient(135deg, #8ee55f 0%, #73c41f 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(149, 236, 105, 0.4);
-}
-
-.mode-toggle-button :deep(.anticon) {
-  font-size: 18px;
+/* 使用 >>> 确保样式穿透 */
+.text-input-wrapper >>> .ant-input {
+  height: 36px !important;
+  line-height: 20px !important;
 }
 
 .send-button {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #95ec69 0%, #7ed321 100%);
+  padding: 8px 20px;
+  height: 36px;
+  border-radius: 4px;
+  background: #07c160;
   border: none;
-  box-shadow: 0 2px 6px rgba(149, 236, 105, 0.3);
-  transition: all 0.3s ease;
+  box-shadow: none;
+  transition: all 0.2s ease;
   cursor: pointer;
+  font-size: 15px;
+  color: #fff;
+  font-weight: 400;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .send-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #8ee55f 0%, #73c41f 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(149, 236, 105, 0.4);
+  background: #06ad56;
 }
 
 .send-button:disabled {
-  background: #f0f0f0;
+  background: #d9d9d9;
   color: #999;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* 确保图标正确显示 */
-.send-button :deep(.anticon) {
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  color: #333;
-  font-size: 18px;
-}
-
-.send-button:disabled :deep(.anticon) {
-  color: #999;
-}
-
-.record-button {
-  flex: 1;
-  height: 44px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, #95ec69 0%, #7ed321 100%);
-  border: none;
-  color: #333;
-  font-weight: 600;
-  font-size: 15px;
-  box-shadow: 0 2px 6px rgba(149, 236, 105, 0.3);
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.record-button:hover:not(.recording) {
-  background: linear-gradient(135deg, #8ee55f 0%, #73c41f 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(149, 236, 105, 0.4);
-}
-
-.record-button.recording {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
-  color: #fff;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(255, 107, 107, 0.2);
-    transform: scale(1.02);
-  }
-  100% {
-    box-shadow: 0 0 0 12px rgba(255, 107, 107, 0);
-    transform: scale(1);
-  }
 }
 
 /* 响应式调整 */
 @media (max-width: 768px) {
   .chat-input-area {
-    padding: 12px;
+    padding: 8px 12px;
   }
 
   .text-input-wrapper {
-    gap: 10px;
-    padding: 3px;
+    gap: 8px;
   }
 
-  .mode-toggle-button,
   .send-button {
-    width: 36px;
-    height: 36px;
-  }
-
-  .mode-toggle-button :deep(.anticon),
-  .send-button :deep(.anticon) {
-    font-size: 16px;
-  }
-
-  .record-button {
-    height: 40px;
+    padding: 8px 16px;
+    height: 34px;
     font-size: 14px;
   }
 
-  .text-input-wrapper :deep(.ant-input) {
-    padding: 8px 14px;
-    min-height: 36px;
+  .text-input-wrapper >>> .ant-input {
+    padding: 6px 10px;
+    height: 34px;
+    min-height: 34px;
+    line-height: 20px;
     font-size: 14px;
+  }
+
+  .text-input-wrapper >>> .ant-input {
+    height: 34px !important;
+    line-height: 20px !important;
   }
 }
 
 @media (max-width: 480px) {
   .chat-input-area {
-    padding: 10px;
+    padding: 8px 10px;
   }
 
-  .text-input-wrapper {
-    gap: 8px;
-    padding: 2px;
-  }
-
-  .mode-toggle-button,
   .send-button {
-    width: 34px;
-    height: 34px;
-  }
-
-  .mode-toggle-button :deep(.anticon),
-  .send-button :deep(.anticon) {
-    font-size: 14px;
-  }
-
-  .record-button {
-    height: 36px;
+    padding: 6px 14px;
+    height: 32px;
     font-size: 13px;
   }
 
-  .text-input-wrapper :deep(.ant-input) {
-    padding: 6px 12px;
-    min-height: 34px;
+  .text-input-wrapper >>> .ant-input {
+    padding: 5px 10px;
+    height: 32px;
+    min-height: 32px;
+    line-height: 20px;
     font-size: 13px;
+  }
+
+  .text-input-wrapper >>> .ant-input {
+    height: 32px !important;
+    line-height: 20px !important;
   }
 }
 </style>

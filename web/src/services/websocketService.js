@@ -82,6 +82,16 @@ export function setLogLevel(level) {
 // =============================
 export const messages = [];
 
+// 打字机效果相关
+// =============================
+let typewriterTimer = null;
+let typewriterQueue = []; // 待打字的文本队列
+let isTyping = false; // 是否正在打字
+const TYPING_SPEED = 50; // 每个字的显示间隔（毫秒）
+
+// 当前正在构建的AI回复消息
+let currentAIMessage = null;
+
 // 添加消息
 export function addMessage(message) {
   if (!message.content) return null;
@@ -168,9 +178,80 @@ function deleteMessage(id) {
 export function clearMessages() {
   // 使用splice方法清空数组，Vue可以检测到这种变化
   messages.splice(0, messages.length);
+  currentAIMessage = null; // 重置当前AI消息
   log('清空所有消息', 'info');
 
   return true;
+}
+
+// 打字机效果：逐字显示文本
+function startTypewriter(text) {
+  // 将文本添加到队列
+  typewriterQueue.push(text);
+  
+  // 如果没有在打字，启动打字机
+  if (!isTyping) {
+    processTypewriterQueue();
+  }
+}
+
+// 处理打字机队列
+function processTypewriterQueue() {
+  if (typewriterQueue.length === 0) {
+    isTyping = false;
+    return;
+  }
+  
+  isTyping = true;
+  const text = typewriterQueue.shift();
+  const chars = Array.from(text); // 支持 emoji 和多字节字符
+  let currentIndex = 0;
+  
+  // 如果是第一次打字，创建消息
+  if (!currentAIMessage) {
+    currentAIMessage = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      content: '',
+      type: 'tts',
+      isUser: false,
+      timestamp: new Date(),
+      isLoading: false
+    };
+    messages.push(currentAIMessage);
+    log(`📝 创建新的AI回复消息 (ID: ${currentAIMessage.id})`, 'info');
+  }
+  
+  // 逐字添加
+  const typeNextChar = () => {
+    if (currentIndex < chars.length) {
+      currentAIMessage.content += chars[currentIndex];
+      currentIndex++;
+      
+      // 触发Vue响应式更新
+      const index = messages.findIndex(msg => msg.id === currentAIMessage.id);
+      if (index !== -1) {
+        messages.splice(index, 1, { ...currentAIMessage });
+      }
+      
+      typewriterTimer = setTimeout(typeNextChar, TYPING_SPEED);
+    } else {
+      // 当前文本打完，处理下一个
+      log(`✅ 完成打字: "${text}"`, 'debug');
+      processTypewriterQueue();
+    }
+  };
+  
+  typeNextChar();
+}
+
+// 停止打字机效果
+function stopTypewriter() {
+  if (typewriterTimer) {
+    clearTimeout(typewriterTimer);
+    typewriterTimer = null;
+  }
+  isTyping = false;
+  typewriterQueue = [];
 }
 
 // WebSocket连接相关
@@ -499,13 +580,40 @@ function handleSTTMessage(data) {
 // 处理TTS消息
 function handleTTSMessage(data) {
   if (data.state === 'start') {
-    log('TTS开始', 'info');
+    log('🎵 TTS开始，准备接收音频', 'info');
+    
+    // 重置打字机和当前AI消息
+    stopTypewriter();
+    currentAIMessage = null;
+    
+    // 通知音频服务准备接收新的音频流
+    if (window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('audio-stream-start'));
+    }
   } else if (data.state === 'sentence_start' && data.text) {
-    // 添加TTS消息
-    addTTSMessage(data.text);
-    log(`TTS文本: ${data.text}`, 'info');
+    // 将新句子加入打字机队列
+    log(`📥 收到新句子: "${data.text}"`, 'info');
+    startTypewriter(data.text);
   } else if (data.state === 'stop') {
-    log('TTS结束', 'info');
+    log('🛑 TTS结束，音频流结束', 'info');
+    
+    // 等待打字机完成后再清理
+    const waitForTyping = () => {
+      if (!isTyping && typewriterQueue.length === 0) {
+        if (currentAIMessage) {
+          log(`✅ AI回复完成，最终内容: "${currentAIMessage.content}"`, 'info');
+          currentAIMessage = null;
+        }
+      } else {
+        setTimeout(waitForTyping, 100);
+      }
+    };
+    waitForTyping();
+    
+    // 通知音频服务流已结束
+    if (window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('audio-stream-end'));
+    }
   }
 }
 
@@ -653,6 +761,9 @@ export function disconnectFromServer() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
+  
+  // 停止打字机效果
+  stopTypewriter();
 
   if (!webSocket) {
     return true;

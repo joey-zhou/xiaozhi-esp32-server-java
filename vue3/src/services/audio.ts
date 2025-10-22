@@ -269,6 +269,12 @@ export function loadOpusLibrary(): Promise<boolean> {
       const path = possiblePaths[pathIndex]
       pathIndex++
 
+      if (!path) {
+        log('路径为空，加载失败', 'error')
+        resolve(false)
+        return
+      }
+
       log(`尝试从路径加载: ${path}`, 'info')
       script.src = path
       document.head.appendChild(script)
@@ -349,7 +355,10 @@ function createOpusDecoder(mod: OpusDecoderModule): OpusDecoder {
 
           const decodedData = new Int16Array(decodedSamples)
           for (let i = 0; i < decodedSamples; i++) {
-            decodedData[i] = mod.HEAP16[(pcmPtr >> 1) + i]
+            const heapValue = mod.HEAP16[(pcmPtr >> 1) + i]
+            if (heapValue !== undefined) {
+              decodedData[i] = heapValue
+            }
           }
 
           mod._free(opusPtr)
@@ -413,7 +422,10 @@ export async function initOpusDecoder(): Promise<OpusDecoder | null> {
 function convertInt16ToFloat32(int16Data: Int16Array): number[] {
   const float32Data: number[] = []
   for (let i = 0; i < int16Data.length; i++) {
-    float32Data.push(int16Data[i] / (int16Data[i] < 0 ? 0x8000 : 0x7fff))
+    const sample = int16Data[i]
+    if (sample !== undefined) {
+      float32Data.push(sample / (sample < 0 ? 0x8000 : 0x7fff))
+    }
   }
   return float32Data
 }
@@ -427,8 +439,16 @@ function resetAudioBuffer(): void {
 function addAudioToBuffer(opusData: Uint8Array): boolean {
   audioBufferQueue.push(opusData)
 
-  if (audioBufferQueue.length === 1 && !isAudioBuffering && !isAudioPlaying) {
+  // 如果没有在播放，启动缓冲流程
+  if (!isAudioPlaying && !isAudioBuffering) {
     startAudioBuffering()
+  }
+  // 如果正在播放但当前没有播放片段，且有足够数据，触发解码
+  else if (isAudioPlaying && streamingContext && !streamingContext.playing && audioBufferQueue.length >= 3) {
+    log('🔄 播放中收到新数据，立即解码', 'debug')
+    const frames = [...audioBufferQueue]
+    audioBufferQueue = []
+    streamingContext.decodeOpusFrames(frames)
   }
 
   return true
@@ -562,7 +582,10 @@ async function playBufferedAudio(): Promise<boolean> {
 
           const channelData = audioBuffer.getChannelData(0)
           for (let i = 0; i < currentSamples.length; i++) {
-            channelData[i] = currentSamples[i]
+            const sample = currentSamples[i]
+            if (sample !== undefined) {
+              channelData[i] = sample
+            }
           }
 
           this.source = audioContext.createBufferSource()
@@ -602,30 +625,28 @@ async function playBufferedAudio(): Promise<boolean> {
             this.analyser = null
             this.playing = false
 
+            // 继续播放队列中的数据
             if (this.queue.length > 0) {
               setTimeout(() => this.startPlaying(), 10)
-            } else if (audioBufferQueue.length > 0) {
+            }
+            // 检查是否有新的缓冲数据
+            else if (audioBufferQueue.length > 0) {
               const frames = [...audioBufferQueue]
               audioBufferQueue = []
               this.decodeOpusFrames(frames)
-            } else if (this.endOfStream) {
-              log('音频播放完成', 'info')
+            }
+            // 流已明确结束
+            else if (this.endOfStream) {
+              log('🏁 音频播放完成（流结束）', 'info')
               isAudioPlaying = false
               streamingContext = null
               window.streamingContext = undefined
-            } else {
-              setTimeout(() => {
-                if (this.queue.length === 0 && audioBufferQueue.length > 0) {
-                  const frames = [...audioBufferQueue]
-                  audioBufferQueue = []
-                  this.decodeOpusFrames(frames)
-                } else if (this.queue.length === 0 && audioBufferQueue.length === 0) {
-                  log('音频播放完成 (超时)', 'info')
-                  isAudioPlaying = false
-                  streamingContext = null
-                  window.streamingContext = undefined
-                }
-              }, 500)
+            }
+            // 等待更多数据（不设置超时，持续等待）
+            else {
+              log('⏳ 等待更多音频数据...', 'debug')
+              // 不做任何处理，保持 isAudioPlaying = true
+              // 当新数据到达时，会通过 addAudioToBuffer 触发继续播放
             }
           }
 

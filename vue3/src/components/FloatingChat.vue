@@ -685,7 +685,7 @@ const connectionStatusDot = computed(() => {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  background: var(--ant-color-bg-layout);
+  background: var(--bg-color);
   scroll-behavior: smooth;
 
   &::-webkit-scrollbar {
@@ -717,7 +717,7 @@ const connectionStatusDot = computed(() => {
 .chat-messages {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .message-timestamp {
@@ -749,7 +749,7 @@ const connectionStatusDot = computed(() => {
 .message-wrapper {
   display: flex;
   gap: 8px;
-  align-items: flex-end;
+  align-items: flex-start;
 
   &.user-message {
     flex-direction: row-reverse;
@@ -761,7 +761,7 @@ const connectionStatusDot = computed(() => {
 }
 
 .message-content {
-  max-width: 70%;
+  max-width: 75%;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -769,24 +769,48 @@ const connectionStatusDot = computed(() => {
 
 .message-bubble {
   padding: 10px 14px;
-  border-radius: 16px;
+  border-radius: 8px;
   word-break: break-word;
-  line-height: 1.5;
-  font-size: 14px;
-  transition: all 0.2s;
+  line-height: 1.6;
+  font-size: 15px;
+  position: relative;
+  max-width: 100%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  
+  // 微信风格的小三角
+  &::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+  }
 }
 
 .user-message .message-bubble {
-  background: linear-gradient(135deg, var(--ant-color-primary) 0%, var(--ant-color-primary-hover) 100%);
-  color: var(--ant-color-text-inverse);
-  border-bottom-right-radius: 4px;
+  background: #95ec69;
+  color: #000;
+  
+  // 右侧小三角
+  &::before {
+    right: -8px;
+    border-width: 6px 0 6px 8px;
+    border-color: transparent transparent transparent #95ec69;
+  }
 }
 
 .ai-message .message-bubble {
-  background: var(--ant-color-bg-container);
+  background: var(--card-bg);
   color: var(--ant-color-text);
-  border-bottom-left-radius: 4px;
   border: 1px solid var(--ant-color-border);
+  
+  // 左侧小三角
+  &::before {
+    left: -7px;
+    border-width: 6px 7px 6px 0;
+    border-color: transparent var(--card-bg) transparent transparent;
+  }
 }
 
 .message-text {
@@ -954,18 +978,5 @@ const connectionStatusDot = computed(() => {
   }
 }
 
-// 深色模式适配
-html.dark,
-html[data-theme='dark'] {
-  .chat-content {
-    &::-webkit-scrollbar-thumb {
-      background: var(--ant-color-fill-quaternary);
-
-      &:hover {
-        background: var(--ant-color-fill-tertiary);
-      }
-    }
-  }
-}
 </style>
 

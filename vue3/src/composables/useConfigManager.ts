@@ -16,7 +16,7 @@ export function useConfigManager(configType: ConfigType) {
     data: configItems,
     pagination,
     handleTableChange,
-    loadData: loadTableData,
+    loadData,
     resetPagination
   } = useTable<Config>()
 
@@ -153,24 +153,13 @@ export function useConfigManager(configType: ConfigType) {
    * 获取配置列表
    */
   async function getData() {
-    await loadTableData(async ({ start, limit }) => {
-      const res = await queryConfigs({
-        start,
-        limit,
+    await loadData((params) => {
+      return queryConfigs({
+        start: params.start,
+        limit: params.limit,
         configType,
         ...queryForm.value,
       })
-      // 转换数据格式以匹配 useTable 的期望
-      return {
-        code: res.code,
-        data: res.data ? {
-          list: res.data.list,
-          total: res.data.total,
-          pageNum: Math.ceil(res.data.total / limit),
-          pageSize: limit
-        } : undefined,
-        message: res.message
-      }
     })
   }
 
@@ -187,10 +176,10 @@ export function useConfigManager(configType: ConfigType) {
       })
 
       if (res.code === 200) {
-        message.success(t('config.deleteSuccess'))
+        message.success(t('common.delete'))
         getData()
       } else {
-        message.error(res.message || t('config.deleteFailed'))
+        message.error(res.message)
       }
     } catch (error) {
       console.error('删除配置失败:', error)

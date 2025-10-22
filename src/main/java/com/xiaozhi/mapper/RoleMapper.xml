@@ -63,6 +63,10 @@
                 </choose>
             </if>
             <if test="state != null and state != ''">state = #{state},</if>
+            <if test="vadEnergyTh != null and vadEnergyTh != ''">vadEnergyTh = #{vadEnergyTh},</if>
+            <if test="vadSpeechTh != null and vadSpeechTh != ''">vadSpeechTh = #{vadSpeechTh},</if>
+            <if test="vadSilenceTh != null and vadSilenceTh != ''">vadSilenceTh = #{vadSilenceTh},</if>
+            <if test="vadSilenceMs != null and vadSilenceMs != ''">vadSilenceMs = #{vadSilenceMs},</if>
         </set>
         WHERE
             roleId = #{roleId}

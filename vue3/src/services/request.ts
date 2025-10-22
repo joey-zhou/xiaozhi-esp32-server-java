@@ -101,6 +101,11 @@ request.interceptors.response.use(
 
     // 处理业务错误码
     if (data.code === 403 || data.code === 401) {
+      // 清空用户信息和token
+      const userStore = useUserStore()
+      userStore.clearUserInfo()
+      userStore.clearToken()
+      
       message.error({
         content: '登录过期，请重新登录！',
         key: 'auth-error',
@@ -126,6 +131,12 @@ request.interceptors.response.use(
     if (error.response) {
       const { status } = error.response
       if (status === 401 || status === 403) {
+        // 清空用户信息和token
+        const userStore = useUserStore()
+        userStore.clearUserInfo()
+        userStore.clearToken()
+        
+        // 使用相同的key避免重复显示
         message.error({
           content: '登录过期，请重新登录！',
           key: 'auth-error',
@@ -135,7 +146,7 @@ request.interceptors.response.use(
         })
       } else {
         message.error({
-          content: error.response.data?.message || '请求失败',
+          content: error.response.data?.message || `请求失败 (${status})`,
           key: 'request-error',
         })
       }
@@ -143,6 +154,12 @@ request.interceptors.response.use(
       message.error({
         content: '网络错误，请检查网络连接',
         key: 'network-error',
+      })
+    } else {
+      // 其他错误（如请求配置错误等）
+      message.error({
+        content: error.message || '请求失败',
+        key: 'unknown-error',
       })
     }
     return Promise.reject(error)

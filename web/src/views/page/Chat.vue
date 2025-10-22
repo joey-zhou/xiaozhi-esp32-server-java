@@ -63,16 +63,12 @@
       ref="chatComponentRef"
       :message-list="messages"
       :show-input="true"
-      :show-voice-toggle="true"
+      :show-voice-toggle="false"
       :user-avatar="userAvatar"
       :ai-avatar="aiAvatar"
       :input-placeholder="'输入消息...'"
       :empty-text="'暂无对话，开始聊天吧'"
       :is-connected-prop="localIsConnected"
-      @recording-start="handleRecordingStart"
-      @recording-stop="handleRecordingStop"
-      @recording-error="handleRecordingError"
-      @mode-change="handleModeChange"
     />
 
     <!-- 连接提示 -->
@@ -208,6 +204,7 @@ import {
 // 导入ChatComponent和mixin
 import ChatComponent from '@/components/ChatComponent';
 import websocketMixin from '@/mixins/websocketMixin';
+import { getResourceUrl } from '@/services/axios';
 
 export default {
   name: 'Chat',
@@ -229,9 +226,6 @@ export default {
         message: '请配置并连接到小智服务器',
         type: 'info'
       },
-      // 头像
-      userAvatar: '/assets/user-avatar.png',
-      aiAvatar: '/assets/ai-avatar.png',
       form: this.$form.createForm(this),
       // 临时服务器配置（用于编辑）
       tempServerConfig: {}
@@ -250,6 +244,15 @@ export default {
     },
     sessionId() {
       return this.$store.getters.WS_SESSION_ID;
+    },
+
+    // 用户头像
+    userAvatar() {
+      const userInfo = this.$store.getters.USER_INFO;
+      if (userInfo && userInfo.avatar) {
+        return getResourceUrl(userInfo.avatar);
+      }
+      return '';
     },
 
     // 自动连接开关的双向绑定
@@ -533,26 +536,25 @@ export default {
   display: flex;
   flex-direction: column;
   height: 80vh;
-  background-color: #ededed;
+  background-color: #f5f5f5;
   position: relative;
   max-width: 800px;
   margin: 0 auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 0;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid #d6d6d6;
 }
 
 .chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
-  border-bottom: 1px solid #e0e0e0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 12px 16px;
+  background: #f7f7f7;
+  border-bottom: 1px solid #d6d6d6;
+  box-shadow: none;
   z-index: 10;
-  backdrop-filter: blur(10px);
 }
 
 .header-left {
@@ -580,7 +582,7 @@ export default {
   padding: 2px 8px;
   height: 20px;
   line-height: 16px;
-  border-radius: 10px;
+  border-radius: 4px;
   font-weight: 500;
 }
 
@@ -593,22 +595,20 @@ export default {
 
 /* 连接按钮样式 */
 .connection-btn {
-  height: 36px;
-  width: 36px;
+  height: 32px;
+  width: 32px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: #fff;
-  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
   transition: all 0.2s ease;
 }
 
 .connection-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-color: #95ec69;
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .connection-btn .anticon {
@@ -623,25 +623,24 @@ export default {
   width: 90%;
   max-width: 500px;
   z-index: 100;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
 }
 
 .connection-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   margin-top: 12px;
 }
 
 .connection-actions .ant-btn {
-  border-radius: 18px;
-  font-weight: 500;
+  border-radius: 4px;
+  font-weight: 400;
   transition: all 0.2s ease;
 }
 
 .connection-actions .ant-btn:hover {
-  transform: translateY(-1px);
+  opacity: 0.9;
 }
 
 /* 悬浮重连按钮 */
@@ -653,23 +652,22 @@ export default {
 }
 
 .floating-reconnect-btn .ant-btn {
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #95ec69 0%, #7ed321 100%);
+  background: #07c160;
   border: none;
-  box-shadow: 0 4px 16px rgba(149, 236, 105, 0.4);
-  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
 }
 
 .floating-reconnect-btn .ant-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(149, 236, 105, 0.5);
+  background: #06ad56;
 }
 
 .floating-reconnect-btn .anticon {
-  font-size: 24px;
-  color: #333;
+  font-size: 20px;
+  color: #fff;
 }
 
 .debug-panel-container {
@@ -753,7 +751,7 @@ export default {
 }
 
 /* 美化确认提示框 */
-:deep(.ant-popover.ant-popconfirm) {
+.chat-container >>> .ant-popover.ant-popconfirm {
   .ant-popover-inner-content {
     background: #fff;
     border-radius: 8px;

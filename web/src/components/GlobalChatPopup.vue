@@ -20,12 +20,8 @@
           </div>
           
           <div class="header-actions">
-            <!-- 添加全屏按钮 -->
-            <a-button type="text" size="small" @click="handleGoToFullChat" title="全屏模式">
-              <a-icon type="fullscreen" />
-            </a-button>
             <a-button type="text" size="small" @click="handleClose" title="关闭">
-              <a-icon type="minus" />
+              <a-icon type="close" />
             </a-button>
           </div>
         </div>
@@ -36,57 +32,14 @@
             ref="chatComponentRef"
             :message-list="messages"
             :show-input="true"
-            :show-voice-toggle="true"
+            :show-voice-toggle="false"
             :user-avatar="userAvatar"
             :ai-avatar="aiAvatar"
             :input-placeholder="'输入消息...'"
             :empty-text="'暂无对话，开始聊天吧'"
             :is-connected-prop="wsIsConnected"
             :avatar-size="32"
-            :content-max-height="'calc(100% - 80px)'"
-            @recording-start="handleRecordingStart"
-            @recording-stop="handleRecordingStop"
-            @recording-error="handleRecordingError"
-            @mode-change="handleModeChange"
           />
-        </div>
-        
-        <!-- 快捷操作 -->
-        <div class="chat-popup-footer">
-          <a-button 
-            type="text" 
-            size="small" 
-            @click="handleToggleConnection"
-            :disabled="wsConnectionStatus === '正在连接...'"
-            :loading="wsConnectionStatus === '正在连接...'"
-          >
-            <a-icon :type="wsIsConnected ? 'disconnect' : 'link'" />
-            {{ wsIsConnected ? '断开' : '连接' }}
-          </a-button>
-          <a-popconfirm
-            title="确定要清空所有对话记录吗？"
-            ok-text="确定"
-            cancel-text="取消"
-            placement="top"
-            :overlay-style="{ maxWidth: '300px' }"
-            @confirm="handleClearMessages"
-          >
-            <a-button 
-              type="text" 
-              size="small"
-            >
-              <a-icon type="delete" />
-              清空
-            </a-button>
-          </a-popconfirm>
-          <a-button 
-            type="text" 
-            size="small" 
-            @click="handleGoToFullChat"
-          >
-            <a-icon type="fullscreen" />
-            全屏
-          </a-button>
         </div>
       </div>
     </div>
@@ -100,6 +53,7 @@ import {
   clearMessages
 } from '@/services/websocketService'
 import websocketMixin from '@/mixins/websocketMixin'
+import { getResourceUrl } from '@/services/axios'
 
 export default {
   name: 'GlobalChatPopup',
@@ -116,9 +70,22 @@ export default {
   data() {
     return {
       messages: messages,
-      userAvatar: '/assets/user-avatar.png',
-      aiAvatar: '/assets/ai-avatar.png',
       internalVisible: false
+    }
+  },
+  computed: {
+    // 用户头像
+    userAvatar() {
+      const userInfo = this.$store.getters.USER_INFO;
+      if (userInfo && userInfo.avatar) {
+        return getResourceUrl(userInfo.avatar);
+      }
+      return '/assets/user-avatar.png';
+    },
+
+    // AI头像（保留兼容性，但不再使用）
+    aiAvatar() {
+      return '/assets/ai-avatar.png';
     }
   },
   watch: {
@@ -209,9 +176,9 @@ export default {
   width: 380px;
   height: 500px;
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border: 1px solid #d6d6d6;
   display: flex;
   flex-direction: column;
 }
@@ -253,14 +220,11 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: linear-gradient(135deg, #1890ff, #40a9ff);
-  color: white;
-  border-radius: 12px 12px 0 0;
+  background: #f7f7f7;
+  color: #333;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 1px solid #d6d6d6;
   user-select: none;
-}
-
-.chat-popup-header:hover {
-  background: linear-gradient(135deg, #40a9ff, #69c0ff);
 }
 
 .header-left {
@@ -305,7 +269,7 @@ export default {
 }
 
 .header-actions .ant-btn {
-  color: white;
+  color: #666;
   border: none;
   background: transparent;
   width: 24px;
@@ -317,41 +281,15 @@ export default {
 }
 
 .header-actions .ant-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
 }
 
 .chat-popup-content {
   flex: 1;
   overflow: hidden;
-  background: #fafafa;
-}
-
-.chat-popup-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  background: #f8f9fa;
-  border-top: 1px solid #e8e8e8;
-  border-radius: 0 0 12px 12px;
-}
-
-.chat-popup-footer .ant-btn {
-  color: #666;
-  border: none;
-  background: transparent;
-  font-size: 12px;
-  height: 28px;
-  padding: 0 8px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.chat-popup-footer .ant-btn:hover {
-  color: #1890ff;
-  background: rgba(24, 144, 255, 0.1);
+  background: #f5f5f5;
+  border-radius: 0 0 8px 8px;
 }
 
 /* 响应式设计 */
@@ -386,11 +324,6 @@ export default {
   
   .chat-popup-content {
     background: #2a2a2a;
-  }
-  
-  .chat-popup-footer {
-    background: #1a1a1a;
-    border-color: #333;
   }
 }
 </style>

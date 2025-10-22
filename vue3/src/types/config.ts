@@ -8,7 +8,7 @@ export type ModelType = 'chat' | 'vision' | 'intent' | 'embedding'
  * 配置信息接口
  */
 export interface Config {
-  configId: number
+  configId?: number
   configType: ConfigType
   provider: string
   configName: string
@@ -17,7 +17,14 @@ export interface Config {
   isDefault?: string // 1-默认 0-非默认
   state?: string
   createTime?: string
-  // 动态参数
+  // API相关字段
+  appId?: string
+  apiKey?: string
+  apiSecret?: string
+  ak?: string
+  sk?: string
+  apiUrl?: string
+  // 支持动态字段
   [key: string]: any
 }
 
@@ -39,6 +46,22 @@ export interface ConfigQueryParams {
 export interface ConfigListResponse {
   list: Config[]
   total: number
+  pageNum: number
+  pageSize: number
+  size: number
+  startRow: number
+  endRow: number
+  pages: number
+  prePage: number
+  nextPage: number
+  isFirstPage: boolean
+  isLastPage: boolean
+  hasPreviousPage: boolean
+  hasNextPage: boolean
+  navigatePages: number
+  navigatepageNums: number[]
+  navigateFirstPage: number
+  navigateLastPage: number
 }
 
 /**

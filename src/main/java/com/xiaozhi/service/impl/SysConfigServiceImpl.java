@@ -115,13 +115,7 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
         if(pageFilter != null){
             PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
         }
-        // 这里为了适配阿里云的 Token 刷新，返回的结果会有重复
-        List<SysConfig> configs = configMapper.query(config);
-        Map<Integer, SysConfig> uniqueConfigs = new LinkedHashMap<>();
-        for (SysConfig c : configs) {
-            uniqueConfigs.put(c.getConfigId(), c); // 利用 Map 的键唯一特性去重
-        }
-        return new ArrayList<>(uniqueConfigs.values());
+        return configMapper.query(config);
     }
 
     /**

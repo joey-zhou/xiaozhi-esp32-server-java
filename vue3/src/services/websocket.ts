@@ -49,6 +49,12 @@ let reconnectAttempts = 0
 const maxReconnectAttempts = 5
 const reconnectDelay = 2000
 
+// 打字机效果相关
+let typewriterTimer: number | null = null
+let typewriterQueue: string[] = [] // 待打字的文本队列
+let isTyping = false // 是否正在打字
+const TYPING_SPEED = 50 // 每个字的显示间隔（毫秒）
+
 // 连接状态
 let connectionStatus: ConnectionStatus = {
   isConnected: false,
@@ -57,8 +63,13 @@ let connectionStatus: ConnectionStatus = {
   sessionId: null
 }
 
-// 消息列表
-export const messages: ChatMessage[] = []
+import { reactive } from 'vue'
+
+// 消息列表 - 使用响应式数组
+export const messages: ChatMessage[] = reactive([])
+
+// 当前正在构建的AI回复消息
+let currentAIMessage: ChatMessage | null = null
 
 // 回调函数
 type MessageHandler = (data: WebSocketMessage) => void
@@ -177,6 +188,7 @@ export function addMessage(message: Partial<ChatMessage>): ChatMessage | null {
 
 export function clearMessages(): boolean {
   messages.splice(0, messages.length)
+  currentAIMessage = null // 重置当前AI消息
   log('清空所有消息', 'info')
   return true
 }
@@ -211,6 +223,7 @@ export function unregisterStatusChangeCallback(callback: StatusChangeHandler): b
 
 export function registerBinaryHandler(handler: BinaryHandler): void {
   binaryHandler = handler
+  log('✅ 二进制消息处理函数已注册', 'info')
 }
 
 // 通知状态变更
@@ -404,17 +417,37 @@ function scheduleReconnect(config: WebSocketConfig): void {
 // 处理WebSocket消息
 function handleWebSocketMessage(event: MessageEvent): void {
   try {
+    // 详细检查消息类型
+    log(`📨 收到WebSocket消息，类型: ${typeof event.data}, 构造函数: ${event.data.constructor.name}`, 'debug')
+    
     // 检查是否是二进制数据
     if (event.data instanceof ArrayBuffer) {
+      log(`🔢 收到二进制数据: ${event.data.byteLength}字节`, 'info')
       if (binaryHandler) {
+        log('✅ 调用二进制处理函数', 'debug')
         binaryHandler(event.data)
       } else {
-        log('未注册二进制消息处理函数', 'warning')
+        log('❌ 未注册二进制消息处理函数', 'warning')
       }
       return
     }
 
+    // 检查是否是Blob数据
+    if (event.data instanceof Blob) {
+      log(`🔢 收到Blob数据: ${event.data.size}字节`, 'info')
+      event.data.arrayBuffer().then(buffer => {
+        if (binaryHandler) {
+          log('✅ 调用二进制处理函数 (Blob转ArrayBuffer)', 'debug')
+          binaryHandler(buffer)
+        } else {
+          log('❌ 未注册二进制消息处理函数', 'warning')
+        }
+      })
+      return
+    }
+
     // 处理文本数据
+    log(`📝 收到文本消息: ${event.data.substring(0, 100)}...`, 'debug')
     const data: WebSocketMessage = JSON.parse(event.data)
 
     // 记录会话ID
@@ -461,19 +494,113 @@ function handleSTTMessage(data: WebSocketMessage): void {
   }
 }
 
+// 打字机效果：逐字显示文本
+function startTypewriter(text: string): void {
+  // 将文本添加到队列
+  typewriterQueue.push(text)
+  
+  // 如果没有在打字，启动打字机
+  if (!isTyping) {
+    processTypewriterQueue()
+  }
+}
+
+// 处理打字机队列
+function processTypewriterQueue(): void {
+  if (typewriterQueue.length === 0) {
+    isTyping = false
+    return
+  }
+  
+  isTyping = true
+  const text = typewriterQueue.shift()!
+  const chars = Array.from(text) // 支持 emoji 和多字节字符
+  let currentIndex = 0
+  
+  // 如果是第一次打字，创建消息
+  if (!currentAIMessage) {
+    currentAIMessage = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      content: '',
+      type: 'tts',
+      isUser: false,
+      timestamp: new Date(),
+      isLoading: false
+    }
+    messages.push(currentAIMessage)
+    log(`📝 创建新的AI回复消息 (ID: ${currentAIMessage.id})`, 'info')
+  }
+  
+  // 逐字添加
+  const typeNextChar = () => {
+    if (currentIndex < chars.length) {
+      currentAIMessage!.content += chars[currentIndex]
+      currentIndex++
+      
+      // 强制触发响应式更新
+      const index = messages.findIndex(msg => msg.id === currentAIMessage!.id)
+      if (index !== -1) {
+        messages[index] = { ...currentAIMessage! }
+      }
+      
+      typewriterTimer = window.setTimeout(typeNextChar, TYPING_SPEED)
+    } else {
+      // 当前文本打完，处理下一个
+      log(`✅ 完成打字: "${text}"`, 'debug')
+      processTypewriterQueue()
+    }
+  }
+  
+  typeNextChar()
+}
+
+// 停止打字机效果
+function stopTypewriter(): void {
+  if (typewriterTimer) {
+    clearTimeout(typewriterTimer)
+    typewriterTimer = null
+  }
+  isTyping = false
+  typewriterQueue = []
+}
+
 // 处理TTS消息（文本转语音）
 function handleTTSMessage(data: WebSocketMessage): void {
   if (data.state === 'start') {
-    log('TTS开始', 'info')
+    log('🎵 TTS开始，准备接收音频', 'info')
+    
+    // 重置打字机和当前AI消息
+    stopTypewriter()
+    currentAIMessage = null
+    
+    // 通知音频服务准备接收新的音频流
+    if (window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('audio-stream-start'))
+    }
   } else if (data.state === 'sentence_start' && data.text) {
-    addMessage({
-      content: data.text,
-      type: 'tts',
-      isUser: false
-    })
-    log(`TTS文本: ${data.text}`, 'info')
+    // 将新句子加入打字机队列
+    log(`📥 收到新句子: "${data.text}"`, 'info')
+    startTypewriter(data.text)
   } else if (data.state === 'stop') {
-    log('TTS结束', 'info')
+    log('🛑 TTS结束，音频流结束', 'info')
+    
+    // 等待打字机完成后再清理
+    const waitForTyping = () => {
+      if (!isTyping && typewriterQueue.length === 0) {
+        if (currentAIMessage) {
+          log(`✅ AI回复完成，最终内容: "${currentAIMessage.content}"`, 'info')
+          currentAIMessage = null
+        }
+      } else {
+        setTimeout(waitForTyping, 100)
+      }
+    }
+    waitForTyping()
+    
+    // 通知音频服务流已结束
+    if (window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('audio-stream-end'))
+    }
   }
 }
 
@@ -606,6 +733,9 @@ export function disconnectFromServer(): boolean {
     clearTimeout(reconnectTimer)
     reconnectTimer = null
   }
+  
+  // 停止打字机效果
+  stopTypewriter()
 
   if (!webSocket) {
     return true

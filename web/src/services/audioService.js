@@ -304,9 +304,16 @@ function resetAudioBuffer() {
 function addAudioToBuffer(opusData) {
   audioBufferQueue.push(opusData);
   
-  // 如果收到的是第一个音频包，开始缓冲过程
-  if (audioBufferQueue.length === 1 && !isAudioBuffering && !isAudioPlaying) {
+  // 如果没有在播放，启动缓冲流程
+  if (!isAudioPlaying && !isAudioBuffering) {
     startAudioBuffering();
+  }
+  // 如果正在播放但当前没有播放片段，且有足够数据，触发解码
+  else if (isAudioPlaying && streamingContext && !streamingContext.playing && audioBufferQueue.length >= 3) {
+    log('🔄 播放中收到新数据，立即解码', 'debug');
+    const frames = [...audioBufferQueue];
+    audioBufferQueue = [];
+    streamingContext.decodeOpusFrames(frames);
   }
   
   return true;
@@ -556,40 +563,28 @@ async function playBufferedAudio() {
             this.analyser = null;
             this.playing = false;
             
-            // 如果队列中还有数据或者缓冲区有新数据，继续播放
+            // 继续播放队列中的数据
             if (this.queue.length > 0) {
               setTimeout(() => this.startPlaying(), 10);
-            } else if (audioBufferQueue.length > 0) {
-              // 缓冲区有新数据，进行解码
+            }
+            // 检查是否有新的缓冲数据
+            else if (audioBufferQueue.length > 0) {
               const frames = [...audioBufferQueue];
               audioBufferQueue = [];
               this.decodeOpusFrames(frames);
-            } else if (this.endOfStream) {
-              // 流已结束且没有更多数据
-              log("音频播放完成", 'info');
+            }
+            // 流已明确结束
+            else if (this.endOfStream) {
+              log('🏁 音频播放完成（流结束）', 'info');
               isAudioPlaying = false;
               streamingContext = null;
-              
-              // 将streamingContext从全局移除
               window.streamingContext = null;
-            } else {
-              // 等待更多数据
-              setTimeout(() => {
-                // 如果仍然没有新数据，但有更多的包到达
-                if (this.queue.length === 0 && audioBufferQueue.length > 0) {
-                  const frames = [...audioBufferQueue];
-                  audioBufferQueue = [];
-                  this.decodeOpusFrames(frames);
-                } else if (this.queue.length === 0 && audioBufferQueue.length === 0) {
-                  // 真的没有更多数据了
-                  log("音频播放完成 (超时)", 'info');
-                  isAudioPlaying = false;
-                  streamingContext = null;
-                  
-                  // 将streamingContext从全局移除
-                  window.streamingContext = null;
-                }
-              }, 500); // 500ms超时
+            }
+            // 等待更多数据（不设置超时，持续等待）
+            else {
+              log('⏳ 等待更多音频数据...', 'debug');
+              // 不做任何处理，保持 isAudioPlaying = true
+              // 当新数据到达时，会通过 addAudioToBuffer 触发继续播放
             }
           };
           

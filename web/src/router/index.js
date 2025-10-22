@@ -121,16 +121,6 @@ export default new Router({
             }
           ]
         },
-        {
-          path: "/chat",
-          component: resolve => require(["@/views/page/Chat"], resolve),
-          name: "Chat",
-          meta: {
-            title: "聊天",
-            icon: "message",
-            breadcrumb: [{ breadcrumbName: "聊天" }]
-          }
-        },
       ]
     },
     {

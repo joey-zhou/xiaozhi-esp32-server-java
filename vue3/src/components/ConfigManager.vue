@@ -36,21 +36,19 @@ const {
 } = useConfigManager(props.configType)
 
 // 表单
-interface FormData extends Record<string, any> {
-  provider?: string
-  configName?: string
-  configDesc?: string
-  modelType?: ModelType
-  isDefault?: boolean | number
-}
-
 const formRef = ref<FormInstance>()
-const formData = ref<FormData>({
+const formData = ref<Partial<Config>>({
   provider: undefined,
   configName: undefined,
   configDesc: undefined,
   modelType: 'chat',
-  isDefault: false,
+  isDefault: '0',
+  apiKey: undefined,
+  apiUrl: undefined,
+  appId: undefined,
+  apiSecret: undefined,
+  ak: undefined,
+  sk: undefined,
 })
 
 // 表格列配置
@@ -174,7 +172,7 @@ function handleEdit(record: Config) {
   // 设置表单值
   formData.value = { 
     ...record,
-    isDefault: props.configType !== 'tts' ? record.isDefault === '1' : false
+    isDefault: props.configType != 'tts' ? record.isDefault : '0'
   }
 
   // LLM 更新模型选项
@@ -194,17 +192,14 @@ async function handleSubmit() {
     
     // 准备提交数据
     const submitData: Partial<Config> = {
+      ...formData.value,
       configId: editingConfigId.value,
       configType: props.configType,
-      provider: formData.value.provider,
-      configName: formData.value.configName,
-      configDesc: formData.value.configDesc,
-      modelType: formData.value.modelType
     }
 
     // 处理 isDefault
     if (props.configType !== 'tts') {
-      submitData.isDefault = formData.value.isDefault ? '1' : '0'
+      submitData.isDefault = formData.value.isDefault == '1' ? '1' : '0'
     }
 
     // LLM 特殊验证
@@ -266,7 +261,13 @@ function resetForm() {
     configName: undefined,
     configDesc: undefined,
     modelType: 'chat',
-    isDefault: false,
+    isDefault: '0',
+    apiKey: undefined,
+    apiUrl: undefined,
+    appId: undefined,
+    apiSecret: undefined,
+    ak: undefined,
+    sk: undefined,
   }
 }
 
