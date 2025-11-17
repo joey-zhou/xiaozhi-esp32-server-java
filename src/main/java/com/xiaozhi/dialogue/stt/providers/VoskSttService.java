@@ -157,7 +157,7 @@ public class VoskSttService implements SttService {
 
         // 使用虚拟线程处理音频识别
         try {
-            Thread.startVirtualThread(() -> {
+            Thread virtualThread = Thread.startVirtualThread(() -> {
                 try (Recognizer recognizer = new Recognizer(model, AudioUtils.SAMPLE_RATE)) {
                     while (!isCompleted.get() || !audioQueue.isEmpty()) {
                         try {
@@ -204,7 +204,18 @@ public class VoskSttService implements SttService {
                 } catch (Exception e) {
                     logger.error("Vosk流式识别过程中发生错误", e);
                 }
-            }).join(); // 等待虚拟线程完成
+            });
+            
+            // 等待虚拟线程完成，最多等待90秒
+            try {
+                virtualThread.join(90000); // 90秒超时
+                if (virtualThread.isAlive()) {
+                    virtualThread.interrupt(); // 中断线程
+                }
+            } catch (InterruptedException e) {
+                logger.warn("等待Vosk识别完成时被中断", e);
+                Thread.currentThread().interrupt();
+            }
         } catch (Exception e) {
             logger.error("启动虚拟线程失败", e);
         }

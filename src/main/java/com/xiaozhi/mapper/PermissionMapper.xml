@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.xiaozhi.dao.PermissionMapper">
+    
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysPermission">
+        <id property="permissionId" column="permissionId" />
+        <result property="parentId" column="parentId" />
+        <result property="name" column="name" />
+        <result property="permissionKey" column="permissionKey" />
+        <result property="permissionType" column="permissionType" />
+        <result property="path" column="path" />
+        <result property="component" column="component" />
+        <result property="icon" column="icon" />
+        <result property="sort" column="sort" />
+        <result property="visible" column="visible" />
+        <result property="status" column="status" />
+        <result property="createTime" column="createTime" />
+        <result property="updateTime" column="updateTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        permissionId, parentId, name, permissionKey, permissionType, path, component, icon, sort, visible, status, createTime, updateTime
+    </sql>
+    
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" /> FROM sys_permission WHERE status = '1' ORDER BY sort
+    </select>
+    
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" /> FROM sys_permission WHERE permissionId = #{permissionId}
+    </select>
+    
+    <select id="selectByType" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" /> FROM sys_permission WHERE permissionType = #{permissionType} AND status = '1' ORDER BY sort
+    </select>
+    
+    <select id="selectByParentId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" /> FROM sys_permission WHERE parentId = #{parentId} AND status = '1' ORDER BY sort
+    </select>
+    
+    <select id="selectByRoleId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT p.* FROM sys_permission p
+        INNER JOIN sys_role_permission rp ON p.permissionId = rp.permissionId
+        WHERE rp.roleId = #{roleId} AND p.status = '1'
+        ORDER BY p.sort
+    </select>
+    
+    <select id="selectByUserId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT DISTINCT p.* FROM sys_permission p
+        INNER JOIN sys_role_permission rp ON p.permissionId = rp.permissionId
+        INNER JOIN sys_user u ON rp.roleId = u.roleId
+        WHERE u.userId = #{userId} AND p.status = '1'
+        ORDER BY p.sort
+    </select>
+    
+    <insert id="add" parameterType="com.xiaozhi.entity.SysPermission" useGeneratedKeys="true" keyProperty="permissionId">
+        INSERT INTO sys_permission (
+            parentId, name, permissionKey, permissionType, path, component, icon, sort, visible, status
+        ) VALUES (
+            #{parentId}, #{name}, #{permissionKey}, #{permissionType}, #{path}, #{component}, #{icon}, #{sort}, #{visible}, #{status}
+        )
+    </insert>
+    
+    <update id="update" parameterType="com.xiaozhi.entity.SysPermission">
+        UPDATE sys_permission
+        <set>
+            <if test="parentId != null">parentId = #{parentId},</if>
+            <if test="name != null">name = #{name},</if>
+            <if test="permissionKey != null">permissionKey = #{permissionKey},</if>
+            <if test="permissionType != null">permissionType = #{permissionType},</if>
+            <if test="path != null">path = #{path},</if>
+            <if test="component != null">component = #{component},</if>
+            <if test="icon != null">icon = #{icon},</if>
+            <if test="sort != null">sort = #{sort},</if>
+            <if test="visible != null">visible = #{visible},</if>
+            <if test="status != null">status = #{status},</if>
+        </set>
+        WHERE permissionId = #{permissionId}
+    </update>
+    
+    <delete id="delete" parameterType="java.lang.Integer">
+        DELETE FROM sys_permission WHERE permissionId = #{permissionId}
+    </delete>
+</mapper>

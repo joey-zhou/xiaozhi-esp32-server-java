@@ -15,7 +15,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
-import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Sinks;
@@ -45,8 +45,8 @@ public class XfyunSttService implements SttService {
 
     private static final String PROVIDER_NAME = "xfyun";
 
-    // 识别超时时间（5秒）
-    private static final long RECOGNITION_TIMEOUT_MS = 5000;
+    // 识别超时时间（90秒）
+    private static final long RECOGNITION_TIMEOUT_MS = 90000;
 
     private static final String hostUrl = "https://iat-api.xfyun.cn/v2/iat";
 
@@ -149,7 +149,7 @@ public class XfyunSttService implements SttService {
      */
     private void handleResultText(Text textObject, List<Text> resultSegments) {
         // 处理流式返回的替换结果
-        if (StringUtils.equals(textObject.getPgs(), "rpl") && textObject.getRg() != null && textObject.getRg().length == 2) {
+        if ("rpl".equals(textObject.getPgs()) && textObject.getRg() != null && textObject.getRg().length == 2) {
             // 返回结果序号sn字段的最小值为1
             int start = textObject.getRg()[0] - 1;
             int end = textObject.getRg()[1] - 1;
@@ -293,11 +293,9 @@ public class XfyunSttService implements SttService {
                 if (response.getData() != null && response.getData().getResult() != null) {
                     Text textObject = response.getData().getResult().getText();
                     handleResultText(textObject, resultSegments);
-                    logger.info("onMessage中间识别结果：{}", getFinalResult(resultSegments));
                 }
 
                 if (response.getData() != null && response.getData().getStatus() == 2) {
-                    logger.info("onMessage is finish ");
                     if (latchReleased.compareAndSet(false, true)) {
                         recognitionLatch.countDown();
                     }
@@ -350,9 +348,12 @@ public class XfyunSttService implements SttService {
             String finalText = "";
             if (recognized) {
                 finalText = getFinalResult(resultSegments);
-                logger.info("最终识别结果：{}", finalText);
             } else {
-                logger.warn("讯飞云识别超时！");
+                String partialResult = getFinalResult(resultSegments);
+                // 即使超时也返回已识别的部分文本
+                if (StringUtils.hasText(partialResult)) {
+                    finalText = partialResult;
+                }
                 wsClose(webSocketRef, isClosed);
             }
             return finalText;
@@ -369,7 +370,6 @@ public class XfyunSttService implements SttService {
             WebSocket ws = webSocketRef.get();
             if (ws != null) {
                 try {
-                    logger.info("xfyun wsClose");
                     ws.close(1000, "程序关闭");
                 } catch (Exception e) {
                     logger.warn("关闭 WebSocket 时发生异常", e);

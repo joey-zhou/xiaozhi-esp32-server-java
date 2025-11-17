@@ -38,13 +38,22 @@ public class CmsUtils {
     @Value("${server.port:8091}")
     private int port;
 
+    @Value("${xiaozhi.server.domain:}")
+    private String domain;
+
     // 初始化websocketAddress、otaAddress
     @PostConstruct
     private void initializeAddresses() {
-        String serverIp = getServerIp();
-        websocketAddress = "ws://" + serverIp + ":" + port + WebSocketConfig.WS_PATH; // 默认WebSocket端口
-        otaAddress = "http://" + serverIp + ":" + port + "/api/device/ota";
-        serverAddress = "http://" + serverIp + ":" + port;
+        if (domain != null && !domain.isEmpty()) {
+            websocketAddress = "wss://ws." + domain + WebSocketConfig.WS_PATH;
+            otaAddress = "https://" + domain + "/api/device/ota";
+            serverAddress = "https://" + domain;
+        } else {
+            String serverIp = getServerIp();
+            websocketAddress = "ws://" + serverIp + ":" + port + WebSocketConfig.WS_PATH; // 默认WebSocket端口
+            otaAddress = "http://" + serverIp + ":" + port + "/api/device/ota";
+            serverAddress = "http://" + serverIp + ":" + port;
+        }
     }
 
     public static SysUser getUser() {
@@ -806,7 +815,7 @@ public class CmsUtils {
 
         // 对于私有IP地址，不进行地理位置查询
         if (isPrivateIp(ipAddress)) {
-            return new IPInfo(ipAddress, "内网地址", "内网");
+            return new IPInfo(ipAddress, null, "内网");
         }
 
         // 首先尝试使用现有的IP_INFO_SERVICES（优先使用已有服务）
@@ -1073,8 +1082,9 @@ public class CmsUtils {
      * 清理HTML内容
      */
     private static String cleanHtml(String html) {
-        if (html == null)
+        if (html == null) {
             return "";
+        }
 
         // 移除所有HTML标签
         String noHtml = html.replaceAll("<[^>]+>", " ");

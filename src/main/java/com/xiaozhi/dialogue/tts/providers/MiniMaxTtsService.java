@@ -30,14 +30,20 @@ public class MiniMaxTtsService implements TtsService {
 
     private final String outputPath;
     private final String voiceName;
+    
+    // 语音参数
+    private final Float pitch;
+    private final Float speed;
 
     private final OkHttpClient client = HttpUtil.client;
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-    public MiniMaxTtsService(SysConfig config, String voiceName, String outputPath) {
+    public MiniMaxTtsService(SysConfig config, String voiceName, Float pitch, Float speed, String outputPath) {
         this.groupId = config.getAppId();
         this.apiKey = config.getApiKey();
         this.voiceName = voiceName;
+        this.pitch = pitch;
+        this.speed = speed;
         this.outputPath = outputPath;
     }
 
@@ -59,7 +65,19 @@ public class MiniMaxTtsService implements TtsService {
     }
 
     private void sendRequest(String text, String filepath) {
+        // 创建请求参数
         var params = new Text2AudioParams(voiceName, text);
+        
+        // 设置语速（MiniMax范围 [0.5, 2]，与我们的范围一致，直接使用）
+        params.voiceSetting.setSpeed(speed);
+        
+        // 设置音调（需要映射：我们的 [0.5, 2] → MiniMax的 [-12, 12]）
+        // 映射公式：minimax_pitch = (our_pitch - 1.0) × 24
+        int minimaxPitch = (int)Math.round((pitch - 1.0f) * 24);
+        // 确保值在有效范围内
+        minimaxPitch = Math.max(-12, Math.min(12, minimaxPitch));
+        params.voiceSetting.setPitch(minimaxPitch);
+        
         var request = new Request.Builder()
                 .url("https://api.minimaxi.com/v1/t2a_v2?Groupid=%s".formatted(groupId))
                 .addHeader("Content-Type", "application/json")

@@ -35,22 +35,22 @@ public class TtsServiceFactory {
      */
     public TtsService getDefaultTtsService() {
         var config = new SysConfig().setProvider(DEFAULT_PROVIDER);
-        return getTtsService(config, TtsServiceFactory.DEFAULT_VOICE);
+        return getTtsService(config, TtsServiceFactory.DEFAULT_VOICE, 1.0f, 1.0f);
     }
 
-    // 创建缓存键，包含provider、configId和voiceName，确保音色变化时创建新的服务实例
-    private String createCacheKey(SysConfig config, String provider, String voiceName) {
+    // 创建缓存键（包含pitch和speed）
+    private String createCacheKey(SysConfig config, String provider, String voiceName, Float pitch, Float speed) {
         Integer configId = -1;
         if (config != null && config.getConfigId() != null) {
             configId = config.getConfigId();
         }
-        return provider + ":" + configId + ":" + voiceName;
+        return provider + ":" + configId + ":" + voiceName + ":" + pitch + ":" + speed;
     }
 
     /**
-     * 根据配置获取TTS服务
+     * 根据配置获取TTS服务（带pitch和speed参数）
      */
-    public TtsService getTtsService(SysConfig config, String voiceName) {
+    public TtsService getTtsService(SysConfig config, String voiceName, Float pitch, Float speed) {
         
         config = !ObjectUtils.isEmpty(config) ? config : new SysConfig().setProvider(DEFAULT_PROVIDER);
 
@@ -64,25 +64,25 @@ public class TtsServiceFactory {
             return serviceCache.get(cacheKey);
         }
 
-        var service = createApiService(config, voiceName);
+        var service = createApiService(config, voiceName, pitch, speed);
         serviceCache.put(cacheKey, service);
         return service;
     }
 
     /**
-     * 根据配置创建API类型的TTS服务
+     * 根据配置创建API类型的TTS服务（带pitch和speed参数）
      */
-    private TtsService createApiService(SysConfig config, String voiceName) {
+    private TtsService createApiService(SysConfig config, String voiceName, Float pitch, Float speed) {
         // Make sure output dir exists
         String outputPath = OUTPUT_PATH;
         ensureOutputPath(outputPath);
 
         return switch (config.getProvider()) {
-            case "aliyun" -> new AliyunTtsService(config, voiceName, outputPath);
-            case "volcengine" -> new VolcengineTtsService(config, voiceName, outputPath);
-            case "xfyun" -> new XfyunTtsService(config, voiceName, outputPath);
-            case "minimax" -> new MiniMaxTtsService(config, voiceName, outputPath);
-            default -> new EdgeTtsService(voiceName, outputPath);
+            case "aliyun" -> new AliyunTtsService(config, voiceName, pitch, speed, outputPath);
+            case "volcengine" -> new VolcengineTtsService(config, voiceName, pitch, speed, outputPath);
+            case "xfyun" -> new XfyunTtsService(config, voiceName, pitch, speed, outputPath);
+            case "minimax" -> new MiniMaxTtsService(config, voiceName, pitch, speed, outputPath);
+            default -> new EdgeTtsService(voiceName, pitch, speed, outputPath);
         };
     }
 

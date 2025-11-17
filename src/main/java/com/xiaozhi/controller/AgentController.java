@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.xiaozhi.common.web.AjaxResult;
+import com.xiaozhi.common.web.ResultMessage;
 import com.xiaozhi.entity.SysAgent;
 import com.xiaozhi.service.SysAgentService;
 import com.xiaozhi.utils.CmsUtils;
@@ -42,7 +42,7 @@ public class AgentController extends BaseController {
     @GetMapping("/query")
     @ResponseBody
     @Operation(summary = "根据条件查询智能体", description = "返回智能体列表信息，会自动查询Coze和Dify当前存在智能体并更新本地数据库信息")
-    public AjaxResult query(@io.swagger.v3.oas.annotations.parameters.RequestBody(
+    public ResultMessage query(@io.swagger.v3.oas.annotations.parameters.RequestBody(
             description = "智能体信息",
             content = @Content(schema = @Schema(implementation = SysAgent.class))) SysAgent agent) {
         try {
@@ -50,10 +50,10 @@ public class AgentController extends BaseController {
             Map<String, Object> data = new HashMap<>();
             data.put("list", sysAgents);
             data.put("total", sysAgents.size());
-            return AjaxResult.success(data);
+            return ResultMessage.success(data);
         }catch (Exception e){
             logger.error("查询智能体列表失败", e.getMessage());
-            return AjaxResult.error(e.getMessage());
+            return ResultMessage.error(e.getMessage());
         }
     }
 
@@ -66,18 +66,18 @@ public class AgentController extends BaseController {
     @PostMapping("/add")
     @ResponseBody
     @Operation(summary = "添加智能体", description = "返回添加结果")
-    public AjaxResult add(@io.swagger.v3.oas.annotations.parameters.RequestBody(
+    public ResultMessage add(@io.swagger.v3.oas.annotations.parameters.RequestBody(
             description = "智能体信息",
-            content = @Content(schema = @Schema(implementation = SysAgent.class))) 
+            content = @Content(schema = @Schema(implementation = SysAgent.class)))
         @RequestBody SysAgent agent) {
         try {
 
             agent.setUserId(CmsUtils.getUserId());
             agentService.add(agent);
-            return AjaxResult.success();
+            return ResultMessage.success();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return AjaxResult.error("添加智能体失败");
+            return ResultMessage.error("添加智能体失败");
         }
     }
 
@@ -90,16 +90,16 @@ public class AgentController extends BaseController {
     @PostMapping("/update")
     @ResponseBody
     @Operation(summary = "更新智能体", description = "返回更新结果")
-    public AjaxResult update(@io.swagger.v3.oas.annotations.parameters.RequestBody(
+    public ResultMessage update(@io.swagger.v3.oas.annotations.parameters.RequestBody(
             description = "智能体信息",
-            content = @Content(schema = @Schema(implementation = SysAgent.class))) 
+            content = @Content(schema = @Schema(implementation = SysAgent.class)))
         @RequestBody SysAgent agent) {
         try {
             agentService.update(agent);
-            return AjaxResult.success();
+            return ResultMessage.success();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return AjaxResult.error("更新智能体失败");
+            return ResultMessage.error("更新智能体失败");
         }
     }
 
@@ -112,16 +112,16 @@ public class AgentController extends BaseController {
     @PostMapping("/delete")
     @ResponseBody
     @Operation(summary = "删除智能体", description = "返回删除结果")
-    public AjaxResult delete(@io.swagger.v3.oas.annotations.parameters.RequestBody(
+    public ResultMessage delete(@io.swagger.v3.oas.annotations.parameters.RequestBody(
             description = "智能体信息",
-            content = @Content(schema = @Schema(implementation = SysAgent.class))) 
+            content = @Content(schema = @Schema(implementation = SysAgent.class)))
         @RequestBody SysAgent agent) {
         try {
             agentService.delete(agent.getAgentId());
-            return AjaxResult.success();
+            return ResultMessage.success();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return AjaxResult.error("删除智能体失败");
+            return ResultMessage.error("删除智能体失败");
         }
     }
 }

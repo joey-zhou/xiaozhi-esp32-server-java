@@ -1,9 +1,6 @@
 package com.xiaozhi.security;
 
-import java.io.UnsupportedEncodingException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-
+import com.xiaozhi.utils.CommonUtils;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,22 +20,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
      */
     public String encryptPassword(String rawPassword) {
         String saltPassword = rawPassword + salt;
-        StringBuilder result = new StringBuilder();
-        try {
-            MessageDigest messageDigest = MessageDigest.getInstance("MD5");
-            byte[] bytes = messageDigest.digest(saltPassword.getBytes("UTF-8"));
-            for (byte b : bytes) {
-                String hex = Integer.toHexString(b & 0xFF);
-                if (hex.length() == 1)
-                    result.append("0");
-                result.append(hex);
-            }
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalArgumentException("No such algorithm MD5");
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException("UTF-8 not supported!");
-        }
-        return result.toString();
+        return CommonUtils.md5(saltPassword);
     }
 
     /**

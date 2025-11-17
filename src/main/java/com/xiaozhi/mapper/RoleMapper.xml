@@ -2,31 +2,56 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xiaozhi.dao.RoleMapper">
 
-    <sql id="roleSql">
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysRole">
+        <id property="roleId" column="roleId" />
+        <result property="avatar" column="avatar" />
+        <result property="roleName" column="roleName" />
+        <result property="roleDesc" column="roleDesc" />
+        <result property="voiceName" column="voiceName" />
+        <result property="modelId" column="modelId" />
+        <result property="sttId" column="sttId" />
+        <result property="ttsId" column="ttsId" />
+        <result property="vadSpeechTh" column="vadSpeechTh" />
+        <result property="vadSilenceTh" column="vadSilenceTh" />
+        <result property="vadEnergyTh" column="vadEnergyTh" />
+        <result property="vadSilenceMs" column="vadSilenceMs" />
+        <result property="userId" column="userId" />
+        <result property="state" column="state" />
+        <result property="isDefault" column="isDefault" />
+        <result property="createTime" column="createTime" />
+        <result property="totalDevice" column="totalDevice" />
+        <result property="modelName" column="modelName" />
+        <result property="ttsPitch" column="ttsPitch" />
+        <result property="ttsSpeed" column="ttsSpeed" />
+        <result property="modelProvider" column="modelProvider" />
+        <result property="ttsProvider" column="ttsProvider" />
+    </resultMap>
+
+    <sql id="Role_Column_List">
         sys_role.roleId, sys_role.avatar, sys_role.roleName, sys_role.roleDesc, sys_role.voiceName,
-        sys_role.modelId, sys_role.sttId, sys_role.ttsId,
+        sys_role.modelId, sys_role.sttId, sys_role.ttsId, sys_role.ttsPitch, sys_role.ttsSpeed,
         sys_role.vadSpeechTh, sys_role.vadSilenceTh, sys_role.vadEnergyTh, sys_role.vadSilenceMs,
         sys_role.userId, sys_role.state, sys_role.isDefault, sys_role.createTime
     </sql>
 
-    <sql id="modelSql">
-        model_config.configId AS modelId, model_config.configName AS modelName, model_config.provider AS modelProvider
+    <sql id="Model_Column_List">
+        model_config.configName AS modelName, model_config.provider AS modelProvider
     </sql>
 
-    <sql id="sttSql">
-        stt_config.configId AS sttId
+    <sql id="STT_Column_List">
+        stt_config.configName AS sttName, stt_config.configDesc AS sttDesc
     </sql>
 
-    <sql id="ttsSql">
-        tts_config.configId AS ttsId, tts_config.provider AS ttsProvider, tts_config.appId, tts_config.apiKey, tts_config.apiSecret, tts_config.ak, tts_config.sk
+    <sql id="TTS_Column_List">
+        tts_config.provider AS ttsProvider
     </sql>
 
-    <select id="query" resultType="com.xiaozhi.entity.SysRole">
+    <select id="query" resultMap="BaseResultMap">
         SELECT
-        <include refid="roleSql"></include>,
-        <include refid="modelSql"></include>,
-        <include refid="sttSql"></include>,
-        <include refid="ttsSql"></include>,
+        <include refid="Role_Column_List"></include>,
+        <include refid="Model_Column_List"></include>,
+        <include refid="STT_Column_List"></include>,
+        <include refid="TTS_Column_List"></include>,
         (SELECT COUNT(*) FROM sys_device WHERE sys_device.roleId = sys_role.roleId) AS totalDevice
         FROM
             sys_role
@@ -39,6 +64,7 @@
             <if test="roleId != null and roleId != ''">AND sys_role.roleId = #{roleId}</if>
             <if test="roleName != null and roleName != ''">AND sys_role.roleName LIKE CONCAT('%', #{roleName}, '%')</if>
             <if test="isDefault != null and isDefault != ''">AND sys_role.isDefault = #{isDefault}</if>
+        GROUP BY sys_role.roleId
     </select>
 
     <update id="update" parameterType="com.xiaozhi.entity.SysRole">
@@ -46,6 +72,7 @@
             sys_role
         <set>
             avatar = #{avatar},
+            <if test="roleName != null and roleName != ''">roleName = #{roleName},</if>
             <if test="roleDesc != null and roleDesc != ''">roleDesc = #{roleDesc},</if>
             <if test="voiceName != null and voiceName != ''">voiceName = #{voiceName},</if>
             <if test="isDefault != null and isDefault != ''">isDefault = #{isDefault},</if>
@@ -67,6 +94,8 @@
             <if test="vadSpeechTh != null and vadSpeechTh != ''">vadSpeechTh = #{vadSpeechTh},</if>
             <if test="vadSilenceTh != null and vadSilenceTh != ''">vadSilenceTh = #{vadSilenceTh},</if>
             <if test="vadSilenceMs != null and vadSilenceMs != ''">vadSilenceMs = #{vadSilenceMs},</if>
+            <if test="ttsPitch != null and ttsPitch != ''">ttsPitch = #{ttsPitch},</if>
+            <if test="ttsSpeed != null and ttsSpeed != ''">ttsSpeed = #{ttsSpeed},</if>
         </set>
         WHERE
             roleId = #{roleId}
@@ -83,11 +112,13 @@
     </update>
 
     <insert id="add" useGeneratedKeys="true" keyProperty="roleName" parameterType="com.xiaozhi.entity.SysRole">
-        INSERT INTO sys_role ( avatar, roleName, roleDesc, voiceName, modelId, ttsId, sttId, userId, isDefault ) VALUES (
+        INSERT INTO sys_role ( avatar, roleName, roleDesc, voiceName, ttsPitch, ttsSpeed, modelId, ttsId, sttId, userId, isDefault ) VALUES (
             #{avatar},
             #{roleName},
             #{roleDesc},
             #{voiceName},
+            #{ttsPitch},
+            #{ttsSpeed},
             #{modelId},
             <choose>
                 <when test="ttsId == -1">null</when>
@@ -102,9 +133,9 @@
         )
     </insert>
 
-    <select id="selectRoleById" resultType="com.xiaozhi.entity.SysRole">
+    <select id="selectRoleById" resultMap="BaseResultMap">
         SELECT
-        <include refid="roleSql"></include>
+        <include refid="Role_Column_List"></include>
         FROM
             sys_role
         WHERE

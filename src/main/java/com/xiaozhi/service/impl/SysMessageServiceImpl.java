@@ -5,6 +5,7 @@ import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.dao.MessageMapper;
 import com.xiaozhi.entity.SysMessage;
 import com.xiaozhi.service.SysMessageService;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +32,7 @@ public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessage
      * @return
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     public int add(SysMessage message) {
         return messageMapper.add(message);
     }
@@ -57,9 +58,23 @@ public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessage
      * @return
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     public int delete(SysMessage message) {
         return messageMapper.delete(message);
+    }
+
+    @Override
+    public void updateMessageByAudioFile(String deviceId, Integer roleId, String sender,
+                                         String createTime, String audioPath) {
+        SysMessage sysMessage = new SysMessage();
+        // 设置消息的where条件
+        sysMessage.setDeviceId(deviceId);
+        sysMessage.setRoleId(roleId);
+        sysMessage.setSender(sender);
+        sysMessage.setCreateTime(DateUtils.toDate(createTime.replace("T", " "), "yyyy-MM-dd HHmmss"));
+        // 设置音频路径和TTS时长
+        sysMessage.setAudioPath(audioPath);
+        messageMapper.updateMessageByAudioFile(sysMessage);
     }
 
 }

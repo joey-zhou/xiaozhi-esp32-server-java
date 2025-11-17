@@ -20,7 +20,8 @@ import lombok.experimental.Accessors;
 @JsonIgnoreProperties({ "startTime", "endTime", "start", "limit", "userId", "code" })
 @Schema(description = "设备信息")
 public class SysDevice extends SysRole {
-    public static final String DEVICE_STATE_ONLINE = "1";
+    public static final String DEVICE_STATE_STANDBY = "2";//已在线，未激活对话
+    public static final String DEVICE_STATE_ONLINE = "1";//已在线，已激活对话
     public static final String DEVICE_STATE_OFFLINE = "0";
 
     @Schema(description = "设备ID")
@@ -61,7 +62,10 @@ public class SysDevice extends SysRole {
 
     /**
      * 最后在线时间
+     * device表的 lastLogin字段,目前没有特别的用处。 如果需要知道设备的最近在线时间，也可以通过访问conversation表最后一条记录获知。
+     * 所以计划在后续版本合适的时候舍弃此字段。
      */
+    @Deprecated
     @JsonFormat(timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "最后在线时间")
     private String lastLogin;

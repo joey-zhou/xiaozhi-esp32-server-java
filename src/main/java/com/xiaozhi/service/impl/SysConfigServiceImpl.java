@@ -50,7 +50,7 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
      * @return
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     public int add(SysConfig config) {
         // 如果当前配置被设置为默认，则将同类型同用户的其他配置设置为非默认
         if (config.getIsDefault() != null && config.getIsDefault().equals("1")) {
@@ -66,7 +66,7 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
      * @return
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     @Caching(evict = {
         @CacheEvict(value = CACHE_NAME, key = "#config.configId"),
         @CacheEvict(value = CACHE_NAME, key = "#config.modelType", condition = "#config.modelType != null")

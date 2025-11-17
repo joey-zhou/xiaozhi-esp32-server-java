@@ -9,6 +9,7 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.resolution.ToolCallbackResolver;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,7 +39,6 @@ public class ToolsGlobalRegistry implements ToolCallbackResolver {
      */
     public ToolCallback registerFunction(String name, ToolCallback functionCallTool) {
         ToolCallback result = allFunction.putIfAbsent(name, functionCallTool);
-        logger.debug("[{}] Function:{} registered into global successfully", TAG, name);
         return result;
     }
 
@@ -51,11 +51,9 @@ public class ToolsGlobalRegistry implements ToolCallbackResolver {
     public boolean unregisterFunction(String name) {
         // Check if the function exists before unregistering
         if (!allFunction.containsKey(name)) {
-            logger.error("[{}] Function:{} not found", TAG, name);
             return false;
         }
         allFunction.remove(name);
-        logger.info("[{}] Function:{} unregistered successfully", TAG, name);
         return true;
     }
 
@@ -65,16 +63,18 @@ public class ToolsGlobalRegistry implements ToolCallbackResolver {
      * @return a map of all registered functions
      */
     public Map<String, ToolCallback> getAllFunctions(ChatSession chatSession) {
+        // 注意：这里不再自动注册所有全局函数到allFunction中
+        // 而是返回一个临时的Map，由McpSessionManager统一管理工具注册
+        Map<String, ToolCallback> tempFunctions = new HashMap<>();
         globalFunctions.forEach(
                 globalFunction -> {
                     ToolCallback toolCallback = globalFunction.getFunctionCallTool(chatSession);
                     if(toolCallback != null){
-                        registerFunction(toolCallback.getToolDefinition().name(),
-                                toolCallback);
+                        tempFunctions.put(toolCallback.getToolDefinition().name(), toolCallback);
                     }
                 }
         );
-        return allFunction;
+        return tempFunctions;
     }
 
     public interface GlobalFunction{

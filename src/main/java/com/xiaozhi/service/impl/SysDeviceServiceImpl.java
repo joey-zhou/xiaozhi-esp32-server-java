@@ -65,7 +65,7 @@ public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceSe
      * @throws NotFoundException 如果没有配置角色
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     public int add(SysDevice device) throws NotFoundException {
 
         SysDevice existingDevice = deviceMapper.selectDeviceById(device.getDeviceId());
@@ -107,7 +107,7 @@ public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceSe
      * @return
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     @CacheEvict(value = CACHE_NAME, key = "#device.deviceId.replace(\":\", \"-\")")
     public int delete(SysDevice device) {
         int row = deviceMapper.delete(device);
@@ -179,7 +179,6 @@ public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceSe
      * @return
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
     @CacheEvict(value = CACHE_NAME, key = "#device.deviceId.replace(\":\", \"-\")")
     public int update(SysDevice device) {
         int rows = deviceMapper.update(device);

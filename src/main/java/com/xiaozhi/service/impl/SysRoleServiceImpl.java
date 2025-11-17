@@ -39,7 +39,7 @@ public class SysRoleServiceImpl extends BaseServiceImpl implements SysRoleServic
      * @return
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     public int add(SysRole role) {
         // 如果当前配置被设置为默认，则将同类型同用户的其他配置设置为非默认
         if (role.getIsDefault() != null && role.getIsDefault().equals("1")) {
@@ -71,7 +71,7 @@ public class SysRoleServiceImpl extends BaseServiceImpl implements SysRoleServic
      * @return
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     public int update(SysRole role) {
         // 如果当前配置被设置为默认，则将同类型同用户的其他配置设置为非默认
         if (role.getIsDefault() != null && role.getIsDefault().equals("1")) {

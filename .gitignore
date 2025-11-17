@@ -15,6 +15,7 @@ vosk-model*
 *.tmp
 *.swp
 *.swo
+.vite
 
 # 忽略 IDE 相关文件
 .idea/

@@ -33,9 +33,15 @@ public class XfyunTtsService implements TtsService {
     private String appId;
     private String apiKey;
     private String apiSecret;
+    
+    // 语音参数
+    private Float pitch;
+    private Float speed;
 
-    public XfyunTtsService(SysConfig config, String voiceName, String outputPath) {
+    public XfyunTtsService(SysConfig config, String voiceName, Float pitch, Float speed, String outputPath) {
         this.voiceName = voiceName;
+        this.pitch = pitch;
+        this.speed = speed;
         this.outputPath = outputPath;
         this.appId = config.getAppId();
         this.apiKey = config.getApiKey();
@@ -84,11 +90,23 @@ public class XfyunTtsService implements TtsService {
     private boolean sendRequest(String text, File file) throws Exception {
         CountDownLatch recognitionLatch = new CountDownLatch(1);
         try {
+            // 将我们的参数（0.5-2.0）映射到讯飞的参数（0-100）
+            // 讯飞规则：0对应0.5倍，100对应2倍
+            // 映射公式：xfyunValue = (ourValue - 0.5) * 100 / 1.5
+            int xfyunSpeed = (int)Math.round((speed - 0.5f) * 100f / 1.5f);
+            int xfyunPitch = (int)Math.round((pitch - 0.5f) * 100f / 1.5f);
+            
+            // 确保值在有效范围内
+            xfyunSpeed = Math.max(0, Math.min(100, xfyunSpeed));
+            xfyunPitch = Math.max(0, Math.min(100, xfyunPitch));
+            
             // 设置合成参数
             TtsClient ttsClient = new TtsClient.Builder()
                     .signature(appId, apiKey, apiSecret)
                     .aue("lame")
                     .vcn(voiceName)
+                    .speed(xfyunSpeed)
+                    .pitch(xfyunPitch)
                     .build();
             ttsClient.send(text, new AbstractTtsWebSocketListener() {
                 //返回格式为音频文件的二进制数组bytes

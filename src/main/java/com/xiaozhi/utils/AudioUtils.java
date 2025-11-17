@@ -4,10 +4,7 @@ import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacv.FrameRecorder;
 import org.slf4j.Logger;
 
-import java.io.DataOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -23,6 +20,7 @@ public class AudioUtils {
     public static final int CHANNELS = 1; // 单声道
     public static final int BITRATE = 16000; // 16kbps比特率
     public static final int SAMPLE_FORMAT = avutil.AV_SAMPLE_FMT_S16; // 16位PCM
+    public static final int BUFFER_SIZE = 512; // 窗口大小
     public static final int OPUS_FRAME_DURATION_MS = 60; // OPUS帧持续时间（毫秒）
 
     /**
@@ -186,7 +184,6 @@ public class AudioUtils {
                 byte[] pcmData = readAsPcm(fullPath);
                 totalPcmSize += pcmData.length;
                 audioChunks.add(pcmData);
-
             }
 
             // 创建输出WAV文件
@@ -375,5 +372,39 @@ public class AudioUtils {
         } else {
             return "application/octet-stream";
         }
+    }
+
+    /**
+     * 获取音频文件的时长
+     * 使用ffprobe
+     * 
+     * @param path 音频文件路径
+     * @return 时长（秒），失败返回-1
+     */
+    public static double getAudioDuration(Path path) {
+        String pathStr = path.toString();
+        
+        try {
+
+            // 使用ffprobe获取时长
+            String[] command = {
+                    "ffprobe",
+                    "-v", "error",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    path.toFile().getAbsolutePath()
+            };
+            Process process = Runtime.getRuntime().exec(command);
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line = reader.readLine();
+                if (line != null) {
+                    return Double.parseDouble(line.trim());
+                }
+            }
+            process.waitFor();
+        } catch (Exception e) {
+            logger.debug("获取音频时长失败: {}", pathStr, e);
+        }
+        return -1;
     }
 }

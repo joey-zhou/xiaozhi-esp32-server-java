@@ -28,10 +28,7 @@ public class DifyChatModel implements ChatModel {
      * 构造函数
      *
      * @param endpoint  API端点
-     * @param appId
      * @param apiKey    API密钥
-     * @param apiSecret
-     * @param model     模型名称
      */
     public DifyChatModel(String endpoint, String apiKey) {
         chatClient = DifyClientFactory.createChatClient(endpoint, apiKey);

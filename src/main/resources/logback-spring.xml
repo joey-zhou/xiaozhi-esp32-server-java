@@ -59,6 +59,13 @@
         <logger name="com.xiaozhi.websocket" level="DEBUG" />
         <logger name="org.springframework.web" level="INFO" />
         <logger name="com.alibaba.dashscope.protocol.okhttp" level="WARN" />
+        
+        <!-- 添加以下配置以捕获 Spring AI 和 HTTP 客户端相关的详细日志 -->
+        <logger name="org.springframework.ai" level="TRACE" />
+        <logger name="i.m.client.transport" level="TRACE" />
+        <logger name="org.springframework.web.reactive" level="TRACE" />
+        <logger name="reactor.netty.http.client" level="DEBUG" />
+        <logger name="com.xiaozhi.dialogue.llm.tool" level="TRACE" />
     </springProfile>
 
     <!-- 生产环境配置 -->

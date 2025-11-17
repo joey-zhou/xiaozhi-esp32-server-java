@@ -95,7 +95,7 @@ public class DeviceMcpService {
         DeviceMcpVision vision = new DeviceMcpVision();
 
         //VLChatController
-        String url = cmsUtils.getServerAddress() + "/vl/chat";
+        String url = "http://" + cmsUtils.getServerIp() + ":8091/api/vl/chat";
         vision.setUrl(url);
         vision.setToken(chatSession.getSessionId());
 
@@ -157,7 +157,7 @@ public class DeviceMcpService {
                                 request.setPayload(requestPayload);
                                 DeviceMcpMessage response = sendMcpRequest(chatSession, request);
                                 if (response != null) {
-                                    logger.debug("SessionId: {},  MCP function call response: {}", chatSession.getSessionId(), response);
+                                    logger.info("SessionId: {},  MCP function call response: {}", chatSession.getSessionId(), response);
                                     //空指针
                                     if (response.getPayload().getResult() == null) {
                                         return response.getPayload().getError().get("message");//返回结果

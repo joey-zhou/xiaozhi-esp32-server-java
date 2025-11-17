@@ -39,7 +39,7 @@ public class CozeChatModel implements ChatModel {
 
     /**
      * 构造函数
-     *
+     * @param apiSecret Coze API密钥
      * @param model     模型名称 (在Coze中不使用)
      */
     public CozeChatModel(String apiSecret, String model) {
@@ -106,7 +106,10 @@ public class CozeChatModel implements ChatModel {
             ChatPoll chatPoll = coze.chat().createAndPoll(req, timeout);
             logger.debug(chatPoll.toString());
             var message = chatPoll.getMessages().getLast();
-            var assistantMessage = new AssistantMessage(message.getContent(), new HashMap<>(message.getMetaData()));
+            Map<String, Object> messageMetadata = Optional.ofNullable(message.getMetaData())
+                    .map(metaData -> new HashMap<String, Object>(metaData))
+                    .orElse(new HashMap<>());
+            var assistantMessage = new AssistantMessage(message.getContent(), messageMetadata);
             var generation = new Generation(assistantMessage,
                     ChatGenerationMetadata.builder().metadata(BeanUtil.beanToMap(chatPoll.getChat())).build());
             logger.info("耗时：{}ms", System.currentTimeMillis() - start);

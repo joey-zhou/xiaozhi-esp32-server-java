@@ -22,7 +22,7 @@ public class SysTemplateServiceImpl implements SysTemplateService {
      * 添加模板
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     public int add(SysTemplate template) {
         // 如果是默认模板，先重置其他默认模板
         if (template.getIsDefault() != null && template.getIsDefault().equals("1")) {
@@ -35,7 +35,7 @@ public class SysTemplateServiceImpl implements SysTemplateService {
      * 修改模板
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     public int update(SysTemplate template) {
         // 如果是默认模板，先重置其他默认模板
         if (template.getIsDefault() != null && template.getIsDefault().equals("1")) {

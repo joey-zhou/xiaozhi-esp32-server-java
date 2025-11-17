@@ -2,8 +2,12 @@ package com.xiaozhi.dialogue.service;
 
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
+import com.xiaozhi.dialogue.tts.TtsService;
+import com.xiaozhi.dialogue.tts.factory.TtsServiceFactory;
+import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.utils.OpusProcessor;
+
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,16 +16,20 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /**
  * 音频服务，负责处理音频的流式和非流式发送
@@ -29,6 +37,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service
 public class AudioService {
     private static final Logger logger = LoggerFactory.getLogger(AudioService.class);
+    private static final DecimalFormat df = new DecimalFormat("0.00");
 
     // 帧发送时间间隔略小于OPUS_FRAME_DURATION_MS，避免因某些调度原因，导致没能在规定时间内发送，设备出现杂音
     private static final long OPUS_FRAME_SEND_INTERVAL_MS = AudioUtils.OPUS_FRAME_DURATION_MS;
@@ -148,7 +157,7 @@ public class AudioService {
     }
 
     /**
-     * 发送音频消息
+     * 发送非流式音频消息
      *
      * @param session   WebSocketSession会话
      * @param sentence  句子对象
@@ -177,11 +186,11 @@ public class AudioService {
         logger.info("向设备发送音频消息（sendAudioMessage） - SessionId: {}, 文本: {}, 音频路径: {}", sessionId, text, audioPath);
 
         if (audioPath == null) {
-            if(text != null && !text.isEmpty()) {
+            if (text != null && !text.isEmpty()) {
                 // 检查是否是纯表情符号（通过检查句子是否有moods但没有实际文本内容）
                 boolean isOnlyEmoji = sentence.getMoods() != null && !sentence.getMoods().isEmpty() && 
                                     (text.trim().length() <= 4); // 表情符号通常不超过4个字符
-                
+
                 if (isOnlyEmoji) {
                     // 纯表情符号，只发送表情，不发送文本
                     CompletableFuture<Void> emotionFuture = startFuture.thenRun(() -> sendSentenceEmotion(session, sentence, null));
@@ -244,7 +253,7 @@ public class AudioService {
         CompletableFuture<Void> emotionFuture = sentenceStartFuture.thenRun(() -> sendSentenceEmotion(session, sentence, null));
 
         // 处理音频文件
-        return emotionFuture.thenCompose(v -> CompletableFuture.supplyAsync(() -> {
+        CompletableFuture<Void> composeFuture = emotionFuture.thenCompose(v -> CompletableFuture.supplyAsync(() -> {
             String fullPath = audioPath;
             File audioFile = new File(fullPath);
             if (!audioFile.exists()) {
@@ -255,15 +264,9 @@ public class AudioService {
             List<byte[]> opusFrames;
 
             try {
-                if (audioPath.contains(".opus")) {
-                    // 如果是opus文件，直接读取opus帧数据
-                    opusFrames = opusProcessor.readOpus(audioFile);
-                } else {
-                    // 如果不是opus文件，按照原来的逻辑处理
-                    byte[] audioData = AudioUtils.readAsPcm(fullPath);
-                    // 将PCM转换为Opus帧
-                    opusFrames = opusProcessor.pcmToOpus(sessionId, audioData, false);
-                }
+                byte[] audioData = AudioUtils.readAsPcm(fullPath);
+                // 将PCM转换为Opus帧
+                opusFrames = opusProcessor.pcmToOpus(sessionId, audioData, false);
                 return opusFrames;
             } catch (Exception e) {
                 logger.error("处理音频文件失败: {}", fullPath, e);
@@ -285,9 +288,19 @@ public class AudioService {
             CompletableFuture<Void> sendFramesFuture = new CompletableFuture<>();
             
             try {
-                // 初始化播放时间和位置
-                playStartTimes.put(sessionId, System.nanoTime());
-                playPositions.put(sessionId, 0L);
+                // 计算句子间需要等待的时间（如果有上一帧的话）
+                long initialDelay = 0;
+                AtomicLong lastSentTime = lastFrameSentTime.get(sessionId);
+                if (lastSentTime != null) {
+                    long timeSinceLastFrame = System.currentTimeMillis() - lastSentTime.get();
+                    if (timeSinceLastFrame < OPUS_FRAME_SEND_INTERVAL_MS) {
+                        // 计算需要延迟的时间以保持间隔
+                        initialDelay = OPUS_FRAME_SEND_INTERVAL_MS - timeSinceLastFrame;
+                    }
+                }
+                
+                // 初始化播放时间和位置（延迟后再设置，避免时间计算错误）
+                final long frameInitialDelay = initialDelay;
                 
                 // 创建帧发送任务，从第一帧开始通过调度器发送
                 final int[] frameIndex = {0};
@@ -302,12 +315,22 @@ public class AudioService {
                                 return;
                             }
                             
+                            // 首帧发送时初始化播放时间和位置
+                            if (frameIndex[0] == 0) {
+                                playStartTimes.put(sessionId, System.nanoTime());
+                                playPositions.put(sessionId, 0L);
+                            }
+                            
                             // 更新活跃时间
                             sessionManager.updateLastActivity(sessionId);
                             
                             // 发送当前帧
                             byte[] frame = opusFrames.get(frameIndex[0]++);
                             sendOpusFrame(session, frame);
+                            
+                            // 更新最后发送帧的时间
+                            lastFrameSentTime.computeIfAbsent(sessionId, k -> new AtomicLong())
+                                .set(System.currentTimeMillis());
                             
                             // 更新播放位置
                             Long position = playPositions.get(sessionId);
@@ -331,9 +354,10 @@ public class AudioService {
                     }
                 };
                 
-                // 启动帧发送调度
+                // 启动帧发送调度，使用计算好的初始延迟
                 if (opusFrames.size() > 0) {
-                    scheduleNextFrame(sessionId, frameTask);
+                    ScheduledFuture<?> future = scheduler.schedule(frameTask, frameInitialDelay, TimeUnit.MILLISECONDS);
+                    scheduledTasks.put(sessionId, future);
                 } else {
                     // 没有帧需要发送
                     endTask(sessionId, sendFramesFuture);
@@ -374,6 +398,8 @@ public class AudioService {
             }
             return null;
         });
+        sendAudioTasks.put(sessionId, composeFuture);
+        return composeFuture;
     }
 
     /**
@@ -412,7 +438,7 @@ public class AudioService {
             logger.info("已取消音频发送任务 - SessionId: {}", sessionId);
         }
     }
-    
+
     /**
      * 结束非流式任务
      */
@@ -437,7 +463,7 @@ public class AudioService {
             future.complete(null);
         }
     }
-    
+
     /**
      * 清理计时器资源
      */

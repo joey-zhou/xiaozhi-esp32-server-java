@@ -32,7 +32,7 @@ public class SileroVadModel implements VadModel {
     private OrtSession session;
     private float[][][] state;
     private float[][] context;
-    private final int windowSize = 512; // 16kHz的窗口大小
+    private final int windowSize = AudioUtils.BUFFER_SIZE; // 16kHz的窗口大小
 
     @PostConstruct
     @Override
@@ -106,6 +106,46 @@ public class SileroVadModel implements VadModel {
         } catch (OrtException e) {
             logger.error("VAD模型推理失败", e);
             return 0.0f;
+        }
+    }
+
+    @Override
+    public InferenceResult infer(float[] samples, float[][][] prevState) {
+        try {
+            if (samples.length != windowSize) {
+                throw new IllegalArgumentException("样本数量必须是" + windowSize);
+            }
+
+            float[][] x = new float[][] { samples };
+
+            float[][][] localState = prevState;
+            if (localState == null) {
+                localState = new float[2][1][128];
+            }
+
+            OnnxTensor inputTensor = OnnxTensor.createTensor(env, x);
+            OnnxTensor stateTensor = OnnxTensor.createTensor(env, localState);
+            OnnxTensor srTensor = OnnxTensor.createTensor(env, new long[] { AudioUtils.SAMPLE_RATE });
+
+            try {
+                OrtSession.Result result = session.run(Map.of(
+                        "input", inputTensor,
+                        "sr", srTensor,
+                        "state", stateTensor
+                ));
+
+                float[][] output = (float[][]) result.get(0).getValue();
+                float[][][] nextState = (float[][][]) result.get(1).getValue();
+
+                return new InferenceResult(output[0][0], nextState);
+            } finally {
+                inputTensor.close();
+                stateTensor.close();
+                srTensor.close();
+            }
+        } catch (OrtException e) {
+            logger.error("VAD模型推理失败", e);
+            return new InferenceResult(0.0f, prevState);
         }
     }
 

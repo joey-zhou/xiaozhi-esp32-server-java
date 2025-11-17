@@ -3,16 +3,13 @@ package com.xiaozhi.dialogue.llm.factory;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.dialogue.llm.providers.CozeChatModel;
 import com.xiaozhi.dialogue.llm.providers.DifyChatModel;
+import com.xiaozhi.dialogue.llm.providers.OpenAiLlmService;
 import com.xiaozhi.dialogue.token.factory.TokenServiceFactory;
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysRole;
 import com.xiaozhi.service.SysConfigService;
 import com.xiaozhi.service.SysRoleService;
-
-import java.net.http.HttpClient;
-import java.time.Duration;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
@@ -38,6 +35,9 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
+
+import java.net.http.HttpClient;
+import java.time.Duration;
 
 /**
  * ChatModel工厂
@@ -65,6 +65,10 @@ public class ChatModelFactory {
     public ChatModel takeChatModel(ChatSession session) {
         SysDevice device = session.getSysDevice();
         SysRole role = roleService.selectRoleById(device.getRoleId());
+        return takeChatModel(role);
+    }
+
+    public ChatModel takeChatModel(SysRole role) {
         Integer modelId = role.getModelId();
         Assert.notNull(modelId, "配置ID不能为空");
         // 根据配置ID查询配置
@@ -73,23 +77,36 @@ public class ChatModelFactory {
     }
 
     public ChatModel takeVisionModel() {
-        SysConfig config = configService.selectModelType("vision");
+        SysConfig config = configService.selectModelType(SysConfig.ModelType.vision.getValue());
         Assert.notNull(config, "未配置多模态模型");
         return createChatModel(config, new SysRole());
     }
 
     public ChatModel takeIntentModel() {
-        SysConfig config = configService.selectModelType("intent");
+        SysConfig config = configService.selectModelType(SysConfig.ModelType.intent.getValue());
         Assert.notNull(config, "未配置意图识别模型");
         return createChatModel(config, new SysRole());
     }
 
     public ChatModel takeEmbeddingModel() {
-        SysConfig config = configService.selectModelType("embedding");
+        SysConfig config = configService.selectModelType(SysConfig.ModelType.embedding.getValue());
         Assert.notNull(config, "未配置向量模型");
         return createChatModel(config, new SysRole());
     }
 
+    /**
+     * 根据角色ID创建ChatModel
+     *
+     * @return
+     */
+    public ChatModel takeChatModel(Integer roleId) {
+        SysRole role = roleService.selectRoleById(roleId);
+        Integer modelId = role.getModelId();
+        Assert.notNull(modelId, "配置ID不能为空");
+        // 根据配置ID查询配置
+        SysConfig config = configService.selectConfigById(modelId);
+        return createChatModel(config, role);
+    }
     /**
      * 创建ChatModel
      * 
@@ -172,6 +189,10 @@ public class ChatModelFactory {
                 .model(model)
                 .temperature(temperature)
                 .topP(topP)
+                // 注意：某些OpenAI兼容API（如豆包）可能不支持以下参数，如遇到400错误可尝试注释掉
+                // .maxCompletionTokens(200)
+                .maxTokens(2000)
+                .streamUsage(true)
                 .build();
 
         var chatModel = OpenAiChatModel.builder()

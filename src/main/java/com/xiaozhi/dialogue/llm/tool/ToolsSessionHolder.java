@@ -115,7 +115,9 @@ public class ToolsSessionHolder {
                 registerFunction(functionName);
             }
         }else{//否则加载所有的全局function
-            globalFunctionRegistry.getAllFunctions(chatSession).forEach(this::registerFunction);
+            // 注意：这里不再自动注册所有全局函数，而是由McpSessionManager统一管理
+            // globalFunctionRegistry.getAllFunctions(chatSession).forEach(this::registerFunction);
+            logger.debug("[{}] - SessionId:{} 跳过自动注册全局函数，由McpSessionManager统一管理", TAG, sessionId);
         }
     }
 }

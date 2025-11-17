@@ -50,6 +50,18 @@ public class SysRole extends Base<SysRole> {
     private String voiceName;
 
     /**
+     * 语音音调(0.5-2.0, 默认1.0)
+     */
+    @Schema(description = "语音音调")
+    private Float ttsPitch = 1.0f;
+
+    /**
+     * 语音语速(0.5-2.0, 默认1.0)
+     */
+    @Schema(description = "语音语速")
+    private Float ttsSpeed = 1.0f;
+
+    /**
      * 状态(1启用 0禁用)
      */
     @Schema(description = "状态(1启用 0禁用)")

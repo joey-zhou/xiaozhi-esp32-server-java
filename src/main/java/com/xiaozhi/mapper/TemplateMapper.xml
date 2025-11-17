@@ -2,18 +2,31 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xiaozhi.dao.TemplateMapper">
     
-    <sql id="templateSql">
-        sys_template.userId, sys_template.templateId, sys_template.templateName, sys_template.templateDesc, sys_template.templateContent, sys_template.category, sys_template.isDefault, sys_template.state, sys_template.createTime, sys_template.updateTime
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysTemplate">
+        <id property="templateId" column="templateId" />
+        <result property="userId" column="userId" />
+        <result property="templateName" column="templateName" />
+        <result property="templateDesc" column="templateDesc" />
+        <result property="templateContent" column="templateContent" />
+        <result property="category" column="category" />
+        <result property="isDefault" column="isDefault" />
+        <result property="state" column="state" />
+        <result property="createTime" column="createTime" />
+        <result property="updateTime" column="updateTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        userId, templateId, templateName, templateDesc, templateContent, category, isDefault, state, createTime, updateTime
     </sql>
     
-    <select id="query" resultType="com.xiaozhi.entity.SysTemplate">
+    <select id="query" resultMap="BaseResultMap">
         SELECT
-        <include refid="templateSql"/>
+        <include refid="Base_Column_List"/>
         FROM
             sys_template
         WHERE
-            sys_template.state = 1
-            AND sys_template.userId = #{userId}
+            state = 1
+            AND userId = #{userId}
             <if test="templateName != null and templateName != ''">
                 AND template_name like concat('%', #{templateName}, '%')
             </if>
@@ -23,9 +36,9 @@
         ORDER BY isDefault, createTime DESC
     </select>
     
-    <select id="selectTemplateById" parameterType="Integer" resultType="com.xiaozhi.entity.SysTemplate">
+    <select id="selectTemplateById" parameterType="Integer" resultMap="BaseResultMap">
         SELECT
-        <include refid="templateSql"/>
+        <include refid="Base_Column_List"/>
         FROM
             sys_template
         WHERE templateId = #{templateId}

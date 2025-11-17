@@ -1,8 +1,10 @@
 package com.xiaozhi.entity;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.experimental.Accessors;
 
 /**
@@ -16,6 +18,22 @@ import lombok.experimental.Accessors;
 @EqualsAndHashCode(callSuper = true)
 @Schema(description = "配置信息")
 public class SysConfig extends Base<SysConfig> {
+
+    @Getter
+    public enum ModelType {
+        chat("chat"),
+        vision("vision"),
+        intent("intent"),
+        embedding("embedding");
+
+        @JsonValue
+        private final String value;
+
+        ModelType(String value) {
+            this.value = value;
+        }
+    }
+
     @Schema(description = "配置ID")
     private Integer configId;
 

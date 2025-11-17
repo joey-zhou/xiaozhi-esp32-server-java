@@ -1,16 +1,21 @@
 package com.xiaozhi.communication.common;
 
+import com.xiaozhi.communication.server.websocket.WebSocketSession;
+import com.xiaozhi.dialogue.llm.memory.Conversation;
 import com.xiaozhi.dialogue.llm.tool.ToolsSessionHolder;
+import com.xiaozhi.dialogue.service.DialogueService;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysRole;
 import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.event.ChatSessionCloseEvent;
 import com.xiaozhi.service.SysDeviceService;
+import com.xiaozhi.event.ChatSessionOpenEvent;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -19,6 +24,7 @@ import reactor.core.publisher.Sinks;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -34,9 +40,6 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class SessionManager {
     private static final Logger logger = LoggerFactory.getLogger(SessionManager.class);
-
-    // 设置不活跃超时时间为60秒
-    private static final long INACTIVITY_TIMEOUT_SECONDS = 60;
 
     // 用于存储所有连接的会话信息
     private final ConcurrentHashMap<String, ChatSession> sessions = new ConcurrentHashMap<>();
@@ -54,28 +57,40 @@ public class SessionManager {
     @Lazy
     private SysDeviceService deviceService;
 
+    @Value("${check.inactive.session:true}")
+    private boolean checkInactiveSession;
+
+    @Value("${inactive.timeout.seconds:60}")
+    private int inactiveTimeOutSeconds;
+
+    private DialogueService getDialogueService() {
+        return applicationContext.getBean(DialogueService.class);
+    }
+
     /**
      * 初始化方法，启动定时检查不活跃会话的任务
      */
     @PostConstruct
     public void init() {
-        // 项目启动时，将所有设备状态设置为离线
-        // 延迟执行设备状态重置，避免循环依赖
-        scheduler.schedule(() -> {
-            try {
-                SysDevice device = new SysDevice();
-                device.setState(SysDevice.DEVICE_STATE_OFFLINE);
-                // 不设置deviceId，这样会更新所有设备
-                int updatedRows = deviceService.update(device);
-                logger.info("项目启动，重置 {} 个设备状态为离线", updatedRows);
-            } catch (Exception e) {
-                logger.error("项目启动时设置设备状态为离线失败", e);
-            }
-        }, 1, TimeUnit.SECONDS);
+        if(checkInactiveSession){
+            // 项目启动时，将所有设备状态设置为离线
+            // 延迟执行设备状态重置，避免循环依赖
+            scheduler.schedule(() -> {
+                try {
+                    SysDevice device = new SysDevice();
+                    device.setState(SysDevice.DEVICE_STATE_OFFLINE);
+                    // 不设置deviceId，这样会更新所有设备
+                    int updatedRows = deviceService.update(device);
+                    logger.info("项目启动，重置 {} 个设备状态为离线", updatedRows);
+                } catch (Exception e) {
+                    logger.error("项目启动时设置设备状态为离线失败", e);
+                }
+            }, 1, TimeUnit.SECONDS);
         
-        // 每10秒检查一次不活跃的会话
-        scheduler.scheduleAtFixedRate(this::checkInactiveSessions, 10, 10, TimeUnit.SECONDS);
-        logger.info("不活跃会话检查任务已启动，超时时间: {}秒", INACTIVITY_TIMEOUT_SECONDS);
+            // 定期检查不活跃的会话
+            scheduler.scheduleAtFixedRate(this::checkInactiveSessions, 10, 10, TimeUnit.SECONDS);
+            logger.info("不活跃会话检查任务已启动，超时时间: {}秒", inactiveTimeOutSeconds);
+        }
     }
 
     /**
@@ -104,13 +119,16 @@ public class SessionManager {
         Thread.startVirtualThread(() -> {
             Instant now = Instant.now();
             sessions.values().forEach(session -> {
-                Instant lastActivity = session.getLastActivityTime();
-                if (lastActivity != null) {
-                    Duration inactiveDuration = Duration.between(lastActivity, now);
-                    if (inactiveDuration.getSeconds() > INACTIVITY_TIMEOUT_SECONDS) {
-                        logger.info("会话 {} 已经 {} 秒没有有效活动，自动关闭",
-                            session.getSessionId(), inactiveDuration.getSeconds());
-                        closeSession(session);
+                if(session instanceof  WebSocketSession || session.isAudioChannelOpen()) {
+                    Instant lastActivity = session.getLastActivityTime();
+                    if (lastActivity != null) {
+                        Duration inactiveDuration = Duration.between(lastActivity, now);
+                        if (inactiveDuration.getSeconds() > inactiveTimeOutSeconds) {
+                            logger.info("会话 {} 已经 {} 秒没有有效活动，自动关闭",
+                                    session.getSessionId(), inactiveDuration.getSeconds());
+                            DialogueService dialogueService = getDialogueService();
+                            dialogueService.sendGoodbyeMessage(session);
+                        }
                     }
                 }
             });
@@ -139,6 +157,16 @@ public class SessionManager {
     public void registerSession(String sessionId, ChatSession chatSession) {
         sessions.put(sessionId, chatSession);
         logger.info("会话已注册 - SessionId: {}  SessionType: {}", sessionId, chatSession.getClass().getSimpleName());
+        applicationContext.publishEvent(new ChatSessionOpenEvent(chatSession));
+    }
+
+    /**
+     * 关闭并清理WebSocket会话
+     *
+     * @param sessionId 会话ID
+     */
+    public void removeSession(String sessionId){
+        sessions.remove(sessionId);
     }
 
     /**
@@ -164,9 +192,15 @@ public class SessionManager {
             return;
         }
         try {
-            sessions.remove(chatSession.getSessionId());
+            if(chatSession instanceof WebSocketSession){
+                removeSession(chatSession.getSessionId());
+            }
             // 关闭会话
-            chatSession.close();
+            if(chatSession.isAudioChannelOpen()){
+                chatSession.close();
+                applicationContext.publishEvent(new ChatSessionCloseEvent(chatSession));
+                logger.info("会话已关闭 - SessionId: {} SessionType: {}", chatSession.getSessionId(), chatSession.getClass().getSimpleName());
+            }
             // 清理音频流
             Sinks.Many<byte[]> sink = chatSession.getAudioSinks();
             if (sink != null) {
@@ -175,9 +209,11 @@ public class SessionManager {
             // 重置会话状态
             chatSession.setStreamingState(false);
             chatSession.setAudioSinks(null);
-            applicationContext.publishEvent(new ChatSessionCloseEvent(chatSession));
-            // 从会话映射中移除
-            logger.info("会话已关闭 - SessionId: {} SessionType: {}", chatSession.getSessionId(), chatSession.getClass().getSimpleName());
+            // 清理Conversation缓存的对话历史。
+            Conversation conversation = chatSession.getConversation();
+            if (conversation != null) {
+                conversation.clear();
+            }
         } catch (Exception e) {
             logger.error("清理会话资源时发生错误 - SessionId: {}",
                     chatSession.getSessionId(), e);
@@ -260,19 +296,18 @@ public class SessionManager {
     }
 
     /**
-     * 获取会话
+     * 根据设备ID获取会话
      *
      * @param deviceId 设备ID
-     * @return 会话ID
+     * @return 会话对象，如果不存在则返回null
      */
     public ChatSession getSessionByDeviceId(String deviceId) {
-        for (ChatSession chatSession : sessions.values()) {
-            if (chatSession.getSysDevice() != null && deviceId.equals(chatSession.getSysDevice().getDeviceId())) {
-                return chatSession;
-            }
-        }
-        return null;
+        return sessions.values().stream()
+                .filter(session -> session.getSysDevice() != null && deviceId.equals(session.getSysDevice().getDeviceId()))
+                .findFirst()
+                .orElse(null);
     }
+
 
     /**
      * 获取设备配置
@@ -509,4 +544,10 @@ public class SessionManager {
         captchaState.remove(deviceId);
     }
 
+    public Optional<Conversation> findConversation(String deviceId) {
+        return sessions.values().stream()
+                .filter(session -> session.getSysDevice().getDeviceId().equals(deviceId))
+                .findFirst()
+                .map(ChatSession::getConversation);
+    }
 }

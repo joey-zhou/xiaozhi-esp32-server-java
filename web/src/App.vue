@@ -1,19 +1,45 @@
+<script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue'
+import { RouterView } from 'vue-router'
+import GlobalLoading from './components/GlobalLoading.vue'
+import ErrorBoundary from './components/ErrorBoundary.vue'
+import { useLocale } from './composables/useLocale'
+import { useAntdTheme } from './composables/useAntdTheme'
+import { useAppStore } from './store/app'
+
+const { antdLocale } = useLocale()
+const { antdTheme } = useAntdTheme()
+const appStore = useAppStore()
+
+// 初始化和监听窗口大小变化
+onMounted(() => {
+  appStore.updateScreenSize()
+  window.addEventListener('resize', appStore.updateScreenSize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', appStore.updateScreenSize)
+})
+</script>
+
 <template>
-  <a-config-provider :locale="locale">
+  <a-config-provider :locale="antdLocale" :theme="antdTheme">
     <div id="app">
-      <router-view></router-view>
+      <!-- 全局 Loading 组件 -->
+      <GlobalLoading />
+      
+      <!-- 错误边界 -->
+      <ErrorBoundary>
+        <!-- 路由视图 -->
+        <RouterView />
+      </ErrorBoundary>
     </div>
   </a-config-provider>
 </template>
 
-<script>
-import zhCN from 'ant-design-vue/lib/locale-provider/zh_CN'
-
-export default {
-  data () {
-    return {
-      locale: zhCN
-    }
-  }
+<style>
+#app {
+  width: 100%;
+  height: 100%;
 }
-</script>
+</style>

@@ -3,6 +3,7 @@ package com.xiaozhi.utils;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 
 public class DateUtils {
 
@@ -39,5 +40,22 @@ public class DateUtils {
         DecimalFormat decimalFormat = new DecimalFormat("0.###"); // 保留 3 位小数
         String formattedTime = decimalFormat.format(deltaTime); // 格式化为字符串
         return Double.parseDouble(formattedTime); // 转换为 Double
+    }
+
+    /**
+     * 将字符串转换为日期对象
+     * @param date
+     * @param strFormat
+     * @return
+     */
+    public static Date toDate(String date, String strFormat) {
+        try {
+            SimpleDateFormat df = new SimpleDateFormat(strFormat);
+            df.setLenient(false);
+            Date objDate = df.parse(date);
+            return objDate;
+        } catch (Exception var4) {
+            return null;
+        }
     }
 }

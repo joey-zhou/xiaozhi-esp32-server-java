@@ -46,11 +46,17 @@ public class AliyunTtsService implements TtsService {
     private final String apiKey;
     private final String voiceName;
     private final String outputPath;
+    
+    // 语音参数
+    private final Float pitch;
+    private final Float speed;
 
     public AliyunTtsService(SysConfig config,
-            String voiceName, String outputPath) {
+            String voiceName, Float pitch, Float speed, String outputPath) {
         this.apiKey = config.getApiKey();
         this.voiceName = voiceName;
+        this.pitch = pitch;
+        this.speed = speed;
         this.outputPath = outputPath;
     }
 
@@ -210,6 +216,8 @@ public class AliyunTtsService implements TtsService {
                                 .apiKey(apiKey)
                                 .model("cosyvoice-v2")
                                 .voice(voiceName)
+                                .speechRate(speed)
+                                .pitchRate(pitch)
                                 .format(com.alibaba.dashscope.audio.ttsv2.SpeechSynthesisAudioFormat.WAV_16000HZ_MONO_16BIT)
                                 .build();
                 
@@ -289,6 +297,8 @@ public class AliyunTtsService implements TtsService {
                         .apiKey(apiKey)
                         .model(voiceName)
                         .text(text)
+                        .rate(speed)
+                        .pitch(pitch)
                         .sampleRate(AudioUtils.SAMPLE_RATE)
                         .format(SpeechSynthesisAudioFormat.WAV)
                         .build();

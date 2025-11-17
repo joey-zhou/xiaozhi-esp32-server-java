@@ -2,23 +2,53 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xiaozhi.dao.DeviceMapper">
 
-    <sql id="deviceSql">
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysDevice">
+        <id property="deviceId" column="deviceId" />
+        <result property="deviceName" column="deviceName" />
+        <result property="ip" column="ip" />
+        <result property="wifiName" column="wifiName" />
+        <result property="chipModelName" column="chipModelName" />
+        <result property="type" column="type" />
+        <result property="version" column="version" />
+        <result property="state" column="state" />
+        <result property="roleId" column="roleId" />
+        <result property="userId" column="userId" />
+        <result property="lastLogin" column="lastLogin" />
+        <result property="createTime" column="createTime" />
+        <result property="location" column="location" />
+        <result property="totalMessage" column="totalMessage" />
+        <result property="roleName" column="roleName" />
+        <result property="roleDesc" column="roleDesc" />
+        <result property="voiceName" column="voiceName" />
+        <result property="modelId" column="modelId" />
+        <result property="sttId" column="sttId" />
+        <result property="ttsId" column="ttsId" />
+        <result property="vadSpeechTh" column="vadSpeechTh" />
+        <result property="vadSilenceTh" column="vadSilenceTh" />
+        <result property="vadEnergyTh" column="vadEnergyTh" />
+        <result property="vadSilenceMs" column="vadSilenceMs" />
+        <result property="code" column="code" />
+        <result property="audioPath" column="audioPath" />
+        <result property="sessionId" column="sessionId" />
+    </resultMap>
+
+    <sql id="Device_Column_List">
         sys_device.deviceId, sys_device.deviceName, sys_device.ip, sys_device.wifiName,
         sys_device.chipModelName, sys_device.type, sys_device.version, sys_device.state,
         sys_device.roleId, sys_device.userId, sys_device.lastLogin, sys_device.createTime,
         sys_device.location
     </sql>
 
-    <sql id="roleSql">
+    <sql id="Role_Column_List">
         sys_role.roleName, sys_role.roleDesc, sys_role.voiceName,
         sys_role.modelId, sys_role.sttId, sys_role.ttsId,
         sys_role.vadSpeechTh, sys_role.vadSilenceTh, sys_role.vadEnergyTh, sys_role.vadSilenceMs
     </sql>
 
-    <select id="query" resultType="com.xiaozhi.entity.SysDevice">
+    <select id="query" resultMap="BaseResultMap">
         SELECT
-        <include refid="deviceSql"></include>,
-        <include refid="roleSql"></include>,
+        <include refid="Device_Column_List"></include>,
+        <include refid="Role_Column_List"></include>,
         (SELECT COUNT(*) FROM sys_message WHERE sys_message.deviceId = sys_device.deviceId AND sys_message.state = '1') AS totalMessage
         FROM
             sys_device
@@ -30,18 +60,20 @@
             <if test="deviceName != null and deviceName != ''">AND deviceName LIKE CONCAT('%', #{deviceName}, '%')</if>
             <if test="roleName != null and roleName != ''">AND roleName LIKE CONCAT('%', #{roleName}, '%')</if>
             <if test="state != null and state != ''">AND sys_device.state = #{state}</if>
+            <if test="roleId != null and roleId != ''">AND sys_device.roleId = #{roleId}</if>
+
     </select>
 
-    <select id="selectDeviceById" resultType="com.xiaozhi.entity.SysDevice">
+    <select id="selectDeviceById" resultMap="BaseResultMap">
         SELECT
-            <include refid="deviceSql"></include>
+            <include refid="Device_Column_List"></include>
         FROM
             sys_device
         WHERE
             deviceId = #{deviceId}
     </select>
 
-    <select id="queryVerifyCode" parameterType="com.xiaozhi.entity.SysDevice" resultType="com.xiaozhi.entity.SysDevice">
+    <select id="queryVerifyCode" parameterType="com.xiaozhi.entity.SysDevice" resultMap="BaseResultMap">
         SELECT
             code, audioPath, deviceId, type
         FROM

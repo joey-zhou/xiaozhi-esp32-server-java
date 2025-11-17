@@ -5,7 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.xiaozhi.dialogue.stt.SttService;
 import com.xiaozhi.entity.SysConfig;
 
-import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.StringUtils;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.slf4j.Logger;
@@ -37,7 +37,7 @@ public class FunASRSttService implements SttService {
     private static final String SPEAKING_START = "{\"mode\":\"online\",\"wav_name\":\"voice.wav\",\"is_speaking\":true,\"wav_format\":\"pcm\",\"chunk_size\":[5,10,5],\"itn\":true}";
     private static final String SPEAKING_END = "{\"is_speaking\": false}";
     private static final int QUEUE_TIMEOUT_MS = 100; // 队列等待超时时间
-    private static final long RECOGNITION_TIMEOUT_MS = 30000; // 识别超时时间（30秒）
+    private static final long RECOGNITION_TIMEOUT_MS = 90000; // 识别超时时间（90秒）
 
     private final String apiUrl;
 
@@ -53,7 +53,7 @@ public class FunASRSttService implements SttService {
     @Override
     public String recognition(byte[] audioData) {
         logger.warn("不支持，请使用流式识别");
-        return StringUtils.EMPTY;
+        return "";
     }
 
     @Override
@@ -151,7 +151,7 @@ public class FunASRSttService implements SttService {
             boolean recognized = recognitionLatch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             
             if (!recognized) {
-                logger.warn("FunASR识别超时");
+
             }
         } catch (Exception e) {
             logger.error("FunASR识别过程中发生错误", e);

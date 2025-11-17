@@ -103,6 +103,10 @@ public class MessageService {
 
     public void sendTextMessage(ChatSession chatSession, String message){
         try {
+            // 检查会话是否仍然有效
+            if (chatSession == null || !chatSession.isOpen()) {
+                return;
+            }
             chatSession.sendTextMessage(message);
         } catch (Exception e) {
             logger.error("发送消息时发生异常 - SessionId: {}, Error: {}", chatSession.getSessionId(), e.getMessage());
@@ -113,6 +117,10 @@ public class MessageService {
 
     public void sendBinaryMessage(ChatSession chatSession, byte[] opusFrame){
         try {
+            // 检查会话是否仍然有效
+            if (chatSession == null || !chatSession.isOpen()) {
+                return;
+            }
             chatSession.sendBinaryMessage(opusFrame);
         } catch (Exception e) {
             logger.error("发送消息时发生异常 - SessionId: {}, Error: {}", chatSession.getSessionId(), e.getMessage());

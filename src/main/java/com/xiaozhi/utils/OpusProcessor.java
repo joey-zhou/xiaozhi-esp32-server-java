@@ -10,7 +10,6 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -264,7 +263,6 @@ public class OpusProcessor {
 
             // 解码所有包
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            int count = 0;
 
             for (byte[] packet : packets) {
                 try {
@@ -277,7 +275,6 @@ public class OpusProcessor {
                     byte[] pcm = opusToPcm(sid, packet);
                     if (pcm.length > 0) {
                         out.write(pcm);
-                        count++;
                     }
                 } catch (OpusException e) {
                     logger.warn("包解码失败: {}", e.getMessage());
@@ -391,232 +388,7 @@ public class OpusProcessor {
         return packets;
     }
 
-    /**
-     * 读取Opus文件
-     */
-    public List<byte[]> readOpus(File file) throws IOException {
-        List<byte[]> frames = new ArrayList<>();
 
-        // 检查文件大小
-        long size = file.length();
-        if (size <= 0) {
-            logger.warn("空文件: {}", file.getPath());
-            return frames;
-        }
-
-        try (FileInputStream fis = new FileInputStream(file)) {
-            // 检查文件格式
-            byte[] header = new byte[8];
-            fis.read(header, 0, Math.min(8, (int) size));
-            fis.getChannel().position(0);
-
-            // 检查OGG格式
-            if (isOgg(header)) {
-                return readOgg(file);
-            }
-
-            // 检查原始Opus格式
-            if (isOpusHead(header)) {
-                return readRaw(fis);
-            }
-
-            // 尝试帧格式
-            frames = readFramed(fis);
-            if (!frames.isEmpty()) {
-                return frames;
-            }
-
-            return readWhole(file);
-        } catch (Exception e) {
-            logger.error("读取失败: {}", file.getName(), e);
-            return readWhole(file);
-        }
-    }
-
-    /**
-     * 检查OGG格式
-     */
-    private boolean isOgg(byte[] data) {
-        return data.length >= 4 &&
-                data[0] == 'O' && data[1] == 'g' &&
-                data[2] == 'g' && data[3] == 'S';
-    }
-
-    /**
-     * 检查Opus头
-     */
-    private boolean isOpusHead(byte[] data) {
-        return data.length >= 8 &&
-                data[0] == 'O' && data[1] == 'p' &&
-                data[2] == 'u' && data[3] == 's' &&
-                data[4] == 'H' && data[5] == 'e' &&
-                data[6] == 'a' && data[7] == 'd';
-    }
-
-    /**
-     * 读取OGG文件
-     */
-    private List<byte[]> readOgg(File file) throws IOException {
-        // 使用Files.readAllBytes代替FileInputStream.readAllBytes
-        byte[] data = Files.readAllBytes(file.toPath());
-        return parseOgg(data);
-    }
-
-    /**
-     * 读取原始Opus文件
-     */
-    private List<byte[]> readRaw(FileInputStream fis) throws IOException {
-        List<byte[]> frames = new ArrayList<>();
-
-        // 跳过头部
-        fis.skip(19);
-
-        byte[] buffer = new byte[4096];
-        int read;
-
-        while ((read = fis.read(buffer)) > 0) {
-            byte[] frame = new byte[read];
-            System.arraycopy(buffer, 0, frame, 0, read);
-            frames.add(frame);
-        }
-
-        return frames;
-    }
-
-    /**
-     * 读取帧格式文件
-     */
-    private List<byte[]> readFramed(FileInputStream fis) throws IOException {
-        // 尝试2字节帧头
-        fis.getChannel().position(0);
-        List<byte[]> frames = readFrames(fis, 2);
-
-        if (!frames.isEmpty()) {
-            logger.info("2字节帧头成功: {} 帧", frames.size());
-            return frames;
-        }
-
-        // 尝试4字节帧头
-        fis.getChannel().position(0);
-        frames = readFrames(fis, 4);
-
-        if (!frames.isEmpty()) {
-            logger.info("4字节帧头成功: {} 帧", frames.size());
-            return frames;
-        }
-
-        // 尝试固定大小帧
-        fis.getChannel().position(0);
-        frames = readFixed(fis, 80);
-
-        if (!frames.isEmpty()) {
-            logger.info("固定帧成功: {} 帧", frames.size());
-        }
-
-        return frames;
-    }
-
-    /**
-     * 读取带帧头的文件
-     */
-    private List<byte[]> readFrames(FileInputStream fis, int headerSize) throws IOException {
-        List<byte[]> frames = new ArrayList<>();
-        byte[] buffer = new byte[MAX_SIZE];
-        byte[] sizeBytes = new byte[headerSize];
-        int good = 0;
-        int bad = 0;
-
-        while (fis.read(sizeBytes, 0, headerSize) == headerSize) {
-            int frameSize = getFrameSize(sizeBytes, headerSize);
-
-            // 检查帧大小
-            if (frameSize <= 0 || frameSize > MAX_SIZE) {
-                bad++;
-                if (bad > 3)
-                    break;
-                continue;
-            }
-
-            // 读取帧
-            int read = fis.read(buffer, 0, frameSize);
-            if (read != frameSize)
-                break;
-
-            byte[] frame = new byte[frameSize];
-            System.arraycopy(buffer, 0, frame, 0, frameSize);
-            frames.add(frame);
-            good++;
-
-            // 5个有效帧就认为格式正确
-            if (good >= 5)
-                return frames;
-        }
-
-        // 帧太少，可能不是正确格式
-        if (good < 5)
-            frames.clear();
-
-        return frames;
-    }
-
-    /**
-     * 获取帧大小
-     */
-    private int getFrameSize(byte[] bytes, int size) {
-        if (size == 2) {
-            return ((bytes[1] & 0xFF) << 8) | (bytes[0] & 0xFF);
-        } else if (size == 4) {
-            return ((bytes[3] & 0xFF) << 24) |
-                    ((bytes[2] & 0xFF) << 16) |
-                    ((bytes[1] & 0xFF) << 8) |
-                    (bytes[0] & 0xFF);
-        }
-        return -1;
-    }
-
-    /**
-     * 读取固定大小帧
-     */
-    private List<byte[]> readFixed(FileInputStream fis, int frameSize) throws IOException {
-        List<byte[]> frames = new ArrayList<>();
-        byte[] buffer = new byte[frameSize];
-
-        int read;
-        while ((read = fis.read(buffer)) == frameSize) {
-            byte[] frame = new byte[frameSize];
-            System.arraycopy(buffer, 0, frame, 0, frameSize);
-            frames.add(frame);
-
-            // 足够多的帧
-            if (frames.size() >= 5)
-                return frames;
-        }
-
-        // 处理最后一帧
-        if (read > 0) {
-            byte[] last = new byte[read];
-            System.arraycopy(buffer, 0, last, 0, read);
-            frames.add(last);
-        }
-
-        return frames;
-    }
-
-    /**
-     * 读取整个文件作为单帧
-     */
-    private List<byte[]> readWhole(File file) throws IOException {
-        List<byte[]> frames = new ArrayList<>();
-
-        // 使用Files.readAllBytes代替FileInputStream.readAllBytes
-        byte[] data = Files.readAllBytes(file.toPath());
-        if (data.length > 0) {
-            frames.add(data);
-            logger.info("整个文件作为单帧: {} 字节", data.length);
-        }
-
-        return frames;
-    }
 
     /**
      * 获取解码器

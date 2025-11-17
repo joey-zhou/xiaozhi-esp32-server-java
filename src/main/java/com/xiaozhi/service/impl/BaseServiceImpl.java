@@ -20,7 +20,7 @@ public class BaseServiceImpl {
         pageFilter = (PageFilter) RequestContextHolder.currentRequestAttributes().
                 getAttribute(PAGE_ATTRIBUTE_KEY, RequestAttributes.SCOPE_REQUEST);
         if(pageFilter == null){
-            // 某些页面不需要分页
+            // 某些页面不需要分页，所以不需要添加默认分页数
             // pageFilter = new PageFilter();
             // pageFilter.setStart(0);
             // pageFilter.setLimit(10);

@@ -10,6 +10,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;  // 改为实现接口
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
+import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
 
 import jakarta.annotation.Resource;
 
@@ -85,5 +86,14 @@ public class WebMvcConfig implements WebMvcConfigurer {  // 实现接口而不�
     public void configurePathMatch(PathMatchConfigurer configurer) {
         // 使用推荐的方法设置尾部斜杠匹配
         configurer.setUseTrailingSlashMatch(true);
+    }
+
+    /**
+     * 配置异步请求支持
+     */
+    @Override
+    public void configureAsyncSupport(AsyncSupportConfigurer configurer) {
+        // 设置异步请求超时时间为120秒，比SSE的60秒超时更长
+        configurer.setDefaultTimeout(120000L);
     }
 }

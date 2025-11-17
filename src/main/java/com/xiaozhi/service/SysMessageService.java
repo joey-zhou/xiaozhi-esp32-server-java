@@ -37,4 +37,14 @@ public interface SysMessageService {
    */
   int delete(SysMessage message);
 
+  /**
+   * 更新消息的音频数据信息
+   * @param deviceId
+   * @param roleId
+   * @param sender
+   * @param createTime
+   * @param audioPath
+   */
+  void updateMessageByAudioFile(String deviceId, Integer roleId, String sender, String createTime,
+                                String audioPath);
 }

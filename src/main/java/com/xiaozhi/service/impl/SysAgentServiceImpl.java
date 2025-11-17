@@ -53,7 +53,7 @@ public class SysAgentServiceImpl implements SysAgentService {
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     public int add(SysAgent agent) {
         return 0;
     }
@@ -65,7 +65,7 @@ public class SysAgentServiceImpl implements SysAgentService {
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     public int update(SysAgent agent) {
         return 0;
     }
@@ -77,7 +77,7 @@ public class SysAgentServiceImpl implements SysAgentService {
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager = "transactionManager")
+    @Transactional
     public int delete(Integer agentId) {
         return 0;
     }

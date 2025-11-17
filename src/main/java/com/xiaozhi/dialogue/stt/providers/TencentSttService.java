@@ -15,6 +15,7 @@ import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.utils.HttpUtil;
 
 import okhttp3.*;
+import org.springframework.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Sinks;
@@ -47,7 +48,7 @@ public class TencentSttService implements SttService {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final String FORMAT = "pcm"; // 支持的音频格式：pcm, wav, mp3
     private static final int QUEUE_TIMEOUT_MS = 100; // 队列等待超时时间
-    private static final long RECOGNITION_TIMEOUT_MS = 30000; // 识别超时时间（30秒）
+    private static final long RECOGNITION_TIMEOUT_MS = 90000; // 识别超时时间（90秒）
 
     // 使用腾讯云SDK的默认URL
     private static final String WS_API_URL = "wss://asr.cloud.tencent.com/asr/v2/";
@@ -308,7 +309,6 @@ public class TencentSttService implements SttService {
             boolean recognized = recognitionLatch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             
             if (!recognized) {
-                logger.warn("腾讯云识别超时 - VoiceId: {}", voiceId);
                 // 超时后清理资源
                 if (activeRecognizers.containsKey(voiceId)) {
                     try {

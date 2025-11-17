@@ -30,6 +30,8 @@ import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 
 import java.util.*;
+import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 自定义的工具调用管理器，用于处理工具调用和执行。
@@ -39,6 +41,68 @@ import java.util.*;
 public class XiaoZhiToolCallingManager implements ToolCallingManager {
 
     private static final Logger logger = LoggerFactory.getLogger(XiaoZhiToolCallingManager.class);
+
+    // 记录最近的工具调用，用于流式响应中获取工具名称
+    private static final ConcurrentHashMap<String, ToolCallRecord> recentToolCalls = new ConcurrentHashMap<>();
+
+    /**
+     * 工具调用记录
+     */
+    private static class ToolCallRecord {
+        private final String toolName;
+        private final long timestamp;
+        private final long conversationTimestamp; // 对话时间戳
+
+        public ToolCallRecord(String toolName, long conversationTimestamp) {
+            this.toolName = toolName;
+            this.timestamp = System.currentTimeMillis();
+            this.conversationTimestamp = conversationTimestamp;
+        }
+
+        public String getToolName() {
+            return toolName;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public long getConversationTimestamp() {
+            return conversationTimestamp;
+        }
+    }
+
+    /**
+     * 记录最近的工具调用
+     * @param sessionId 会话ID
+     * @param toolName 工具名称
+     * @param conversationTimestamp 对话时间戳
+     */
+    public static void recordRecentToolCall(String sessionId, String toolName, long conversationTimestamp) {
+        recentToolCalls.put(sessionId, new ToolCallRecord(toolName, conversationTimestamp));
+    }
+
+    /**
+     * 获取最近的工具调用
+     * @param sessionId 会话ID
+     * @param conversationTimestamp 当前对话时间戳
+     * @return 工具名称，如果记录不属于当前对话则返回空字符串
+     */
+    public static String getRecentToolCall(String sessionId, long conversationTimestamp) {
+        ToolCallRecord record = recentToolCalls.get(sessionId);
+        if (record != null && record.getConversationTimestamp() == conversationTimestamp) {
+            return record.getToolName();
+        }
+        return "";
+    }
+
+    /**
+     * 清除最近的工具调用记录
+     * @param sessionId 会话ID
+     */
+    public static void clearRecentToolCall(String sessionId) {
+        recentToolCalls.remove(sessionId);
+    }
 
     // @formatter:off
 
@@ -55,7 +119,6 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager {
             = DefaultToolExecutionExceptionProcessor.builder().build();
 
     // @formatter:on
-
     private final ObservationRegistry observationRegistry;
 
     private final ToolCallbackResolver toolCallbackResolver;
@@ -73,6 +136,43 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager {
         this.observationRegistry = observationRegistry;
         this.toolCallbackResolver = toolCallbackResolver;
         this.toolExecutionExceptionProcessor = toolExecutionExceptionProcessor;
+    }
+
+    /**
+     * 从Prompt中提取会话ID
+     * @param prompt Prompt对象
+     * @return 会话ID，如果没有则返回null
+     */
+    private String getSessionIdFromPrompt(Prompt prompt) {
+        if (prompt.getOptions() instanceof ToolCallingChatOptions toolCallingChatOptions) {
+            Map<String, Object> toolContext = toolCallingChatOptions.getToolContext();
+            if (toolContext != null && toolContext.containsKey("session")) {
+                Object sessionObj = toolContext.get("session");
+                if (sessionObj instanceof com.xiaozhi.communication.common.ChatSession) {
+                    String sessionId = ((com.xiaozhi.communication.common.ChatSession) sessionObj).getSessionId();
+                    return sessionId;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 从Prompt中提取对话时间戳
+     * @param prompt Prompt对象
+     * @return 对话时间戳，如果没有则返回0
+     */
+    private long getConversationTimestampFromPrompt(Prompt prompt) {
+        if (prompt.getOptions() instanceof ToolCallingChatOptions toolCallingChatOptions) {
+            Map<String, Object> toolContext = toolCallingChatOptions.getToolContext();
+            if (toolContext != null && toolContext.containsKey("conversationTimestamp")) {
+                Object timestampObj = toolContext.get("conversationTimestamp");
+                if (timestampObj instanceof Long) {
+                    return (Long) timestampObj;
+                }
+            }
+        }
+        return 0;
     }
 
     @Override
@@ -132,15 +232,27 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager {
                 functionParam.append(toolCall.arguments());
             }
         }
+        
+        // 记录工具调用
+        String sessionId = getSessionIdFromPrompt(prompt);
+        if (sessionId != null && functionName.length() > 0) {
+            // 从会话中获取对话时间戳
+            long conversationTimestamp = getConversationTimestampFromPrompt(prompt);
+            recordRecentToolCall(sessionId, functionName.toString(), conversationTimestamp);
+        }
+        
         AssistantMessage assistantMessage = toolCallGeneration.get().getOutput();
         AssistantMessage.ToolCall toolCall = new AssistantMessage.ToolCall(
-                //ollama为toolId为空的情况
-                StringUtils.isBlank(toolId) ?"":toolId,
-                toolType,
+                toolId != null ? toolId : "",
+                toolType != null ? toolType : "",
                 functionName.toString(),
                 functionParam.toString()
         );
-        AssistantMessage toolCallMessage = new AssistantMessage(assistantMessage.getText(), assistantMessage.getMetadata(), List.of(toolCall));
+        
+        // 为工具调用消息设置正确的元数据，包含toolName
+        Map<String, Object> metadata = new HashMap<>(assistantMessage.getMetadata());
+        metadata.put("toolName", functionName.toString());
+        AssistantMessage toolCallMessage = new AssistantMessage(assistantMessage.getText(), metadata, List.of(toolCall));
 
         ToolContext toolContext = buildToolContext(prompt, assistantMessage);
 
@@ -164,8 +276,18 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager {
             toolContextMap = new HashMap<>(toolCallingChatOptions.getToolContext());
 
             List<Message> messageHistory = new ArrayList<>(prompt.copy().getInstructions());
-            messageHistory.add(new AssistantMessage(assistantMessage.getText(), assistantMessage.getMetadata(),
-                    assistantMessage.getToolCalls()));
+            
+            // 确保工具调用消息包含正确的元数据
+            if (!CollectionUtils.isEmpty(assistantMessage.getToolCalls())) {
+                Map<String, Object> metadata = new HashMap<>(assistantMessage.getMetadata());
+                String toolName = assistantMessage.getToolCalls().get(0).name();
+                metadata.put("toolName", toolName);
+                AssistantMessage updatedAssistantMessage = new AssistantMessage(assistantMessage.getText(), metadata, assistantMessage.getToolCalls());
+                messageHistory.add(updatedAssistantMessage);
+            } else {
+                messageHistory.add(new AssistantMessage(assistantMessage.getText(), assistantMessage.getMetadata(),
+                        assistantMessage.getToolCalls()));
+            }
 
             toolContextMap.put(ToolContext.TOOL_CALL_HISTORY,
                     buildConversationHistoryBeforeToolExecution(prompt, assistantMessage));
@@ -177,8 +299,19 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager {
     private static List<Message> buildConversationHistoryBeforeToolExecution(Prompt prompt,
                                                                              AssistantMessage assistantMessage) {
         List<Message> messageHistory = new ArrayList<>(prompt.copy().getInstructions());
-        messageHistory.add(new AssistantMessage(assistantMessage.getText(), assistantMessage.getMetadata(),
-                assistantMessage.getToolCalls()));
+        
+        // 确保工具调用消息包含正确的元数据
+        if (!CollectionUtils.isEmpty(assistantMessage.getToolCalls())) {
+            Map<String, Object> metadata = new HashMap<>(assistantMessage.getMetadata());
+            String toolName = assistantMessage.getToolCalls().get(0).name();
+            metadata.put("toolName", toolName);
+            AssistantMessage updatedAssistantMessage = new AssistantMessage(assistantMessage.getText(), metadata, assistantMessage.getToolCalls());
+            messageHistory.add(updatedAssistantMessage);
+        } else {
+            messageHistory.add(new AssistantMessage(assistantMessage.getText(), assistantMessage.getMetadata(),
+                    assistantMessage.getToolCalls()));
+        }
+        
         return messageHistory;
     }
 
@@ -197,8 +330,6 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager {
         Boolean returnDirect = null;
 
         for (AssistantMessage.ToolCall toolCall : assistantMessage.getToolCalls()) {
-
-            logger.debug("Executing tool call: {}", toolCall.name());
 
             String toolName = toolCall.name();
             String toolInputArguments = toolCall.arguments();
@@ -234,7 +365,13 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager {
                             toolResult = toolCallback.call(toolInputArguments, toolContext);
                         }
                         catch (ToolExecutionException ex) {
+                            logger.error("Tool execution exception: ", ex);
                             toolResult = this.toolExecutionExceptionProcessor.process(ex);
+                            logger.debug("Processed tool execution exception result: {}", toolResult);
+                        }
+                        catch (Exception ex) {
+                            logger.error("Unexpected exception during tool execution: ", ex);
+                            toolResult = "Error executing tool: " + ex.getMessage();
                         }
                         observationContext.setToolCallResult(toolResult);
                         return toolResult;
@@ -250,7 +387,18 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager {
     private List<Message> buildConversationHistoryAfterToolExecution(List<Message> previousMessages,
                                                                      AssistantMessage assistantMessage, ToolResponseMessage toolResponseMessage) {
         List<Message> messages = new ArrayList<>(previousMessages);
-        messages.add(assistantMessage);
+        
+        // 确保工具调用消息包含正确的元数据
+        if (!CollectionUtils.isEmpty(assistantMessage.getToolCalls())) {
+            Map<String, Object> metadata = new HashMap<>(assistantMessage.getMetadata());
+            String toolName = assistantMessage.getToolCalls().get(0).name();
+            metadata.put("toolName", toolName);
+            AssistantMessage updatedAssistantMessage = new AssistantMessage(assistantMessage.getText(), metadata, assistantMessage.getToolCalls());
+            messages.add(updatedAssistantMessage);
+        } else {
+            messages.add(assistantMessage);
+        }
+        
         messages.add(toolResponseMessage);
         return messages;
     }

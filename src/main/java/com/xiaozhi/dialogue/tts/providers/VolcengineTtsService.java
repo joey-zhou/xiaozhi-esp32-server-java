@@ -32,11 +32,17 @@ public class VolcengineTtsService implements TtsService {
     // API相关
     private String appId;
     private String accessToken; // 对应 apiKey
+    
+    // 语音参数
+    private Float pitch;
+    private Float speed;
 
     private final OkHttpClient client = HttpUtil.client;
 
-    public VolcengineTtsService(SysConfig config, String voiceName, String outputPath) {
+    public VolcengineTtsService(SysConfig config, String voiceName, Float pitch, Float speed, String outputPath) {
         this.voiceName = voiceName;
+        this.pitch = pitch;
+        this.speed = speed;
         this.outputPath = outputPath;
         this.appId = config.getAppId();
         this.accessToken = config.getApiKey();
@@ -97,9 +103,9 @@ public class VolcengineTtsService implements TtsService {
             JsonObject audio = new JsonObject();
             audio.addProperty("voice_type", voiceName);
             audio.addProperty("encoding", "wav");
-            audio.addProperty("speed_ratio", 1.0);
+            audio.addProperty("speed_ratio", speed);
             audio.addProperty("volume_ratio", 1.0);
-            audio.addProperty("pitch_ratio", 1.0);
+            audio.addProperty("pitch_ratio", pitch);
             audio.addProperty("rate", AudioUtils.SAMPLE_RATE);
             requestJson.add("audio", audio);
 

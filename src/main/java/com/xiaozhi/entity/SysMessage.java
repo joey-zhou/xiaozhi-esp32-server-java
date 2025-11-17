@@ -41,7 +41,8 @@ public class SysMessage extends Base<SysMessage> {
     private String deviceId;
 
     /**
-     * 消息发送方：user-用户，ai-人工智能
+     * 消息发送方：user-用户，assistant-人工智能
+     * 后续考虑：重命名为speaker是否更好？
      */
     @Schema(description = "消息发送方：user-用户，ai-人工智能")
     private String sender;

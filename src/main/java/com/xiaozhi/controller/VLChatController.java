@@ -15,9 +15,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.content.Media;
 import org.springframework.util.MimeType;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashMap;
@@ -27,6 +25,7 @@ import java.util.Map;
  * 视觉对话
  */
 @RestController
+@RequestMapping("/api/vl")
 @Tag(name = "视觉对话管理", description = "视觉对话相关操作")
 public class VLChatController extends BaseController {
 
@@ -36,12 +35,11 @@ public class VLChatController extends BaseController {
     @Resource
     private SessionManager sessionManager;
 
-
     /**
      * 视觉对话
      */
     @UnLogin
-    @PostMapping(value = "/vl/chat", produces = "application/json;charset=UTF-8")
+    @PostMapping(value = "/chat", produces = "application/json;charset=UTF-8")
     @Operation(summary = "图片识别", description = "根据问题返回识别结果")
     public String vlChat(
         @Parameter(description = "文件") @RequestParam("file") MultipartFile file,

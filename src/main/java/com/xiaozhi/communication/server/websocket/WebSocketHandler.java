@@ -4,11 +4,13 @@ import com.xiaozhi.communication.common.*;
 import com.xiaozhi.communication.domain.*;
 import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpService;
 import com.xiaozhi.entity.SysDevice;
+import com.xiaozhi.event.ChatAudioOpenEvent;
 import com.xiaozhi.service.SysDeviceService;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.socket.BinaryMessage;
@@ -37,6 +39,9 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
 
     @Resource
     private DeviceMcpService deviceMcpService;
+
+    @Resource
+    private ApplicationContext applicationContext;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -69,9 +74,11 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
 //            }
 //        }else{
 
-        messageHandler.afterConnection(new com.xiaozhi.communication.server.websocket.WebSocketSession(session), deviceIdAuth);
+        com.xiaozhi.communication.server.websocket.WebSocketSession xiaoZhiSession
+                = new com.xiaozhi.communication.server.websocket.WebSocketSession(session);
+        messageHandler.afterConnection(xiaoZhiSession, deviceIdAuth);
+        applicationContext.publishEvent(new ChatAudioOpenEvent(xiaoZhiSession));
         logger.info("WebSocket连接建立成功 - SessionId: {}, DeviceId: {}", session.getId(), deviceIdAuth);
-
     }
 
     @Override
@@ -86,9 +93,19 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
                 handleHelloMessage(session, m);
             } else {
                 if (device == null || device.getRoleId() == null) {
-                    // 设备未绑定，处理未绑定设备的消息
-                    messageHandler.handleUnboundDevice(sessionId, device);
-                    return;
+                    // 设备未绑定，尝试自动绑定
+                    boolean autoBound = messageHandler.handleUnboundDevice(sessionId, device);
+                    if (!autoBound) {
+                        // 自动绑定失败或需要验证码，不继续处理消息
+                        return;
+                    }
+                    // 自动绑定成功，重新获取设备信息
+                    device = sessionManager.getDeviceConfig(sessionId);
+                    if (device == null || device.getRoleId() == null) {
+                        logger.warn("自动绑定后设备信息异常 - SessionId: {}", sessionId);
+                        return;
+                    }
+                    logger.info("自动绑定成功，继续处理消息 - SessionId: {}, DeviceId: {}", sessionId, device.getDeviceId());
                 }
                 messageHandler.handleMessage(msg, sessionId);
             }

@@ -44,6 +44,16 @@ public class SysUser extends Base<SysUser> {
     private String password;
 
     /**
+     * 微信openid
+     */
+    private String wxOpenId;
+
+    /**
+     * 微信unionid
+     */
+    private String wxUnionId;
+
+    /**
      * 姓名
      */
     @Schema(description = "姓名")

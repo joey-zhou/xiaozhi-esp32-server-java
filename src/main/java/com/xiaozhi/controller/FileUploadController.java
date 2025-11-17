@@ -1,7 +1,8 @@
 package com.xiaozhi.controller;
 
-import com.xiaozhi.common.web.AjaxResult;
+import com.xiaozhi.common.web.ResultMessage;
 import com.xiaozhi.utils.FileUploadUtils;
+import com.xiaozhi.utils.FileHashUtil;
 import com.xiaozhi.utils.CmsUtils;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -46,7 +47,7 @@ public class FileUploadController {
     @PostMapping("/upload")
     @ResponseBody
     @Operation(summary = "文件上传", description = "如果有配置腾讯云对象存储的话默认会存储到对象存储中")
-    public AjaxResult uploadFile(
+    public ResultMessage uploadFile(
             @Parameter(description = "上传的文件") @RequestParam("file") MultipartFile file,
             @Parameter(description = "文件类型") @RequestParam(value = "type", required = false, defaultValue = "common") String type) {
 
@@ -64,13 +65,17 @@ public class FileUploadController {
             String fileUrl = FileUploadUtils.smartUpload(uploadPath, relativePath, fileName, file);
             logger.info("文件上传成功: {}", fileUrl);
 
+            // 计算文件哈希值
+            String fileHash = FileHashUtil.calculateSha256(file);
+
             // 判断是否是COS URL
             boolean isCosUrl = fileUrl.startsWith("https://") && fileUrl.contains(".cos.");
 
-            AjaxResult result = AjaxResult.success("上传成功");
+            ResultMessage result = ResultMessage.success("上传成功");
             result.put("url", fileUrl);
             result.put("fileName", originalFilename);
             result.put("newFileName", fileName);
+            result.put("hash", fileHash);
 
             // 如果是本地URL，需要调整格式
             if (!isCosUrl) {
@@ -83,7 +88,7 @@ public class FileUploadController {
             return result;
         } catch (Exception e) {
             logger.error("文件上传失败: {}", e.getMessage(), e);
-            return AjaxResult.error("文件上传失败: " + e.getMessage());
+            return ResultMessage.error("文件上传失败: " + e.getMessage());
         }
     }
 }

@@ -2,23 +2,37 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xiaozhi.dao.MessageMapper">
 
-    <sql id="messageSql">
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysMessage">
+        <id property="messageId" column="messageId" />
+        <result property="deviceId" column="deviceId" />
+        <result property="message" column="message" />
+        <result property="sender" column="sender" />
+        <result property="roleId" column="roleId" />
+        <result property="state" column="state" />
+        <result property="createTime" column="createTime" />
+        <result property="messageType" column="messageType" />
+        <result property="deviceName" column="deviceName" />
+        <result property="userId" column="userId" />
+        <result property="roleName" column="roleName" />
+    </resultMap>
+
+    <sql id="Message_Column_List">
         sys_message.messageId, sys_message.deviceId, sys_message.message, sys_message.sender, sys_message.roleId, sys_message.state, sys_message.createTime, sys_message.messageType
     </sql>
 
-    <sql id="deviceSql">
+    <sql id="Device_Column_List">
         sys_device.deviceName, sys_device.userId
     </sql>
 
-    <sql id="roleSql">
-        sys_role.roleId, sys_role.roleName, sys_role.roleDesc, sys_role.voiceName
+    <sql id="Role_Column_List">
+        sys_role.roleName
     </sql>
 
-    <select id="query" resultType="com.xiaozhi.entity.SysMessage">
+    <select id="query" resultMap="BaseResultMap">
         SELECT
-        <include refid="messageSql"></include>,
-        <include refid="deviceSql"></include>,
-        <include refid="roleSql"></include>
+        <include refid="Message_Column_List"></include>,
+        <include refid="Device_Column_List"></include>,
+        <include refid="Role_Column_List"></include>
         FROM
             sys_message
             LEFT JOIN sys_device ON sys_message.deviceId = sys_device.deviceId
@@ -44,10 +58,41 @@
         ORDER BY sys_message.createTime DESC, sender DESC
     </select>
 
+    <!-- 查找历史对话记录 -->
+    <select id="find" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Message_Column_List"></include>
+        FROM sys_message
+        WHERE sys_message.state = 1 and sys_message.messageType = "NORMAL"
+        and sys_message.deviceId = #{deviceId} and sys_message.roleId = #{roleId}
+        ORDER BY sys_message.createTime DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 查找历史对话记录(在指定时间戳后的消息 -->
+    <select id="findAfter" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Message_Column_List"></include>
+        FROM sys_message
+        WHERE sys_message.state = 1 and sys_message.messageType = "NORMAL"
+        and sys_message.deviceId = #{deviceId} and sys_message.roleId = #{roleId}
+        and sys_message.createTime >= #{timeMillis, jdbcType=TIMESTAMP}
+    </select>
+
     <insert id="add" parameterType="com.xiaozhi.entity.SysMessage">
-        INSERT INTO sys_message ( deviceId, sessionId, sender, roleId, message, messageType ,createTime)
+        INSERT INTO sys_message ( deviceId, sessionId, sender, roleId, message, messageType, createTime)
         SELECT #{deviceId}, #{sessionId}, #{sender}, #{roleId}, #{message}, #{messageType},#{createTime,jdbcType=TIMESTAMP}
     </insert>
+
+    <!-- 批量保存消息 -->
+    <insert id="saveAll" parameterType="java.util.List">
+        INSERT INTO sys_message ( deviceId, sessionId, sender, roleId, message, messageType, createTime)
+        VALUES
+        <foreach collection="list" item="message" separator=",">
+            (#{message.deviceId}, #{message.sessionId}, #{message.sender}, #{message.roleId}, #{message.message}, #{message.messageType},#{message.createTime,jdbcType=TIMESTAMP})
+        </foreach>
+    </insert>
+
 
     <update id="delete" parameterType="com.xiaozhi.entity.SysMessage">
         UPDATE sys_message
@@ -63,4 +108,11 @@
         </if>
     </update>
 
+    <update id="updateMessageByAudioFile" parameterType="com.xiaozhi.entity.SysMessage">
+        UPDATE sys_message
+        <set>
+            <if test="audioPath != null">audioPath = #{audioPath},</if>
+        </set>
+        WHERE deviceId = #{deviceId} AND roleId = #{roleId} AND sender = #{sender} AND createTime = #{createTime}
+    </update>
 </mapper>

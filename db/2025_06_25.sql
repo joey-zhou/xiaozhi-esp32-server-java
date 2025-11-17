@@ -1,1 +1,0 @@
-ALTER TABLE xiaozhi.sys_config MODIFY COLUMN sk text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT 'Secret Key';

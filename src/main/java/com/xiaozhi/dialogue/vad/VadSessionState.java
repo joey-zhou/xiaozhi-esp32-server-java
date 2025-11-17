@@ -3,6 +3,8 @@ package com.xiaozhi.dialogue.vad;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.xiaozhi.utils.AudioUtils;
+
 /**
  * VAD会话状态类 - 管理每个会话的VAD状态
  */
@@ -23,7 +25,7 @@ public class VadSessionState {
     // 配置参数
     private final int requiredConsecutiveFrames = 3;
     private final int maxPreBufferSize = 32000; // 预缓冲区大小 (1秒@16kHz,16位双字节)
-    private final int windowSizeSample = 512; // 分析窗口大小
+    private final int windowSizeSample = AudioUtils.BUFFER_SIZE; // 分析窗口大小
     private final int frameDurationMs = 30; // 每帧持续时间(毫秒)
 
     /**

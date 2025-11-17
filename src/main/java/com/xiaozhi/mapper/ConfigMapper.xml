@@ -2,9 +2,28 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xiaozhi.dao.ConfigMapper">
 
-    <sql id="configSql">
-        sys_config.configId, sys_config.userId, sys_config.configName, sys_config.configDesc, sys_config.configType, sys_config.modelType, sys_config.provider,
-        sys_config.appId, sys_config.apiKey, sys_config.apiSecret, sys_config.ak, sys_config.sk, sys_config.apiUrl, sys_config.isDefault, sys_config.state, sys_config.createTime
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysConfig">
+        <id property="configId" column="configId" />
+        <result property="userId" column="userId" />
+        <result property="configName" column="configName" />
+        <result property="configDesc" column="configDesc" />
+        <result property="configType" column="configType" />
+        <result property="modelType" column="modelType" />
+        <result property="provider" column="provider" />
+        <result property="appId" column="appId" />
+        <result property="apiKey" column="apiKey" />
+        <result property="apiSecret" column="apiSecret" />
+        <result property="ak" column="ak" />
+        <result property="sk" column="sk" />
+        <result property="apiUrl" column="apiUrl" />
+        <result property="isDefault" column="isDefault" />
+        <result property="state" column="state" />
+        <result property="createTime" column="createTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        configId, userId, configName, configDesc, configType, modelType, provider,
+        appId, apiKey, apiSecret, ak, sk, apiUrl, isDefault, state, createTime
     </sql>
 
     <insert id="add" parameterType="com.xiaozhi.entity.SysConfig">
@@ -46,16 +65,16 @@
             AND userId = #{userId}
     </update>
 
-    <select id="query" parameterType="com.xiaozhi.entity.SysConfig" resultType="com.xiaozhi.entity.SysConfig">
+    <select id="query" parameterType="com.xiaozhi.entity.SysConfig" resultMap="BaseResultMap">
         SELECT
         DISTINCT
-        <include refid="configSql"></include>
+        <include refid="Base_Column_List"></include>
         FROM
             sys_config
         WHERE
-            sys_config.state = 1
-            <if test="userId != null and userId != ''">AND sys_config.userId = #{userId}</if>
-            <if test="isDefault != null and isDefault != ''">AND sys_config.isDefault = #{isDefault}</if>
+            state = '1'
+            <if test="userId != null and userId != ''">AND userId = #{userId}</if>
+            <if test="isDefault != null and isDefault != ''">AND isDefault = #{isDefault}</if>
             <if test="configType != null and configType != ''">AND configType = #{configType}</if>
             <if test="modelType != null and modelType != ''">AND modelType = #{modelType}</if>
             <choose>
@@ -70,12 +89,12 @@
             <if test="configName != null and configName != ''">AND configName LIKE CONCAT('%', #{configName}, '%')</if>
     </select>
 
-    <select id="selectConfigById" resultType="com.xiaozhi.entity.SysConfig">
+    <select id="selectConfigById" resultMap="BaseResultMap">
         SELECT
-        <include refid="configSql"></include>
+        <include refid="Base_Column_List"></include>
         FROM
             sys_config
         WHERE
-            sys_config.configId = #{configId}
+            configId = #{configId}
     </select>
 </mapper>

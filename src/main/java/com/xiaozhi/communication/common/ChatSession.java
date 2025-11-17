@@ -79,7 +79,16 @@ public abstract class ChatSession {
      * 会话的最后有效活动时间
      */
     protected Instant lastActivityTime;
+    /**
+     * 当前session是否支持function_call
+     */
+    protected boolean supportFunctionCall = true;
 
+    /**
+     * 最近一次对话的模型响应时间及TTS响应时间
+     */
+    public static final String ATTR_FIRST_MODEL_RESPONSE_TIME = "firstModelResponseTime";
+    public static final String ATTR_FIRST_TTS_RESPONSE_TIME = "firstTtsResponseTime";
     /**
      * 会话属性存储
      */
@@ -121,7 +130,7 @@ public abstract class ChatSession {
      * 音频文件约定路径为：audio/{device-id}/{role-id}/{timestamp}-user.wav
      * {device-id}/{role-id}/{timestamp}-user 能确定唯一性，不会有并发的麻烦。
      * 除非多设备在嵌入式软件里强行修改mac地址（deviceId目前是基于mac地址的)
-     * 
+     *
      * @param who
      * @return
      */
@@ -141,11 +150,11 @@ public abstract class ChatSession {
     }
 
     public Path getUserAudioPath() {
-        return getAudioPath("user", this.getUserTimeMillis());
+        return getAudioPath(Conversation.MESSAGE_TYPE_USER, this.getUserTimeMillis());
     }
 
     public Path getAssistantAudioPath() {
-        return getAudioPath("assistant", getAssistantTimeMillis());
+        return getAudioPath(Conversation.MESSAGE_TYPE_ASSISTANT, getAssistantTimeMillis());
     }
 
     public ToolsSessionHolder getFunctionSessionHolder() {
@@ -162,14 +171,14 @@ public abstract class ChatSession {
 
     /**
      * 会话连接是否打开中
-     * 
+     *
      * @return
      */
     public abstract boolean isOpen();
 
     /**
      * 音频通道是否打开可用
-     * 
+     *
      * @return
      */
     public abstract boolean isAudioChannelOpen();
@@ -183,7 +192,7 @@ public abstract class ChatSession {
     /**
      * 设置 Conversation，需要与当前活跃角色一致。
      * 当切换角色时，会释放当前 Conversation，并新建一个对应于新角色的Conversation。
-     * 
+     *
      * @param conversation
      */
     public void setConversation(Conversation conversation) {
@@ -192,7 +201,7 @@ public abstract class ChatSession {
 
     /**
      * 获取与当前活跃角色一致的 Conversation。
-     * 
+     *
      * @return
      */
     public Conversation getConversation() {

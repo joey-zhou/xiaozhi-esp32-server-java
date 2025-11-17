@@ -2,31 +2,70 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xiaozhi.dao.UserMapper">
 
-    <sql id="userSql">
-        sys_user.userId, sys_user.username, sys_user.`name`, sys_user.tel, sys_user.email, sys_user.avatar, sys_user.password, sys_user.state, sys_user.isAdmin, sys_user.loginIp, sys_user.loginTime, sys_user.createTime
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysUser">
+        <id property="userId" column="userId" />
+        <result property="username" column="username" />
+        <result property="wxOpenId" column="wxOpenId" />
+        <result property="wxUnionId" column="wxUnionId" />
+        <result property="name" column="name" />
+        <result property="tel" column="tel" />
+        <result property="email" column="email" />
+        <result property="avatar" column="avatar" />
+        <result property="password" column="password" />
+        <result property="state" column="state" />
+        <result property="isAdmin" column="isAdmin" />
+        <result property="roleId" column="roleId" />
+        <result property="loginIp" column="loginIp" />
+        <result property="loginTime" column="loginTime" />
+        <result property="createTime" column="createTime" />
+        <result property="totalDevice" column="totalDevice" />
+        <result property="totalMessage" column="totalMessage" />
+        <result property="aliveNumber" column="aliveNumber" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        sys_user.userId, sys_user.username, sys_user.wxOpenId, sys_user.wxUnionId, sys_user.`name`, sys_user.tel, sys_user.email, sys_user.avatar, sys_user.password, sys_user.state, sys_user.isAdmin, sys_user.roleId, sys_user.loginIp, sys_user.loginTime, sys_user.createTime
     </sql>
 
-    <select id="selectUserByUsername" resultType="com.xiaozhi.entity.SysUser">
+    <select id="selectUserByUsername" resultMap="BaseResultMap">
         SELECT
-        <include refid="userSql"></include>
+        <include refid="Base_Column_List"></include>
         FROM
             sys_user
         WHERE
             username = #{username}
     </select>
 
-    <select id="selectUserByEmail" resultType="com.xiaozhi.entity.SysUser">
+    <select id="selectUserByWxOpenId" resultMap="BaseResultMap">
         SELECT
-        <include refid="userSql"></include>
+        <include refid="Base_Column_List"></include>
+        FROM
+            sys_user
+        WHERE
+            wxOpenId = #{wxOpenId}
+    </select>
+
+    <select id="selectUserByEmail" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"></include>
         FROM
             sys_user
         WHERE
             email = #{email}
     </select>
 
-    <select id="query" resultType="com.xiaozhi.entity.SysUser">
+    <select id="selectUserByTel" resultMap="BaseResultMap">
         SELECT
-        <include refid="userSql"></include>,
+        <include refid="Base_Column_List"></include>
+        FROM
+            sys_user
+        WHERE
+            tel = #{tel}
+    </select>
+
+    <select id="query" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"></include>,
         (
             SELECT count(*) FROM sys_device WHERE sys_device.userId = sys_user.userId
         ) AS totalDevice,
@@ -51,10 +90,11 @@
             username = #{username}
     </select>
 
-    <select id="queryUsers" parameterType="com.xiaozhi.entity.SysUser" resultType="com.xiaozhi.entity.SysUser">
+    <select id="queryUsers" parameterType="com.xiaozhi.entity.SysUser" resultMap="BaseResultMap">
         SELECT
             sys_user.userId,
             sys_user.`name`,
+            sys_user.username,
             <!-- 电话号码脱敏：显示前3位和后4位，中间用****替代 -->
             CASE 
                 WHEN LENGTH(sys_user.tel) &gt; 7 THEN 
@@ -62,15 +102,7 @@
                 ELSE sys_user.tel
             END AS tel,
             <!-- 邮箱脱敏：显示@前面的前3位和@后面的所有内容，中间用***替代 -->
-            CASE 
-                WHEN sys_user.email LIKE '%@%' THEN 
-                    CONCAT(
-                        LEFT(sys_user.email, LEAST(3, LOCATE('@', sys_user.email) - 1)),
-                        '***',
-                        SUBSTRING(sys_user.email, LOCATE('@', sys_user.email))
-                    )
-                ELSE sys_user.email
-            END AS email,
+            sys_user.email,
             sys_user.avatar,
             sys_user.state,
             sys_user.isAdmin,
@@ -102,13 +134,14 @@
             <if test="email != null and email != ''">AND sys_user.email = #{email}</if>
             <if test="tel != null and tel != ''">AND sys_user.tel = #{tel}</if>
             <if test="name != null and name != ''">AND name LIKE CONCAT('%', #{name}, '%')</if>
+            <if test="isAdmin != null and isAdmin != ''">AND isAdmin = #{isAdmin}</if>
         ORDER BY createTime DESC
     </select>
 
 
-    <select id="selectUserByUserId" resultType="com.xiaozhi.entity.SysUser">
+    <select id="selectUserByUserId" resultMap="BaseResultMap">
         SELECT
-        <include refid="userSql"></include>
+        <include refid="Base_Column_List"></include>
         FROM
             sys_user
         WHERE
@@ -116,9 +149,9 @@
     </select>
 
     <insert id="add" parameterType="com.xiaozhi.entity.SysUser">
-        INSERT INTO sys_user ( username, `name`, tel, email, password, state, isAdmin )
+        INSERT INTO sys_user ( username, `name`, tel, email, password, wxOpenId, state, roleId, isAdmin )
         VALUES
-            (#{username}, #{name}, #{tel}, #{email}, #{password}, '1', '0')
+            (#{username}, #{name}, #{tel}, #{email}, #{password}, #{wxOpenId}, '1', #{roleId}, '0')
     </insert>
 
     <update id="update" parameterType="com.xiaozhi.entity.SysUser">
@@ -130,11 +163,19 @@
             <if test="email != null and email != ''">email = #{email},</if>
             <if test="password != null and password != ''">password = #{password},</if>
             <if test="avatar != null and avatar != ''">avatar = #{avatar},</if>
-            <if test="state != null and state != ''">state = ${state},</if>
+            <if test="roleId != null and roleId != ''">roleId = ${roleId},</if>
+            <if test="wxOpenId != null and wxOpenId != ''">wxOpenId = #{wxOpenId},</if>
+            <if test="state != null and state != ''">state = #{state},</if>
         </set>
-        WHERE
-            `username` = #{username}
+        <where>
+            <if test="username != null and username != ''">AND `username` = #{username}</if>
             <if test="email != null and email != ''">AND email = #{email}</if>
+            <if test="tel != null and tel != ''">AND tel = #{tel}</if>
+            <!-- 安全检查：如果没有任何条件，添加一个永远为false的条件 -->
+            <if test="(username == null or username == '') and (email == null or email == '') and (tel == null or tel == '')">
+                AND 1 = 0
+            </if>
+        </where>
     </update>
 
     <insert id="generateCode" parameterType="com.xiaozhi.entity.SysUser">

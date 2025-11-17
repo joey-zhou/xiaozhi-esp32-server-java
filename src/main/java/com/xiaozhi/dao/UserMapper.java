@@ -16,7 +16,11 @@ public interface UserMapper {
 
     SysUser selectUserByUsername(@Param("username") String username);
 
+    SysUser selectUserByWxOpenId(@Param("wxOpenId") String wxOpenId);
+
     SysUser selectUserByEmail(@Param("email") String email);
+
+    SysUser selectUserByTel(@Param("tel") String tel);
 
     SysUser query(@Param("username") String username, @Param("startTime") String startTime,
             @Param("endTime") String endTime);

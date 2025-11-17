@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.github.pagehelper.PageInfo;
-import com.xiaozhi.common.web.AjaxResult;
+import com.xiaozhi.common.web.ResultMessage;
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.dialogue.stt.factory.SttServiceFactory;
 import com.xiaozhi.dialogue.tts.factory.TtsServiceFactory;
@@ -58,16 +58,16 @@ public class ConfigController extends BaseController {
     @GetMapping("/query")
     @ResponseBody
     @Operation(summary = "根据条件查询配置", description = "返回配置信息列表")
-    public AjaxResult query(SysConfig config, HttpServletRequest request) {
+    public ResultMessage query(SysConfig config, HttpServletRequest request) {
         try {
             PageFilter pageFilter = initPageFilter(request);
             List<SysConfig> configList = configService.query(config, pageFilter);
-            AjaxResult result = AjaxResult.success();
+            ResultMessage result = ResultMessage.success();
             result.put("data", new PageInfo<>(configList));
             return result;
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return AjaxResult.error();
+            return ResultMessage.error();
         }
     }
 
@@ -80,7 +80,7 @@ public class ConfigController extends BaseController {
     @PostMapping("/update")
     @ResponseBody
     @Operation(summary = "更新配置信息", description = "返回更新结果")
-    public AjaxResult update(SysConfig config) {
+    public ResultMessage update(SysConfig config) {
         try {
             config.setUserId(CmsUtils.getUserId());
             SysConfig oldSysConfig = configService.selectConfigById(config.getConfigId());
@@ -96,10 +96,10 @@ public class ConfigController extends BaseController {
                     }
                 }
             }
-            return AjaxResult.success();
+            return ResultMessage.success();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return AjaxResult.error();
+            return ResultMessage.error();
         }
     }
 
@@ -111,21 +111,21 @@ public class ConfigController extends BaseController {
     @PostMapping("/add")
     @ResponseBody
     @Operation(summary = "添加配置信息", description = "返回添加结果")
-    public AjaxResult add(SysConfig config) {
+    public ResultMessage add(SysConfig config) {
         try {
             config.setUserId(CmsUtils.getUserId());
             configService.add(config);
-            return AjaxResult.success();
+            return ResultMessage.success();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return AjaxResult.error();
+            return ResultMessage.error();
         }
     }
 
     @PostMapping("/getModels")
     @ResponseBody
     @Operation(summary = "获取模型列表", description = "返回模型列表")
-    public AjaxResult getModels(SysConfig config) {
+    public ResultMessage getModels(SysConfig config) {
         try {
             RestTemplate restTemplate = new RestTemplate();
             // 设置请求头
@@ -149,7 +149,7 @@ public class ConfigController extends BaseController {
             // 提取 "data" 字段
             JsonNode dataNode = rootNode.get("data");
             if (dataNode == null || !dataNode.isArray()) {
-                return AjaxResult.error("响应数据格式错误，缺少 data 字段或 data 不是数组");
+                return ResultMessage.error("响应数据格式错误，缺少 data 字段或 data 不是数组");
             }
 
             // 将 "data" 字段解析为 List<Map<String, Object>>
@@ -159,7 +159,7 @@ public class ConfigController extends BaseController {
                     });
 
             // 返回成功结果
-            AjaxResult result = AjaxResult.success();
+            ResultMessage result = ResultMessage.success();
             result.put("data", modelList);
             return result;
 
@@ -167,11 +167,11 @@ public class ConfigController extends BaseController {
             // 捕获 HTTP 客户端异常并返回详细错误信息
             String errorMessage = e.getResponseBodyAsString();
             // 返回详细错误信息到前端
-            return AjaxResult.error("调用模型接口失败: " + errorMessage);
+            return ResultMessage.error("调用模型接口失败: " + errorMessage);
 
         } catch (Exception e) {
             // 捕获其他异常并记录日志
-            return AjaxResult.error();
+            return ResultMessage.error();
         }
     }
 }

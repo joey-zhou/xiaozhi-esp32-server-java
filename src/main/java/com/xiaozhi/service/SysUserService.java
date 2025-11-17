@@ -50,7 +50,11 @@ public interface SysUserService {
 
     SysUser selectUserByUsername(String username);
 
+    SysUser selectUserByWxOpenId(String wxOpenId);
+
     SysUser selectUserByEmail(String email);
+
+    SysUser selectUserByTel(String tel);
 
     /**
      * 新增用户
@@ -81,6 +85,6 @@ public interface SysUserService {
      * @param email
      * @return
      */
-    int queryCaptcha(String code, String email);
+    int queryCaptcha(SysUser user);
 
 }
