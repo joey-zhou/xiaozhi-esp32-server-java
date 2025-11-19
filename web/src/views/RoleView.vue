@@ -211,31 +211,16 @@ const handleEdit = (record: Role) => {
   nextTick(() => {
     // 获取模型信息
     const modelInfo = getModelInfo(record.modelId || undefined)
-    
+
     // 获取语音信息
     const voiceInfo = getVoiceInfo(record.voiceName || undefined)
 
-    // 准备折叠面板内的VAD参数值（延迟到用户展开时设置）
-    pendingVadValues.value = {
-      vadSpeechTh: record.vadSpeechTh ?? 0.5,
-      vadSilenceTh: record.vadSilenceTh ?? 0.3,
-      vadEnergyTh: record.vadEnergyTh ?? 0.01,
-      vadSilenceMs: record.vadSilenceMs ?? 1200
-    }
+    // 清空pending值（编辑时不使用pending机制）
+    pendingVadValues.value = null
+    pendingModelValues.value = null
+    pendingTtsValues.value = null
 
-    // 准备折叠面板内的模型参数值（延迟到用户展开时设置）
-    pendingModelValues.value = {
-      temperature: record.temperature ?? 0.7,
-      topP: record.topP ?? 0.9
-    }
-
-    // 准备折叠面板内的TTS参数值（延迟到用户展开时设置）
-    pendingTtsValues.value = {
-      ttsPitch: record.ttsPitch ?? 1.0,
-      ttsSpeed: record.ttsSpeed ?? 1.0
-    }
-
-    // 设置表单基础值（不包括折叠面板内的值）
+    // 设置表单所有值（包括高级设置的值）
     Object.assign(formData, {
       roleName: record.roleName,
       roleDesc: record.roleDesc || '',
@@ -243,10 +228,18 @@ const handleEdit = (record: Role) => {
       isDefault: record.isDefault === '1',
       modelType: modelInfo?.type || 'llm',
       modelId: record.modelId,
+      temperature: record.temperature ?? 0.7,
+      topP: record.topP ?? 0.9,
       sttId: record.sttId ?? -1,
+      vadSpeechTh: record.vadSpeechTh ?? 0.5,
+      vadSilenceTh: record.vadSilenceTh ?? 0.3,
+      vadEnergyTh: record.vadEnergyTh ?? 0.01,
+      vadSilenceMs: record.vadSilenceMs ?? 1200,
       voiceName: record.voiceName || '',
       ttsId: voiceInfo?.ttsId,
-      gender: voiceInfo?.gender || ''
+      gender: voiceInfo?.gender || '',
+      ttsPitch: record.ttsPitch ?? 1.0,
+      ttsSpeed: record.ttsSpeed ?? 1.0
     })
   })
 }
