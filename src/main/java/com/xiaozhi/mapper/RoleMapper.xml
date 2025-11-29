@@ -11,6 +11,8 @@
         <result property="modelId" column="modelId" />
         <result property="sttId" column="sttId" />
         <result property="ttsId" column="ttsId" />
+        <result property="temperature" column="temperature" />
+        <result property="topP" column="topP" />
         <result property="vadSpeechTh" column="vadSpeechTh" />
         <result property="vadSilenceTh" column="vadSilenceTh" />
         <result property="vadEnergyTh" column="vadEnergyTh" />
@@ -29,7 +31,7 @@
 
     <sql id="Role_Column_List">
         sys_role.roleId, sys_role.avatar, sys_role.roleName, sys_role.roleDesc, sys_role.voiceName,
-        sys_role.modelId, sys_role.sttId, sys_role.ttsId, sys_role.ttsPitch, sys_role.ttsSpeed,
+        sys_role.modelId, sys_role.sttId, sys_role.ttsId, sys_role.ttsPitch, sys_role.ttsSpeed, sys_role.temperature, sys_role.topP, 
         sys_role.vadSpeechTh, sys_role.vadSilenceTh, sys_role.vadEnergyTh, sys_role.vadSilenceMs,
         sys_role.userId, sys_role.state, sys_role.isDefault, sys_role.createTime
     </sql>
@@ -77,6 +79,8 @@
             <if test="voiceName != null and voiceName != ''">voiceName = #{voiceName},</if>
             <if test="isDefault != null and isDefault != ''">isDefault = #{isDefault},</if>
             <if test="modelId != null and modelId != ''">modelId = #{modelId},</if>
+            <if test="temperature != null and temperature != ''">temperature = #{temperature},</if>
+            <if test="topP != null and topP != ''">topP = #{topP},</if>
             <if test="ttsId != null and ttsId != ''">
                 <choose>
                     <when test="ttsId == -1">ttsId = null,</when>
@@ -112,7 +116,7 @@
     </update>
 
     <insert id="add" useGeneratedKeys="true" keyProperty="roleName" parameterType="com.xiaozhi.entity.SysRole">
-        INSERT INTO sys_role ( avatar, roleName, roleDesc, voiceName, ttsPitch, ttsSpeed, modelId, ttsId, sttId, userId, isDefault ) VALUES (
+        INSERT INTO sys_role ( avatar, roleName, roleDesc, voiceName, ttsPitch, ttsSpeed, modelId, ttsId, sttId, temperature, topP, userId, isDefault ) VALUES (
             #{avatar},
             #{roleName},
             #{roleDesc},
@@ -128,6 +132,8 @@
                 <when test="sttId == -1">null</when>
                 <otherwise>#{sttId}</otherwise>
             </choose>,
+            #{temperature},
+            #{topP},
             #{userId},
             #{isDefault}
         )

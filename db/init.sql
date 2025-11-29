@@ -104,6 +104,8 @@ CREATE TABLE `xiaozhi`.`sys_role` (
   `ttsId` int DEFAULT NULL COMMENT 'TTS服务ID',
   `modelId` int unsigned DEFAULT NULL COMMENT '模型ID',
   `sttId` int unsigned DEFAULT NULL COMMENT 'STT服务ID',
+  `temperature` DOUBLE DEFAULT 0.7 COMMENT '温度参数，控制输出的随机性',
+  `topP` DOUBLE DEFAULT 0.9 COMMENT 'Top-P参数，控制输出的多样性',
   `vadSpeechTh` FLOAT DEFAULT 0.5 COMMENT '语音检测阈值',
   `vadSilenceTh` FLOAT DEFAULT 0.3 COMMENT '静音检测阈值',
   `vadEnergyTh` FLOAT DEFAULT 0.01 COMMENT '能量检测阈值',
