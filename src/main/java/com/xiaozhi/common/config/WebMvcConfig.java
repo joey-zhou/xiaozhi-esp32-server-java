@@ -1,6 +1,5 @@
 package com.xiaozhi.common.config;
 
-import com.xiaozhi.common.interceptor.AuthenticationInterceptor;
 import com.xiaozhi.common.interceptor.LogInterceptor;
 
 import lombok.extern.slf4j.Slf4j;
@@ -23,26 +22,8 @@ public class WebMvcConfig implements WebMvcConfigurer {  // 实现接口而不�
     @Resource
     private LogInterceptor logInterceptor;
 
-    @Resource
-    private AuthenticationInterceptor authenticationInterceptor;
-
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(authenticationInterceptor)
-                .addPathPatterns("/**")
-                .excludePathPatterns(
-                        "/api/user/login",
-                        "/api/user/register",
-                        "/api/device/ota",
-                        "/audio/**",
-                        "/uploads/**",
-                        "/ws/**",
-                        // 添加 swagger 相关路径
-                        "/swagger-ui/**",
-                        "/v3/api-docs/**",
-                        "/swagger-resources/**",
-                        "/webjars/**"
-                );
     }
 
     @Override

@@ -1,5 +1,8 @@
 package com.xiaozhi.common.exception;
 
+import cn.dev33.satoken.exception.NotLoginException;
+import cn.dev33.satoken.exception.NotPermissionException;
+import cn.dev33.satoken.exception.NotRoleException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -53,6 +56,36 @@ public class GlobalExceptionHandler {
     public ResultMessage handleUnauthorizedException(UnauthorizedException e, WebRequest request) {
         logger.warn("权限不足: {}", e.getMessage());
         return ResultMessage.error(HttpStatus.FORBIDDEN.value(), e.getMessage());
+    }
+
+    /**
+     * Sa-Token 未登录异常
+     */
+    @ExceptionHandler(NotLoginException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ResultMessage handleNotLoginException(NotLoginException e, WebRequest request) {
+        logger.warn("用户未登录或token已失效: {}", e.getMessage());
+        return ResultMessage.error(HttpStatus.UNAUTHORIZED.value(), "登录已过期，请重新登录");
+    }
+
+    /**
+     * Sa-Token 权限不足异常
+     */
+    @ExceptionHandler(NotPermissionException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ResultMessage handleNotPermissionException(NotPermissionException e, WebRequest request) {
+        logger.warn("权限不足: {}", e.getMessage());
+        return ResultMessage.error(HttpStatus.FORBIDDEN.value(), "权限不足");
+    }
+
+    /**
+     * Sa-Token 角色不足异常
+     */
+    @ExceptionHandler(NotRoleException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ResultMessage handleNotRoleException(NotRoleException e, WebRequest request) {
+        logger.warn("角色权限不足: {}", e.getMessage());
+        return ResultMessage.error(HttpStatus.FORBIDDEN.value(), "角色权限不足");
     }
 
     /**

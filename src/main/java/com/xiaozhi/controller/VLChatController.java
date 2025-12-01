@@ -1,7 +1,7 @@
 package com.xiaozhi.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xiaozhi.common.interceptor.UnLogin;
+import cn.dev33.satoken.annotation.SaIgnore;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.dialogue.llm.factory.ChatModelFactory;
@@ -38,7 +38,7 @@ public class VLChatController extends BaseController {
     /**
      * 视觉对话
      */
-    @UnLogin
+    @SaIgnore
     @PostMapping(value = "/chat", produces = "application/json;charset=UTF-8")
     @Operation(summary = "图片识别", description = "根据问题返回识别结果")
     public String vlChat(

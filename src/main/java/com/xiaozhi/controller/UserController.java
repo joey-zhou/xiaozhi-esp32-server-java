@@ -8,23 +8,23 @@ import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.entity.SysAuthRole;
 import com.xiaozhi.entity.SysPermission;
 import com.xiaozhi.entity.SysUser;
+import com.xiaozhi.entity.SysUserAuth;
 import com.xiaozhi.security.AuthenticationService;
 import com.xiaozhi.service.SysPermissionService;
 import com.xiaozhi.service.SysUserService;
+import com.xiaozhi.service.SysUserAuthService;
 import com.xiaozhi.service.WxLoginService;
 import com.xiaozhi.service.SysAuthRoleService;
-import com.xiaozhi.utils.JwtUtil;
-import com.xiaozhi.utils.CmsUtils;
-import com.xiaozhi.utils.EmailUtils;
-import com.xiaozhi.utils.ImageUtils;
-import com.xiaozhi.utils.SmsUtils;
+import cn.dev33.satoken.annotation.SaIgnore;
+import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.utils.CaptchaUtils;
+import com.xiaozhi.utils.EmailUtils;
+import com.xiaozhi.utils.SmsUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -54,6 +54,9 @@ public class UserController extends BaseController {
     private WxLoginService wxLoginService;
 
     @Resource
+    private SysUserAuthService userAuthService;
+
+    @Resource
     private SysAuthRoleService authRoleService;
 
     @Resource
@@ -61,13 +64,10 @@ public class UserController extends BaseController {
 
     @Resource
     private SmsUtils smsUtils;
-    
-    @Resource
-    private JwtUtil jwtUtil;
 
     @Resource
     private EmailUtils emailUtils;
-    
+
     @Resource
     private CaptchaUtils captchaUtils;
 
@@ -77,6 +77,7 @@ public class UserController extends BaseController {
      * @throws UsernameNotFoundException
      * @throws UserPasswordNotMatchException
      */
+    @SaIgnore
     @PostMapping("/login")
     @ResponseBody
     @Operation(summary = "用户登录", description = "返回登录结果")
@@ -88,6 +89,12 @@ public class UserController extends BaseController {
             userService.login(username, password);
             SysUser user = userService.selectUserByUsername(username);
 
+            // Sa-Token登录
+            StpUtil.login(user.getUserId(), 2592000);  // 30天过期
+
+            // 获取Token
+            String token = StpUtil.getTokenValue();
+
             // 获取用户角色
             SysAuthRole role = authRoleService.selectById(user.getRoleId());
 
@@ -96,27 +103,15 @@ public class UserController extends BaseController {
 
             // 构建权限树
             List<SysPermission> permissionTree = permissionService.buildPermissionTree(permissions);
-    
-            // 生成JWT Token
-            String token = jwtUtil.generateToken(user.getUserId(), user.getUsername());
-            String refreshToken = jwtUtil.generateRefreshToken(user.getUserId());
-
-            String sessionId = request.getSession().getId();
-
-            // 保存用户到会话
-            HttpSession session = request.getSession();
-            session.setAttribute(SysUserService.USER_SESSIONKEY, user);
-            
-            // 保存用户
-            CmsUtils.setUser(request, user);
 
             Map<String, Object> result = new HashMap<>();
+            result.put("token", token);
+            result.put("refreshToken", token); // Sa-Token 使用相同token作为refresh token
+            result.put("expiresIn", 2592000);
+            result.put("userId", user.getUserId());
             result.put("user", user);
             result.put("role", role);
             result.put("permissions", permissionTree);
-            result.put("token", token);
-            result.put("sessionId", sessionId);
-            result.put("refreshToken", refreshToken);
 
             return ResultMessage.success(result);
         } catch (UsernameNotFoundException e) {
@@ -135,6 +130,7 @@ public class UserController extends BaseController {
      * @param loginRequest 包含手机号和验证码的请求体
      * @return 登录结果
      */
+    @SaIgnore
     @PostMapping("/tel-login")
     @ResponseBody
     @Operation(summary = "手机号验证码登录", description = "返回登录结果")
@@ -163,11 +159,17 @@ public class UserController extends BaseController {
 
             // 根据手机号查询用户
             SysUser user = userService.selectUserByTel(tel);
-            
+
             // 如果用户不存在，返回状态码201，提示需要注册
             if (user == null) {
                 return new ResultMessage(201, "该手机号未注册，请先注册", null);
             }
+
+            // Sa-Token登录
+            StpUtil.login(user.getUserId(), 2592000);  // 30天过期
+
+            // 获取Token
+            String token = StpUtil.getTokenValue();
 
             // 获取用户角色
             SysAuthRole role = authRoleService.selectById(user.getRoleId());
@@ -177,27 +179,15 @@ public class UserController extends BaseController {
 
             // 构建权限树
             List<SysPermission> permissionTree = permissionService.buildPermissionTree(permissions);
-    
-            // 生成JWT Token
-            String token = jwtUtil.generateToken(user.getUserId(), user.getUsername());
-            String refreshToken = jwtUtil.generateRefreshToken(user.getUserId());
-
-            String sessionId = request.getSession().getId();
-
-            // 保存用户到会话
-            HttpSession session = request.getSession();
-            session.setAttribute(SysUserService.USER_SESSIONKEY, user);
-            
-            // 保存用户
-            CmsUtils.setUser(request, user);
 
             Map<String, Object> result = new HashMap<>();
+            result.put("token", token);
+            result.put("refreshToken", token); // Sa-Token 使用相同token作为refresh token
+            result.put("expiresIn", 2592000);
+            result.put("userId", user.getUserId());
             result.put("user", user);
             result.put("role", role);
             result.put("permissions", permissionTree);
-            result.put("token", token);
-            result.put("sessionId", sessionId);
-            result.put("refreshToken", refreshToken);
 
             return ResultMessage.success(result);
         } catch (Exception e) {
@@ -207,77 +197,81 @@ public class UserController extends BaseController {
     }
 
     /**
-     * 微信登录
+     * 微信登录 - 自动注册模式
      *
-     * @param requestBody 包含微信code的请求体
+     * @param requestBody 包含微信code和可选的邀请人ID
      * @return 登录结果
      */
+    @SaIgnore
     @PostMapping("/wx-login")
     @ResponseBody
     public ResultMessage wxLogin(@RequestBody Map<String, Object> requestBody, HttpServletRequest request) {
         try {
             String code = (String) requestBody.get("code");
+            Integer inviterId = (Integer) requestBody.get("inviterId");
+
             if (!StringUtils.hasText(code)) {
                 return ResultMessage.error("微信登录code不能为空");
             }
 
-            // 调用微信API获取openid和session_key
-            // 这里需要实现一个微信登录服务，用于调用微信API
+            // 1. 调用微信API获取openid和session_key
             Map<String, String> wxLoginInfo = wxLoginService.getWxLoginInfo(code);
             String openid = wxLoginInfo.get("openid");
             String sessionKey = wxLoginInfo.get("session_key");
+            String unionId = wxLoginInfo.get("unionid");
 
             if (!StringUtils.hasText(openid)) {
                 return ResultMessage.error("获取微信openid失败");
             }
 
-            // 根据openid查询用户
-            SysUser user = userService.selectUserByWxOpenId(openid);
+            // 2. 查询或创建用户
+            SysUserAuth userAuth = userAuthService.getByOpenIdAndPlatform(openid, "wechat");
+            SysUser user;
+            boolean isNewUser = false;
 
-            // 如果用户不存在，返回特定状态码，前端跳转到绑定页面
-            if (user == null) {
-                // 保存微信会话信息到session，以便后续绑定使用
-                HttpSession session = request.getSession();
-                session.setAttribute("wx_session_key", sessionKey);
-                session.setAttribute("wx_openid", openid);
+            if (userAuth == null) {
+                // 新用户 - 自动注册
+                user = autoRegisterWechatUser(openid, unionId, sessionKey, wxLoginInfo, inviterId);
+                isNewUser = true;
 
-                Map<String, Object> result = new HashMap<>();
-                result.put("openid", openid);
-                result.put("sessionId", request.getSession().getId());
+                // 创建认证记录
+                userAuth = new SysUserAuth();
+                userAuth.setUserId(user.getUserId());
+                userAuth.setOpenId(openid);
+                userAuth.setUnionId(unionId);
+                userAuth.setPlatform("wechat");
+                userAuth.setProfile(new com.google.gson.Gson().toJson(wxLoginInfo));
+                userAuthService.save(userAuth);
+            } else {
+                // 老用户 - 直接登录
+                user = userService.selectUserByUserId(userAuth.getUserId());
 
-                // 返回状态码201，表示需要绑定账号
-                return new ResultMessage(201, "需要绑定账号", result);
+                // 更新最后登录时间
+                user.setLoginTime(new java.util.Date());
+                userService.update(user);
             }
 
-            // 保存用户到会话
-            HttpSession session = request.getSession();
-            session.setAttribute(SysUserService.USER_SESSIONKEY, user);
+            // 3. Sa-Token登录
+            StpUtil.login(user.getUserId(), 2592000);  // 30天过期
 
-            // 保存微信会话信息到session
-            session.setAttribute("wx_session_key", sessionKey);
-            session.setAttribute("wx_openid", openid);
+            // 4. 获取Token
+            String token = StpUtil.getTokenValue();
 
-            // 保存用户
-            CmsUtils.setUser(request, user);
-
-            // 获取用户角色和权限
+            // 5. 获取用户角色和权限
             SysAuthRole role = authRoleService.selectById(user.getRoleId());
             List<SysPermission> permissions = permissionService.selectByUserId(user.getUserId());
             List<SysPermission> permissionTree = permissionService.buildPermissionTree(permissions);
 
-            // 生成JWT Token
-            String token = jwtUtil.generateToken(user.getUserId(), user.getUsername());
-            String refreshToken = jwtUtil.generateRefreshToken(user.getUserId());
-
-            String sessionId = request.getSession().getId();
-
+            // 6. 返回结果
             Map<String, Object> result = new HashMap<>();
+            result.put("token", token);
+            result.put("refreshToken", token);
+            result.put("expiresIn", 2592000);
+            result.put("userId", user.getUserId());
+            result.put("isNewUser", isNewUser);
             result.put("user", user);
             result.put("role", role);
             result.put("permissions", permissionTree);
-            result.put("token", token);
-            result.put("sessionId", sessionId);
-            result.put("refreshToken", refreshToken);
 
             return ResultMessage.success(result);
         } catch (Exception e) {
@@ -287,11 +281,46 @@ public class UserController extends BaseController {
     }
 
     /**
+     * 自动注册微信用户
+     *
+     * @param openid 微信openid
+     * @param unionId 微信unionid
+     * @param sessionKey 微信session_key
+     * @param wxInfo 微信返回的完整信息
+     * @param inviterId 邀请人ID
+     * @return 新创建的用户
+     */
+    private SysUser autoRegisterWechatUser(String openid, String unionId,
+                                            String sessionKey, Map<String, String> wxInfo,
+                                            Integer inviterId) {
+        // 1. 创建用户
+        SysUser user = new SysUser();
+        user.setUsername("wx_" + openid.substring(0, Math.min(10, openid.length())));
+        user.setPassword(authenticationService.encryptPassword(java.util.UUID.randomUUID().toString()));
+        user.setName("微信用户" + System.currentTimeMillis() % 10000);
+        user.setRoleId(2);  // 默认普通用户角色
+        user.setIsAdmin("0");
+        user.setState("1");
+        user.setAvatar(null);  // 默认头像
+
+        userService.add(user);
+
+        // 2. 处理邀请关系(如果有)
+        if (inviterId != null) {
+            // TODO: 创建邀请记录
+            // invitationService.createInvitation(inviterId, user.getUserId());
+        }
+
+        return user;
+    }
+
+    /**
      * 新增用户
-     * 
+     *
      * @param loginRequest 包含用户信息的请求体
      * @return 添加结果
      */
+    @SaIgnore
     @PostMapping("/add")
     @ResponseBody
     @Operation(summary = "新增用户", description = "返回添加结果")
@@ -449,6 +478,7 @@ public class UserController extends BaseController {
      * @param requestBody 包含邮箱和类型的请求体
      * @return 发送结果
      */
+    @SaIgnore
     @PostMapping("/sendEmailCaptcha")
     @ResponseBody
     @Operation(summary = "发送邮箱验证码", description = "返回发送结果")
@@ -493,6 +523,7 @@ public class UserController extends BaseController {
      * @param requestBody 包含手机号和类型的请求体
      * @return 发送结果
      */
+    @SaIgnore
     @PostMapping("/sendSmsCaptcha")
     @ResponseBody
     @Operation(summary = "发送短信验证码", description = "返回发送结果")
@@ -540,6 +571,7 @@ public class UserController extends BaseController {
      * @param tel 手机号
      * @return 验证结果
      */
+    @SaIgnore
     @GetMapping("/checkCaptcha")
     @ResponseBody
     @Operation(summary = "验证验证码是否有效", description = "返回验证结果")
@@ -569,6 +601,7 @@ public class UserController extends BaseController {
      * @param user 用户名
      * @return 检查结果
      */
+    @SaIgnore
     @GetMapping("/checkUser")
     @ResponseBody
     @Operation(summary = "检查用户名和手机号是否已存在", description = "返回检查结果")

@@ -163,7 +163,7 @@
             <if test="email != null and email != ''">email = #{email},</if>
             <if test="password != null and password != ''">password = #{password},</if>
             <if test="avatar != null and avatar != ''">avatar = #{avatar},</if>
-            <if test="roleId != null and roleId != ''">roleId = ${roleId},</if>
+            <if test="roleId != null and roleId != ''">roleId = #{roleId},</if>
             <if test="wxOpenId != null and wxOpenId != ''">wxOpenId = #{wxOpenId},</if>
             <if test="state != null and state != ''">state = #{state},</if>
         </set>
