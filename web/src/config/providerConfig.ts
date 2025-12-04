@@ -33,49 +33,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           help: 'OpenAI官方地址或代理地址'
         }
       ],
-      'Azure-OpenAI': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: '在 Azure 门户中申请'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://your-resource-name.openai.azure.com',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'Azure OpenAI 服务地址'
-        }
-      ],
-      // xAI
-      'xAI': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: '在 https://x.ai/api-keys 申请'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.x.ai/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'xAI API 接口地址'
-        }
-      ],
       // 阿里云系列
       'Tongyi-Qianwen': [
         {
@@ -96,6 +53,36 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           span: 12,
           suffix: '/chat/completions',
           help: '阿里云通义千问 API 接口地址'
+        }
+      ],
+      // 讯飞星火
+      'XunFei Spark': [
+        {
+          name: 'appId',
+          label: 'App Id',
+          required: true,
+          inputType: 'text',
+          placeholder: 'your-app-id',
+          span: 12,
+          help: '在 https://console.xfyun.cn/ 申请讯飞开放平台 AppID'
+        },
+        {
+          name: 'apiKey',
+          label: 'API Key',
+          required: true,
+          inputType: 'password',
+          placeholder: 'your-api-key',
+          span: 12,
+          help: '讯飞开放平台 API Key'
+        },
+        {
+          name: 'apiSecret',
+          label: 'API Secret',
+          required: true,
+          inputType: 'password',
+          placeholder: 'your-api-secret',
+          span: 12,
+          help: '讯飞开放平台 API Secret'
         }
       ],
       // 智谱AI
