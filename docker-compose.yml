@@ -47,6 +47,7 @@ services:
     networks:
       - app-network
     environment:
+      - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/xiaozhi?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
       - SPRING_DATASOURCE_USERNAME=xiaozhi
       - SPRING_DATASOURCE_PASSWORD=123456
@@ -54,6 +55,13 @@ services:
       - maven_repo:/root/.m2/repository  # 持久化Maven仓库
       - vosk_models:/vosk_cache  # 持久化Vosk模型
     restart: on-failure  # 添加重启策略，如果启动失败会自动重试
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    networks:
+      - app-network
 
 networks:
   app-network:
