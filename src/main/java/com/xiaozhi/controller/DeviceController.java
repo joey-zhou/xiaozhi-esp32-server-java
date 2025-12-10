@@ -29,6 +29,7 @@ import com.xiaozhi.utils.CmsUtils;
 import com.xiaozhi.utils.JsonUtil;
 
 import ch.qos.logback.core.util.StringUtil;
+import cn.dev33.satoken.annotation.SaIgnore;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -180,6 +181,7 @@ public class DeviceController extends BaseController {
         }
     }
 
+    @SaIgnore
     @PostMapping("/ota")
     @ResponseBody
     @Operation(summary = "处理OTA请求", description = "返回OTA结果")
