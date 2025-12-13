@@ -16,21 +16,21 @@ export function queryAgents(params: Partial<AgentQueryParams>) {
  * 添加智能体
  */
 export function addAgent(data: Partial<PlatformConfig>) {
-  return http.post(api.agent.add, data)
+  return http.postJSON(api.agent.add, data)
 }
 
 /**
  * 更新智能体
  */
 export function updateAgent(data: Partial<PlatformConfig>) {
-  return http.post(api.agent.update, data)
+  return http.putJSON(api.agent.update, data)
 }
 
 /**
  * 删除智能体
  */
 export function deleteAgent(botId: string) {
-  return http.post(api.agent.delete, { bot_id: botId })
+  return http.delete(api.agent.delete, { bot_id: botId })
 }
 
 
