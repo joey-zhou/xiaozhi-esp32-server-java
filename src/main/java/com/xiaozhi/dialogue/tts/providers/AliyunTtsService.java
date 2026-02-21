@@ -285,22 +285,25 @@ public class AliyunTtsService implements TtsService {
                 String audioUrl = result.getOutput().getAudio().getUrl();
                 String outPath = outputPath + getAudioFileName();
                 File file = new File(outPath);
-                
-                // 下载音频文件到本地，也使用共享线程池
+
+                // 下载 WAV（24kHz），重采样到 16kHz 后保存
                 Future<Boolean> downloadFuture = sharedExecutor.submit(() -> {
-                    try (InputStream in = new URL(audioUrl).openStream();
-                            FileOutputStream out = new FileOutputStream(file)) {
-                        byte[] buffer = new byte[1024];
+                    try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                         InputStream in = new URL(audioUrl).openStream()) {
+                        byte[] buffer = new byte[4096];
                         int bytesRead;
                         while ((bytesRead = in.read(buffer)) != -1) {
-                            out.write(buffer, 0, bytesRead);
+                            baos.write(buffer, 0, bytesRead);
                         }
+                        byte[] pcm24k = AudioUtils.wavToPcm(baos.toByteArray());
+                        byte[] pcm16k = AudioUtils.resamplePcm(pcm24k, 24000, 16000);
+                        AudioUtils.saveAsWav(file.toPath(), pcm16k);
                         return true;
                     } catch (Exception e) {
                         return false;
                     }
                 });
-                
+
                 try {
                     Boolean downloadSuccess = downloadFuture.get(TTS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                     if (!downloadSuccess) {
@@ -318,7 +321,7 @@ public class AliyunTtsService implements TtsService {
                     TimeUnit.MILLISECONDS.sleep(RETRY_DELAY_MS);
                     continue;
                 }
-                
+
                 return outPath;
             } catch (Exception e) {
                 attempts++;

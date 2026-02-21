@@ -230,6 +230,40 @@ public class AudioUtils {
     }
 
     /**
+     * 从WAV字节数组中提取PCM数据
+     *
+     * @param wavData WAV文件的原始字节数组
+     * @return PCM数据字节数组
+     */
+    public static byte[] wavToPcm(byte[] wavData) throws IOException {
+        if (wavData == null || wavData.length < 44) {
+            throw new IOException("无效的WAV数据");
+        }
+
+        if (wavData[0] != 'R' || wavData[1] != 'I' || wavData[2] != 'F' || wavData[3] != 'F' ||
+                wavData[8] != 'W' || wavData[9] != 'A' || wavData[10] != 'V' || wavData[11] != 'E') {
+            throw new IOException("不是有效的WAV文件格式");
+        }
+
+        int dataOffset = -1;
+        for (int i = 12; i < wavData.length - 4; i++) {
+            if (wavData[i] == 'd' && wavData[i + 1] == 'a' && wavData[i + 2] == 't' && wavData[i + 3] == 'a') {
+                dataOffset = i + 8;
+                break;
+            }
+        }
+
+        if (dataOffset == -1) {
+            throw new IOException("在WAV文件中找不到data子块");
+        }
+
+        int dataSize = wavData.length - dataOffset;
+        byte[] pcmData = new byte[dataSize];
+        System.arraycopy(wavData, dataOffset, pcmData, 0, dataSize);
+        return pcmData;
+    }
+
+    /**
      * 从WAV文件中提取PCM数据
      *
      * @param wavPath WAV文件路径
@@ -308,6 +342,52 @@ public class AudioUtils {
             byte[] pcmData = readAsPcm(filePath);
             return new OpusProcessor().pcmToOpus(pcmData, false);
         }
+    }
+
+    /**
+     * 将PCM数据从指定采样率重采样到目标采样率（线性插值）
+     * 适用于实时流式场景（纯内存操作，无I/O延迟）
+     *
+     * @param pcmData      原始PCM数据（16位有符号小端序）
+     * @param fromRate     源采样率（Hz），如 24000
+     * @param toRate       目标采样率（Hz），如 16000
+     * @return 重采样后的PCM数据
+     */
+    public static byte[] resamplePcm(byte[] pcmData, int fromRate, int toRate) {
+        if (fromRate == toRate || pcmData == null || pcmData.length == 0) {
+            return pcmData;
+        }
+
+        // 每个样本 2 字节（16位）
+        int inputSamples = pcmData.length / 2;
+        int outputSamples = (int) Math.ceil((long) inputSamples * toRate / fromRate);
+        byte[] output = new byte[outputSamples * 2];
+
+        for (int i = 0; i < outputSamples; i++) {
+            // 源采样位置（浮点）
+            double srcPos = (double) i * fromRate / toRate;
+            int srcIndex = (int) srcPos;
+            double frac = srcPos - srcIndex;
+
+            // 读取相邻两个样本（16位小端序有符号）
+            short s0 = readShortLE(pcmData, srcIndex);
+            short s1 = (srcIndex + 1 < inputSamples) ? readShortLE(pcmData, srcIndex + 1) : s0;
+
+            // 线性插值
+            short interpolated = (short) Math.round(s0 + frac * (s1 - s0));
+
+            // 写入输出（小端序）
+            output[i * 2] = (byte) (interpolated & 0xFF);
+            output[i * 2 + 1] = (byte) ((interpolated >> 8) & 0xFF);
+        }
+
+        return output;
+    }
+
+    private static short readShortLE(byte[] data, int index) {
+        int byteIndex = index * 2;
+        if (byteIndex + 1 >= data.length) return 0;
+        return (short) ((data[byteIndex] & 0xFF) | (data[byteIndex + 1] << 8));
     }
 
     /**
