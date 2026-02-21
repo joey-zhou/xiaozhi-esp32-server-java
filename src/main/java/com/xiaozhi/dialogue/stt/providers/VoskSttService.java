@@ -18,6 +18,9 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,7 +33,10 @@ public class VoskSttService implements SttService {
 
     private static final Logger logger = LoggerFactory.getLogger(VoskSttService.class);
     private static final String PROVIDER_NAME = "vosk";
-    private static final int QUEUE_TIMEOUT_MS = 5000; // 队列等待超时时间
+
+    // 使用平台线程池执行 JNI native 识别任务，避免虚拟线程与 native 内存绑定冲突
+    private static final ExecutorService recognizerExecutor =
+            Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
     // Vosk模型相关对象
     private Model model;
@@ -155,69 +161,65 @@ public class VoskSttService implements SttService {
                 () -> isCompleted.set(true)
         );
 
-        // 使用虚拟线程处理音频识别
-        try {
-            Thread virtualThread = Thread.startVirtualThread(() -> {
-                try (Recognizer recognizer = new Recognizer(model, AudioUtils.SAMPLE_RATE)) {
-                    while (!isCompleted.get() || !audioQueue.isEmpty()) {
-                        try {
-                            byte[] audioChunk = audioQueue.poll(100, TimeUnit.MILLISECONDS);
-                            if (audioChunk != null) {
-                                boolean hasResult = recognizer.acceptWaveForm(audioChunk, audioChunk.length);
-                                if (hasResult) {
-                                    // 提取部分识别结果中的文本
-                                    String result = recognizer.getResult();
-                                    JSONObject jsonResult = new JSONObject(result);
-                                    if (jsonResult.has("text") && !jsonResult.getString("text").isEmpty()) {
-                                        String text = jsonResult.getString("text").replaceAll("\\s+", "");
-                                        recognizedText.add(text);
-                                        logger.debug("Vosk识别中间结果: {}", text);
-                                    }
+        // 使用平台线程池执行识别任务，避免虚拟线程与 JNI native 内存绑定冲突
+        Future<?> future = recognizerExecutor.submit(() -> {
+            try (Recognizer recognizer = new Recognizer(model, AudioUtils.SAMPLE_RATE)) {
+                while (!isCompleted.get() || !audioQueue.isEmpty()) {
+                    try {
+                        byte[] audioChunk = audioQueue.poll(100, TimeUnit.MILLISECONDS);
+                        if (audioChunk != null) {
+                            boolean hasResult = recognizer.acceptWaveForm(audioChunk, audioChunk.length);
+                            if (hasResult) {
+                                // 提取部分识别结果中的文本
+                                String result = recognizer.getResult();
+                                JSONObject jsonResult = new JSONObject(result);
+                                if (jsonResult.has("text") && !jsonResult.getString("text").isEmpty()) {
+                                    String text = jsonResult.getString("text").replaceAll("\\s+", "");
+                                    recognizedText.add(text);
+                                    logger.debug("Vosk识别中间结果: {}", text);
                                 }
                             }
+                        }
 
-                            // 如果已完成且队列为空，获取最终结果
-                            if (isCompleted.get() && audioQueue.isEmpty()) {
-                                String finalText = recognizer.getFinalResult();
-                                JSONObject jsonFinal = new JSONObject(finalText);
-                                if (jsonFinal.has("text")) {
-                                    String text = jsonFinal.getString("text").replaceAll("\\s+", "");
-                                    if (!text.isEmpty()) {
-                                        recognizedText.add(text);
-                                        logger.debug("Vosk识别最终结果: {}", text);
-                                    }
+                        // 如果已完成且队列为空，获取最终结果
+                        if (isCompleted.get() && audioQueue.isEmpty()) {
+                            String finalText = recognizer.getFinalResult();
+                            JSONObject jsonFinal = new JSONObject(finalText);
+                            if (jsonFinal.has("text")) {
+                                String text = jsonFinal.getString("text").replaceAll("\\s+", "");
+                                if (!text.isEmpty()) {
+                                    recognizedText.add(text);
+                                    logger.debug("Vosk识别最终结果: {}", text);
                                 }
-                                break;
                             }
-                        } catch (InterruptedException e) {
-                            logger.warn("音频数据队列等待被中断", e);
-                            Thread.currentThread().interrupt(); // 重新设置中断标志
                             break;
                         }
+                    } catch (InterruptedException e) {
+                        logger.warn("音频数据队列等待被中断", e);
+                        Thread.currentThread().interrupt();
+                        break;
                     }
-
-                    // 合并所有识别结果
-                    for (String text : recognizedText) {
-                        finalResult.append(text);
-                    }
-
-                } catch (Exception e) {
-                    logger.error("Vosk流式识别过程中发生错误", e);
                 }
-            });
-            
-            // 等待虚拟线程完成，最多等待90秒
-            try {
-                virtualThread.join(90000); // 90秒超时
-                if (virtualThread.isAlive()) {
-                    virtualThread.interrupt(); // 中断线程
+
+                // 合并所有识别结果
+                for (String text : recognizedText) {
+                    finalResult.append(text);
                 }
-            } catch (InterruptedException e) {
-                logger.warn("等待Vosk识别完成时被中断", e);
-                Thread.currentThread().interrupt();
+
+            } catch (Exception e) {
+                logger.error("Vosk流式识别过程中发生错误", e);
             }
+        });
+
+        try {
+            future.get(90, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            logger.warn("等待Vosk识别完成时被中断", e);
+            Thread.currentThread().interrupt();
+            future.cancel(true);
         } catch (Exception e) {
-            logger.error("启动虚拟线程失败", e);
+            logger.error("Vosk识别任务执行失败", e);
+            future.cancel(true);
         }
 
         return finalResult.toString();
