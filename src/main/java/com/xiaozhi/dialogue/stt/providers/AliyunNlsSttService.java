@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -33,6 +34,24 @@ public class AliyunNlsSttService implements SttService {
     // 超时时间
     private static final long RECOGNITION_TIMEOUT_MS = 90000; // 识别超时时间（90秒）
 
+    /**
+     * 全局NlsClient缓存（按configId共享）
+     */
+    private static final ConcurrentHashMap<Integer, CachedNlsClient> globalClientCache = new ConcurrentHashMap<>();
+
+    /**
+     * 缓存的NlsClient包装类
+     */
+    private static class CachedNlsClient {
+        final NlsClient client;
+        final int tokenHash;
+
+        CachedNlsClient(NlsClient client, int tokenHash) {
+            this.client = client;
+            this.tokenHash = tokenHash;
+        }
+    }
+
     // 阿里云配置
     private final SysConfig config;
 
@@ -45,14 +64,53 @@ public class AliyunNlsSttService implements SttService {
     }
 
     /**
-     * 创建新的NLS客户端实例
+     * 获取或创建NlsClient实例（支持连接复用）
      */
-    private NlsClient createClient() throws Exception {
-        String accessToken = tokenService.getToken();
-        if (accessToken == null) {
+    private NlsClient getOrCreateClient() throws Exception {
+        String currentToken = tokenService.getToken();
+        if (currentToken == null) {
             throw new RuntimeException("无法获取阿里云Token");
         }
-        return new NlsClient(NLS_URL, accessToken);
+
+        Integer configId = config.getConfigId();
+        int currentHash = currentToken.hashCode();
+
+        CachedNlsClient cached = globalClientCache.get(configId);
+        if (cached != null && cached.tokenHash == currentHash) {
+            return cached.client;
+        }
+
+        return globalClientCache.compute(configId, (k, existing) -> {
+            if (existing != null && existing.tokenHash == currentHash) {
+                return existing;
+            }
+            if (existing != null) {
+                try {
+                    existing.client.shutdown();
+                } catch (Exception e) {
+                    logger.warn("关闭旧NlsClient失败", e);
+                }
+            }
+            NlsClient newClient = new NlsClient(NLS_URL, currentToken);
+            return new CachedNlsClient(newClient, currentHash);
+        }).client;
+    }
+
+    /**
+     * 清理指定configId的NlsClient缓存
+     */
+    public static void clearClientCache(Integer configId) {
+        if (configId == null) {
+            return;
+        }
+        CachedNlsClient removed = globalClientCache.remove(configId);
+        if (removed != null) {
+            try {
+                removed.client.shutdown();
+            } catch (Exception e) {
+                logger.warn("关闭NlsClient失败", e);
+            }
+        }
     }
 
     @Override
@@ -94,8 +152,8 @@ public class AliyunNlsSttService implements SttService {
         SpeechTranscriber transcriber = null;
 
         try {
-            // 创建NLS客户端
-            client = createClient();
+            // 获取或复用NlsClient
+            client = getOrCreateClient();
 
             // 创建识别监听器
             SpeechTranscriberListener listener = new SpeechTranscriberListener() {
@@ -216,21 +274,16 @@ public class AliyunNlsSttService implements SttService {
 
         } catch (Exception e) {
             logger.error("阿里云NLS实时识别失败", e);
+            // 连接异常时清除缓存，下次调用时重建client
+            globalClientCache.remove(config.getConfigId());
             return "";
         } finally {
-            // 清理资源
+            // 只关闭transcriber，client由缓存统一管理复用，不在此处shutdown
             if (transcriber != null) {
                 try {
                     transcriber.close();
                 } catch (Exception e) {
                     logger.warn("关闭SpeechTranscriber失败", e);
-                }
-            }
-            if (client != null) {
-                try {
-                    client.shutdown();
-                } catch (Exception e) {
-                    logger.warn("关闭NlsClient失败", e);
                 }
             }
         }
