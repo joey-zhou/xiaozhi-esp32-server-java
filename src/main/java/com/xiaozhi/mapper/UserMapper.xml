@@ -34,6 +34,7 @@
             sys_user
         WHERE
             username = #{username}
+        LIMIT 1
     </select>
 
     <select id="selectUserByWxOpenId" resultMap="BaseResultMap">
@@ -43,6 +44,7 @@
             sys_user
         WHERE
             wxOpenId = #{wxOpenId}
+        LIMIT 1
     </select>
 
     <select id="selectUserByEmail" resultMap="BaseResultMap">
@@ -52,6 +54,7 @@
             sys_user
         WHERE
             email = #{email}
+        LIMIT 1
     </select>
 
     <select id="selectUserByTel" resultMap="BaseResultMap">
@@ -61,6 +64,7 @@
             sys_user
         WHERE
             tel = #{tel}
+        LIMIT 1
     </select>
 
     <select id="query" resultMap="BaseResultMap">
@@ -148,7 +152,7 @@
             userId = #{userId}
     </select>
 
-    <insert id="add" parameterType="com.xiaozhi.entity.SysUser">
+    <insert id="add" parameterType="com.xiaozhi.entity.SysUser" useGeneratedKeys="true" keyProperty="userId">
         INSERT INTO sys_user ( username, `name`, tel, email, password, wxOpenId, state, roleId, isAdmin )
         VALUES
             (#{username}, #{name}, #{tel}, #{email}, #{password}, #{wxOpenId}, '1', #{roleId}, '0')
@@ -166,6 +170,8 @@
             <if test="roleId != null and roleId != ''">roleId = #{roleId},</if>
             <if test="wxOpenId != null and wxOpenId != ''">wxOpenId = #{wxOpenId},</if>
             <if test="state != null and state != ''">state = #{state},</if>
+            <if test="loginIp != null">loginIp = #{loginIp},</if>
+            <if test="loginTime != null">loginTime = #{loginTime},</if>
         </set>
         <where>
             <!-- 优先使用 userId（主键，最可靠） -->

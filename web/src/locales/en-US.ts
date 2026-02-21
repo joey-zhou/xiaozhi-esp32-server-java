@@ -297,6 +297,8 @@ export default {
     clearingMemory: 'Clearing memory...',
     memoryType: 'Memory Type',
     windowMemory: 'Window Memory',
+    summaryMemory: 'Summary Memory',
+    longMemory: 'Long Memory',
     allMemory: 'All Memory',
   },
 
@@ -380,6 +382,9 @@ export default {
     voskLocalRecognition: 'Vosk Local Recognition',
     unknownModel: 'Unknown Model',
     voiceTestMessage: 'Hello, I am your voice assistant, I am very happy to serve you',
+
+    // MCP related
+    mcpTools: 'MCP Tools',
     
     // Memory type configuration
     memoryTypeSettings: 'Memory Type Configuration',
@@ -654,6 +659,8 @@ export default {
       sttConfig: 'STT Configuration',
       ttsConfig: 'TTS Configuration',
       memoryManagement: 'Memory Management',
+      shortTermMemory: 'Short-term Memory',
+      summaryMemory: 'Memory Summary',
       chat: 'Chat',
       drama: 'Drama',
       account: 'Account',
@@ -665,6 +672,7 @@ export default {
       roleManagement: 'Role Management',
       configManagement: 'Configuration',
       settings: 'Settings',
+      memoryManagement: 'Memory Management',
     },
   },
 
@@ -734,6 +742,7 @@ export default {
 
   memory: {
     chat: 'Chat History',
+    summary: 'Summary',
     content: 'Content',
     confirmDelete: 'Are you sure to delete this memory? This operation cannot be undone.',
   },

@@ -1,12 +1,9 @@
 package com.xiaozhi.dialogue.llm.memory;
 
 import com.xiaozhi.entity.SysDevice;
-import com.xiaozhi.entity.SysMessage;
 import com.xiaozhi.entity.SysRole;
 import org.springframework.ai.chat.messages.*;
 
-import org.springframework.ai.chat.metadata.Usage;
-import org.springframework.util.StringUtils;
 
 import java.util.*;
 
@@ -74,10 +71,9 @@ public class MessageWindowConversation extends Conversation {
      * 后续考虑：继承封装UserMessage和AssistantMessage,UserMessageWithTime,AssistantMessageWithTime
      * 后续考虑：将function 或者 mcp 的相关信息封装在AssistantMessageWithTime，来精细处理。或者根据元数据判断是function_call还是mcp调用
      * @param message
-     * @param timeMillis
      */
     @Override
-    public void add(Message message, Long timeMillis) {
+    public void add(Message message) {
 
         if(message instanceof UserMessage  || message instanceof AssistantMessage ){
 
@@ -87,7 +83,6 @@ public class MessageWindowConversation extends Conversation {
                     messages.removeLast();
                 }
             }else{
-                ChatMemory.setTimeMillis(message, timeMillis);
                 messages.add(message);
             }
         }else{

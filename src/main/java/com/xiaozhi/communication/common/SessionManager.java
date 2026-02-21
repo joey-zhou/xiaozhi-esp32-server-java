@@ -4,10 +4,12 @@ import com.xiaozhi.communication.server.websocket.WebSocketSession;
 import com.xiaozhi.dialogue.llm.memory.Conversation;
 import com.xiaozhi.dialogue.llm.tool.ToolsSessionHolder;
 import com.xiaozhi.dialogue.service.DialogueService;
+import com.xiaozhi.dialogue.service.Persona;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysRole;
 import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.event.ChatSessionCloseEvent;
+import com.xiaozhi.event.DeviceOnlineEvent;
 import com.xiaozhi.service.SysDeviceService;
 import com.xiaozhi.event.ChatSessionOpenEvent;
 import jakarta.annotation.PostConstruct;
@@ -50,6 +52,9 @@ public class SessionManager {
     // 定时任务执行器
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
+    // 服务关闭标志，关闭期间跳过设备状态写库（启动时会 bulk reset，无需重复写）
+    private volatile boolean shuttingDown = false;
+
     @Resource
     private ApplicationContext applicationContext;
 
@@ -60,7 +65,7 @@ public class SessionManager {
     @Value("${check.inactive.session:true}")
     private boolean checkInactiveSession;
 
-    @Value("${inactive.timeout.seconds:20}")
+    @Value("${inactive.timeout.seconds:60}")
     private int inactiveTimeOutSeconds;
 
     private DialogueService getDialogueService() {
@@ -96,9 +101,12 @@ public class SessionManager {
     /**
      * 销毁方法，关闭定时任务执行器
      */
+    public boolean isShuttingDown() {
+        return shuttingDown;
+    }
+
     @PreDestroy
     public void destroy() {
-        
         scheduler.shutdown();
         try {
             if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -126,8 +134,17 @@ public class SessionManager {
                         if (inactiveDuration.getSeconds() > inactiveTimeOutSeconds) {
                             logger.info("会话 {} 已经 {} 秒没有有效活动，发送超时提示并自动关闭",
                                     session.getSessionId(), inactiveDuration.getSeconds());
-                            DialogueService dialogueService = getDialogueService();
-                            dialogueService.sendTimeoutMessage(session);
+                            // 长时间不活跃，可以直接清理ASR还没有被识别的音频数据
+                            session.clearAudioSinks();
+                            if(session.getPersona() !=null){
+                                // 不涉及ASR了
+                                session.getPersona().sendGoodbyeMessage();
+                            }
+                            if(session instanceof WebSocketSession){
+                                // 解绑WebSocket会话，回收Session对象。
+                                removeSession(session.getSessionId());
+                            }
+
                         }
                     }
                 }
@@ -156,6 +173,7 @@ public class SessionManager {
      */
     public void registerSession(String sessionId, ChatSession chatSession) {
         sessions.put(sessionId, chatSession);
+        
         logger.info("会话已注册 - SessionId: {}  SessionType: {}", sessionId, chatSession.getClass().getSimpleName());
         applicationContext.publishEvent(new ChatSessionOpenEvent(chatSession));
     }
@@ -196,20 +214,12 @@ public class SessionManager {
                 removeSession(chatSession.getSessionId());
                 // 先关闭WebSocket连接
                 chatSession.close();
+
+                applicationContext.publishEvent(new ChatSessionCloseEvent(chatSession));
+                logger.info("会话已关闭 - SessionId: {} SessionType: {}", chatSession.getSessionId(), chatSession.getClass().getSimpleName());
             }
-            // 清理音频流
-            Sinks.Many<byte[]> sink = chatSession.getAudioSinks();
-            if (sink != null) {
-                sink.tryEmitComplete();
-            }
-            // 重置会话状态
-            chatSession.setStreamingState(false);
-            chatSession.setAudioSinks(null);
-            // 清理Conversation缓存的对话历史。
-            Conversation conversation = chatSession.getConversation();
-            if (conversation != null) {
-                conversation.clear();
-            }
+            chatSession.clearAudioSinks();
+
         } catch (Exception e) {
             logger.error("清理会话资源时发生错误 - SessionId: {}",
                     chatSession.getSessionId(), e);
@@ -229,36 +239,10 @@ public class SessionManager {
             chatSession.setSysDevice(device);
             updateLastActivity(sessionId); // 更新活动时间
             logger.debug("设备配置已注册 - SessionId: {}, DeviceId: {}", sessionId, device.getDeviceId());
+            applicationContext.publishEvent(new DeviceOnlineEvent(this, device.getDeviceId()));
         }
     }
 
-    /**
-     * 设置会话完成后是否关闭
-     *
-     * @param sessionId 会话ID
-     * @param close     是否关闭
-     */
-    public void setCloseAfterChat(String sessionId, boolean close) {
-        ChatSession chatSession = sessions.get(sessionId);
-        if(chatSession != null){
-            chatSession.setCloseAfterChat(close);
-        }
-    }
-
-    /**
-     * 获取会话完成后是否关闭
-     *
-     * @param sessionId 会话ID
-     * @return 是否关闭
-     */
-    public boolean isCloseAfterChat(String sessionId) {
-        ChatSession chatSession = sessions.get(sessionId);
-        if(chatSession != null){
-            return chatSession.isCloseAfterChat();
-        }else{
-            return true;
-        }
-    }
 
 //    /**
 //     * 缓存配置信息
@@ -344,33 +328,6 @@ public class SessionManager {
             return chatSession.getSysRoleList();
         }
         return null;
-    }
-
-    /**
-     * 音乐播放状态
-     *
-     * @param sessionId 会话ID
-     * @param isPlaying 是否正在播放音乐
-     */
-    public void setMusicPlaying(String sessionId, boolean isPlaying) {
-        ChatSession chatSession = sessions.get(sessionId);
-        if (chatSession != null) {
-            chatSession.setMusicPlaying(isPlaying);
-        }
-    }
-
-    /**
-     * 是否在播放音乐
-     *
-     * @param sessionId 会话ID
-     * @return 是否正在播放音乐
-     */
-    public boolean isMusicPlaying(String sessionId) {
-        ChatSession chatSession = sessions.get(sessionId);
-        if (chatSession != null) {
-            return chatSession.isMusicPlaying();
-        }
-        return false;
     }
 
 
@@ -531,6 +488,7 @@ public class SessionManager {
         return sessions.values().stream()
                 .filter(session -> session.getSysDevice().getDeviceId().equals(deviceId))
                 .findFirst()
-                .map(ChatSession::getConversation);
+                .map(ChatSession::getPersona)
+                .map(Persona::getConversation);
     }
 }

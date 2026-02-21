@@ -27,7 +27,7 @@ public class CmsUtils {
     public static final String USER_ATTRIBUTE_KEY = "user";
 
     // 缓存服务器IP地址 - 只在第一次调用getServerIp时初始化
-    private String serverIp = "192.168.1.13";
+    private String serverIp = null;
     private boolean initializing = false;
 
     // 新增的全局变量
@@ -118,41 +118,6 @@ public class CmsUtils {
             "https://myip.ipip.net/json", // IPIP.net，返回详细信息
     };
 
-    // 云服务商IP段特征
-    private static final String[] CLOUD_IP_PATTERNS = {
-            // 阿里云
-            "^47\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 47.x.x.x
-            "^39\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 39.x.x.x
-            "^59\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 59.x.x.x
-            "^106\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 106.x.x.x
-            "^116\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 116.x.x.x
-            "^120\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 120.x.x.x
-
-            // 腾讯云
-            "^118\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 118.x.x.x
-            "^119\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 119.x.x.x
-            "^129\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 129.x.x.x
-            "^170\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 170.x.x.x
-
-            // 华为云
-            "^114\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 114.x.x.x
-            "^121\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 121.x.x.x
-            "^49\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 49.x.x.x
-
-            // AWS
-            "^52\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 52.x.x.x
-            "^54\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 54.x.x.x
-            "^18\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 18.x.x.x
-
-            // Azure
-            "^13\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 13.x.x.x
-            "^40\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 40.x.x.x
-            "^104\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 104.x.x.x
-
-            // Google Cloud
-            "^35\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*", // 35.x.x.x
-            "^34\\.((25[2-5])|(2[0-4]\\d)|(1\\d{2})|([1-9]\\d)|\\d)\\..*" // 34.x.x.x
-    };
 
     // 私有IP地址段
     private static final String[] PRIVATE_IP_PATTERNS = {
@@ -491,7 +456,7 @@ public class CmsUtils {
      */
     private static String getDockerGatewayIp() {
         String os = System.getProperty("os.name").toLowerCase();
-        
+
         if (os.contains("windows")) {
             return getWindowsGatewayIp();
         } else {
@@ -771,16 +736,9 @@ public class CmsUtils {
         }
 
         /**
-         * 检查是否为云服务商IP
+         * 检查是否为云服务商IP（仅通过关键词判断）
          */
         private boolean checkIsCloudProvider() {
-            // 检查IP段是否匹配云服务商IP段
-            for (String pattern : CLOUD_IP_PATTERNS) {
-                if (ip.matches(pattern)) {
-                    return true;
-                }
-            }
-
             // 检查IP信息中是否包含云服务商关键词
             for (String keyword : CLOUD_KEYWORDS) {
                 if (location.contains(keyword) || isp.contains(keyword)) {
@@ -1139,7 +1097,8 @@ public class CmsUtils {
                     Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
                     while (addresses.hasMoreElements()) {
                         InetAddress address = addresses.nextElement();
-                        if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+                        if (address instanceof Inet4Address && !address.isLoopbackAddress()
+                                && !address.isLinkLocalAddress()) {
                             String ip = address.getHostAddress();
 
                             // 优先返回无线或有线接口的IP
@@ -1172,7 +1131,8 @@ public class CmsUtils {
                     Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
                     while (addresses.hasMoreElements()) {
                         InetAddress address = addresses.nextElement();
-                        if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+                        if (address instanceof Inet4Address && !address.isLoopbackAddress()
+                                && !address.isLinkLocalAddress()) {
                             return address.getHostAddress();
                         }
                     }

@@ -1,8 +1,6 @@
 package com.xiaozhi.dialogue.service;
 
 import com.xiaozhi.utils.EmojiUtils;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
@@ -11,10 +9,9 @@ import java.util.regex.Pattern;
 
 /**
  * 句子处理帮助类。
- * TODO 考虑将此类实现为订阅者。将DialogueService的handleSentence方法改为此类的方法或子类方法。
- * @see org.reactivestreams.Subscriber
+ * 有状态的实例，不要复用，用完就丢弃。
  */
-class DialogueHelper {
+class DialogueHelper implements ChatConverter {
     // 句子结束标点符号模式（中英文句号、感叹号、问号）
     private static final Pattern SENTENCE_END_PATTERN = Pattern.compile("[。！？!?]");
 
@@ -32,8 +29,6 @@ class DialogueHelper {
 
     final StringBuilder currentSentence = new StringBuilder(); // 当前句子的缓冲区
     final StringBuilder contextBuffer = new StringBuilder(); // 上下文缓冲区，用于检测数字中的小数点
-
-
 
 
     public DialogueHelper( ) {
@@ -120,17 +115,13 @@ class DialogueHelper {
     }
 
     public void onComplete(FluxSink sink) {
-        // 检查该会话是否已完成处理
-        // 处理当前缓冲区剩余的内容（如果有）
         String sentence = currentSentence.toString().trim();
-
-        if (StringUtils.hasText(sentence)) {
-            // 这是最后一个句子
-            // 即使句子很短，也要发送（比如"再见"这样的词）
+        // 过滤颜文字
+        sentence = EmojiUtils.filterKaomoji(sentence);
+        if (containsSubstantialContent(sentence)) {
             sink.next(sentence);
         }
         sink.complete();
-
     }
     /**
      * 判断文本是否包含实质性内容（不仅仅是空白字符或标点符号）
@@ -143,27 +134,26 @@ class DialogueHelper {
             return false;
         }
 
-        // 移除所有标点符号和空白字符后，检查是否还有内容
-        String stripped = text.replaceAll("[\\p{P}\\s]", "");
-        return stripped.length() >= 2; // 至少有两个非标点非空白字符
+        // 移除标点、空白、emoji 后，检查是否还有实质文字内容
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < text.length(); ) {
+            int cp = text.codePointAt(i);
+            if (!EmojiUtils.isEmoji(cp)) {
+                sb.appendCodePoint(cp);
+            }
+            i += Character.charCount(cp);
+        }
+        String stripped = sb.toString().replaceAll("[\\p{P}\\s]", "");
+        return stripped.length() >= 2;
     }
 
-    public Flux<String> convert(Flux<ChatResponse> chatResponseFlux){
-        return chatResponseFlux.map(chatResponse -> {
-            String token = chatResponse.getResult() == null
-                    || chatResponse.getResult().getOutput() == null
-                    || chatResponse.getResult().getOutput().getText() == null ? ""
-                    : chatResponse.getResult().getOutput().getText();
-            return token;
-        });
-    }
 
     // 使用句子切分处理响应
-    public Flux<String> convert2sentence(Flux<ChatResponse> chatResponseFlux) {
+    public Flux<String> convert(Flux<String> stringFlux) {
 
         // 转换为句子流
         Flux<String> sentenceFlux = Flux.create(sink -> {
-            convert(chatResponseFlux).subscribe(token -> {
+            stringFlux.subscribe(token -> {
                         this.onToken(token, sink);
                     },
                     sink::error,
@@ -172,5 +162,3 @@ class DialogueHelper {
         return sentenceFlux;
     }
 }
-
-//

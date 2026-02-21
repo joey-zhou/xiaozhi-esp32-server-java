@@ -61,7 +61,7 @@
             <if test="roleName != null and roleName != ''">AND roleName LIKE CONCAT('%', #{roleName}, '%')</if>
             <if test="state != null and state != ''">AND sys_device.state = #{state}</if>
             <if test="roleId != null and roleId != ''">AND sys_device.roleId = #{roleId}</if>
-
+        ORDER BY sys_device.createTime DESC
     </select>
 
     <select id="selectDeviceById" resultMap="BaseResultMap">

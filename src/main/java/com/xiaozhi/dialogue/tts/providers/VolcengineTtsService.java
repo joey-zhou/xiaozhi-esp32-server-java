@@ -23,6 +23,11 @@ public class VolcengineTtsService implements TtsService {
     private static final String API_URL = "https://openspeech.bytedance.com/api/v1/tts";
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
+    // 重试机制常量
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+    private static final long RETRY_DELAY_MS = 1000;
+
+
     // 音频名称
     private String voiceName;
 
@@ -75,23 +80,39 @@ public class VolcengineTtsService implements TtsService {
             return null;
         }
 
-        try {
-            // 生成音频文件名
-            String audioFileName = getAudioFileName();
-            String audioFilePath = outputPath + audioFileName;
+        int attempts = 0;
+        while (attempts < MAX_RETRY_ATTEMPTS) {
+            try {
+                // 生成音频文件名
+                String audioFileName = getAudioFileName();
+                String audioFilePath = outputPath + audioFileName;
 
-            // 发送POST请求
-            boolean success = sendRequest(text, audioFilePath);
+                // 发送POST请求
+                boolean success = sendRequest(text, audioFilePath);
 
-            if (success) {
-                return audioFilePath;
-            } else {
-                throw new Exception("语音合成失败");
+                if (success) {
+                    return audioFilePath;
+                } else {
+                    throw new Exception("语音合成失败");
+                }
+            } catch (Exception e) {
+                attempts++;
+                if (attempts < MAX_RETRY_ATTEMPTS) {
+                    logger.warn("火山语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
+                    try {
+                        Thread.sleep(RETRY_DELAY_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        logger.error("重试等待被中断", ie);
+                        throw e;
+                    }
+                } else {
+                    logger.error("火山语音合成失败，已达到最大重试次数", e);
+                    throw e;
+                }
             }
-        } catch (Exception e) {
-            logger.error("语音合成时发生错误！", e);
-            throw e;
         }
+        throw new Exception("语音合成失败");
     }
 
     /**

@@ -3,10 +3,13 @@ package com.xiaozhi.dialogue.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xiaozhi.communication.common.ChatSession;
+import com.xiaozhi.event.TtsPlaybackEndEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +18,12 @@ public class MessageService {
 
     private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private final ApplicationEventPublisher eventPublisher;
+
+    public MessageService(ApplicationEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
+    }
 
     /**
      * 发送格式消息给指定会话
@@ -25,7 +34,7 @@ public class MessageService {
      */
     public void sendTtsMessage(ChatSession session, String text, String state) {
         if (session == null || !session.isOpen()) {
-            logger.warn("sendTtsMessage无法发送消息 - 会话已关闭或为null");
+            logger.error("ChatSession为null 或者已关闭，请检查！{}", Arrays.toString(Thread.currentThread().getStackTrace()));
         }
         ObjectNode messageJson = objectMapper.createObjectNode();
         messageJson.put("type", "tts");
@@ -37,6 +46,13 @@ public class MessageService {
         String jsonMessage = messageJson.toString();
         logger.info("sendTtsMessage发送消息 - SessionId: {}, Message: {}", session.getSessionId(), jsonMessage);
         sendTextMessage(session, jsonMessage);
+
+        if ("stop".equals(state)) {
+            // 无论是正常结束还是 abort 路径，统一在此更新 session 播放状态
+            session.setPlaying(false);
+            // TTS 播放结束时发布事件，通知 VadService 重置 Silero 隐状态
+            eventPublisher.publishEvent(new TtsPlaybackEndEvent(session));
+        }
     }
 
     /**

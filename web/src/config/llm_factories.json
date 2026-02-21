@@ -1003,72 +1003,58 @@
             "status": "1",
             "llm": [
                 {
-                    "llm_name": "doubao-seed-1.6",
+                    "llm_name": "doubao-seed-1-6-250615",
                     "tags": "LLM,CHAT,256K,IMAGE2TEXT,REASONING",
                     "max_tokens": 256000,
                     "model_type": "chat",
                     "is_tools": true
                 },
                 {
-                    "llm_name": "doubao-seed-1.6-lite",
+                    "llm_name": "doubao-seed-1-6-lite-251015",
                     "tags": "LLM,CHAT,256K,IMAGE2TEXT,REASONING",
                     "max_tokens": 256000,
                     "model_type": "chat",
                     "is_tools": true
                 },
                 {
-                    "llm_name": "doubao-seed-1.6-flash",
+                    "llm_name": "doubao-seed-1-6-flash-250828",
                     "tags": "LLM,CHAT,256K,IMAGE2TEXT,FAST,REASONING",
                     "max_tokens": 256000,
                     "model_type": "chat",
                     "is_tools": true
                 },
                 {
-                    "llm_name": "doubao-seed-1.6-thinking",
+                    "llm_name": "doubao-seed-1-6-thinking-250715",
                     "tags": "LLM,CHAT,256K,REASONING,IMAGE2TEXT",
                     "max_tokens": 256000,
                     "model_type": "chat",
                     "is_tools": true
                 },
                 {
-                    "llm_name": "doubao-seed-1.6-vision",
+                    "llm_name": "doubao-seed-1-6-vision-250815",
                     "tags": "LLM,CHAT,256K,IMAGE2TEXT,REASONING,GUI",
                     "max_tokens": 256000,
                     "model_type": "image2text",
                     "is_tools": true
                 },
                 {
-                    "llm_name": "deepseek-v3.1",
+                    "llm_name": "deepseek-v3-1-250821",
                     "tags": "LLM,CHAT,128K,REASONING",
                     "max_tokens": 128000,
                     "model_type": "chat",
                     "is_tools": true
                 },
                 {
-                    "llm_name": "doubao-1.5-pro-32k",
+                    "llm_name": "doubao-1-5-pro-32k-250115",
                     "tags": "LLM,CHAT,32K,CHARACTER",
                     "max_tokens": 32768,
                     "model_type": "chat",
                     "is_tools": false
                 },
                 {
-                    "llm_name": "doubao-embedding-large",
+                    "llm_name": "doubao-embedding-text-240715",
                     "tags": "TEXT EMBEDDING",
                     "max_tokens": 4096,
-                    "model_type": "embedding",
-                    "is_tools": false
-                },
-                {
-                    "llm_name": "doubao-embedding",
-                    "tags": "TEXT EMBEDDING",
-                    "max_tokens": 4096,
-                    "model_type": "embedding",
-                    "is_tools": false
-                },
-                {
-                    "llm_name": "doubao-embedding-vision",
-                    "tags": "TEXT EMBEDDING,IMAGE2TEXT,MULTIMODAL",
-                    "max_tokens": 128000,
                     "model_type": "embedding",
                     "is_tools": false
                 }
@@ -3649,6 +3635,93 @@
                     "tags": "LLM,IMAGE2TEXT,6k",
                     "max_tokens": 6144,
                     "model_type": "image2text"
+                },
+                {
+                    "llm_name": "hunyuan-t1-vision-20250916",
+                    "tags": "LLM,IMAGE2TEXT,REASONING,28k",
+                    "max_tokens": 28672,
+                    "model_type": "image2text"
+                },
+                {
+                    "llm_name": "hunyuan-turbos-vision",
+                    "tags": "LLM,IMAGE2TEXT,16k",
+                    "max_tokens": 16384,
+                    "model_type": "image2text"
+                },
+                {
+                    "llm_name": "hunyuan-turbos-vision-20250619",
+                    "tags": "LLM,IMAGE2TEXT,16k",
+                    "max_tokens": 16384,
+                    "model_type": "image2text"
+                },
+                {
+                    "llm_name": "hunyuan-large-vision",
+                    "tags": "LLM,IMAGE2TEXT,24k",
+                    "max_tokens": 24576,
+                    "model_type": "image2text"
+                },
+                {
+                    "llm_name": "hunyuan-vision",
+                    "tags": "LLM,IMAGE2TEXT,6k",
+                    "max_tokens": 6144,
+                    "model_type": "image2text"
+                }
+            ]
+        },
+        {
+            "name": "XunFei Spark",
+            "logo": "",
+            "tags": "LLM,TTS",
+            "status": "1",
+            "llm": [
+                {
+                    "llm_name": "x1",
+                    "tags": "LLM,CHAT,REASONING,8K",
+                    "max_tokens": 8192,
+                    "model_type": "chat",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "general",
+                    "tags": "LLM,CHAT,8K",
+                    "max_tokens": 8192,
+                    "model_type": "chat",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "generalv3",
+                    "tags": "LLM,CHAT,8K",
+                    "max_tokens": 8192,
+                    "model_type": "chat",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "generalv3-128k",
+                    "tags": "LLM,CHAT,128K",
+                    "max_tokens": 128000,
+                    "model_type": "chat",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "generalv3.5",
+                    "tags": "LLM,CHAT,8K",
+                    "max_tokens": 8192,
+                    "model_type": "chat",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "generalv3.5-32k",
+                    "tags": "LLM,CHAT,32K",
+                    "max_tokens": 32768,
+                    "model_type": "chat",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "4.0Ultra",
+                    "tags": "LLM,CHAT,8K",
+                    "max_tokens": 8192,
+                    "model_type": "chat",
+                    "is_tools": true
                 }
             ]
         },

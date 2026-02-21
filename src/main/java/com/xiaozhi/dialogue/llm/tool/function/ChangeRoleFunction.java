@@ -2,11 +2,11 @@ package com.xiaozhi.dialogue.llm.tool.function;
 
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.communication.common.ChatSession;
-import com.xiaozhi.dialogue.llm.memory.Conversation;
-import com.xiaozhi.dialogue.llm.memory.ConversationFactory;
+import com.xiaozhi.dialogue.llm.ChatService;
 import com.xiaozhi.dialogue.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.dialogue.llm.tool.ToolsGlobalRegistry;
 import com.xiaozhi.dialogue.llm.tool.XiaozhiToolMetadata;
+import com.xiaozhi.dialogue.service.Persona;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysRole;
 import com.xiaozhi.service.SysDeviceService;
@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
-import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Lazy;
 
 import java.util.List;
 import java.util.Map;
@@ -35,7 +35,8 @@ public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
     @Resource
     private SysDeviceService sysDeviceService;
     @Resource
-    ConversationFactory conversationFactory;
+    @Lazy
+    private ChatService chatService;
 
     @Override
     public ToolCallback getFunctionCallTool(ChatSession chatSession) {
@@ -60,11 +61,12 @@ public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
                                 sysDevice.setRoleId(role.getRoleId());
                                 sysDeviceService.update(sysDevice);
                                 // 切换了角色，需要更换Conversation
-                                if(chatSession.getConversation()!=null){
-                                    chatSession.getConversation().clear();
+                                if(chatSession.getPersona().getConversation()!=null){
+                                    chatSession.getPersona().getConversation().clear();
                                 }
-                                Conversation conversation = conversationFactory.initConversation(sysDevice, role, chatSession.getSessionId());
-                                chatSession.setConversation(conversation);
+
+                                Persona persona = chatService.buildPersona(chatSession, sysDevice, role);
+                                chatSession.setPersona(persona);
                                 return "角色已切换至" + roleName;
                             }else{
                                 return "角色切换失败, 没有对应角色哦";

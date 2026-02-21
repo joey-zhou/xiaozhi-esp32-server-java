@@ -297,6 +297,8 @@ export default {
     clearingMemory: '正在清除记忆...',
     memoryType: '记忆类型',
     windowMemory: '短期记忆',
+    summaryMemory: '摘要记忆',
+    longMemory: '长期记忆',
     allMemory: '全部记忆',
   },
 
@@ -379,6 +381,9 @@ export default {
     voskLocalRecognition: 'Vosk本地识别',
     unknownModel: '未知模型',
     voiceTestMessage: '您好，我是您的语音助手，很高兴为您服务',
+
+    // MCP 相关
+    mcpTools: 'MCP Tools',
     
     // 记忆类型配置
     memoryTypeSettings: '记忆类型配置',
@@ -651,6 +656,8 @@ export default {
       agent: '智能体管理',
       sttConfig: '语音识别配置',
       ttsConfig: '语音合成配置',
+      shortTermMemory: '短期记忆',
+      summaryMemory: '记忆总结',
       chat: '聊天',
       account: '个人中心',
       personalConfig: '个人设置',
@@ -661,6 +668,7 @@ export default {
       roleManagement: '角色管理',
       configManagement: '配置管理',
       settings: '设置',
+      memoryManagement: '记忆管理',
     },
   },
 
@@ -729,6 +737,7 @@ export default {
 
   memory: {
     chat: '聊天记录',
+    summary: '摘要',
     content: '内容',
     confirmDelete: '确定要删除该记忆吗？此操作不可恢复。',
   },

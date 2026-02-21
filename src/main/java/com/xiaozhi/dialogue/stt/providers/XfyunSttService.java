@@ -18,7 +18,7 @@ import okhttp3.WebSocketListener;
 import org.springframework.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Sinks;
+import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import javax.crypto.Mac;
@@ -209,7 +209,7 @@ public class XfyunSttService implements SttService {
     }
 
     @Override
-    public String streamRecognition(Sinks.Many<byte[]> audioSink) {
+    public String streamRecognition(Flux<byte[]> audioSink) {
         // 检查配置是否已设置
         if (secretId == null || secretKey == null || appId == null) {
             logger.error("讯飞云语音识别配置未设置，无法进行识别");
@@ -244,8 +244,7 @@ public class XfyunSttService implements SttService {
                 isClosed.set(false);
                 Thread.startVirtualThread(() -> {
                     // 使用 Flux 订阅音频流
-                    audioSink.asFlux()
-                            .subscribeOn(Schedulers.single())  // 保证顺序执行
+                    audioSink.subscribeOn(Schedulers.single())  // 保证顺序执行
                             .subscribe(
                                     chunk -> {
                                         if (isClosed.get()) return;

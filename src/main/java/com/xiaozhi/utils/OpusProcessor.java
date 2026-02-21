@@ -55,6 +55,45 @@ public class OpusProcessor {
     }
 
     /**
+     * 刷新残留数据，生成最后一帧
+     */
+    public List<byte[]> flushLeftover() {
+        LeftoverState state = leftoverStates;
+        List<byte[]> frames = new ArrayList<>();
+
+        if (state.leftoverCount <= 0) {
+            return frames;
+        }
+
+        // 获取编码器
+        OpusEncoder encoder = encoders;
+
+        // 准备缓冲区
+        short[] shortBuf = new short[FRAME_SIZE];
+        byte[] opusBuf = new byte[MAX_SIZE];
+
+        // 复制残留数据并填充静音
+        System.arraycopy(state.leftoverBuffer, 0, shortBuf, 0, state.leftoverCount);
+        Arrays.fill(shortBuf, state.leftoverCount, FRAME_SIZE, (short) 0);
+
+        try {
+            // 编码最后一帧
+            int opusLen = encoder.encode(shortBuf, 0, FRAME_SIZE, opusBuf, 0, opusBuf.length);
+            if (opusLen > 0) {
+                byte[] frame = new byte[opusLen];
+                System.arraycopy(opusBuf, 0, frame, 0, opusLen);
+                frames.add(frame);
+            }
+        } catch (OpusException e) {
+            logger.warn("残留数据编码失败: {}", e.getMessage());
+        }
+
+        // 清空缓存
+        state.clear();
+        return frames;
+    }
+
+    /**
      * Opus转PCM字节数组
      */
     public byte[] opusToPcm(byte[] data) throws OpusException {

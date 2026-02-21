@@ -53,8 +53,10 @@ public class DifyChatModel implements ChatModel {
             logger.debug("回复: {}", response.getAnswer());
             logger.debug("会话ID: {}", response.getConversationId());
             logger.debug("消息ID: {}", response.getMessageId());
-            Map metadata = Map.of("messageId", response.getMessageId(), "conversationId", response.getConversationId());
-            return new ChatResponse(List.of(new Generation(AssistantMessage.builder().content(response.getAnswer()).properties(metadata).build())));
+            return new ChatResponse(List.of(new Generation(AssistantMessage.builder()
+                    .content(response.getAnswer())
+                    .properties(Map.of("messageId", response.getMessageId(), "conversationId", response.getConversationId()))
+                    .build())));
 
         } catch (IOException e) {
             logger.error("错误: ", e);
@@ -81,12 +83,13 @@ public class DifyChatModel implements ChatModel {
                 chatClient.sendChatMessageStream(message, new ChatStreamCallback() {
                     @Override
                     public void onMessage(MessageEvent event) {
-                        AssistantMessage assistantMessage = AssistantMessage.builder().content(event.getAnswer())
-                                .properties(Map.of("messageId", event.getMessageId(),
-                                        "conversationId", event.getConversationId()))
-                                .build();
                         sink.next(ChatResponse.builder()
-                                .generations(List.of(new Generation(assistantMessage)))
+                                .generations(
+                                        List.of(new Generation(AssistantMessage.builder()
+                                                .content(event.getAnswer())
+                                                .properties(Map.of("messageId", event.getMessageId(),
+                                                        "conversationId", event.getConversationId()))
+                                                .build())))
                                 .build());
                     }
 

@@ -138,13 +138,14 @@ export function useRoleManager() {
       }
 
       // 2. 并行加载所有语音JSON文件
-      const [edgeVoices, aliyunVoices, aliyunNlsVoices, volcengineVoices, xfyunVoices, minimaxVoices] = await Promise.all([
+      const [edgeVoices, aliyunVoices, aliyunNlsVoices, volcengineVoices, xfyunVoices, minimaxVoices, tencentVoices] = await Promise.all([
         loadVoiceJson('/static/assets/edgeVoicesList.json', 'edge'),
         loadVoiceJson('/static/assets/aliyunVoicesList.json', 'aliyun'),
         loadVoiceJson('/static/assets/aliyunNlsVoicesList.json', 'aliyun-nls'),
         loadVoiceJson('/static/assets/volcengineVoicesList.json', 'volcengine'),
         loadVoiceJson('/static/assets/xfyunVoicesList.json', 'xfyun'),
-        loadVoiceJson('/static/assets/minimaxVoicesList.json', 'minimax')
+        loadVoiceJson('/static/assets/minimaxVoicesList.json', 'minimax'),
+        loadVoiceJson('/static/assets/tencentVoicesList.json', 'tencent')
       ])
 
       // 3. 合并所有语音，并关联TTS配置
@@ -162,7 +163,8 @@ export function useRoleManager() {
         'aliyun-nls': aliyunNlsVoices,
         volcengine: volcengineVoices,
         xfyun: xfyunVoices,
-        minimax: minimaxVoices
+        minimax: minimaxVoices,
+        tencent: tencentVoices
       }
 
       Object.entries(providerVoicesMap).forEach(([provider, providerVoices]) => {
@@ -279,10 +281,16 @@ export function useRoleManager() {
 
   /**
    * 根据语音名称获取语音信息
+   * @param voiceName 语音名称/ID
    */
   function getVoiceInfo(voiceName?: string) {
     if (!voiceName) return null
-    return allVoices.value.find(v => v.value === voiceName)
+
+    // 先在标准音色中查找
+    const voice = allVoices.value.find(v => v.value === voiceName)
+    if (voice) return voice
+
+    return null
   }
 
   /**
@@ -319,6 +327,13 @@ export function useRoleManager() {
     return colors[provider || 'edge'] || 'green'
   }
 
+  /**
+   * 获取所有可用音色
+   */
+  function getAllVoices(): VoiceOption[] {
+    return [...allVoices.value]
+  }
+
   return {
     // 状态
     modelLoading,
@@ -341,7 +356,8 @@ export function useRoleManager() {
     getModelInfo,
     getVoiceInfo,
     formatProviderName,
-    getVoiceTagColor
+    getVoiceTagColor,
+    getAllVoices
   }
 }
 

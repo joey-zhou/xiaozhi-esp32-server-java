@@ -1,7 +1,6 @@
 package com.xiaozhi.dialogue.llm.memory;
 
 import com.xiaozhi.entity.SysDevice;
-import com.xiaozhi.entity.SysMessage;
 import com.xiaozhi.entity.SysRole;
 import lombok.Getter;
 import org.slf4j.Logger;
@@ -14,8 +13,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
-import java.util.stream.Collectors;
 
+import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 import static java.time.temporal.ChronoField.*;
 
 /**
@@ -26,13 +25,14 @@ import static java.time.temporal.ChronoField.*;
  * deviceID与roleID本质上不是Conversation的真正属性，而是外键，代表连接的2个对象。
  * 只有sessionID是真正挂在Conversation的属性。
  *
- * Conversation 也不再负责消息的存储持久化，将其改为由ChatModel的ObservationHandler处理。
+ * Conversation 也不再负责消息的存储持久化。
  *
  */
-public class Conversation{
+public class Conversation extends ConversationIdentifier {
     private static final Logger logger = LoggerFactory.getLogger(Conversation.class);
-    public static final String MESSAGE_TYPE_ASSISTANT = "assistant";
+
     public static final String MESSAGE_TYPE_USER = "user";
+    public static final String MESSAGE_TYPE_ASSISTANT = "assistant";
     public static final AssistantMessage ROLLBACK_MESSAGE = new AssistantMessage("rollback");
     // device, role, sessionId 唯一确定一个Conversation,as key,通过final保持全程的不变性(immutable)
     private final SysDevice device;
@@ -53,7 +53,14 @@ public class Conversation{
             .appendValue(SECOND_OF_MINUTE, 2)
             .toFormatter();
 
+    /**
+     *
+     * @param device
+     * @param role
+     * @param sessionId
+     */
     public Conversation(SysDevice device, SysRole role, String sessionId) {
+        super(device.getDeviceId(), role.getRoleId(), sessionId);
         // final 属性的规范要求
         Assert.notNull(device, "device must not be null");
         Assert.notNull(role, "role must not be null");
@@ -100,6 +107,20 @@ public class Conversation{
         }
     }
 
+    @Deprecated
+    public static List<Message> buildDatetimeToolMessage() {
+        var assistantMessage = AssistantMessage.builder()
+                .content("当前日期时间")
+                .properties(Map.of())
+                .toolCalls(List.of(new AssistantMessage.ToolCall("current_date_time", "function", "current_date_time", "")))
+                .build();
+        var localDatetime = LocalDateTime.now();
+        var currentDateTime = ToolResponseMessage.builder()
+                .responses(List.of(new ToolResponseMessage.ToolResponse("current_date_time", "current_date_time", localDatetime.format(ISO_LOCAL_DATE_TIME))))
+                .build();
+        logger.debug("fake two messages of function calling for datetime:{} \n {}", assistantMessage, currentDateTime);
+        return List.of(assistantMessage, currentDateTime);
+    }
 
     /**
      * 当前Conversation的多轮消息列表。
@@ -110,16 +131,13 @@ public class Conversation{
 
     /**
      * 清理当前Conversation涉及的相关资源，包括缓存的消息列表。
-     * 不是所有的Conversation子类实现都是即时入库的，对于批量入库的，需要这个方法确保连接关闭时能清空入库。
      * 对于某些具体的子类实现，清理也可能是指删除当前Covnersation的消息。
      */
     public void clear(){
         messages.clear();
     }
 
-    public void add(Message message, Long timeMillis) {
-
-        ChatMemory.setTimeMillis(message, timeMillis);
+    public void add(Message message) {
 
         if(message instanceof UserMessage userMsg){
             messages.add(userMsg);
@@ -138,32 +156,6 @@ public class Conversation{
             // 2. 更新缓存
             messages.add(assistantMessage);
         }
-    }
-
-    /**
-     * 将数据库记录的SysMessag转换为spring-ai的Message。
-     *
-     * @param messages
-     * @return
-     */
-    public static List<Message> convert(List<SysMessage> messages) {
-        if (messages == null || messages.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return messages.stream()
-                .filter(message -> MessageType.ASSISTANT.getValue().equals(message.getSender())
-                        || MessageType.USER.getValue().equals(message.getSender()))
-                .map(message -> {
-                    String role = message.getSender();
-                    // 一般消息("messageType", "NORMAL");//默认为普通消息
-                    Map<String, Object> metadata = Map.of("messageId", message.getMessageId(), "messageType",
-                            message.getMessageType());
-                    return switch (role) {
-                        case MESSAGE_TYPE_ASSISTANT -> AssistantMessage.builder().content(message.getMessage()).properties(metadata).build();
-                        case MESSAGE_TYPE_USER -> UserMessage.builder().text(message.getMessage()).metadata(metadata).build();
-                        default -> throw new IllegalArgumentException("Invalid role: " + role);
-                    };
-                }).collect(Collectors.toList());
     }
 
 }

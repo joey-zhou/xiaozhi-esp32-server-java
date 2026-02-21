@@ -26,6 +26,7 @@ import type { PageQueryParams } from './api'
 export interface MessageQueryParams extends PageQueryParams {
   deviceId?: string
   deviceName?: string
+  roleId?: number
   sender?: string
   startTime?: string
   endTime?: string

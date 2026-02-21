@@ -20,7 +20,7 @@ import org.springframework.format.annotation.DateTimeFormat;
  */
 @Getter
 @Accessors(chain = true)
-@JsonIgnoreProperties({ "start", "limit", "userId", "startTime", "endTime" })
+@JsonIgnoreProperties({ "start", "limit", "startTime", "endTime" })
 @Schema(description = "基础信息")
 public class Base<T extends Base<T>> implements java.io.Serializable {
     /**

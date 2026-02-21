@@ -5,11 +5,11 @@ import com.xiaozhi.dialogue.llm.memory.Conversation;
 import com.xiaozhi.dialogue.llm.tool.ToolsSessionHolder;
 import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpHolder;
 import com.xiaozhi.dialogue.service.Player;
-import com.xiaozhi.dialogue.service.Synthesizer;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysRole;
 import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.dialogue.service.Persona;
 import lombok.Data;
 import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Sinks;
@@ -20,10 +20,12 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Data
 public abstract class ChatSession {
@@ -40,13 +42,9 @@ public abstract class ChatSession {
      * TODO ChangeRoleFunction.java 已从数据库中获取，所以这里实际没有被用到。
      */
     protected List<SysRole> sysRoleList;
-    /**
-     * 一个Session在某个时刻，只有一个活跃的Conversation。
-     * 当切换角色时，Conversation应该释放新建。切换角色一般是不频繁的。
-     */
-    protected Conversation conversation;
 
-    protected Synthesizer synthesizer;
+    protected Persona persona;
+
     /**
      * 设备iot信息
      */
@@ -56,10 +54,6 @@ public abstract class ChatSession {
      */
     protected ToolsSessionHolder toolsSessionHolder;
 
-    /**
-     * 当前语音发送完毕后，是否关闭session
-     */
-    protected boolean closeAfterChat;
     /**
      * 是否正在播放音乐
      */
@@ -79,6 +73,7 @@ public abstract class ChatSession {
     protected ListenMode mode;
     /**
      * 会话的音频数据流
+     * TODO 也考虑改为在Persona中处理。
      */
     protected Sinks.Many<byte[]> audioSinks;
     /**
@@ -89,15 +84,35 @@ public abstract class ChatSession {
      * 会话的最后有效活动时间
      */
     protected Instant lastActivityTime;
+
     /**
-     * 当前session是否支持function_call
+     * 当前对话轮次中的工具调用详情列表（包括内置Function和MCP工具）
+     * 由 XiaoZhiToolCallingManager 在执行工具时追加，由 Persona 在消息保存后清空。
      */
-    protected boolean supportFunctionCall = true;
+    protected final List<ToolCallInfo> toolCallDetails = new CopyOnWriteArrayList<>();
+
+    /**
+     * 工具调用详情
+     */
+    public record ToolCallInfo(String name, String arguments, String result) {}
+
+    public void addToolCallDetail(String name, String arguments, String result) {
+        toolCallDetails.add(new ToolCallInfo(name, arguments, result));
+    }
+
+    public List<ToolCallInfo> drainToolCallDetails() {
+        List<ToolCallInfo> details = new ArrayList<>(toolCallDetails);
+        toolCallDetails.clear();
+        return details;
+    }
+
+    public boolean isFunctionCalled() {
+        return !toolCallDetails.isEmpty();
+    }
 
     /**
      * 最近一次对话的模型响应时间及TTS响应时间
      */
-    public static final String ATTR_FIRST_MODEL_RESPONSE_TIME = "firstModelResponseTime";
     public static final String ATTR_FIRST_TTS_RESPONSE_TIME = "firstTtsResponseTime";
     /**
      * 会话属性存储
@@ -124,12 +139,15 @@ public abstract class ChatSession {
         return attributes.get(key);
     }
 
-    public void setAssistantTimeMillis(Long assistantTimeMillis) {
-        setAttribute("assistantTimeMillis", assistantTimeMillis);
-    }
-
-    public Long getAssistantTimeMillis() {
-        return (Long) getAttribute("assistantTimeMillis");
+    public void clearAudioSinks(){
+        // 清理音频流
+        Sinks.Many<byte[]> sink = getAudioSinks();
+        if (sink != null) {
+            sink.tryEmitComplete();
+        }
+        // 重置会话状态
+        setStreamingState(false);
+        setAudioSinks(null);
     }
 
     /**
@@ -140,9 +158,9 @@ public abstract class ChatSession {
      * @param who
      * @return
      */
-    public Path getAudioPath(String who, Long timeMillis) {
+    public Path getAudioPath(String who, Instant instant) {
 
-        Instant instant = Instant.ofEpochMilli(timeMillis).truncatedTo(ChronoUnit.SECONDS);
+        instant = instant.truncatedTo(ChronoUnit.SECONDS);
 
         LocalDateTime localDateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
         String datetime = localDateTime.format(DateTimeFormatter.ISO_DATE_TIME).replace(":", "");
@@ -175,34 +193,10 @@ public abstract class ChatSession {
      */
     public abstract boolean isOpen();
 
-    /**
-     * 音频通道是否打开可用
-     *
-     * @return
-     */
-
     public abstract void close();
 
     public abstract void sendTextMessage(String message);
 
     public abstract void sendBinaryMessage(byte[] message);
 
-    /**
-     * 设置 Conversation，需要与当前活跃角色一致。
-     * 当切换角色时，会释放当前 Conversation，并新建一个对应于新角色的Conversation。
-     *
-     * @param conversation
-     */
-    public void setConversation(Conversation conversation) {
-        this.conversation = conversation;
-    }
-
-    /**
-     * 获取与当前活跃角色一致的 Conversation。
-     *
-     * @return
-     */
-    public Conversation getConversation() {
-        return conversation;
-    }
 }

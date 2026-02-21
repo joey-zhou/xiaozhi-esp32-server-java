@@ -18,8 +18,7 @@ import org.springframework.util.MimeType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 视觉对话
@@ -48,16 +47,34 @@ public class VLChatController extends BaseController {
         try {
             //获取当前下发的session信息
             String authorization = request.getHeader("authorization");
-            logger.info("用户authorization：{}", authorization);
+            logger.info("用户Authorization：{}", authorization);
+
+            // 检查 Authorization header 是否存在
+            if (authorization == null || authorization.isEmpty()) {
+                logger.error("Authorization header 不存在");
+                return createErrorResponse("缺少认证信息");
+            }
+
+            // 检查是否是 Bearer token 格式
+            if (!authorization.startsWith("Bearer ")) {
+                logger.error("Authorization header 格式错误: {}", authorization);
+                return createErrorResponse("认证格式错误，应为: Bearer <token>");
+            }
+
             //下发的是session
             String sessionId = authorization.substring(7);
 
             ChatSession session = sessionManager.getSession(sessionId);
             if (session == null) {
-                return "session不存在";
+                logger.error("session不存在: {}", sessionId);
+                return createErrorResponse("session不存在");
             }
 
             ChatModel chatModel = chatModelFactory.takeVisionModel();
+            if (chatModel == null) {
+                logger.error("无可用的视觉模型");
+                return createErrorResponse("无可用的视觉模型");
+            }
 
             MimeType mimeType = MimeType.valueOf(file.getContentType());
             Media media = Media.builder()
@@ -80,8 +97,23 @@ public class VLChatController extends BaseController {
 
             return string;
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
-            return "无可以使用的视觉模型";
+            logger.error("视觉对话处理失败", e);
+            return createErrorResponse("视觉对话处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 创建错误响应
+     */
+    private String createErrorResponse(String errorMessage) {
+        try {
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", false);
+            result.put("error", errorMessage);
+            return new ObjectMapper().writeValueAsString(result);
+        } catch (Exception e) {
+            logger.error("创建错误响应失败", e);
+            return "{\"success\":false,\"error\":\"" + errorMessage + "\"}";
         }
     }
 }

@@ -264,64 +264,6 @@ public class OpenAiLlmService {
         void onToken(String token);
     }
 
-    public boolean testFunctionCall(){
-        List<Map<String, Object>> formattedMessages = new ArrayList<>();
-        // 添加提示词信息
-        Map<String, Object> systemMsg = new HashMap<>();
-        systemMsg.put("role", "system");
-        systemMsg.put("content", "你是一个工具助手，能够调用函数来完成任务。目前只有一个function: test_function");
-        formattedMessages.add(systemMsg);
-
-        // 添加当前用户消息
-        Map<String, Object> currentUserMsg = new HashMap<>();
-        currentUserMsg.put("role", "user");
-        currentUserMsg.put("content", "帮我调用function: test_function");
-        formattedMessages.add(currentUserMsg);
-
-        Map<String , Object> functionCall = new HashMap<>();
-        functionCall.put("type", "function");
-        Map<String , Object> functionDef = new HashMap<>();
-        functionDef.put("name", "test_function");
-        functionDef.put("description", "这是函数test_function");
-        functionCall.put("function", functionDef);
-
-        // 构建请求体
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("messages", formattedMessages);
-        requestBody.put("tools", List.of(functionCall));
-        try{
-            // 转换为JSON
-            String jsonBody = objectMapper.writeValueAsString(requestBody);
-            // 构建请求
-            Request request = new Request.Builder()
-                    .url(endpoint + "/chat/completions")
-                    .post(RequestBody.create(jsonBody, JSON))
-                    .addHeader("Authorization", "Bearer " + apiKey)
-                    .build();
-            // 发送请求
-            try (Response response = client.newCall(request).execute()) {
-                if (!response.isSuccessful()) {
-                    return false;
-                }
-                String responseBody = response.body().string();
-
-                Map<String, Object> responseMap = objectMapper.readValue(responseBody,
-                        new TypeReference<>() {});
-                List<Map<String, Object>> choices = (List<Map<String, Object>>) responseMap.get("choices");
-                if (choices != null && !choices.isEmpty()) {
-                    Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-                    if (message != null) {
-                        return message.containsKey("tool_calls");
-                    }
-                }
-            }
-        }catch (Exception e){
-            logger.error("调用{}模型检查是否支持FunctionCall发生错误", model, e);
-        }
-        return false;
-    }
-
     public String getModel() {
         return model;
     }

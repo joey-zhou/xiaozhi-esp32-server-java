@@ -87,6 +87,13 @@ spring:
   profiles:
     active: dev
 
+  # Neo4j 配置（公共部分）
+  neo4j:
+    uri: bolt://localhost:7687
+    authentication:
+      username: neo4j
+      password: 12345678
+
 # ============================================================
 # 日志配置
 # ============================================================

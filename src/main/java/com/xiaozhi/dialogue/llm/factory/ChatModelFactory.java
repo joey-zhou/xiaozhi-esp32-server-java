@@ -1,7 +1,6 @@
 package com.xiaozhi.dialogue.llm.factory;
 
 import com.xiaozhi.communication.common.ChatSession;
-import com.xiaozhi.dialogue.llm.providers.OpenAiLlmService;
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysRole;
@@ -90,7 +89,6 @@ public class ChatModelFactory {
         Assert.notNull(config, "未配置意图识别模型");
         return createChatModel(config, new SysRole());
     }
-
 
     /**
      * 根据角色ID创建ChatModel

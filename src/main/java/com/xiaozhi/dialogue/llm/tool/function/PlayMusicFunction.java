@@ -4,24 +4,32 @@ import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.dialogue.llm.ChatService;
 import com.xiaozhi.dialogue.llm.tool.ToolsGlobalRegistry;
 import com.xiaozhi.dialogue.llm.tool.ToolCallStringResultConverter;
-import com.xiaozhi.dialogue.service.MusicService;
-import jakarta.annotation.Resource;
+import com.xiaozhi.dialogue.service.MessageService;
+import com.xiaozhi.dialogue.service.MusicPlayer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.ai.tool.metadata.ToolMetadata;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-// @Component  // 音乐服务已停用，暂时禁用此功能
+//@Component
 public class PlayMusicFunction implements ToolsGlobalRegistry.GlobalFunction {
     private static final Logger logger = LoggerFactory.getLogger(PlayMusicFunction.class);
-
-    @Resource
-    private MusicService musicService;
+    // 使用虚拟线程执行器处理定时任务
+    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(
+            Runtime.getRuntime().availableProcessors(),
+            Thread.ofVirtual().name("music-scheduler-", 0).factory());
+    @Autowired
+    private MessageService messageService;
 
     ToolCallback toolCallback = FunctionToolCallback
             .builder("func_playMusic", (Map<String, String> params, ToolContext toolContext) -> {
@@ -31,7 +39,11 @@ public class PlayMusicFunction implements ToolsGlobalRegistry.GlobalFunction {
                     if (songName == null || songName.isEmpty()) {
                         return "音乐播放失败";
                     }else{
-                        musicService.newMusicPlayer(chatSession,songName, null).play();
+                        scheduler.schedule(() -> {
+                            // 必须异步处理，也就是先返回一个回应用户的字符串，再开始播放。
+                            new MusicPlayer(chatSession,songName, null).play();
+                        },60, TimeUnit.MILLISECONDS);
+
                         return "尝试播放歌曲《"+songName+"》";
                     }
                 }catch (Exception e){

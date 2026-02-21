@@ -29,7 +29,7 @@ export function useMemoryView() {
     }
 
     router.push({
-      path: '/memory-management',
+      path: '/memory/chat',
       query
     })
   }

@@ -2,6 +2,7 @@ package com.xiaozhi.service;
 
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.entity.SysMessage;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -20,6 +21,9 @@ public interface SysMessageService {
    * @return
    */
   int add(SysMessage message);
+
+  @Transactional
+  int saveAll(List<SysMessage> messages);
 
   /**
    * 查询聊天记录

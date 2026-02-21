@@ -2,6 +2,7 @@ import { http } from './request'
 import api from './api'
 import type { Role, RoleQueryParams, RoleFormData, TestVoiceParams } from '@/types/role'
 import type { PromptTemplate, TemplateQuery } from '@/types/template'
+import type { McpToolItem } from '@/types/mcpServer'
 import type { PageResponse, DataResponse } from '@/types/api'
 
 /**
@@ -38,3 +39,28 @@ export function deleteRole(roleId: number) {
 export function testVoice(data: Partial<TestVoiceParams>) {
   return http.get<string>(api.role.testVoice, data)
 }
+
+/**
+ * 获取系统全局工具列表
+ */
+export function getSystemGlobalTools() {
+  return http.getList<string>(api.mcpTool.getSystemGlobalTools, {})
+}
+
+/**
+ * 获取角色禁用的工具列表
+ */
+export function getDisabledTools(roleId: number) {
+  return http.get<{ roleDisabled: string[]; globalDisabled: string[] }>(
+    api.mcpTool.getDisabledTools,
+    { roleId }
+  )
+}
+
+/**
+ * 批量更新工具禁用状态
+ */
+export function updateToolsStatus(roleId: number, excludeTools: string[]) {
+  return http.postJSON(api.mcpTool.batchSetExcludeTools, { roleId, excludeTools })
+}
+

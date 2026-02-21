@@ -87,6 +87,11 @@ export function setupErrorHandler(app: App) {
       return
     }
 
+    // 忽略音频解码失败（音频过短或格式问题，已在组件内处理）
+    if (reason?.message?.includes('Unable to decode audio data')) {
+      return
+    }
+
     // 检测动态导入失败（通常是因为部署了新版本，旧文件已被删除）
     if (
       reason?.message?.includes('Failed to fetch dynamically imported module') ||

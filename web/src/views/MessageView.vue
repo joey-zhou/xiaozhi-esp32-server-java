@@ -30,7 +30,7 @@ const {
 } = useTable<Message>()
 
 // 使用导出 composable
-const { exporting, exportToExcel } = useExport()
+const { exporting, exportToCSV } = useExport()
 
 // 查询表单
 const queryForm = reactive({
@@ -180,15 +180,31 @@ function getSenderText(sender: string) {
 
 // 导出消息数据（耗时操作，使用全局 loading）
 async function handleExport() {
-  if (!data.value || data.value.length === 0) {
-    antMessage.warning(t('export.noData'))
-    return
-  }
-  
   loadingStore.showLoading(t('common.exporting'))
   try {
-    // 导出为 Excel 格式（兼容 CSV）
-    await exportToExcel(data.value, {
+    // 先获取全部数据（设置较大的 limit）
+    const queryParams: MessageQueryParams = {
+      start: 1,
+      limit: 100000, // 获取全部数据
+      startTime: timeRange.value[0].format('YYYY-MM-DD HH:mm:ss'),
+      endTime: timeRange.value[1].format('YYYY-MM-DD HH:mm:ss'),
+    }
+    
+    if (queryForm.deviceId) queryParams.deviceId = queryForm.deviceId
+    if (queryForm.deviceName) queryParams.deviceName = queryForm.deviceName
+    if (queryForm.sender) queryParams.sender = queryForm.sender
+    
+    const res = await queryMessages(queryParams)
+    
+    if (res.code !== 200 || !res.data?.list || res.data.list.length === 0) {
+      antMessage.warning(t('export.noData'))
+      return
+    }
+    
+    const allData = res.data.list
+    
+    // 导出为 CSV 格式
+    await exportToCSV(allData, {
       filename: `messages_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}`,
       showLoading: false,  // 禁用内部的 message，使用全局 loading
       columns: [

@@ -10,6 +10,13 @@ spring:
     username: xiaozhi
     password: 123456
 
+  # Neo4j 配置
+  neo4j:
+    uri: bolt://localhost:7687
+    authentication:
+      username: neo4j
+      password: 12345678
+
 # 生产环境邮箱配置
 email:
   smtp:
@@ -37,3 +44,7 @@ sms:
 xiaozhi:
   server:
     domain: connectai.chat
+    
+dashscope:
+  api:
+    key: xxx

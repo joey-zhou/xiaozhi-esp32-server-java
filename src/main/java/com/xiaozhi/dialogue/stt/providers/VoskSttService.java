@@ -10,7 +10,7 @@ import org.vosk.LibVosk;
 import org.vosk.LogLevel;
 import org.vosk.Model;
 import org.vosk.Recognizer;
-import reactor.core.publisher.Sinks;
+import reactor.core.publisher.Flux;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -133,7 +133,7 @@ public class VoskSttService implements SttService {
     }
 
     @Override
-    public String streamRecognition(Sinks.Many<byte[]> audioSink) {
+    public String streamRecognition(Flux<byte[]> audioSink) {
         if (!isModelLoaded()) {
             logger.error("Vosk模型未加载，无法进行流式识别！");
             return null;
@@ -146,7 +146,7 @@ public class VoskSttService implements SttService {
         StringBuilder finalResult = new StringBuilder();
 
         // 订阅Sink并将数据放入队列
-        audioSink.asFlux().subscribe(
+        audioSink.subscribe(
                 data -> audioQueue.offer(data),
                 error -> {
                     logger.error("音频流处理错误", error);

@@ -447,8 +447,7 @@ public class XingHuoChatModel implements ChatModel {
                         .properties(Map.of("model", model))
                         .toolCalls(assistantToolCalls)
                         .build();
-
-                
+                        
                 ChatResponse chatResponse = ChatResponse.builder()
                         .generations(List.of(new Generation(assistantMessage)))
                         .build();

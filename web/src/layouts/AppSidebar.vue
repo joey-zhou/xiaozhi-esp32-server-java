@@ -38,7 +38,7 @@ function getMenuTitle(title?: string) {
 
     <!-- 菜单 -->
     <a-menu
-      v-model:open-keys="openKeys"
+      :open-keys="openKeys"
       v-model:selected-keys="selectedKeys"
       mode="inline"
       class="sidebar-menu"

@@ -21,7 +21,7 @@ export interface ExportColumn<T = unknown> {
   /**
    * 自定义格式化函数
    */
-  format?: (value: unknown, record: T) => string | number
+  format?: (value: any, record: T) => string | number
 }
 
 export interface ExportOptions<T = unknown> {

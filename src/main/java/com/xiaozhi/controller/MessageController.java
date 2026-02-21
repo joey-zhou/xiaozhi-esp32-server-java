@@ -1,10 +1,8 @@
 package com.xiaozhi.controller;
 
-import com.github.pagehelper.PageInfo;
 import com.xiaozhi.common.web.ResultMessage;
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.communication.common.SessionManager;
-import com.xiaozhi.dto.response.MessageDTO;
 import com.xiaozhi.entity.SysMessage;
 import com.xiaozhi.service.SysMessageService;
 import com.xiaozhi.utils.CmsUtils;
@@ -51,10 +49,7 @@ public class MessageController extends BaseController {
             message.setUserId(CmsUtils.getUserId());
             List<SysMessage> messageList = sysMessageService.query(message, pageFilter);
 
-            // 转换为DTO
-            List<MessageDTO> messageDTOList = DtoConverter.toMessageDTOList(messageList);
-
-            return ResultMessage.success(new PageInfo<>(messageDTOList));
+            return ResultMessage.success(DtoConverter.toPageInfo(messageList, DtoConverter::toMessageDTOList));
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
             return ResultMessage.error();

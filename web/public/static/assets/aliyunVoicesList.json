@@ -792,122 +792,283 @@
   },
   {
     "label": "Cherry - 芊悦",
-    "value": "Cherry",
+    "value": "qwen3-tts-flash-realtime:Cherry",
     "gender": "female",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash-realtime"
   },
   {
     "label": "Ethan - 晨煦",
-    "value": "Ethan",
+    "value": "qwen3-tts-flash:Ethan",
     "gender": "male",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash"
   },
   {
     "label": "Nofish - 不吃鱼",
-    "value": "Nofish",
+    "value": "qwen3-tts-flash-realtime:Nofish",
     "gender": "female",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash-realtime"
   },
   {
     "label": "Jennifer - 詹妮弗",
-    "value": "Jennifer",
+    "value": "qwen3-tts-flash-realtime:Jennifer",
     "gender": "female",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash-realtime"
   },
   {
     "label": "Ryan - 甜茶",
-    "value": "Ryan",
+    "value": "qwen3-tts-flash-realtime:Ryan",
     "gender": "male",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash-realtime"
   },
   {
     "label": "Katerina - 卡捷琳娜",
-    "value": "Katerina",
+    "value": "qwen3-tts-flash:Katerina",
     "gender": "female",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash"
   },
   {
     "label": "Elias - 墨讲师",
-    "value": "Elias",
+    "value": "qwen3-tts-flash-realtime:Elias",
     "gender": "male",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash-realtime"
   },
   {
     "label": "Jada - 上海阿珍",
-    "value": "Jada",
+    "value": "qwen3-tts-flash:Jada",
     "gender": "female",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash"
   },
   {
     "label": "Dylan - 北京晓东",
-    "value": "Dylan",
+    "value": "qwen3-tts-flash-realtime:Dylan",
     "gender": "male",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash-realtime"
   },
   {
     "label": "Sunny - 四川晴儿",
-    "value": "Sunny",
+    "value": "qwen3-tts-flash-realtime:Sunny",
     "gender": "female",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash-realtime"
   },
   {
     "label": "Li - 南京老李",
-    "value": "Li",
+    "value": "qwen3-tts-flash-realtime:Li",
     "gender": "male",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash-realtime"
   },
   {
     "label": "Marcus - 陕西秦川",
-    "value": "Marcus",
+    "value": "qwen3-tts-flash-realtime:Marcus",
     "gender": "male",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash-realtime"
   },
   {
     "label": "Roy - 闽南阿杰",
-    "value": "Roy",
+    "value": "qwen3-tts-flash:Roy",
     "gender": "male",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash"
   },
   {
     "label": "Peter - 天津李彼得",
-    "value": "Peter",
+    "value": "qwen3-tts-flash:Peter",
     "gender": "male",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash"
   },
   {
     "label": "Rocky - 粤语阿强",
-    "value": "Rocky",
+    "value": "qwen3-tts-flash-realtime:Rocky",
     "gender": "male",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash-realtime"
   },
   {
     "label": "Kiki - 粤语阿清",
-    "value": "Kiki",
+    "value": "qwen3-tts-flash:Kiki",
     "gender": "female",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash"
   },
   {
     "label": "Eric - 四川程川",
-    "value": "Eric",
+    "value": "qwen3-tts-flash-realtime:Eric",
     "gender": "male",
     "provider": "aliyun",
-    "model": "Qwen3"
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Serena - 苏瑶",
+    "value": "qwen3-tts-flash-realtime:Serena",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Chelsie - 千雪",
+    "value": "qwen3-tts-flash-realtime:Chelsie",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Momo - 茉兔",
+    "value": "qwen3-tts-flash-realtime:Momo",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Moon - 月白",
+    "value": "qwen3-tts-flash-realtime:Moon",
+    "gender": "male",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Maia - 四月",
+    "value": "qwen3-tts-flash-realtime:Maia",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Kai - 凯",
+    "value": "qwen3-tts-flash-realtime:Kai",
+    "gender": "male",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Bella - 萌宝",
+    "value": "qwen3-tts-flash-realtime:Bella",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Aiden - 艾登",
+    "value": "qwen3-tts-flash-realtime:Aiden",
+    "gender": "male",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "EldricSage - 沧明子",
+    "value": "qwen3-tts-flash-realtime:EldricSage",
+    "gender": "male",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Mia - 乖小妹",
+    "value": "qwen3-tts-flash-realtime:Mia",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Bellona - 燕铮莺",
+    "value": "qwen3-tts-flash-realtime:Bellona",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Vincent - 田叔",
+    "value": "qwen3-tts-flash-realtime:Vincent",
+    "gender": "male",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Bunny - 萌小姬",
+    "value": "qwen3-tts-flash-realtime:Bunny",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Arthur - 徐大爷",
+    "value": "qwen3-tts-flash-realtime:Arthur",
+    "gender": "male",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Ebona - 诡婆婆",
+    "value": "qwen3-tts-flash-realtime:Ebona",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Seren - 小婉",
+    "value": "qwen3-tts-flash-realtime:Seren",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Bodega - 博德加",
+    "value": "qwen3-tts-flash-realtime:Bodega",
+    "gender": "male",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Sonrisa - 索尼莎",
+    "value": "qwen3-tts-flash-realtime:Sonrisa",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Alek - 阿列克",
+    "value": "qwen3-tts-flash-realtime:Alek",
+    "gender": "male",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "OnoAnna - 小野杏",
+    "value": "qwen3-tts-flash-realtime:OnoAnna",
+    "gender": "female",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Lenn - 莱恩",
+    "value": "qwen3-tts-flash-realtime:Lenn",
+    "gender": "male",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Emilien - 埃米尔安",
+    "value": "qwen3-tts-flash-realtime:Emilien",
+    "gender": "male",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
+  },
+  {
+    "label": "Andre - 安德雷",
+    "value": "qwen3-tts-flash-realtime:Andre",
+    "gender": "male",
+    "provider": "aliyun",
+    "model": "qwen3-tts-flash-realtime"
   },
   {
     "label": "龙安洋(阳光大男孩)",

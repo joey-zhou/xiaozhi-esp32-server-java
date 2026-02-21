@@ -57,21 +57,12 @@ public class TtsServiceFactory {
      * 根据配置获取TTS服务（带pitch和speed参数）
      */
     public TtsService getTtsService(SysConfig config, String voiceName, Float pitch, Float speed) {
-        
-        config = !ObjectUtils.isEmpty(config) ? config : new SysConfig().setProvider(DEFAULT_PROVIDER);
+        final SysConfig finalConfig = !ObjectUtils.isEmpty(config) ? config : new SysConfig().setProvider(DEFAULT_PROVIDER);
+        String provider = finalConfig.getProvider();
+        String cacheKey = createCacheKey(finalConfig, provider, voiceName, pitch, speed);
 
-        // 如果提供商为空，则使用默认提供商
-        String provider = config.getProvider();
-        String cacheKey = createCacheKey(config, provider, voiceName, pitch, speed);
-
-        // 检查是否已有该配置的服务实例
-        if (serviceCache.containsKey(cacheKey)) {
-            return serviceCache.get(cacheKey);
-        }
-
-        TtsService newService = createApiService(config, voiceName, pitch, speed);
-        serviceCache.put(cacheKey, newService);
-        return newService;
+        // 使用 computeIfAbsent 确保原子性操作，避免并发创建多个实例
+        return serviceCache.computeIfAbsent(cacheKey, k -> createApiService(finalConfig, voiceName, pitch, speed));
     }
 
     /**
@@ -92,6 +83,7 @@ public class TtsServiceFactory {
             case "volcengine" -> new VolcengineTtsService(config, voiceName, pitch, speed, outputPath);
             case "xfyun" -> new XfyunTtsService(config, voiceName, pitch, speed, outputPath);
             case "minimax" -> new MiniMaxTtsService(config, voiceName, pitch, speed, outputPath);
+            case "tencent" -> new TencentTtsService(config, voiceName, pitch, speed, outputPath);
             default -> new EdgeTtsService(voiceName, pitch, speed, outputPath);
         };
     }
@@ -110,10 +102,15 @@ public class TtsServiceFactory {
         String provider = config.getProvider();
         Integer configId = config.getConfigId();
 
+        // 如果是阿里云NLS，需要额外清理NlsClient缓存
+        if ("aliyun-nls".equals(provider)) {
+            com.xiaozhi.dialogue.tts.providers.AliyunNlsTtsService.clearClientCache(configId);
+        }
+
         // 遍历缓存的所有键，找到匹配的键并移除
         serviceCache.keySet().removeIf(key -> {
             String[] parts = key.split(":");
-            if (parts.length != 3) {
+            if (parts.length < 5) {  // 新格式是 provider:configId:voiceName:pitch:speed
                 return false;
             }
             String keyProvider = parts[0];
@@ -122,6 +119,6 @@ public class TtsServiceFactory {
             // 检查provider和configId是否匹配
             return keyProvider.equals(provider) && keyConfigId.equals(String.valueOf(configId));
         });
-        
+
     }
 }

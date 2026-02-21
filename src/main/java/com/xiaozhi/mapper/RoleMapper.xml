@@ -76,7 +76,7 @@
         UPDATE
             sys_role
         <set>
-            avatar = #{avatar},
+            <if test="avatar !=null and avatar != ''"> avatar = #{avatar},</if>
             <if test="roleName != null and roleName != ''">roleName = #{roleName},</if>
             <if test="roleDesc != null and roleDesc != ''">roleDesc = #{roleDesc},</if>
             <if test="voiceName != null and voiceName != ''">voiceName = #{voiceName},</if>

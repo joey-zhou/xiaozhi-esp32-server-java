@@ -18,12 +18,20 @@ import cn.xfyun.service.tts.AbstractTtsWebSocketListener;
 import okhttp3.Response;
 import okhttp3.WebSocket;
 
+/**
+ * 讯飞语音合成服务
+ *
+ */
 public class XfyunTtsService implements TtsService {
     private static final Logger logger = LoggerFactory.getLogger(XfyunTtsService.class);
 
     private static final String PROVIDER_NAME = "xfyun";
     // 识别超时时间（60秒）
     private static final long RECOGNITION_TIMEOUT_MS = 60000;
+
+    // 重试机制常量
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+    private static final long RETRY_DELAY_MS = 1000;
 
     // 音频名称
     private String voiceName;
@@ -82,23 +90,39 @@ public class XfyunTtsService implements TtsService {
             return null;
         }
 
-        try {
-            // 生成音频文件名
-            String audioFileName = getAudioFileName();
-            String audioFilePath = outputPath + audioFileName;
-            File file = new File(audioFilePath);
-            // 发送POST请求
-            boolean success = sendRequest(text, file);
+        int attempts = 0;
+        while (attempts < MAX_RETRY_ATTEMPTS) {
+            try {
+                // 生成音频文件名
+                String audioFileName = getAudioFileName();
+                String audioFilePath = outputPath + audioFileName;
+                File file = new File(audioFilePath);
+                // 发送POST请求
+                boolean success = sendRequest(text, file);
 
-            if (success) {
-                return audioFilePath;
-            } else {
-                throw new Exception("语音合成失败");
+                if (success) {
+                    return audioFilePath;
+                } else {
+                    throw new Exception("语音合成失败");
+                }
+            } catch (Exception e) {
+                attempts++;
+                if (attempts < MAX_RETRY_ATTEMPTS) {
+                    logger.warn("讯飞语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
+                    try {
+                        Thread.sleep(RETRY_DELAY_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        logger.error("重试等待被中断", ie);
+                        throw e;
+                    }
+                } else {
+                    logger.error("讯飞语音合成失败，已达到最大重试次数", e);
+                    throw e;
+                }
             }
-        } catch (Exception e) {
-            logger.error("语音合成时发生错误！", e);
-            throw e;
         }
+        throw new Exception("语音合成失败");
     }
 
     /**
@@ -107,12 +131,22 @@ public class XfyunTtsService implements TtsService {
     private boolean sendRequest(String text, File file) throws Exception {
         CountDownLatch recognitionLatch = new CountDownLatch(1);
         try {
-            // 将我们的参数（0.5-2.0）映射到讯飞的参数（0-100）
-            // 讯飞规则：0对应0.5倍，100对应2倍
-            // 映射公式：xfyunValue = (ourValue - 0.5) * 100 / 1.5
-            int xfyunSpeed = (int)Math.round((speed - 0.5f) * 100f / 1.5f);
-            int xfyunPitch = (int)Math.round((pitch - 0.5f) * 100f / 1.5f);
-            
+            // 将我们的参数（0.5-2.0）非线性映射到讯飞的参数（0-100）
+            // 映射规则：0.5→0，1.0→50（讯飞默认），2.0→100
+            int xfyunSpeed;
+            if (speed <= 1.0f) {
+                xfyunSpeed = (int)Math.round((speed - 0.5f) * 100f);
+            } else {
+                xfyunSpeed = (int)Math.round(50f + (speed - 1.0f) * 50f);
+            }
+
+            int xfyunPitch;
+            if (pitch <= 1.0f) {
+                xfyunPitch = (int)Math.round((pitch - 0.5f) * 100f);
+            } else {
+                xfyunPitch = (int)Math.round(50f + (pitch - 1.0f) * 50f);
+            }
+
             // 确保值在有效范围内
             xfyunSpeed = Math.max(0, Math.min(100, xfyunSpeed));
             xfyunPitch = Math.max(0, Math.min(100, xfyunPitch));

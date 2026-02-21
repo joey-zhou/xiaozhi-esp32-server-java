@@ -33,8 +33,11 @@ public class MessageDTO {
     @Schema(description = "语音文件路径", example = "/audio/message_123456.mp3")
     private String audioPath;
 
-    @Schema(description = "消息类型: NORMAL-普通消息，FUNCTION_CALL-函数调用消息，MCP-MCP调用消息", example = "NORMAL", allowableValues = {"NORMAL", "FUNCTION_CALL", "MCP"})
+    @Schema(description = "消息类型: NORMAL-普通消息，FUNCTION_CALL-函数调用消息", example = "NORMAL", allowableValues = {"NORMAL", "FUNCTION_CALL"})
     private String messageType;
+
+    @Schema(description = "工具调用详情JSON，包含name/arguments/result")
+    private String toolCalls;
 
     @Schema(description = "会话ID", example = "session_123456")
     private String sessionId;

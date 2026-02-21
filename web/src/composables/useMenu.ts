@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/store/user'
@@ -14,11 +14,30 @@ export function useMenu() {
   const userStore = useUserStore()
   const { t } = useI18n()
 
-  // 展开的菜单keys（默认展开配置管理）
-  const openKeys = ref<string[]>(['router.parent.configManagement'])
+  // 展开的菜单keys（根据当前路由的父菜单初始化）
+  const initialOpenKey = route.meta?.parent as string | undefined
+  const openKeys = ref<string[]>(initialOpenKey ? [initialOpenKey] : [])
+
+  // 路由变化时同步展开对应父菜单
+  watch(
+    () => route.meta?.parent,
+    (parent) => {
+      if (parent && !openKeys.value.includes(parent as string)) {
+        openKeys.value = [parent as string]
+      }
+    }
+  )
   
   // 根级子菜单keys（用于手风琴模式）
-  const rootSubmenuKeys = ['router.parent.roleManagement', 'router.parent.configManagement', 'router.parent.settings']
+  const rootSubmenuKeys = ['router.parent.roleManagement', 'router.parent.configManagement', 'router.parent.settings', 'router.parent.memoryManagement']
+
+  // 父菜单图标映射
+  const parentIconMap: Record<string, string> = {
+    'router.parent.roleManagement': 'UserAddOutlined',
+    'router.parent.configManagement': 'SettingOutlined',
+    'router.parent.settings': 'SettingOutlined',
+    'router.parent.memoryManagement': 'DatabaseOutlined',
+  }
 
   // 获取所有菜单项（从路由配置中获取）
   const menuItems = computed<MenuItem[]>(() => {
@@ -57,7 +76,7 @@ export function useMenu() {
               name: parentKey,
               meta: {
                 title: parentKey, // 这里已经是多语言键了
-                icon: route.meta.icon || 'SettingOutlined',
+                icon: parentIconMap[parentKey] || 'SettingOutlined',
                 isAdmin: route.meta.isAdmin
               },
               children: []
@@ -116,12 +135,11 @@ export function useMenu() {
    */
   function handleOpenChange(keys: string[]) {
     const latestOpenKey = keys.find(key => !openKeys.value.includes(key))
-    
+
     if (latestOpenKey && rootSubmenuKeys.includes(latestOpenKey)) {
-      // 如果打开的是根级菜单，只保留这一个
+      // 新打开一个根级菜单，只保留这一个（手风琴）
       openKeys.value = [latestOpenKey]
     } else {
-      // 否则保留所有打开的菜单
       openKeys.value = keys
     }
   }

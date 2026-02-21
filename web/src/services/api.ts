@@ -51,7 +51,18 @@ export default {
     update: '/config',
     getModels: '/config/getModels',
   },
+  mcpTool: {
+    toggleStatus: '/mcpTool/toggleStatus',
+    toggleGlobalStatus: '/mcpTool/toggleGlobalStatus',
+    batchSetExcludeTools: '/mcpTool/batchSetExcludeTools',
+    getDisabledTools: '/mcpTool/getDisabledTools',
+    getSystemGlobalTools: '/mcpTool/getSystemGlobalTools',
+    refreshCache: '/mcpTool/refreshCache',
+  },
   upload: '/api/file/upload',
+  memory: {
+    summary: '/memory/summary',
+  },
 }
 
 

@@ -22,7 +22,7 @@ public class NewChatFunction implements ToolsGlobalRegistry.GlobalFunction {
     ToolCallback toolCallback = FunctionToolCallback
             .builder("func_new_chat", (Map<String, String> params, ToolContext toolContext) -> {
                 ChatSession chatSession = (ChatSession) toolContext.getContext().get(ChatService.TOOL_CONTEXT_SESSION_KEY);
-                Conversation conversation = chatSession.getConversation();
+                Conversation conversation = chatSession.getPersona().getConversation();
                 conversation.clear();
                 String sayNewChat = params.get("sayNewChat");
                 if (sayNewChat == null) {

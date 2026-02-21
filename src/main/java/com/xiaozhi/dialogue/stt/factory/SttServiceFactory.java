@@ -127,6 +127,7 @@ public class SttServiceFactory {
             }
             case "funasr" -> new FunASRSttService(config);
             case "xfyun" -> new XfyunSttService(config);
+            case "volcengine" -> new VolcengineSttService(config);
             default -> {
                 var service = initializeVosk();
                 if (service == null) {

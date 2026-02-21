@@ -4,12 +4,12 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.6</version>
+        <version>3.5.8</version>
         <relativePath /> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.xiaozhi.server</groupId>
     <artifactId>xiaozhi.server</artifactId>
-    <version>4.0.0</version>
+    <version>4.1.0</version>
     <name>xiaozhi-server</name>
     <description></description>
 
@@ -22,7 +22,7 @@
             <dependency>
                 <groupId>org.springframework.ai</groupId>
                 <artifactId>spring-ai-bom</artifactId>
-                <version>1.1.0</version>
+                <version>1.1.2</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -130,6 +130,12 @@
             <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
             <version>4.5.0</version>
         </dependency>
+        <!-- 手动指定 springdoc-openapi 版本以兼容 Spring Boot 3.5.x -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.8.0</version>
+        </dependency>
         <!-- JsonObject -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
@@ -187,6 +193,12 @@
             <artifactId>vosk</artifactId>
             <version>0.3.45</version>
         </dependency>
+        <!-- WebRTC AEC (回声消除) -->
+        <dependency>
+            <groupId>dev.onvoid.webrtc</groupId>
+            <artifactId>webrtc-java</artifactId>
+            <version>0.14.0</version>
+        </dependency>
         <!-- ONNX -->
         <dependency>
             <groupId>com.microsoft.onnxruntime</groupId>
@@ -226,6 +238,11 @@
             <artifactId>kotlin-stdlib</artifactId>
             <version>1.9.22</version>
         </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-reflect</artifactId>
+            <version>1.9.22</version>
+        </dependency>
         <!-- Email -->
         <dependency>
             <groupId>io.github.biezhi</groupId>
@@ -250,11 +267,11 @@
             <artifactId>nls-sdk-tts</artifactId>
             <version>2.2.18</version>
         </dependency>
-
+        <!-- 阿里云 DashScope SDK -->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>dashscope-sdk-java</artifactId>
-            <version>2.22.0</version>
+            <version>2.22.7</version>
         </dependency>
         <!-- 阿里云Token -->
         <dependency>
@@ -336,6 +353,13 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.38</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <!-- 添加 Surefire 插件配置 -->
@@ -378,17 +402,6 @@
             <id>be.0110.repo-releases</id>
             <name>0110.be repository</name>
             <url>https://mvn.0110.be/releases</url>
-        </repository>
-
-        <repository>
-            <id>sonatype-staging</id>
-            <url>https://s01.oss.sonatype.org/content/groups/staging/</url>
-            <releases>
-                <enabled>true</enabled>
-            </releases>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
         </repository>
     </repositories>
 

@@ -15,7 +15,7 @@ public interface MessageMapper {
 
   int add(SysMessage message);
 
-  void saveAll(List<SysMessage> messages);
+  int saveAll(List<SysMessage> messages);
 
   int delete(SysMessage message);
 

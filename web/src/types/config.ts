@@ -14,7 +14,7 @@ export interface Config {
   configName: string
   configDesc?: string
   modelType?: ModelType
-  isDefault?: string | boolean // 1-默认 0-非默认
+  isDefault?: string | boolean // 1-默认 0-非默认，表单中使用boolean
   state?: string
   createTime?: string
   // API相关字段

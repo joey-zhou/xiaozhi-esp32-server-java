@@ -1,7 +1,8 @@
 package com.xiaozhi.dialogue.llm.memory;
 
 import com.xiaozhi.dao.MessageMapper;
-import com.xiaozhi.entity.Base;
+import com.xiaozhi.dao.SummaryMapper;
+import com.xiaozhi.entity.SysSummary;
 import com.xiaozhi.entity.SysMessage;
 
 import org.jetbrains.annotations.NotNull;
@@ -25,11 +26,24 @@ public class DatabaseChatMemory  implements ChatMemory {
     private static final Logger logger = LoggerFactory.getLogger(DatabaseChatMemory.class);
 
 
+    private final SummaryMapper summaryMapper;
     private final MessageMapper messageMapper;
 
     @Autowired
-    public DatabaseChatMemory(MessageMapper messageMapper) {
+    public DatabaseChatMemory(MessageMapper messageMapper,SummaryMapper summaryMapper) {
         this.messageMapper = messageMapper;
+        this.summaryMapper = summaryMapper;
+    }
+
+    @Override
+    public void save(SysSummary summary) {
+        summaryMapper.saveSummary(summary);
+    }
+
+    @Override
+    public SysSummary findLastSummary(String deviceId, int roleId) {
+        SysSummary summary = summaryMapper.findLastSummary(deviceId, roleId);
+        return summary;
     }
 
     @Override
@@ -54,17 +68,38 @@ public class DatabaseChatMemory  implements ChatMemory {
         }
     }
 
-    private static @NotNull AbstractMessage convert(SysMessage message) {
+    public static @NotNull AbstractMessage convert(SysMessage message) {
         String role = message.getSender();
         // 一般消息("messageType", "NORMAL");//默认为普通消息
         Map<String, Object> metadata = Map.of("messageId", message.getMessageId(), ChatMemory.MESSAGE_TYPE_KEY,
                 message.getMessageType());
-        return switch (role) {
-            case "assistant" -> AssistantMessage.builder().content(message.getMessage()).properties(metadata).build();
-            case "user" -> UserMessage.builder().text(message.getMessage()).metadata(metadata).build();
-            default -> throw new IllegalArgumentException("Invalid role: " + role);
-        };
+
+        if (MessageType.ASSISTANT.getValue().equals(role)) {
+            return AssistantMessage.builder().content(message.getMessage()).properties(metadata).build();
+        }
+        if (MessageType.USER.getValue().equals(role)) {
+            return UserMessage.builder().text(message.getMessage()).metadata(metadata).build();
+        }
+        throw new IllegalArgumentException("Invalid role: " + role);
     }
+
+    /**
+     * 将数据库记录的SysMessag转换为spring-ai的Message。
+     *
+     * @param messages
+     * @return
+     */
+    public static List<AbstractMessage> convert(List<SysMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return messages.stream()
+                .filter(message -> MessageType.ASSISTANT.getValue().equals(message.getSender())
+                        || MessageType.USER.getValue().equals(message.getSender()))
+                .map(DatabaseChatMemory::convert)
+                .collect(Collectors.toList());
+    }
+
 
     @Override
     public List<Message> find(String deviceId, int roleId, Instant timeMillis){

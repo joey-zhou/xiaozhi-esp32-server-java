@@ -109,14 +109,25 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'memory-management',
-        name: 'memory-management',
+        path: 'memory/chat',
+        name: 'memory-chat',
         component: () => import('../views/MemoryManagementView.vue'),
         meta: {
-          title: 'router.title.memoryManagement',
+          title: 'router.title.shortTermMemory',
+          parent: 'router.parent.memoryManagement',
           requiresAuth: true,
-          permission: 'system:role',
-          hideInMenu: true
+          permission: 'system:message',
+        },
+      },
+      {
+        path: 'memory/summary',
+        name: 'memory-summary',
+        component: () => import('../views/MemoryManagementView.vue'),
+        meta: {
+          title: 'router.title.summaryMemory',
+          parent: 'router.parent.memoryManagement',
+          requiresAuth: true,
+          permission: 'system:message',
         },
       },
       // 配置管理

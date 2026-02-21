@@ -1,6 +1,6 @@
 package com.xiaozhi.dialogue.stt;
 
-import reactor.core.publisher.Sinks;
+import reactor.core.publisher.Flux;
 
 /**
  * STT服务接口
@@ -26,7 +26,7 @@ public interface SttService {
    * @param audioSink 音频数据流
    * @return 识别的文本结果流
    */
-  String streamRecognition(Sinks.Many<byte[]> audioSink);
+  String streamRecognition(Flux<byte[]> audioSink);
 
   /**
    * 检查服务是否支持流式处理

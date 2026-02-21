@@ -6,8 +6,8 @@ import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.dialogue.llm.ChatService;
 import com.xiaozhi.dialogue.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.dialogue.llm.tool.ToolsGlobalRegistry;
-import com.xiaozhi.dialogue.service.HuiBenService;
-import jakarta.annotation.Resource;
+import com.xiaozhi.dialogue.service.HuiBenPlayer;
+import com.xiaozhi.utils.AudioUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
@@ -17,13 +17,18 @@ import org.springframework.ai.tool.metadata.ToolMetadata;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 // @Component
 public class PlayHuiBenFunction implements ToolsGlobalRegistry.GlobalFunction {
     private static final Logger logger = LoggerFactory.getLogger(PlayHuiBenFunction.class);
+    // 使用虚拟线程执行器处理定时任务
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(
+            Runtime.getRuntime().availableProcessors(),
+            Thread.ofVirtual().name("huiBen-scheduler-", 0).factory());
 
-    @Resource
-    private HuiBenService huiBenService;
 
     ToolCallback toolCallback = FunctionToolCallback
             .builder("func_playHuiBen", (Map<String, String> params, ToolContext toolContext) -> {
@@ -33,7 +38,11 @@ public class PlayHuiBenFunction implements ToolsGlobalRegistry.GlobalFunction {
                     if (num == null || num < 5 || num > 1100) {
                         num = RandomUtil.randomInt(5, 1100);
                     }
-                    huiBenService.newHuiBenPlayer(chatSession,num).play();
+                    var huiBenPlayer = new HuiBenPlayer(chatSession,num);
+                    scheduler.schedule(() -> {
+                        huiBenPlayer.play();
+                    }, AudioUtils.OPUS_FRAME_DURATION_MS, TimeUnit.MILLISECONDS);
+
                     return "尝试播放绘本《" + num + "》";
 
                 } catch (Exception e) {

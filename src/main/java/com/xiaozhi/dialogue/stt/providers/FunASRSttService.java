@@ -5,12 +5,11 @@ import com.alibaba.fastjson.JSONObject;
 import com.xiaozhi.dialogue.stt.SttService;
 import com.xiaozhi.entity.SysConfig;
 
-import org.springframework.util.StringUtils;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Sinks;
+import reactor.core.publisher.Flux;
 
 import java.net.URI;
 import java.util.concurrent.BlockingQueue;
@@ -62,7 +61,7 @@ public class FunASRSttService implements SttService {
     }
 
     @Override
-    public String streamRecognition(Sinks.Many<byte[]> audioSink) {
+    public String streamRecognition(Flux<byte[]> audioSink) {
         // 使用阻塞队列存储音频数据
         BlockingQueue<byte[]> audioQueue = new LinkedBlockingQueue<>();
         AtomicBoolean isCompleted = new AtomicBoolean(false);
@@ -70,7 +69,7 @@ public class FunASRSttService implements SttService {
         CountDownLatch recognitionLatch = new CountDownLatch(1);
         
         // 订阅Sink并将数据放入队列
-        audioSink.asFlux().subscribe(
+        audioSink.subscribe(
             data -> audioQueue.offer(data),
             error -> {
                 logger.error("音频流处理错误", error);

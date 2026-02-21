@@ -151,7 +151,7 @@ public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceSe
     }
 
     @Override
-    @Cacheable(value = CACHE_NAME, key = "#deviceId.replace(\":\", \"-\")")
+    @Cacheable(value = CACHE_NAME, key = "#deviceId.replace(\":\", \"-\")", unless = "#result == null")
     public SysDevice selectDeviceById(String deviceId) {
         // 使用布隆过滤器快速判断设备是否不存在
         if (!bloomFilterManager.mightContain(deviceId)) {

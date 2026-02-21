@@ -68,17 +68,8 @@ public class TokenServiceFactory {
         var provider = config.getProvider();
         var cacheKey = createCacheKey(config, provider);
 
-        // 检查是否已有该配置的服务实例
-        TokenService service = serviceCache.get(cacheKey);
-        if (service != null) {
-            return service;
-        }
-
-        // 创建新的服务实例
-        service = createTokenService(config);
-        serviceCache.put(cacheKey, service);
-        
-        return service;
+        // 使用 computeIfAbsent 确保原子性操作，避免并发创建多个实例
+        return serviceCache.computeIfAbsent(cacheKey, k -> createTokenService(config));
     }
 
     /**

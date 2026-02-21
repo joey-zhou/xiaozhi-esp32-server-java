@@ -22,17 +22,16 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.github.pagehelper.PageInfo;
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.common.web.ResultMessage;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.dto.param.*;
-import com.xiaozhi.dto.response.DeviceDTO;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.service.SysDeviceService;
 import com.xiaozhi.utils.CmsUtils;
@@ -90,11 +89,8 @@ public class DeviceController extends BaseController {
             device.setUserId(CmsUtils.getUserId());
             List<SysDevice> deviceList = deviceService.query(device, pageFilter);
 
-            // 转换为DTO
-            List<DeviceDTO> deviceDTOList = DtoConverter.toDeviceDTOList(deviceList);
-
             ResultMessage result = ResultMessage.success();
-            result.put("data", new PageInfo<>(deviceDTOList));
+            result.put("data", DtoConverter.toPageInfo(deviceList, DtoConverter::toDeviceDTOList));
             return result;
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
@@ -201,7 +197,26 @@ public class DeviceController extends BaseController {
             device.setDeviceId(deviceId);
             device.setUserId(CmsUtils.getUserId());
 
+            // 检查是否切换了角色
+            boolean roleChanged = false;
+            if (param.getRoleId() != null) {
+                SysDevice oldDevice = deviceService.selectDeviceById(deviceId);
+                if (oldDevice != null && !param.getRoleId().equals(oldDevice.getRoleId())) {
+                    roleChanged = true;
+                }
+            }
+
             deviceService.update(device);
+
+            // 如果切换了角色，清理Persona（包含Conversation、Synthesizer等），下次唤醒时会重新构建
+            if (roleChanged) {
+                ChatSession session = sessionManager.getSessionByDeviceId(deviceId);
+                if (session != null && session.getPersona() != null) {
+                    session.getPersona().getConversation().clear();
+                    session.setPersona(null);
+                    logger.info("设备 {} 切换角色，已清理Persona及对话历史", deviceId);
+                }
+            }
 
             // 返回更新后的设备信息
             SysDevice updatedDevice = deviceService.selectDeviceById(deviceId);
@@ -247,56 +262,59 @@ public class DeviceController extends BaseController {
     }
 
     @SaIgnore
-    @PostMapping("/ota")
+    @RequestMapping(value = "/ota", method = {RequestMethod.GET, RequestMethod.POST})
     @ResponseBody
     @Operation(summary = "处理OTA请求", description = "返回OTA结果")
     public ResponseEntity<byte[]> ota(
         @Parameter(description = "设备ID") @RequestHeader("Device-Id") String deviceIdAuth,
-        @RequestBody String requestBody,
+        @RequestBody(required = false) String requestBody,
         HttpServletRequest request) {
         try {
             // 读取请求体内容
             SysDevice device = new SysDevice();
 
-            // 解析JSON请求体
-            try {
-                Map<String, Object> jsonData = JsonUtil.OBJECT_MAPPER.readValue(requestBody, new TypeReference<>() {});
+            // 解析JSON请求体（仅POST请求会有请求体）
+            if (requestBody != null && !requestBody.isEmpty()) {
+                try {
+                    Map<String, Object> jsonData = JsonUtil.OBJECT_MAPPER.readValue(requestBody, new TypeReference<>() {});
 
-                // 获取设备ID (MAC地址)
-                if (deviceIdAuth == null) {
-                    if (jsonData.containsKey("mac_address")) {
-                        deviceIdAuth = (String) jsonData.get("mac_address");
-                    } else if (jsonData.containsKey("mac")) {
-                        deviceIdAuth = (String) jsonData.get("mac");
+                    // 获取设备ID (MAC地址)
+                    if (deviceIdAuth == null) {
+                        if (jsonData.containsKey("mac_address")) {
+                            deviceIdAuth = (String) jsonData.get("mac_address");
+                        } else if (jsonData.containsKey("mac")) {
+                            deviceIdAuth = (String) jsonData.get("mac");
+                        }
                     }
-                }
 
-                // 提取芯片型号
-                if (jsonData.containsKey("chip_model_name")) {
-                    device.setChipModelName((String) jsonData.get("chip_model_name"));
-                    
-                }
+                    // 提取芯片型号
+                    if (jsonData.containsKey("chip_model_name")) {
+                        device.setChipModelName((String) jsonData.get("chip_model_name"));
+                    }
 
-                // 提取应用版本
-                if (jsonData.containsKey("application") && jsonData.get("application") instanceof Map) {
-                    Map<String, Object> application = (Map<String, Object>) jsonData.get("application");
-                    if (application.containsKey("version")) {
-                        device.setVersion((String) application.get("version"));
+                    // 提取应用版本
+                    if (jsonData.containsKey("application") && jsonData.get("application") instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> application = (Map<String, Object>) jsonData.get("application");
+                        if (application.containsKey("version")) {
+                            device.setVersion((String) application.get("version"));
+                        }
                     }
-                }
 
-                // 提取WiFi名称和设备类型
-                if (jsonData.containsKey("board") && jsonData.get("board") instanceof Map) {
-                    Map<String, Object> board = (Map<String, Object>) jsonData.get("board");
-                    if (board.containsKey("ssid")) {
-                        device.setWifiName((String) board.get("ssid"));
+                    // 提取WiFi名称和设备类型
+                    if (jsonData.containsKey("board") && jsonData.get("board") instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> board = (Map<String, Object>) jsonData.get("board");
+                        if (board.containsKey("ssid")) {
+                            device.setWifiName((String) board.get("ssid"));
+                        }
+                        if (board.containsKey("type")) {
+                            device.setType((String) board.get("type"));
+                        }
                     }
-                    if (board.containsKey("type")) {
-                        device.setType((String) board.get("type"));
-                    }
+                } catch (Exception e) {
+                    logger.debug("JSON解析失败: {}", e.getMessage());
                 }
-            } catch (Exception e) {
-                logger.debug("JSON解析失败: {}", e.getMessage());
             }
 
             if (deviceIdAuth == null || !cmsUtils.isMacAddressValid(deviceIdAuth)) {
@@ -404,7 +422,7 @@ public class DeviceController extends BaseController {
         }
     }
 
-
+    @SaIgnore
     @PostMapping("/ota/activate")
     @ResponseBody
     @Operation(summary = "查询OTA激活状态", description = "返回OTA激活状态")

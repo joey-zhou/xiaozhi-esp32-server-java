@@ -1,13 +1,11 @@
 package com.xiaozhi.controller;
 
-import com.github.pagehelper.PageInfo;
 import com.xiaozhi.common.web.ResultMessage;
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.dialogue.tts.factory.TtsServiceFactory;
 import com.xiaozhi.dto.param.RoleAddParam;
 import com.xiaozhi.dto.param.RoleUpdateParam;
 import com.xiaozhi.dto.param.TestVoiceParam;
-import com.xiaozhi.dto.response.RoleDTO;
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.entity.SysRole;
 import com.xiaozhi.service.SysConfigService;
@@ -61,11 +59,8 @@ public class RoleController extends BaseController {
             role.setUserId(CmsUtils.getUserId());
             List<SysRole> roleList = roleService.query(role, pageFilter);
 
-            // 转换为DTO
-            List<RoleDTO> roleDTOList = DtoConverter.toRoleDTOList(roleList);
-
             ResultMessage result = ResultMessage.success();
-            result.put("data", new PageInfo<>(roleDTOList));
+            result.put("data", DtoConverter.toPageInfo(roleList, DtoConverter::toRoleDTOList));
             return result;
         } catch (Exception e) {
             logger.error(e.getMessage(), e);

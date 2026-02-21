@@ -44,7 +44,9 @@ export function register(data: {
   password: string
   verifyCode: string
 }) {
-  return http.postJSON(api.user.add, data)
+  // 后端期望的参数名是 code，前端使用 verifyCode 更语义化
+  const { verifyCode, ...rest } = data
+  return http.postJSON(api.user.add, { ...rest, code: verifyCode })
 }
 
 /**
@@ -107,5 +109,3 @@ export function updateUser(data: Partial<UpdateUserParams>) {
 export function addUser(data: Partial<User>) {
   return http.postJSON(api.user.add, data)
 }
-
-

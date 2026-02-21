@@ -22,7 +22,7 @@ public class SessionExitFunction implements ToolsGlobalRegistry.GlobalFunction {
     ToolCallback toolCallback = FunctionToolCallback
             .builder("func_exitSession", (Map<String, String> params, ToolContext toolContext) -> {
                 ChatSession chatSession = (ChatSession)toolContext.getContext().get(ChatService.TOOL_CONTEXT_SESSION_KEY);
-                sessionManager.setCloseAfterChat(chatSession.getSessionId(), true);
+                chatSession.getPlayer().setFunctionAfterChat(()->sessionManager.closeSession(chatSession));
                 String sayGoodbye = params.get("sayGoodbye");
                 if(sayGoodbye == null || sayGoodbye.trim().isEmpty()){
                     sayGoodbye = "好的，再见！期待下次聊天哦！";

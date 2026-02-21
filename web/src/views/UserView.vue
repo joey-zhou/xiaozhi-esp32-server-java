@@ -3,13 +3,16 @@ import { reactive, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message, type TablePaginationConfig } from 'ant-design-vue'
 import { useTable } from '@/composables/useTable'
+import { useExport } from '@/composables/useExport'
 import { useLoadingStore } from '@/store/loading'
 import { queryUsers } from '@/services/user'
 import { useAvatar } from '@/composables/useAvatar'
 import type { User, UserQueryParams } from '@/types/user'
+import dayjs from 'dayjs'
 
 const { t } = useI18n()
 const { getAvatarUrl } = useAvatar()
+const { exporting, exportToCSV } = useExport()
 
 // 表格和分页
 const {
@@ -131,12 +134,52 @@ const debouncedSearch = createDebouncedSearch(fetchData, 500)
 
 // 导出用户数据
 async function handleExport() {
+  loadingStore.showLoading(t('common.exporting'))
   try {
-    loadingStore.showLoading(t('common.exporting'))
+    // 先获取全部用户数据
+    const queryParams: UserQueryParams = {
+      start: 1,
+      limit: 100000, // 获取全部数据
+    }
     
-    // TODO: 调用实际的导出接口
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    if (queryForm.name) queryParams.name = queryForm.name
+    if (queryForm.email) queryParams.email = queryForm.email
+    if (queryForm.tel) queryParams.tel = queryForm.tel
     
+    const res = await queryUsers(queryParams)
+    
+    if (res.code !== 200 || !res.data?.list || res.data.list.length === 0) {
+      message.warning(t('export.noData'))
+      return
+    }
+    
+    const allData = res.data.list
+    
+    // 导出为 CSV 格式
+    await exportToCSV(allData, {
+      filename: `users_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}`,
+      showLoading: false,
+      columns: [
+        { key: 'name', title: t('common.name') },
+        { key: 'email', title: t('user.email') },
+        { key: 'tel', title: t('user.phone') },
+        { key: 'totalDevice', title: t('user.deviceCount') },
+        { key: 'aliveNumber', title: t('user.onlineDeviceCount') },
+        { key: 'totalMessage', title: t('user.messageCount') },
+        { 
+          key: 'state', 
+          title: t('common.status'),
+          format: (val) => val == 1 ? t('user.normal') : t('user.disabled')
+        },
+        { 
+          key: 'isAdmin', 
+          title: t('user.accountType'),
+          format: (val) => val == 1 ? t('user.admin') : t('user.normalUser')
+        },
+        { key: 'loginTime', title: t('user.lastLoginTime') },
+        { key: 'loginIp', title: t('user.lastLoginIp') },
+      ]
+    })
     message.success(t('common.exportSuccess'))
   } catch (error) {
     console.error('导出失败:', error)
@@ -190,7 +233,7 @@ fetchData()
     <!-- 数据表格 -->
     <a-card :title="t('menu.user')" :bordered="false">
       <template #extra>
-        <a-button type="primary" @click="handleExport">
+        <a-button type="primary" @click="handleExport" :loading="exporting">
           {{ t('common.export') }}
         </a-button>
       </template>

@@ -1,7 +1,6 @@
 package com.xiaozhi.dialogue.llm.memory;
 
-import com.xiaozhi.communication.common.ChatSession;
-import com.xiaozhi.entity.SysMessage;
+import com.xiaozhi.entity.SysSummary;
 import org.springframework.ai.chat.messages.Message;
 
 import java.time.Instant;
@@ -21,6 +20,22 @@ public interface ChatMemory {
     String MESSAGE_TYPE_KEY = "SYS_MESSAGE_TYPE";
     String TIME_MILLIS_KEY = "TIME_MILLIS";
     String AUDIO_PATH = "AUDIO_PATH";
+
+
+
+    /**
+     * 保存会话的基本信息（ID，摘要，totalTokens,创建时间）
+     * @param summary
+     */
+    void save(SysSummary summary);
+
+    /**
+     * 查询最近的Conversation Summary
+     * @param deviceId
+     * @param roleId
+     * @return
+     */
+    SysSummary findLastSummary(String deviceId, int roleId);
 
     /**
      * 获取历史对话消息列表
@@ -48,28 +63,5 @@ public interface ChatMemory {
      */
     void delete(String deviceId, int roleId);
 
-    static void setSysMessageType(Message message, String messageType){
-        message.getMetadata().put(MESSAGE_TYPE_KEY, messageType);
-    }
-
-    static String getSysMessageType(Message message){
-        return (String) message.getMetadata().getOrDefault(MESSAGE_TYPE_KEY,SysMessage.MESSAGE_TYPE_NORMAL);
-    }
-
-    static void setTimeMillis(Message message, Long timeMillis){
-        message.getMetadata().put(TIME_MILLIS_KEY, timeMillis);
-    }
-
-    static Long getTimeMillis(Message message){
-        return (Long) message.getMetadata().getOrDefault(TIME_MILLIS_KEY,System.currentTimeMillis());
-    }
-
-    static Integer getFirstModelResponseTime(Message message){
-        return (Integer)message.getMetadata().get(ChatSession.ATTR_FIRST_MODEL_RESPONSE_TIME);
-    }
-
-    static Integer getFirstTtsResponseTime(Message message){
-        return (Integer)message.getMetadata().get(ChatSession.ATTR_FIRST_TTS_RESPONSE_TIME);
-    }
 
 }

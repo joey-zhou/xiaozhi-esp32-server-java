@@ -1,0 +1,506 @@
+[
+  {
+    "label": "智小虎",
+    "value": "502007",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "聊天童声",
+    "language": "中英文"
+  },
+  {
+    "label": "智小悟",
+    "value": "502006",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "聊天男声",
+    "language": "中英文"
+  },
+  {
+    "label": "智小解",
+    "value": "502005",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "解说男声",
+    "language": "中英文"
+  },
+  {
+    "label": "智小满",
+    "value": "502004",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "营销女声",
+    "language": "中英文"
+  },
+  {
+    "label": "智小敏",
+    "value": "502003",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "聊天女声",
+    "language": "中英文"
+  },
+  {
+    "label": "智小柔",
+    "value": "502001",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "聊天女声",
+    "language": "中英文"
+  },
+  {
+    "label": "暖心阿灿",
+    "value": "602004",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "聊天男声",
+    "language": "中英文"
+  },
+  {
+    "label": "专业梓欣",
+    "value": "602005",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "聊天女声",
+    "language": "中英文"
+  },
+  {
+    "label": "懂事少年",
+    "value": "603000",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "特色男声",
+    "language": "中英文"
+  },
+  {
+    "label": "潇湘妹妹",
+    "value": "603001",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "特色女声",
+    "language": "中英文"
+  },
+  {
+    "label": "软萌心心",
+    "value": "603002",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "特色男童声",
+    "language": "中英文"
+  },
+  {
+    "label": "随和老李",
+    "value": "603003",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "聊天男声",
+    "language": "中英文"
+  },
+  {
+    "label": "温柔小柠",
+    "value": "603004",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "聊天女声",
+    "language": "中英文"
+  },
+  {
+    "label": "知心大林",
+    "value": "603005",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "聊天男声",
+    "language": "中英文"
+  },
+  {
+    "label": "爱小悠",
+    "value": "602003",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "超自然大模型音色",
+    "scene": "聊天女声",
+    "language": "中英文"
+  },
+  {
+    "label": "智斌",
+    "value": "501000",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "阅读男声",
+    "language": "中英文"
+  },
+  {
+    "label": "智兰",
+    "value": "501001",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "资讯女声",
+    "language": "中英文"
+  },
+  {
+    "label": "智菊",
+    "value": "501002",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "阅读女声",
+    "language": "中英文"
+  },
+  {
+    "label": "智宇",
+    "value": "501003",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "阅读男声",
+    "language": "中英文"
+  },
+  {
+    "label": "月华",
+    "value": "501004",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天女声",
+    "language": "中英文"
+  },
+  {
+    "label": "飞镜",
+    "value": "501005",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天男声",
+    "language": "中英文"
+  },
+  {
+    "label": "千嶂",
+    "value": "501006",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天男声",
+    "language": "中英文"
+  },
+  {
+    "label": "浅草",
+    "value": "501007",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天男声",
+    "language": "中英文"
+  },
+  {
+    "label": "WeJames",
+    "value": "501008",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "外语男声",
+    "language": "英文"
+  },
+  {
+    "label": "WeWinny",
+    "value": "501009",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "外语女声",
+    "language": "英文"
+  },
+  {
+    "label": "爱小童",
+    "value": "601015",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "男童声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小溪",
+    "value": "601000",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天女声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小洛",
+    "value": "601001",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "阅读女声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小辰",
+    "value": "601002",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天男声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小荷",
+    "value": "601003",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "阅读女声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小树",
+    "value": "601004",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "资讯男声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小静",
+    "value": "601005",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天女声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小耀",
+    "value": "601006",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "阅读男声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小叶",
+    "value": "601007",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天女声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小豪",
+    "value": "601008",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天男声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小芊",
+    "value": "601009",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天女声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小娇",
+    "value": "601010",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天女声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小川",
+    "value": "601011",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天男声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小璟",
+    "value": "601012",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "特色女声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小伊",
+    "value": "601013",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "阅读女声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小简",
+    "value": "601014",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "大模型音色",
+    "scene": "聊天男声",
+    "language": "中文"
+  },
+  {
+    "label": "WeJack",
+    "value": "101050",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "英文男声",
+    "language": "英文"
+  },
+  {
+    "label": "智付",
+    "value": "101055",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "通用女声",
+    "language": "中文"
+  },
+  {
+    "label": "智辉",
+    "value": "101013",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "新闻男声",
+    "language": "中文"
+  },
+  {
+    "label": "智彤",
+    "value": "101019",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "粤语女声",
+    "language": "中文"
+  },
+  {
+    "label": "智柯",
+    "value": "101030",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "通用男声",
+    "language": "中文"
+  },
+  {
+    "label": "智友",
+    "value": "101054",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "通用男声",
+    "language": "中文"
+  },
+  {
+    "label": "智梅",
+    "value": "101027",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "通用女声",
+    "language": "中文"
+  },
+  {
+    "label": "智希",
+    "value": "101026",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "通用女声",
+    "language": "中文"
+  },
+  {
+    "label": "智云",
+    "value": "101004",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "通用男声",
+    "language": "中文"
+  },
+  {
+    "label": "智萌",
+    "value": "101015",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "男童声",
+    "language": "中文"
+  },
+  {
+    "label": "智燕",
+    "value": "101011",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "新闻女声",
+    "language": "中文"
+  },
+  {
+    "label": "智瑜",
+    "value": "101001",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "情感女声",
+    "language": "中文"
+  },
+  {
+    "label": "智瑞",
+    "value": "101021",
+    "gender": "male",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "新闻男声",
+    "language": "中文"
+  },
+  {
+    "label": "智甜",
+    "value": "101016",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "女童声",
+    "language": "中文"
+  },
+  {
+    "label": "爱小静",
+    "value": "301037",
+    "gender": "female",
+    "provider": "tencent",
+    "model": "精品音色",
+    "scene": "对话女声",
+    "language": "中文"
+  }
+]

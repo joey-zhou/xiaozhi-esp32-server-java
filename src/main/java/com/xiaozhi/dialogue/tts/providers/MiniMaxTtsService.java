@@ -10,10 +10,7 @@ import com.xiaozhi.utils.JsonUtil;
 import lombok.Data;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
+import okhttp3.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -25,6 +22,10 @@ public class MiniMaxTtsService implements TtsService {
 
     private static final String PROVIDER_NAME = "minimax";
 
+    // 重试机制常量
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+    private static final long RETRY_DELAY_MS = 1000;
+
     private final String groupId;
     private final String apiKey;
 
@@ -32,8 +33,11 @@ public class MiniMaxTtsService implements TtsService {
     private final String voiceName;
     
     // 语音参数
-    private final Float pitch;
+    //private final Float pitch;
+    private int minimaxPitch;
     private final Float speed;
+    private final Float pitch;
+    private final String model;
 
     private final OkHttpClient client = HttpUtil.client;
     public static final String APPLICATION_JSON_CHARSET_UTF_8 = "application/json; charset=utf-8";
@@ -46,6 +50,12 @@ public class MiniMaxTtsService implements TtsService {
         this.pitch = pitch;
         this.speed = speed;
         this.outputPath = outputPath;
+        this.model = config.getConfigName();
+        // 设置音调（需要映射：我们的 [0.5, 2] → MiniMax的 [-12, 12]）
+        // 映射公式：minimax_pitch = (our_pitch - 1.0) × 24
+        minimaxPitch = (int)Math.round((pitch - 1.0f) * 24);
+        // 确保值在有效范围内
+        minimaxPitch = Math.max(-12, Math.min(12, minimaxPitch));
     }
 
     @Override
@@ -67,7 +77,6 @@ public class MiniMaxTtsService implements TtsService {
     public Float getPitch() {
         return pitch;
     }
-
     @Override
     public String audioFormat() {
         return "mp3";
@@ -75,23 +84,40 @@ public class MiniMaxTtsService implements TtsService {
 
     @Override
     public String textToSpeech(String text) throws Exception {
-        var output = Paths.get(outputPath, getAudioFileName()).toString();
-        sendRequest(text, output);
-        return output;
+        int attempts = 0;
+        Exception lastException = null;
+
+        while (attempts < MAX_RETRY_ATTEMPTS) {
+            try {
+                var output = Paths.get(outputPath, getAudioFileName()).toString();
+                sendRequest(text, output);
+                return output;
+            } catch (Exception e) {
+                lastException = e;
+                attempts++;
+                if (attempts < MAX_RETRY_ATTEMPTS) {
+                    log.warn("MiniMax语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
+                    try {
+                        Thread.sleep(RETRY_DELAY_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.error("重试等待被中断", ie);
+                        throw e;
+                    }
+                } else {
+                    log.error("MiniMax语音合成失败，已达到最大重试次数", e);
+                }
+            }
+        }
+        throw lastException != null ? lastException : new Exception("语音合成失败");
     }
 
     private void sendRequest(String text, String filepath) {
         // 创建请求参数
-        var params = new Text2AudioParams(voiceName, text);
+        var params = new Text2AudioParams(model, voiceName, text);
         
         // 设置语速（MiniMax范围 [0.5, 2]，与我们的范围一致，直接使用）
         params.voiceSetting.setSpeed(speed);
-        
-        // 设置音调（需要映射：我们的 [0.5, 2] → MiniMax的 [-12, 12]）
-        // 映射公式：minimax_pitch = (our_pitch - 1.0) × 24
-        int minimaxPitch = (int)Math.round((pitch - 1.0f) * 24);
-        // 确保值在有效范围内
-        minimaxPitch = Math.max(-12, Math.min(12, minimaxPitch));
         params.voiceSetting.setPitch(minimaxPitch);
         
         var request = new Request.Builder()
@@ -124,10 +150,6 @@ public class MiniMaxTtsService implements TtsService {
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public static class Text2AudioParams {
 
-        public Text2AudioParams(String voiceId, String text) {
-            this("speech-02-hd", voiceId, text);
-        }
-
         public Text2AudioParams(String model, String voiceId, String text) {
             this.model = model;
             this.text = text;
@@ -157,7 +179,7 @@ public class MiniMaxTtsService implements TtsService {
             private double speed = 1;
             private double vol = 1;
             private int pitch = 0;
-            private String emotion = "happy";
+            //private String emotion = "happy";
         }
 
         @Data
@@ -171,13 +193,58 @@ public class MiniMaxTtsService implements TtsService {
 
     @Data
     public static class Text2AudioResp {
+        @JsonProperty("is_final")
+        private boolean isFinal;
+        @JsonProperty("session_id")
+        private String sessionId;
+        @JsonProperty("trace_id")
+        private String traceId;
+        @JsonProperty("event")
+        private String event;
+        @JsonProperty("data")
         private Data data;
+        @JsonProperty("extra_info")
+        private ExtraInfo extraInfo;
         @JsonProperty("base_resp")
         private BaseResp baseResp;
 
-        record Data(int status, String audio) {
+        /**
+         * 在MiniMax 的 WebSocket协议中，Data不一定会有 status。 java record默认是全参构造函数。
+         */
+        @lombok.Data
+        public static class Data {
+            private int status;
+            private String audio;
         }
 
+        @lombok.Data
+        @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+        class ExtraInfo {
+            @JsonProperty("audio_channel")
+            private int audioChannel;
+            @JsonProperty("audio_format")
+            private String audioFormat;
+            // 音频时长，精确到毫秒
+            @JsonProperty("audio_length")
+            private int audioLength;
+            @JsonProperty("audio_sample_rate")
+            private int audioSampleRate;
+            // 音频文件大小，单位为字节
+            @JsonProperty("audio_size")
+            private int audioSize;
+            // 音频比特率
+            @JsonProperty("bitrate")
+            private int bitrate;
+            // 非法字符占比。非法字符不超过 10%（包含 10%），音频会正常生成并返回非法字符占比，超过进行报错
+            @JsonProperty("invisible_character_ratio")
+            private int invisibleCharacterRatio;
+            // 计费字符数。本次语音生成的计费字符数
+            @JsonProperty("usage_characters")
+            private int usageCharacters;
+            // 已发音的字数统计，包含汉字、数字、字母，不包含标点符号
+            @JsonProperty("word_count")
+            private int wordCount;
+        }
         record BaseResp(@JsonProperty("status_code") int statusCode, @JsonProperty("status_msg") String statusMsg) {
         }
     }

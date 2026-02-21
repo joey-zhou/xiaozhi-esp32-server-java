@@ -7,6 +7,7 @@ import com.xiaozhi.dao.ConfigMapper;
 import com.xiaozhi.dialogue.stt.factory.SttServiceFactory;
 import com.xiaozhi.dialogue.token.factory.TokenServiceFactory;
 import com.xiaozhi.dialogue.tts.factory.TtsServiceFactory;
+import com.xiaozhi.dialogue.tts.providers.AliyunNlsTtsService;
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.service.SysConfigService;
 import jakarta.annotation.Resource;
@@ -86,6 +87,8 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
         if (rows > 0) {
             sttServiceFactory.removeCache(config);
             ttsServiceFactory.removeCache(config);
+            // 清除阿里云NLS的NlsClient连接缓存，确保下次使用新配置重建连接
+            AliyunNlsTtsService.clearClientCache(config.getConfigId());
             List<SysConfig> configs = configMapper.query(config);
             // 这里可能为 null，
             if (configs.size() > 0) {
@@ -131,7 +134,7 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
      * @return 具体的配置
      */
     @Override
-    @Cacheable(value = CACHE_NAME, key = "#configId")
+    @Cacheable(value = CACHE_NAME, key = "#configId", unless = "#result == null")
     public SysConfig selectConfigById(Integer configId) {
         return configMapper.selectConfigById(configId);
     }

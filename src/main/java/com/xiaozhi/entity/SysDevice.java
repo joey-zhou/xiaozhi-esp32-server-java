@@ -17,7 +17,7 @@ import lombok.experimental.Accessors;
 @Data
 @Accessors(chain = true)
 @EqualsAndHashCode(callSuper = true)
-@JsonIgnoreProperties({ "startTime", "endTime", "start", "limit", "userId", "code" })
+@JsonIgnoreProperties({ "startTime", "endTime", "start", "limit", "code" })
 @Schema(description = "设备信息")
 public class SysDevice extends SysRole {
     public static final String DEVICE_STATE_STANDBY = "2";//已在线，未激活对话

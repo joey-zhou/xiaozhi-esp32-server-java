@@ -15,10 +15,9 @@ import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.utils.HttpUtil;
 
 import okhttp3.*;
-import org.springframework.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Sinks;
+import reactor.core.publisher.Flux;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -134,7 +133,7 @@ public class TencentSttService implements SttService {
     }
 
     @Override
-    public String streamRecognition(Sinks.Many<byte[]> audioSink) {
+    public String streamRecognition(Flux<byte[]> audioSink) {
         // 检查配置是否已设置
         if (secretId == null || secretKey == null || appId == null) {
             logger.error("腾讯云语音识别配置未设置，无法进行识别");
@@ -148,7 +147,7 @@ public class TencentSttService implements SttService {
         CountDownLatch recognitionLatch = new CountDownLatch(1);
         
         // 订阅Sink并将数据放入队列
-        audioSink.asFlux().subscribe(
+        audioSink.subscribe(
             data -> audioQueue.offer(data),
             error -> {
                 logger.error("音频流处理错误", error);

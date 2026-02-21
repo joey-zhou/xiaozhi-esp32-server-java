@@ -1,11 +1,13 @@
 package com.xiaozhi.utils;
 
+import com.github.pagehelper.PageInfo;
 import com.xiaozhi.dto.response.*;
 import com.xiaozhi.entity.*;
 import org.springframework.beans.BeanUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -15,6 +17,28 @@ import java.util.stream.Collectors;
  * @author Joey
  */
 public class DtoConverter {
+
+    /**
+     * 通用分页转换方法
+     * 将 PageHelper 分页后的 List 转换为 DTO 的 PageInfo，保留完整分页信息
+     *
+     * @param sourceList 原始分页列表（由 PageHelper 分页后的结果）
+     * @param converter  列表转换函数
+     * @param <S>        源类型
+     * @param <T>        目标类型
+     * @return 转换后的 PageInfo
+     */
+    public static <S, T> PageInfo<T> toPageInfo(List<S> sourceList, Function<List<S>, List<T>> converter) {
+        // 先获取原始分页信息（PageHelper 的分页信息在此时有效）
+        PageInfo<S> originalPageInfo = new PageInfo<>(sourceList);
+        // 转换列表
+        List<T> targetList = converter.apply(sourceList);
+        // 复制分页信息并替换列表
+        PageInfo<T> resultPageInfo = new PageInfo<>();
+        BeanUtils.copyProperties(originalPageInfo, resultPageInfo);
+        resultPageInfo.setList(targetList);
+        return resultPageInfo;
+    }
 
     /**
      * SysUser -> UserDTO

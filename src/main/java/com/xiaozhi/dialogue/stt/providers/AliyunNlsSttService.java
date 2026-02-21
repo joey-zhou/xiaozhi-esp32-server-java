@@ -9,10 +9,9 @@ import com.alibaba.nls.client.protocol.asr.SpeechTranscriberResponse;
 import com.xiaozhi.dialogue.stt.SttService;
 import com.xiaozhi.dialogue.token.TokenService;
 import com.xiaozhi.entity.SysConfig;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Sinks;
+import reactor.core.publisher.Flux;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +26,7 @@ public class AliyunNlsSttService implements SttService {
     private static final Logger logger = LoggerFactory.getLogger(AliyunNlsSttService.class);
 
     private static final String PROVIDER_NAME = "aliyun-nls";
-    
+
     // 阿里云NLS服务的默认URL
     private static final String NLS_URL = "wss://nls-gateway.aliyuncs.com/ws/v1";
 
@@ -36,7 +35,7 @@ public class AliyunNlsSttService implements SttService {
 
     // 阿里云配置
     private final SysConfig config;
-    
+
     // Token管理器
     private final TokenService tokenService;
 
@@ -74,7 +73,7 @@ public class AliyunNlsSttService implements SttService {
     }
 
     @Override
-    public String streamRecognition(Sinks.Many<byte[]> audioSink) {
+    public String streamRecognition(Flux<byte[]> audioSink) {
         if (audioSink == null) {
             logger.error("音频数据流为空");
             return "";
@@ -83,21 +82,21 @@ public class AliyunNlsSttService implements SttService {
         // 用于收集识别结果
         StringBuilder resultBuilder = new StringBuilder();
         CountDownLatch latch = new CountDownLatch(1);
-        
+
         // 用于标识识别是否完成
         AtomicBoolean recognitionCompleted = new AtomicBoolean(false);
         AtomicBoolean recognitionFailed = new AtomicBoolean(false);
-        
+
         // 用于存储错误信息
         AtomicBoolean[] errorHolder = new AtomicBoolean[]{new AtomicBoolean(false)};
-        
+
         NlsClient client = null;
         SpeechTranscriber transcriber = null;
 
         try {
             // 创建NLS客户端
             client = createClient();
-            
+
             // 创建识别监听器
             SpeechTranscriberListener listener = new SpeechTranscriberListener() {
                 @Override
@@ -130,8 +129,8 @@ public class AliyunNlsSttService implements SttService {
                 @Override
                 public void onFail(SpeechTranscriberResponse response) {
                     logger.error("NLS实时识别失败 - TaskId: {}, Status: {}, StatusText: {}",
-                            response.getTaskId(), 
-                            response.getStatus(), 
+                            response.getTaskId(),
+                            response.getStatus(),
                             response.getStatusText());
                     recognitionFailed.set(true);
                     errorHolder[0].set(true);
@@ -141,19 +140,19 @@ public class AliyunNlsSttService implements SttService {
 
             // 创建语音识别器
             transcriber = new SpeechTranscriber(client, listener);
-            
+
             // 设置AppKey
             transcriber.setAppKey(config.getApiKey());
-            
+
             // 设置音频格式为PCM
             transcriber.setFormat(InputFormatEnum.PCM);
-            
+
             // 设置采样率为16000Hz
             transcriber.setSampleRate(SampleRateEnum.SAMPLE_RATE_16K);
-            
+
             // 启用中间结果
             transcriber.setEnableIntermediateResult(true);
-            
+
             // 启用标点符号
             transcriber.setEnablePunctuation(true);
 
@@ -165,30 +164,30 @@ public class AliyunNlsSttService implements SttService {
             Thread sendThread = new Thread(() -> {
                 try {
                     // 订阅音频流并发送数据
-                    audioSink.asFlux().subscribe(
-                        audioChunk -> {
-                            if (audioChunk != null && audioChunk.length > 0) {
+                    audioSink.subscribe(
+                            audioChunk -> {
+                                if (audioChunk != null && audioChunk.length > 0) {
+                                    try {
+                                        // 发送音频数据
+                                        finalTranscriber.send(audioChunk);
+                                    } catch (Exception e) {
+                                        logger.error("发送音频数据失败", e);
+                                    }
+                                }
+                            },
+                            error -> {
+                                logger.error("音频流处理错误", error);
+                                errorHolder[0].set(true);
+                                latch.countDown();
+                            },
+                            () -> {
                                 try {
-                                    // 发送音频数据
-                                    finalTranscriber.send(audioChunk);
+                                    // 音频流结束，停止识别
+                                    finalTranscriber.stop();
                                 } catch (Exception e) {
-                                    logger.error("发送音频数据失败", e);
+                                    logger.error("停止识别失败", e);
                                 }
                             }
-                        },
-                        error -> {
-                            logger.error("音频流处理错误", error);
-                            errorHolder[0].set(true);
-                            latch.countDown();
-                        },
-                        () -> {
-                            try {
-                                // 音频流结束，停止识别
-                                finalTranscriber.stop();
-                            } catch (Exception e) {
-                                logger.error("停止识别失败", e);
-                            }
-                        }
                     );
                 } catch (Exception e) {
                     logger.error("处理音频流时发生错误", e);

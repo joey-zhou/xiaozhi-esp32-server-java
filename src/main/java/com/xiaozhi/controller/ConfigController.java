@@ -3,7 +3,6 @@ package com.xiaozhi.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.github.pagehelper.PageInfo;
 import com.xiaozhi.common.web.ResultMessage;
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.dialogue.stt.factory.SttServiceFactory;
@@ -11,7 +10,6 @@ import com.xiaozhi.dialogue.tts.factory.TtsServiceFactory;
 import com.xiaozhi.dto.param.ConfigAddParam;
 import com.xiaozhi.dto.param.ConfigGetModelsParam;
 import com.xiaozhi.dto.param.ConfigUpdateParam;
-import com.xiaozhi.dto.response.ConfigDTO;
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.service.SysConfigService;
 import com.xiaozhi.utils.CmsUtils;
@@ -70,11 +68,8 @@ public class ConfigController extends BaseController {
             PageFilter pageFilter = initPageFilter(request);
             List<SysConfig> configList = configService.query(config, pageFilter);
 
-            // 转换为DTO
-            List<ConfigDTO> configDTOList = DtoConverter.toConfigDTOList(configList);
-
             ResultMessage result = ResultMessage.success();
-            result.put("data", new PageInfo<>(configDTOList));
+            result.put("data", DtoConverter.toPageInfo(configList, DtoConverter::toConfigDTOList));
             return result;
         } catch (Exception e) {
             logger.error(e.getMessage(), e);

@@ -14,10 +14,6 @@ const props = withDefaults(defineProps<Props>(), {
   autoPlay: false,
 })
 
-const emit = defineEmits<{
-  audioLoadError: []
-}>()
-
 // 状态
 const wavesurfer = ref<WaveSurfer | null>(null)
 const isPlaying = ref(false)
@@ -56,7 +52,6 @@ function initWaveSurfer() {
     console.error('WaveSurfer 初始化失败:', error)
     loading.value = false
     loadError.value = true
-    emit('audioLoadError')
     return
   }
 
@@ -86,10 +81,9 @@ function initWaveSurfer() {
     }
   })
 
-  wavesurfer.value.on('error', () => {
+  wavesurfer.value.on('error', (_err: unknown) => {
     loading.value = false
     loadError.value = true
-    emit('audioLoadError')
   })
 
   // 加载音频
@@ -108,7 +102,6 @@ function loadAudio(url: string) {
   
   if (!wavesurfer.value) {
     loadError.value = true
-    emit('audioLoadError')
     return
   }
 
@@ -128,13 +121,11 @@ function loadAudio(url: string) {
       } else {
         loading.value = false
         loadError.value = true
-        emit('audioLoadError')
       }
     }
   } catch (error) {
     loading.value = false
     loadError.value = true
-    emit('audioLoadError')
   }
 }
 
@@ -170,7 +161,6 @@ watch(
       loadAudio(newUrl)
     } else if (!wavesurfer.value && newUrl) {
       loadError.value = true
-      emit('audioLoadError')
     }
   },
 )

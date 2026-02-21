@@ -1034,7 +1034,8 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
       { label: 'Aliyun（DashScope）', value: 'aliyun', key: '1' },
       { label: 'Aliyun（NLS标准版）', value: 'aliyun-nls', key: '2' },
       { label: 'Xfyun', value: 'xfyun', key: '3' },
-      { label: 'FunASR', value: 'funasr', key: '4' }
+      { label: 'FunASR', value: 'funasr', key: '4' },
+      { label: 'Volcengine（doubao）', value: 'volcengine', key: '5' }
     ],
     typeFields: {
       tencent: [
@@ -1135,6 +1136,25 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           defaultUrl: "ws://127.0.0.1:10095",
           help: '本地FunASR服务WebSocket地址，需要先部署FunASR服务',
           placeholder: 'ws://127.0.0.1:10095'
+        }
+      ],
+      volcengine: [
+        { 
+          name: 'appId', 
+          label: 'App ID', 
+          required: true, 
+          span: 12,
+          help: '在 https://console.volcengine.com/speech/app 获取应用ID',
+          placeholder: 'your-app-id'
+        },
+        { 
+          name: 'apiKey', 
+          label: 'Access Token', 
+          required: true, 
+          inputType: 'password',
+          span: 12,
+          help: '火山引擎语音识别服务访问令牌',
+          placeholder: 'your-access-token'
         }
       ]
     }
@@ -1275,46 +1295,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'your-api-key'
         }
       ],
-    }
-  },
-  voice_clone: {
-    label: 'config.voiceClone',
-    typeFields: {
-      aliyun: [
-        {
-          name: 'configName',
-          label: '音色克隆模型',
-          required: true,
-          inputType: 'select',
-          span: 12,
-          help: '选择音色克隆使用的模型版本',
-          placeholder: '请选择模型',
-          options: [
-            { label: 'CosyVoice-v2', value: 'cosyvoice-v2' },
-            { label: 'CosyVoice-v3-plus', value: 'cosyvoice-v3-plus' }
-          ]
-        },
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          span: 12,
-          help: '在阿里云智能语音交互控制台获取',
-          placeholder: 'your-api-key'
-        }
-      ],
-      volcengine: [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          span: 12,
-          help: '在火山引擎语音技术控制台获取',
-          placeholder: 'your-api-key'
-        }
-      ]
     }
   }
 };

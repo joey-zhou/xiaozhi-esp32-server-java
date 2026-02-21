@@ -99,7 +99,7 @@ const columns = computed(() => {
     {
       title: t('common.createTime'),
       dataIndex: 'createTime',
-      width: 150,
+      width: 200,
       align: 'center' as const,
     },
     {
@@ -201,7 +201,7 @@ async function handleSubmit() {
     }
 
     // 处理 isDefault：将 boolean 转换为后端需要的 string enum ('0'/'1')
-    submitData.isDefault = formData.value.isDefault ? '1' : '0'
+    submitData.isDefault = formData.value.isDefault == '1' ? '1' : '0'
 
     // LLM 特殊验证
     if (props.configType === 'llm') {

@@ -2,34 +2,30 @@ package com.xiaozhi.communication.common;
 
 import com.xiaozhi.communication.domain.*;
 import com.xiaozhi.communication.server.websocket.WebSocketSession;
+import com.xiaozhi.dialogue.aec.AecService;
+import com.xiaozhi.dialogue.llm.ChatService;
 import com.xiaozhi.dialogue.llm.factory.ChatModelFactory;
-import com.xiaozhi.dialogue.llm.memory.Conversation;
-import com.xiaozhi.dialogue.llm.memory.ConversationFactory;
-import com.xiaozhi.dialogue.llm.providers.OpenAiLlmService;
 import com.xiaozhi.dialogue.llm.tool.ToolsGlobalRegistry;
 import com.xiaozhi.dialogue.llm.tool.ToolsSessionHolder;
 import com.xiaozhi.dialogue.service.*;
-import com.xiaozhi.dialogue.stt.factory.SttServiceFactory;
 import com.xiaozhi.dialogue.tts.factory.TtsServiceFactory;
-import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysRole;
 import com.xiaozhi.enums.ListenState;
 import com.xiaozhi.event.ChatAbortEvent;
-import com.xiaozhi.service.SysConfigService;
 import com.xiaozhi.service.SysDeviceService;
 import com.xiaozhi.service.SysMessageService;
 import com.xiaozhi.service.SysRoleService;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
+import java.nio.file.Path;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -51,9 +47,6 @@ public class MessageHandler {
     private SessionManager sessionManager;
 
     @Resource
-    private SysConfigService configService;
-
-    @Resource
     private DialogueService dialogueService;
 
     @Resource
@@ -63,10 +56,7 @@ public class MessageHandler {
     private TtsServiceFactory ttsFactory;
 
     @Resource
-    private SttServiceFactory sttFactory;
-
-    @Resource
-    private ConversationFactory conversationFactory;
+    private ChatService chatService;
 
     @Resource
     private ChatModelFactory chatModelFactory;
@@ -85,6 +75,9 @@ public class MessageHandler {
 
     @Resource
     private SysMessageService sysMessageService;
+
+    @Autowired(required = false)
+    private AecService aecService;
 
     // 用于存储设备ID和验证码生成状态的映射
     private final Map<String, Boolean> captchaGenerationInProgress = new ConcurrentHashMap<>();
@@ -128,55 +121,30 @@ public class MessageHandler {
         chatSession.setFunctionSessionHolder(toolsSessionHolder);
         // 从数据库获取角色描述。device.getRoleId()表示当前设备的当前活跃角色，或者上次退出时的活跃角色。
         SysRole role = roleService.selectRoleById(device.getRoleId());
-        Conversation conversation = conversationFactory.initConversation(device, role, sessionId);
-        chatSession.setConversation(conversation);
 
-        //以上同步处理结束后，再启动虚拟线程进行设备初始化，确保chatSession中已设置的sysDevice信息
-        Thread.startVirtualThread(() -> {
+        chatService.buildPersona(chatSession, device, role);
+
+        // 连接建立时就初始化 AEC，确保后续任何 TTS 播放（含唤醒响应）的参考帧都不会被丢弃
+        if (aecService != null) aecService.initSession(sessionId);
+
+        //以上同步处理结束后，再启动虚拟线程进行设备初始化，确保chatSession中已设置的sysDevice信息 TODO 性能优化后续再做
+
+        try {
+            // 更新设备状态
+            deviceService.update(new SysDevice()
+                    .setDeviceId(device.getDeviceId())
+                    .setState(chatSession instanceof WebSocketSession ? SysDevice.DEVICE_STATE_ONLINE : SysDevice.DEVICE_STATE_STANDBY)
+                    .setLastLogin(new Date().toString()));
+
+        } catch (Exception e) {
+            logger.error("设备初始化失败 - DeviceId: " + deviceId, e);
             try {
-                if (role.getSttId() != null) {
-                    SysConfig sttConfig = configService.selectConfigById(role.getSttId());
-                    if (sttConfig != null) {
-                        sttFactory.getSttService(sttConfig);// 提前初始化，加速后续使用
-                    }
-                }
-                if (role.getTtsId() != null) {
-                    SysConfig ttsConfig = configService.selectConfigById(role.getTtsId());
-                    if (ttsConfig != null) {
-                        ttsFactory.getTtsService(ttsConfig, role.getVoiceName(), role.getTtsPitch(), role.getTtsSpeed());// 提前初始化，加速后续使用
-                    }
-                }
-                if (role.getModelId() != null) {
-                    ChatModel chatModel = chatModelFactory.takeChatModel(chatSession);// 提前初始化，加速后续使用
-                    if(chatModel instanceof OpenAiChatModel){
-                        Thread.startVirtualThread(()->{
-                            //如果是openApi类型的ai，异步校验当前模型是否支持function call
-                            // 根据配置ID查询配置
-                            SysConfig config = configService.selectConfigById(role.getModelId());
-                            String model = config.getConfigName();
-                            String endpoint = config.getApiUrl();
-                            String apiKey = config.getApiKey();
-                            OpenAiLlmService openAiLlmService = new OpenAiLlmService(endpoint, apiKey, model);
-                            chatSession.setSupportFunctionCall(openAiLlmService.testFunctionCall());
-                        });
-                    }
-                }
-
-                // 更新设备状态
-                deviceService.update(new SysDevice()
-                        .setDeviceId(device.getDeviceId())
-                        .setState(chatSession instanceof WebSocketSession ? SysDevice.DEVICE_STATE_ONLINE : SysDevice.DEVICE_STATE_STANDBY)
-                        .setLastLogin(new Date().toString()));
-
-            } catch (Exception e) {
-                logger.error("设备初始化失败 - DeviceId: " + deviceId, e);
-                try {
-                    sessionManager.closeSession(sessionId);
-                } catch (Exception ex) {
-                    logger.error("关闭WebSocket连接失败", ex);
-                }
+                sessionManager.closeSession(sessionId);
+            } catch (Exception ex) {
+                logger.error("关闭WebSocket连接失败", ex);
             }
-        });
+        }
+
     }
 
     /**
@@ -194,36 +162,38 @@ public class MessageHandler {
         if (device != null) {
             String deviceId = device.getDeviceId();
 
-            Thread.startVirtualThread(() -> {
-                try {
-                    // 根据连接类型判断设备状态：
-                    // WebSocket 连接关闭 -> OFFLINE（离线）
-                    String newState = chatSession instanceof WebSocketSession ?
-                            SysDevice.DEVICE_STATE_OFFLINE : SysDevice.DEVICE_STATE_STANDBY;
+            // 服务关闭期间跳过状态写库：启动时会 bulk reset 所有设备为离线，无需在关机时逐台写入
+            if (!sessionManager.isShuttingDown()) {
+                Thread.startVirtualThread(() -> {
+                    try {
+                        // 根据连接类型和断开原因判断设备状态：
+                        // WebSocket 连接关闭 -> OFFLINE（离线）
+                        String newState = SysDevice.DEVICE_STATE_OFFLINE;
 
-                    // 时序保护：检查设备是否已重连
-                    ChatSession currentSession = sessionManager.getSessionByDeviceId(deviceId);
-                    if (currentSession != null && !sessionId.equals(currentSession.getSessionId())) {
-                        return;
+                        // 时序保护：检查设备是否已重连
+                        ChatSession currentSession = sessionManager.getSessionByDeviceId(deviceId);
+                        if (currentSession != null && !sessionId.equals(currentSession.getSessionId())) {
+                            return;
+                        }
+
+                        deviceService.update(new SysDevice()
+                                .setDeviceId(deviceId)
+                                .setState(newState)
+                                .setLastLogin(new Date().toString()));
+                        logger.info("连接已关闭 - SessionId: {}, DeviceId: {}, 新状态: {}",
+                                sessionId, deviceId, newState);
+                    } catch (Exception e) {
+                        logger.error("更新设备状态失败", e);
                     }
-
-                    deviceService.update(new SysDevice()
-                            .setDeviceId(deviceId)
-                            .setState(newState)
-                            .setLastLogin(new Date().toString()));
-                    logger.info("连接已关闭 - SessionId: {}, DeviceId: {}, 新状态: {}",
-                            sessionId, deviceId, newState);
-                } catch (Exception e) {
-                    logger.error("更新设备状态失败", e);
-                }
-            });
+                });
+            }
         }
         // 清理会话
         sessionManager.closeSession(sessionId);
         // 清理VAD会话
         vadService.resetSession(sessionId);
-        // 清理对话
-        dialogueService.cleanupSession(chatSession);
+        // 清理AEC会话
+        if (aecService != null) aecService.resetSession(sessionId);
 
     }
 
@@ -342,15 +312,14 @@ public class MessageHandler {
         Thread.startVirtualThread(() -> {
             try {
                 // 对于未绑定设备， 播放器是一次性用途，不需要绑定到ChatSession。
-                Player player = new FilePlayer(chatSession, messageService, sessionManager, sysMessageService);
+                Player player = new ScheduledPlayer(chatSession, messageService, sysMessageService, aecService);
                 // 设备已注册但未配置模型
                 if (device.getDeviceName() != null && device.getRoleId() == null) {
                     String message = "设备未配置角色，请到角色配置页面完成配置后开始对话";
 
                     String audioFilePath = ttsFactory.getDefaultTtsService().textToSpeech(message);
 
-                    player.append(new Sentence(message, audioFilePath));
-                    player.play();
+                    player.play(message, Path.of(audioFilePath));
 
                     // 延迟一段时间后再解除标记
                     try {
@@ -377,8 +346,7 @@ public class MessageHandler {
                     audioFilePath = codeResult.getAudioPath();
                 }
 
-                player.append(new Sentence(codeResult.getCode(), codeResult.getAudioPath()));
-                player.play();
+                player.play(codeResult.getCode(), Path.of(audioFilePath));
                 // 延迟一段时间后再解除标记
                 try {
                     Thread.sleep(1000);
@@ -405,11 +373,12 @@ public class MessageHandler {
 
         // 检查会话是否已发送goodbye，如果是则忽略listen消息
         if (isGoodbye) {
+            logger.info("goodbye中，忽略listen消息{} - SessionId: {}", message.toString(), sessionId);
             return;
         }
 
         // 如果会话标记为即将关闭，忽略listen消息
-        if (chatSession.isCloseAfterChat()) {
+        if (chatSession.getPlayer().getFunctionAfterChat()!= null) {
             return;
         }
 
@@ -428,6 +397,8 @@ public class MessageHandler {
 
                 // 初始化VAD会话
                 vadService.initSession(sessionId);
+                // 初始化AEC会话
+                if (aecService != null) aecService.initSession(sessionId);
                 break;
 
             case ListenState.Stop:
@@ -440,19 +411,23 @@ public class MessageHandler {
                 sessionManager.setStreamingState(sessionId, false);
                 // 重置VAD会话
                 vadService.resetSession(sessionId);
+                // 注意：不重置 AEC 会话，保留已收敛的滤波器状态供后续对话复用
                 break;
 
             case ListenState.Text:
-                // 检测聊天文本输入
+                // 检测聊天文本输入 — 确保 AEC 在 TTS 开始前已初始化
+                if (aecService != null) aecService.initSession(sessionId);
                 Player player = chatSession.getPlayer();
                 if (player != null ) {
-                    applicationContext.publishEvent(new ChatAbortEvent(chatSession, message.getMode().getValue()));
+                    String modeValue = message.getMode() != null ? message.getMode().getValue() : null;
+                    applicationContext.publishEvent(new ChatAbortEvent(chatSession, modeValue));
                 }
                 dialogueService.handleText(chatSession, message.getText());
                 break;
 
             case ListenState.Detect:
-                // 检测到唤醒词
+                // 检测到唤醒词 — 确保 AEC 在 TTS 开始前已初始化
+                if (aecService != null) aecService.initSession(sessionId);
                 dialogueService.handleWakeWord(chatSession, message.getText());
                 break;
 
@@ -484,29 +459,15 @@ public class MessageHandler {
 
     private void handleGoodbyeMessage(ChatSession session, GoodbyeMessage message) {
 
-        // 先清理VAD会话，防止后续的listen消息重新初始化VAD
+        // 先清理VAD和AEC会话，防止后续的listen消息重新初始化
         String sessionId = session.getSessionId();
         vadService.resetSession(sessionId);
+        if (aecService != null) aecService.resetSession(sessionId);
 
         // 中止正在进行的对话，停止TTS和音频发送
         applicationContext.publishEvent(new ChatAbortEvent(session, "设备主动退出"));
 
         sessionManager.closeSession(session);
-        if(!(session instanceof WebSocketSession)){
-            if (session.getSysDevice() != null) {
-                Thread.startVirtualThread(() -> {
-                    try {
-                        deviceService.update(new SysDevice()
-                                .setDeviceId(session.getSysDevice().getDeviceId())
-                                .setState(SysDevice.DEVICE_STATE_STANDBY)
-                                .setLastLogin(new Date().toString()));
-                        logger.info("设备连接进入待机状态 - SessionId: {}, DeviceId: {}", session.getSessionId(), session.getSysDevice().getDeviceId());
-                    } catch (Exception e) {
-                        logger.error("更新设备状态失败", e);
-                    }
-                });
-            }
-        }
     }
 
     private void handleDeviceMcpMessage(ChatSession chatSession, DeviceMcpMessage message) {

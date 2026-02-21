@@ -44,11 +44,21 @@ public class BloomFilterManager {
             if (!deviceIdBloomFilter.isExists()) {
                 // 预期100万设备, 误判率0.01% (万分之一)
                 deviceIdBloomFilter.tryInit(1000000L, 0.0001);
-
-                // 加载所有现有设备ID
+                logger.info("布隆过滤器初始化成功 - 预期元素数: 1000000, 误判率: 0.01%");
                 loadAllDeviceIds();
             } else {
-                logger.info("布隆过滤器已存在,当前元素数: {}", deviceIdBloomFilter.count());
+                // 验证已有过滤器配置是否兼容，不兼容则重建
+                try {
+                    deviceIdBloomFilter.contains("__probe__");
+                    logger.info("布隆过滤器已存在,当前元素数: {}", deviceIdBloomFilter.count());
+                } catch (Exception configMismatch) {
+                    logger.warn("布隆过滤器配置已变更，重新初始化: {}", configMismatch.getMessage());
+                    deviceIdBloomFilter.delete();
+                    deviceIdBloomFilter = redissonClient.getBloomFilter("xiaozhi:bloom:deviceId");
+                    deviceIdBloomFilter.tryInit(1000000L, 0.0001);
+                    logger.info("布隆过滤器重新初始化成功");
+                    loadAllDeviceIds();
+                }
             }
 
         } catch (Exception e) {

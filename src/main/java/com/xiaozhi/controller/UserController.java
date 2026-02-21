@@ -23,6 +23,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.utils.CaptchaUtils;
 import com.xiaozhi.utils.EmailUtils;
 import com.xiaozhi.utils.SmsUtils;
+import com.xiaozhi.utils.CmsUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -161,11 +162,16 @@ public class UserController extends BaseController {
      */
     @SaIgnore
     @PostMapping("/login")
-    @Operation(summary = "用户名密码登录", description = "使用用户名和密码进行登录,返回token、用户信息、角色和权限")
-    public ResultMessage login(@Valid @RequestBody LoginParam param) {
+    @Operation(summary = "用户名密码登录", description = "使用用户名/邮箱/手机号和密码进行登录,返回token、用户信息、角色和权限")
+    public ResultMessage login(@Valid @RequestBody LoginParam param, HttpServletRequest request) {
         try {
-            userService.login(param.getUsername(), param.getPassword());
-            SysUser user = userService.selectUserByUsername(param.getUsername());
+            // login方法支持用户名、邮箱、手机号登录，直接使用返回值
+            SysUser user = userService.login(param.getUsername(), param.getPassword());
+
+            // 记录登录时间和IP
+            user.setLoginTime(new java.util.Date());
+            user.setLoginIp(CmsUtils.getClientIp(request));
+            userService.update(user);
 
             // Sa-Token登录
             StpUtil.login(user.getUserId(), 2592000);
@@ -199,12 +205,12 @@ public class UserController extends BaseController {
     }
 
     /**
-     * 手机号验证码登录
+     * 手机号验证码登录 - 自动注册模式
      */
     @SaIgnore
     @PostMapping("/tel-login")
-    @Operation(summary = "手机号验证码登录", description = "使用手机号和验证码登录,未注册返回201状态码")
-    public ResultMessage telLogin(@Valid @RequestBody TelLoginParam param) {
+    @Operation(summary = "手机号验证码登录", description = "使用手机号和验证码登录,未注册自动注册")
+    public ResultMessage telLogin(@Valid @RequestBody TelLoginParam param, HttpServletRequest request) {
         try {
             // 验证验证码
             SysUser codeUser = new SysUser();
@@ -215,11 +221,16 @@ public class UserController extends BaseController {
                 return ResultMessage.error("验证码错误或已过期");
             }
 
-            // 查询用户
+            // 查询用户，不存在则自动注册
             SysUser user = userService.selectUserByTel(param.getTel());
             if (user == null) {
-                return new ResultMessage(201, "该手机号未注册，请先注册", null);
+                user = autoRegisterTelUser(param.getTel());
             }
+
+            // 记录登录时间和IP
+            user.setLoginTime(new java.util.Date());
+            user.setLoginIp(CmsUtils.getClientIp(request));
+            userService.update(user);
 
             // Sa-Token登录
             StpUtil.login(user.getUserId(), 2592000);
@@ -246,6 +257,28 @@ public class UserController extends BaseController {
             logger.error("手机号登录失败", e);
             return ResultMessage.error("登录失败，请稍后重试");
         }
+    }
+
+    /**
+     * 自动注册手机号用户
+     *
+     * @param tel 手机号
+     * @return 新创建的用户
+     */
+    private SysUser autoRegisterTelUser(String tel) {
+        SysUser user = new SysUser();
+        // 用户名使用手机号后4位
+        String suffix = tel.length() >= 4 ? tel.substring(tel.length() - 4) : tel;
+        user.setUsername("tel_" + suffix + "_" + System.currentTimeMillis() % 1000);
+        user.setPassword(authenticationService.encryptPassword(java.util.UUID.randomUUID().toString()));
+        user.setName("用户" + suffix);
+        user.setTel(tel);
+        user.setRoleId(2);  // 默认普通用户角色
+        user.setIsAdmin("0");
+        user.setState("1");
+
+        userService.add(user);
+        return user;
     }
 
     /**
@@ -297,11 +330,12 @@ public class UserController extends BaseController {
             } else {
                 // 老用户 - 直接登录
                 user = userService.selectUserByUserId(userAuth.getUserId());
-
-                // 更新最后登录时间
-                user.setLoginTime(new java.util.Date());
-                userService.update(user);
             }
+
+            // 更新最后登录时间和IP
+            user.setLoginTime(new java.util.Date());
+            user.setLoginIp(CmsUtils.getClientIp(request));
+            userService.update(user);
 
             // 3. Sa-Token登录
             StpUtil.login(user.getUserId(), 2592000);  // 30天过期
@@ -382,6 +416,30 @@ public class UserController extends BaseController {
             int row = userService.queryCaptcha(codeUser);
             if (row < 1) {
                 return ResultMessage.error("无效验证码");
+            }
+
+            // 检查用户名是否已存在（防止并发注册导致重复）
+            if (StringUtils.hasText(param.getUsername())) {
+                SysUser existingUser = userService.selectUserByUsername(param.getUsername());
+                if (!ObjectUtils.isEmpty(existingUser)) {
+                    return ResultMessage.error("用户名已存在");
+                }
+            }
+
+            // 检查邮箱是否已存在
+            if (StringUtils.hasText(param.getEmail())) {
+                SysUser existingUser = userService.selectUserByEmail(param.getEmail());
+                if (!ObjectUtils.isEmpty(existingUser)) {
+                    return ResultMessage.error("邮箱已注册");
+                }
+            }
+
+            // 检查手机号是否已存在
+            if (StringUtils.hasText(param.getTel())) {
+                SysUser existingUser = userService.selectUserByTel(param.getTel());
+                if (!ObjectUtils.isEmpty(existingUser)) {
+                    return ResultMessage.error("手机号已注册");
+                }
             }
 
             // 创建用户

@@ -19,7 +19,7 @@ export interface UploadOptions {
 /**
  * 通用文件上传方法
  * @param file 要上传的文件
- * @param type 文件类型: avatar, firmware, voiceClone, knowledge 等
+ * @param type 文件类型: avatar
  * @param options 上传配置选项
  * @returns 默认返回URL，fullResponse=true时返回完整响应
  */

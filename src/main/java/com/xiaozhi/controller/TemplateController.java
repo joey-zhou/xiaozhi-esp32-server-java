@@ -1,10 +1,8 @@
 package com.xiaozhi.controller;
 
-import com.github.pagehelper.PageInfo;
 import com.xiaozhi.common.web.ResultMessage;
 import com.xiaozhi.dto.param.TemplateAddParam;
 import com.xiaozhi.dto.param.TemplateUpdateParam;
-import com.xiaozhi.dto.response.TemplateDTO;
 import com.xiaozhi.entity.SysTemplate;
 import com.xiaozhi.service.SysTemplateService;
 import com.xiaozhi.utils.CmsUtils;
@@ -40,11 +38,8 @@ public class TemplateController {
             template.setUserId(CmsUtils.getUserId());
             List<SysTemplate> templateList = templateService.query(template);
 
-            // 转换为DTO
-            List<TemplateDTO> templateDTOList = DtoConverter.toTemplateDTOList(templateList);
-
             ResultMessage result = ResultMessage.success();
-            result.put("data", new PageInfo<>(templateDTOList));
+            result.put("data", DtoConverter.toPageInfo(templateList, DtoConverter::toTemplateDTOList));
             return result;
         } catch (Exception e) {
             return ResultMessage.error(e.getMessage());

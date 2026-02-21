@@ -18,10 +18,15 @@ public class DefaultConversationFactory implements ConversationFactory{
 
     @Autowired
     private ChatMemory chatMemory;
+    // 聊天总结(或者可以看作是中短期记忆）
+    @Autowired
+    private SummaryConversationFactory summaryConversationFactory;
 
     @Override
     public Conversation initConversation(SysDevice device, SysRole role, String sessionId) {
+        // 根据配置文件的不同类型，返回不同的Conversation
         Conversation conversation = switch (role.getMemoryType()) {
+            case "summary" -> summaryConversationFactory.initConversation(device, role, sessionId);
             case "window"-> MessageWindowConversation.builder().chatMemory(chatMemory)
                     .maxMessages(maxMessages)
                     .role(role)

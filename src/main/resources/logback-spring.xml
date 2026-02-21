@@ -47,6 +47,13 @@
         </encoder>
     </appender>
     
+    <!-- 抑制特定的Neo4j弃用警告 -->
+    <logger name="org.neo4j.cypher" level="ERROR" />
+    <!-- 抑制 Neo4j 实体 Long ID 弃用警告 -->
+    <logger name="org.springframework.data.neo4j.core.mapping.Neo4jPersistentEntity" level="ERROR" />
+    <!-- 抑制 Spring Data 仓库扫描 INFO 日志 -->
+    <logger name="org.springframework.data.repository.config.RepositoryConfigurationDelegate" level="WARN" />
+    
     <!-- 开发环境配置 -->
     <springProfile name="dev">
         <root level="INFO">

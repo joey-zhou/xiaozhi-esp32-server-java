@@ -223,11 +223,6 @@ public class AudioUtils {
                     dos.write(pcmData);
                 }
             }
-            // 目前采用的处理策略是删除已经合并了的文件。
-            for (var audioPath : audioPaths) {
-                var fullPath = audioPath.startsWith(AUDIO_PATH) ? audioPath : AUDIO_PATH + audioPath;
-                Files.deleteIfExists(Paths.get(fullPath));
-            }
 
         } catch (Exception e) {
             logger.error("合并音频文件时发生错误", e);

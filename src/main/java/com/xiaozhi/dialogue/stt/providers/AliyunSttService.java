@@ -5,24 +5,18 @@ import com.alibaba.dashscope.audio.asr.recognition.RecognitionParam;
 import com.alibaba.dashscope.audio.asr.translation.TranslationRecognizerParam;
 import com.alibaba.dashscope.audio.asr.translation.TranslationRecognizerRealtime;
 import com.alibaba.dashscope.audio.asr.translation.results.TranslationRecognizerResult;
-import com.alibaba.dashscope.audio.omni.OmniRealtimeCallback;
-import com.alibaba.dashscope.audio.omni.OmniRealtimeConfig;
-import com.alibaba.dashscope.audio.omni.OmniRealtimeConversation;
-import com.alibaba.dashscope.audio.omni.OmniRealtimeModality;
-import com.alibaba.dashscope.audio.omni.OmniRealtimeParam;
-import com.alibaba.dashscope.audio.omni.OmniRealtimeTranscriptionParam;
+import com.alibaba.dashscope.audio.omni.*;
 import com.alibaba.dashscope.common.ResultCallback;
 import com.alibaba.dashscope.exception.NoApiKeyException;
 import com.google.gson.JsonObject;
 import com.xiaozhi.dialogue.stt.SttService;
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.utils.AudioUtils;
-
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
 
 import java.nio.ByteBuffer;
 import java.util.Base64;
@@ -31,9 +25,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
 
 public class AliyunSttService implements SttService {
     private static final Logger logger = LoggerFactory.getLogger(AliyunSttService.class);
@@ -64,18 +55,18 @@ public class AliyunSttService implements SttService {
     }
 
     @Override
-    public String streamRecognition(Sinks.Many<byte[]> audioSink) {
+    public String streamRecognition(Flux<byte[]> audioSink) {
         try {
             if (model.toLowerCase().contains("gummy")) {
                 return streamRecognitionGummy(audioSink);
-            } else if (model.toLowerCase().contains("qwen")) {
+            } else if (model.toLowerCase().contains("qwen") && model.toLowerCase().contains("realtime")) {
                 return streamRecognitionQwen(audioSink);
             } else {
                 // paraformer 逻辑
                 String actualModel = model;
                 // 兼容以前的数据，如果不包含已知模型类型，则使用默认模型
-                if (!model.toLowerCase().contains("paraformer") 
-                    && !model.toLowerCase().contains("fun-asr")) {
+                if (!model.toLowerCase().contains("paraformer")
+                        && !model.toLowerCase().contains("fun-asr")) {
                     actualModel = "paraformer-realtime-v2";
                     logger.info("未识别的模型类型: {}，使用默认模型: {}", model, actualModel);
                 }
@@ -90,7 +81,7 @@ public class AliyunSttService implements SttService {
     /**
      * Paraformer 模型的流式识别
      */
-    private String streamRecognitionParaformer(Sinks.Many<byte[]> audioSink, String modelName) {
+    private String streamRecognitionParaformer(Flux<byte[]> audioSink, String modelName) {
         var recognizer = new Recognition();
 
         // 创建识别参数
@@ -105,7 +96,7 @@ public class AliyunSttService implements SttService {
         var recognition = Flux.<String>create(sink -> {
             try {
                 recognizer.streamCall(param, Flowable.create(emitter -> {
-                            audioSink.asFlux().subscribe(
+                            audioSink.subscribe(
                                     chunk -> emitter.onNext(ByteBuffer.wrap(chunk)),
                                     emitter::onError,
                                     emitter::onComplete
@@ -114,8 +105,7 @@ public class AliyunSttService implements SttService {
                         .timeout(90, TimeUnit.SECONDS)
                         .subscribe(result -> {
                                     if (result.isSentenceEnd()) {
-                                        logger.info("Paraformer语音识别结果 - RequestId: {}, Text: {}",
-                                                result.getRequestId(), result.getSentence().getText());
+                                        logger.info("语音识别结果({}): {}", modelName, result.getSentence().getText());
                                         sink.next(result.getSentence().getText());
                                     }
                                 },
@@ -137,11 +127,11 @@ public class AliyunSttService implements SttService {
     /**
      * Gummy 模型的流式识别（支持实时翻译）
      */
-    private String streamRecognitionGummy(Sinks.Many<byte[]> audioSink) {
+    private String streamRecognitionGummy(Flux<byte[]> audioSink) {
         StringBuilder result = new StringBuilder();
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean hasError = new AtomicBoolean(false);
-        
+
         // 初始化请求参数
         var param = TranslationRecognizerParam.builder()
                 .apiKey(apiKey)
@@ -151,7 +141,6 @@ public class AliyunSttService implements SttService {
                 .transcriptionEnabled(true)
                 .sourceLanguage("auto")
                 .build();
-        
         // 初始化回调接口
         ResultCallback<TranslationRecognizerResult> callback =
                 new ResultCallback<TranslationRecognizerResult>() {
@@ -163,8 +152,7 @@ public class AliyunSttService implements SttService {
                             if (recognizerResult.getTranscriptionResult() != null) {
                                 if (recognizerResult.isSentenceEnd()) {
                                     String text = recognizerResult.getTranscriptionResult().getText();
-                                    logger.info("Gummy语音识别结果 - RequestId: {}, Text: {}",
-                                            recognizerResult.getRequestId(), text);
+                                    logger.info("语音识别结果({}): {}", model, text);
                                     synchronized (result) {
                                         result.append(text);
                                     }
@@ -182,21 +170,21 @@ public class AliyunSttService implements SttService {
 
                     @Override
                     public void onError(Exception e) {
-                        logger.error("Gummy语音识别错误: {}", e.getMessage(), e);
+                        logger.error("语音识别错误({}): {}", model, e.getMessage(), e);
                         hasError.set(true);
                         latch.countDown();
                     }
                 };
-        
+
         // 初始化流式识别服务
         TranslationRecognizerRealtime translator = new TranslationRecognizerRealtime();
-        
+
         try {
             // 启动流式语音识别
             translator.call(param, callback);
-            
+
             // 订阅音频流并发送数据
-            audioSink.asFlux().subscribe(
+            audioSink.subscribe(
                     audioChunk -> {
                         try {
                             ByteBuffer buffer = ByteBuffer.wrap(audioChunk);
@@ -214,14 +202,14 @@ public class AliyunSttService implements SttService {
                         translator.stop();
                     }
             );
-            
+
             // 等待识别完成，最多90秒
             boolean completed = latch.await(90, TimeUnit.SECONDS);
-            
+
             if (!completed) {
                 logger.warn("语音识别超时({})", model);
             }
-            
+
         } catch (Exception e) {
             logger.error("流式识别过程中发生错误({})", model, e);
             hasError.set(true);
@@ -233,31 +221,29 @@ public class AliyunSttService implements SttService {
                 logger.error("关闭连接时发生错误", e);
             }
         }
-        
+
         if (hasError.get()) {
             return "";
         }
-        
+
         return result.toString();
     }
 
     /**
      * Qwen 模型的流式识别（qwen3-asr-flash-realtime）
      */
-    private String streamRecognitionQwen(Sinks.Many<byte[]> audioSink) {
+    private String streamRecognitionQwen(Flux<byte[]> audioSink) {
         StringBuilder result = new StringBuilder();
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean hasError = new AtomicBoolean(false);
         AtomicBoolean isCompleted = new AtomicBoolean(false);
         AtomicReference<OmniRealtimeConversation> conversationRef = new AtomicReference<>(null);
-        
         // 初始化请求参数
         OmniRealtimeParam param = OmniRealtimeParam.builder()
                 .model(model)
                 .url("wss://dashscope.aliyuncs.com/api-ws/v1/realtime")
                 .apikey(apiKey)
                 .build();
-        
         try {
             // 初始化回调接口
             OmniRealtimeConversation conversation = new OmniRealtimeConversation(param, new OmniRealtimeCallback() {
@@ -268,22 +254,12 @@ public class AliyunSttService implements SttService {
                 @Override
                 public void onEvent(JsonObject message) {
                     String type = message.get("type").getAsString();
-                    // 尝试获取 request_id 或 event_id
-                    String eventId = message.has("event_id") ? message.get("event_id").getAsString() : null;
-
                     switch(type) {
                         case "session.created":
-                            if (eventId != null) {
-                                logger.info("Qwen会话已创建 - EventId: {}", eventId);
-                            }
                             break;
                         case "conversation.item.input_audio_transcription.completed":
                             String transcript = message.get("transcript").getAsString();
-                            if (eventId != null) {
-                                logger.info("Qwen语音识别结果 - EventId: {}, Text: {}", eventId, transcript);
-                            } else {
-                                logger.info("Qwen语音识别结果 - Text: {}", transcript);
-                            }
+                            logger.info("语音识别结果({}): {}", model, transcript);
                             synchronized (result) {
                                 result.append(transcript);
                             }
@@ -316,15 +292,15 @@ public class AliyunSttService implements SttService {
 
                 @Override
                 public void onClose(int code, String reason) {
-                    logger.info("Qwen语音识别连接已关闭 - Code: {}, Reason: {}", code, reason);
+                    logger.info("Qwen 语音识别连接关闭 - code: {}, reason: {}", code, reason);
                     if (isCompleted.compareAndSet(false, true)) {
                         latch.countDown();
                     }
                 }
             });
-            
+
             conversationRef.set(conversation);
-            
+
             // 建立连接
             try {
                 conversation.connect();
@@ -333,24 +309,22 @@ public class AliyunSttService implements SttService {
                 hasError.set(true);
                 return "";
             }
-            
             // 配置转录参数
             OmniRealtimeTranscriptionParam transcriptionParam = new OmniRealtimeTranscriptionParam();
             // transcriptionParam.setLanguage("zh");
             transcriptionParam.setInputAudioFormat("pcm");
             transcriptionParam.setInputSampleRate(AudioUtils.SAMPLE_RATE);
-            
             // 配置会话参数
             OmniRealtimeConfig config = OmniRealtimeConfig.builder()
                     .modalities(Collections.singletonList(OmniRealtimeModality.TEXT))
                     .transcriptionConfig(transcriptionParam)
                     .enableTurnDetection(false)  // 关闭服务端VAD
                     .build();
-            
+
             conversation.updateSession(config);
-            
+
             // 订阅音频流并发送数据
-            audioSink.asFlux().subscribe(
+            audioSink.subscribe(
                     audioChunk -> {
                         try {
                             // 将音频数据转换为 Base64
@@ -376,10 +350,10 @@ public class AliyunSttService implements SttService {
                         }
                     }
             );
-            
+
             // 等待识别完成，最多90秒
             boolean completed = latch.await(90, TimeUnit.SECONDS);
-            
+
             if (!completed) {
                 logger.warn("语音识别超时({})", model);
                 // 超时情况下主动关闭连接
@@ -389,7 +363,6 @@ public class AliyunSttService implements SttService {
                     logger.error("关闭连接时发生错误", e);
                 }
             }
-            
         } catch (Exception e) {
             logger.error("流式识别过程中发生错误({})", model, e);
             hasError.set(true);
@@ -402,11 +375,11 @@ public class AliyunSttService implements SttService {
                 logger.error("关闭连接时发生错误", ex);
             }
         }
-        
+
         if (hasError.get()) {
             return "";
         }
-        
+
         return result.toString();
     }
 }

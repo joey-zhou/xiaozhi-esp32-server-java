@@ -53,7 +53,24 @@ public class DeviceMcpService {
         }
         if (chatSession.getDeviceMcpHolder().isMcpInitialized()) {
             //2、获取工具列表
-            sendToolsList(chatSession);
+            sendToolsList(chatSession, null);
+        }
+    }
+
+    /**
+     * 初始化设备端MCP工具列表
+     * 并获取用户工具列表
+     */
+    public void initializeWithUserTools(ChatSession chatSession) {
+        //1、调用始化命令
+        DeviceMcpMessage initResult = sendInitialize(chatSession);
+        //根据调用结果进行处理
+        if (initResult != null) {
+            chatSession.getDeviceMcpHolder().setMcpInitialized(true);
+        }
+        if (chatSession.getDeviceMcpHolder().isMcpInitialized()) {
+            //2、获取工具列表
+            sendToolsList(chatSession, true);
         }
     }
 
@@ -110,7 +127,7 @@ public class DeviceMcpService {
      *
      * @param chatSession
      */
-    private void sendToolsList(ChatSession chatSession) {
+    private void sendToolsList(ChatSession chatSession, Boolean withUserTools) {
         DeviceMcpMessage message = new DeviceMcpMessage();
         message.setSessionId(chatSession.getSessionId());
         DeviceMcpPayload payload = new DeviceMcpPayload();
@@ -122,6 +139,10 @@ public class DeviceMcpService {
         } else {
             payload.setParams(Map.of(
                     "cursor", "")); // 初始请求时使用空字符串
+        }
+        if (withUserTools != null && withUserTools) {
+            payload.setParams(Map.of(
+                    "withUserTools", true));
         }
         message.setPayload(payload);
 
@@ -185,7 +206,7 @@ public class DeviceMcpService {
             if (nextCursor != null && !nextCursor.toString().isEmpty()) {
                 // 如果有下一页游标，继续请求下一页
                 chatSession.getDeviceMcpHolder().setMcpCursor(nextCursor.toString());
-                sendToolsList(chatSession);
+                sendToolsList(chatSession, null);
             } else {
                 // 所有工具加载完成
                 chatSession.getDeviceMcpHolder().setMcpCursor(null);
@@ -205,7 +226,7 @@ public class DeviceMcpService {
             // 阻塞并等待异步操作完成
             response = future.get(30, TimeUnit.SECONDS);//等待2秒，没反应则退出
         } catch (Exception e) {
-            logger.error("SessionId: {}, Error sending MCP request", chatSession.getSessionId(), e);
+            logger.error("SessionId: {}, Error sending MCP request：{}", chatSession.getSessionId(), e);
             chatSession.getDeviceMcpHolder().getMcpPendingRequests().remove(id);
         }
         return response;

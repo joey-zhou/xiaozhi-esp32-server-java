@@ -28,7 +28,7 @@
             state = 1
             AND userId = #{userId}
             <if test="templateName != null and templateName != ''">
-                AND template_name like concat('%', #{templateName}, '%')
+                AND templateName like concat('%', #{templateName}, '%')
             </if>
             <if test="category != null and category != ''">
                 AND category = #{category}
