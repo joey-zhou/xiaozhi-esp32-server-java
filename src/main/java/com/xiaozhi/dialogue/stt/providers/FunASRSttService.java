@@ -33,7 +33,7 @@ public class FunASRSttService implements SttService {
     private static final Logger logger = LoggerFactory.getLogger(FunASRSttService.class);
     private static final String PROVIDER_NAME = "funasr";
 
-    private static final String SPEAKING_START = "{\"mode\":\"online\",\"wav_name\":\"voice.wav\",\"is_speaking\":true,\"wav_format\":\"pcm\",\"chunk_size\":[5,10,5],\"itn\":true}";
+    private static final String SPEAKING_START = "{\"mode\":\"2pass\",\"wav_name\":\"voice.wav\",\"is_speaking\":true,\"wav_format\":\"pcm\",\"chunk_size\":[5,10,5],\"itn\":true}";
     private static final String SPEAKING_END = "{\"is_speaking\": false}";
     private static final int QUEUE_TIMEOUT_MS = 100; // 队列等待超时时间
     private static final long RECOGNITION_TIMEOUT_MS = 90000; // 识别超时时间（90秒）
@@ -65,6 +65,8 @@ public class FunASRSttService implements SttService {
         // 使用阻塞队列存储音频数据
         BlockingQueue<byte[]> audioQueue = new LinkedBlockingQueue<>();
         AtomicBoolean isCompleted = new AtomicBoolean(false);
+        // 拼接所有2pass-offline离线修正结果
+        StringBuilder offlineResult = new StringBuilder();
         AtomicReference<String> finalResult = new AtomicReference<>("");
         CountDownLatch recognitionLatch = new CountDownLatch(1);
         
@@ -117,10 +119,15 @@ public class FunASRSttService implements SttService {
             public void onMessage(String message) {
                 try {
                     JSONObject jsonObject = JSON.parseObject(message);
-                    if (jsonObject.getBoolean("is_final")) {
-                        String text = jsonObject.getString("text");
-                        finalResult.set(text);
-                        recognitionLatch.countDown(); // 识别完成，释放锁
+                    boolean isFinal = Boolean.TRUE.equals(jsonObject.getBoolean("is_final"));
+                    String mode = jsonObject.getString("mode");
+                    String text = jsonObject.getString("text");
+                    // 2pass模式：拼接每个离线修正片段（VAD可能将一句话分为多段）
+                    if (isFinal && "2pass-offline".equals(mode)) {
+                        if (text != null && !text.isEmpty()) {
+                            offlineResult.append(text);
+                        }
+                        logger.debug("FunASR 离线修正片段: {}", text);
                     }
                 } catch (Exception e) {
                     logger.error("解析FunASR响应失败", e);
@@ -130,7 +137,8 @@ public class FunASRSttService implements SttService {
             @Override
             public void onClose(int code, String reason, boolean remote) {
                 logger.info("FunASR WS关闭，原因：{}", reason);
-                // 确保锁被释放
+                // 连接关闭时，离线修正结果已全部收到，设置最终结果
+                finalResult.set(offlineResult.toString());
                 recognitionLatch.countDown();
             }
 
