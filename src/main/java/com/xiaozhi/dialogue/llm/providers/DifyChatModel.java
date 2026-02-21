@@ -93,6 +93,18 @@ public class DifyChatModel implements ChatModel {
                                 .build());
                     }
 
+                    @Override
+                    public void onAgentMessage(AgentMessageEvent event) {
+                        sink.next(ChatResponse.builder()
+                                .generations(
+                                        List.of(new Generation(AssistantMessage.builder()
+                                                .content(event.getAnswer())
+                                                .properties(Map.of("messageId", event.getMessageId(),
+                                                        "conversationId", event.getConversationId()))
+                                                .build())))
+                                .build());
+                    }
+
 
                     @Override
                     public void onMessageEnd(MessageEndEvent event) {
