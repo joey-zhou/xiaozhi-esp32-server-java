@@ -132,7 +132,11 @@ public abstract class ChatSession {
     }
 
     public void setAttribute(String key, Object value) {
-        attributes.put(key, value);
+        if (value != null) {
+            attributes.put(key, value);
+        } else {
+            attributes.remove(key);
+        }
     }
 
     public Object getAttribute(String key) {

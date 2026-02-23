@@ -67,7 +67,10 @@ public class AecService {
     public void resetSession(String sessionId) {
         AecState state = states.remove(sessionId);
         if (state != null) {
-            state.dispose();
+            // 在 apmLock 内 dispose，确保等待正在进行的 processStream/processReverseStream 完成
+            synchronized (state.apmLock) {
+                state.dispose();
+            }
             logger.info("AEC会话已重置: {}", sessionId);
         }
     }
@@ -87,10 +90,15 @@ public class AecService {
             AecState fresh = new AecState();
             // 原子替换：用新实例替换旧实例
             if (states.replace(sessionId, old, fresh)) {
-                old.dispose();
+                // 在 apmLock 内 dispose，确保等待正在进行的 processStream/processReverseStream 完成
+                synchronized (old.apmLock) {
+                    old.dispose();
+                }
             } else {
                 // 并发竞争，新实例被抢先替换，释放刚创建的
-                fresh.dispose();
+                synchronized (fresh.apmLock) {
+                    fresh.dispose();
+                }
             }
         } catch (Exception e) {
             logger.warn("AEC重建失败: {}: {}", sessionId, e.getMessage());
@@ -114,6 +122,7 @@ public class AecService {
 
             // 立即逐子帧调用 processReverseStream，以 TTS 实时节奏驱动参考通道
             synchronized (state.apmLock) {
+                if (state.disposed) return;
                 int offset = 0;
                 while (offset + FRAME_BYTES_10MS <= pcm.length) {
                     byte[] subFrame = new byte[FRAME_BYTES_10MS];
@@ -146,6 +155,7 @@ public class AecService {
             int outOffset = 0;
 
             synchronized (state.apmLock) {
+                if (state.disposed) return micPcm;
                 while (offset + FRAME_BYTES_10MS <= totalBytes) {
                     byte[] micSubFrame = new byte[FRAME_BYTES_10MS];
                     System.arraycopy(micPcm, offset, micSubFrame, 0, FRAME_BYTES_10MS);
@@ -181,6 +191,7 @@ public class AecService {
         final OpusProcessor refDecoder;
         final AudioProcessingStreamConfig streamConfig;
         final Object apmLock = new Object();  // feedReference 和 process 共用同一把锁，保证 APM 调用线程安全
+        volatile boolean disposed = false;     // dispose 标志，在 apmLock 内设置和检查
 
         AecState() {
             apm = new AudioProcessing();
@@ -216,6 +227,7 @@ public class AecService {
         }
 
         void dispose() {
+            disposed = true;
             try {
                 apm.dispose();
             } catch (Exception e) {
