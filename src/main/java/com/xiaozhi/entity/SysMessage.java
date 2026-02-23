@@ -70,7 +70,7 @@ public class SysMessage extends Base<SysMessage> {
      *
      */
     @Schema(description = "消息类型: NORMAL-普通消息，FUNCTION_CALL-函数调用消息")
-    private String messageType = "NORMAL";
+    private String messageType;
 
     /**
      * 工具调用详情（JSON数组），记录本轮对话中调用的工具名称、参数和执行结果

@@ -29,7 +29,7 @@
     </resultMap>
 
     <sql id="Message_Column_List">
-        sys_message.messageId, sys_message.deviceId, sys_message.message, sys_message.sender, sys_message.roleId, sys_message.state, sys_message.createTime, sys_message.messageType, sys_message.audioPath
+        sys_message.messageId, sys_message.deviceId, sys_message.message, sys_message.sender, sys_message.roleId, sys_message.state, sys_message.createTime, sys_message.messageType, sys_message.audioPath, sys_message.toolCalls
     </sql>
 
     <sql id="Device_Column_List">
@@ -50,7 +50,7 @@
             LEFT JOIN sys_device ON sys_message.deviceId = sys_device.deviceId
             LEFT JOIN sys_role ON sys_message.roleId = sys_role.roleId
         WHERE
-            sys_message.state = 1
+            1 = 1
             <if test="userId != null and userId != ''">AND sys_device.userId = #{userId}</if>
             <if test="deviceId != null and deviceId != ''">
                 AND sys_message.deviceId = #{deviceId}

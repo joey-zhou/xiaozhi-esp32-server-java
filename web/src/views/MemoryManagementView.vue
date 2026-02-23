@@ -132,6 +132,12 @@ const columns = computed(() => {
         align: 'center' as const,
       },
       {
+        title: t('message.toolCalls'),
+        dataIndex: 'messageType',
+        width: 250,
+        align: 'center' as const,
+      },
+      {
         title: t('message.messageContent'),
         dataIndex: 'message',
         width: 300,
@@ -276,6 +282,19 @@ const onTableChange = (pag: TablePaginationConfig) => {
  */
 function getSenderText(sender: string) {
   return sender === 'user' ? t('message.user') : t('message.assistant')
+}
+
+/**
+ * 解析 toolCalls JSON 字符串为数组
+ */
+function parseToolCalls(toolCalls: string | undefined | null): { name: string; arguments: string; result: string }[] {
+  if (!toolCalls) return []
+  try {
+    const parsed = JSON.parse(toolCalls)
+    return Array.isArray(parsed) ? parsed : [parsed]
+  } catch {
+    return []
+  }
 }
 
 /**
@@ -457,12 +476,51 @@ onMounted(async () => {
         :pagination="pagination"
         :scroll="{ x: 800 }"
         size="middle"
+        :expandable="{
+          rowExpandable: (record: any) => record.messageType === 'FUNCTION_CALL' && !!record.toolCalls,
+        }"
         @change="onTableChange"
       >
+        <template #expandedRowRender="{ record }">
+          <a-table
+            :columns="[
+              { title: t('message.toolName'), dataIndex: 'name', width: 300 },
+              { title: t('message.toolArguments'), dataIndex: 'arguments', width: 300 },
+              { title: t('message.toolResult'), dataIndex: 'result' },
+            ]"
+            :data-source="parseToolCalls(record.toolCalls).map((t, i) => ({ ...t, _key: i }))"
+            :pagination="false"
+            size="small"
+            :row-key="(r: any) => r._key"
+          >
+            <template #bodyCell="{ column, record: tool }">
+              <template v-if="column.dataIndex === 'arguments'">
+                <pre class="tool-json">{{ tool.arguments }}</pre>
+              </template>
+              <template v-else-if="column.dataIndex === 'result'">
+                <pre class="tool-json">{{ tool.result }}</pre>
+              </template>
+            </template>
+          </a-table>
+        </template>
+
         <template #bodyCell="{ column, record }">
           <!-- 发送方列 -->
           <template v-if="column.dataIndex === 'sender'">
             {{ getSenderText(record.sender) }}
+          </template>
+
+          <!-- 消息类型列 -->
+          <template v-else-if="column.dataIndex === 'messageType'">
+            <template v-if="record.messageType === 'FUNCTION_CALL' && record.sender === 'assistant'">
+              <a-tooltip placement="topLeft" :mouse-enter-delay="0.5" :overlay-style="{ maxWidth: '400px' }">
+                <template #title>
+                  <div v-for="(tool, index) in parseToolCalls(record.toolCalls)" :key="index">{{ tool.name }}</div>
+                </template>
+                <div v-for="(tool, index) in parseToolCalls(record.toolCalls)" :key="index" class="ellipsis-text">{{ tool.name }}</div>
+              </a-tooltip>
+            </template>
+            <span v-else>-</span>
           </template>
 
           <!-- 消息内容列 -->
@@ -483,12 +541,14 @@ onMounted(async () => {
 
           <!-- 操作列 -->
           <template v-else-if="column.dataIndex === 'operation'">
-            <TableActionButtons
-              :record="record"
-              show-delete
-              :delete-title="t('message.confirmDeleteMessage')"
-              @delete="() => handleDeleteMessage(record)"
-            />
+            <a-space>
+              <TableActionButtons
+                :record="record"
+                :show-delete="record.state !== '0'"
+                :delete-title="t('message.confirmDeleteMessage')"
+                @delete="() => handleDeleteMessage(record)"
+              />
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -567,5 +627,16 @@ onMounted(async () => {
   .ant-table-tbody > tr > td {
     max-width: 0;
   }
+}
+
+// 工具调用 JSON 展示
+.tool-json {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 200px;
+  overflow-y: auto;
 }
 </style>

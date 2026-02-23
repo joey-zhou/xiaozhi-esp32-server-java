@@ -33,6 +33,9 @@ public class MessageDTO {
     @Schema(description = "语音文件路径", example = "/audio/message_123456.mp3")
     private String audioPath;
 
+    @Schema(description = "消息状态: 1-正常，0-已删除")
+    private String state;
+
     @Schema(description = "消息类型: NORMAL-普通消息，FUNCTION_CALL-函数调用消息", example = "NORMAL", allowableValues = {"NORMAL", "FUNCTION_CALL"})
     private String messageType;
 
