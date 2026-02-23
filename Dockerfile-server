@@ -64,6 +64,12 @@ FROM eclipse-temurin:21-jre
 # 安装必要的运行时依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libxfixes3 \
+    libxtst6 \
+    libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
