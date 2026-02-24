@@ -41,6 +41,13 @@ export function testVoice(data: Partial<TestVoiceParams>) {
 }
 
 /**
+ * 获取本地 sherpa-onnx 音色列表（动态扫描 models/tts 目录）
+ */
+export function querySherpaVoices() {
+  return http.getList<Record<string, string>>(api.role.sherpaVoices, {})
+}
+
+/**
  * 获取系统全局工具列表
  */
 export function getSystemGlobalTools() {

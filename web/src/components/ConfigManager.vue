@@ -571,13 +571,14 @@ fetchData()
                 show-icon
                 style="margin-bottom: 16px"
               >
-                <template #message>本地语音合成模型配置说明</template>
+                <template #message>本地语音合成（Sherpa-ONNX）使用说明</template>
                 <template #description>
-                  <div style="font-size: 13px; line-height: 1.8">
-                    <p style="margin: 0">1. 支持 VITS、Kokoro、Matcha 三种模型，系统会根据模型目录中的文件自动检测类型</p>
-                    <p style="margin: 0">2. 默认使用 <code>models/tts/vits-melo-tts-zh_en</code> 中英文模型，需先下载模型文件到对应目录</p>
-                    <p style="margin: 0">3. 角色配置中的「语音名称」格式为 <code>模型类型:说话人ID</code>，如 <code>vits:0</code>、<code>kokoro:1</code></p>
-                    <p style="margin: 0">4. 本地模型无需 API 密钥，所有字段均为可选</p>
+                  <div style="font-size: 13px; line-height: 2">
+                    <p style="margin: 0">无需填写任何参数，保存后即可在角色配置中选择本地音色。</p>
+                    <p style="margin: 0">支持 <strong>VITS</strong>、<strong>Kokoro</strong>、<strong>Matcha</strong> 三种模型架构，系统自动识别。</p>
+                    <p style="margin: 0">模型存放目录：<code>models/tts/</code>，每个子目录对应一个模型。</p>
+                    <p style="margin: 0">Matcha 模型需额外下载 vocoder 文件（如 <code>vocos-16khz-univ.onnx</code>）放入模型目录。</p>
+                    <p style="margin: 0">中文模型若缺少 <code>dict/</code> 目录，可软链接至其他模型的 dict 目录共用。</p>
                   </div>
                 </template>
               </a-alert>

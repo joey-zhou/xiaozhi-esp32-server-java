@@ -7,6 +7,7 @@ import { ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { queryConfigs } from '@/services/config'
 import { queryAgents } from '@/services/agent'
+import { querySherpaVoices } from '@/services/role'
 import type { ModelOption, VoiceOption, SttOption, VoiceProvider } from '@/types/role'
 import type { Config } from '@/types/config'
 import type { Agent } from '@/types/agent'
@@ -137,8 +138,9 @@ export function useRoleManager() {
         ttsConfigs.value = ttsRes.data.list
       }
 
-      // 2. 并行加载所有语音JSON文件
-      const [edgeVoices, aliyunVoices, aliyunNlsVoices, volcengineVoices, xfyunVoices, minimaxVoices, tencentVoices, sherpaOnnxVoices] = await Promise.all([
+      // 2. 并行加载所有语音JSON文件和 sherpa-onnx 动态音色
+      const sherpaConfig = ttsConfigs.value.find(c => c.provider === 'sherpa-onnx')
+      const [edgeVoices, aliyunVoices, aliyunNlsVoices, volcengineVoices, xfyunVoices, minimaxVoices, tencentVoices, sherpaRes] = await Promise.all([
         loadVoiceJson('/static/assets/edgeVoicesList.json', 'edge'),
         loadVoiceJson('/static/assets/aliyunVoicesList.json', 'aliyun'),
         loadVoiceJson('/static/assets/aliyunNlsVoicesList.json', 'aliyun-nls'),
@@ -146,7 +148,7 @@ export function useRoleManager() {
         loadVoiceJson('/static/assets/xfyunVoicesList.json', 'xfyun'),
         loadVoiceJson('/static/assets/minimaxVoicesList.json', 'minimax'),
         loadVoiceJson('/static/assets/tencentVoicesList.json', 'tencent'),
-        loadVoiceJson('/static/assets/sherpaOnnxVoicesList.json', 'sherpa-onnx')
+        sherpaConfig ? querySherpaVoices().catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
       ])
 
       // 3. 合并所有语音，并关联TTS配置
@@ -155,33 +157,42 @@ export function useRoleManager() {
       // Edge语音（不需要TTS配置）
       voices.push(...edgeVoices.map(v => ({
         ...v,
-        ttsId: -1 // Edge使用-1作为特殊标记
+        ttsId: -1
       })))
 
-      // 其他提供商的语音（需要关联TTS配置）
-      const providerVoicesMap = {
+      // 云服务提供商语音（需要关联TTS配置）
+      const providerVoicesMap: Record<string, VoiceOption[]> = {
         aliyun: aliyunVoices,
         'aliyun-nls': aliyunNlsVoices,
         volcengine: volcengineVoices,
         xfyun: xfyunVoices,
         minimax: minimaxVoices,
         tencent: tencentVoices,
-        'sherpa-onnx': sherpaOnnxVoices
       }
 
       Object.entries(providerVoicesMap).forEach(([provider, providerVoices]) => {
-        // 找到该提供商的TTS配置
         const ttsConfig = ttsConfigs.value.find(c => c.provider === provider)
         if (ttsConfig) {
-          // 只添加有TTS配置的提供商的语音
           providerVoices.forEach((v: VoiceOption) => {
-            voices.push({
-              ...v,
-              ttsId: ttsConfig.configId
-            })
+            voices.push({ ...v, ttsId: ttsConfig.configId })
           })
         }
       })
+
+      // sherpa-onnx 动态音色
+      if (sherpaConfig) {
+        const items = (sherpaRes as { data?: Record<string, string>[] }).data ?? []
+        items.forEach((item: Record<string, string>) => {
+          voices.push({
+            label: item.label,
+            value: item.value,
+            gender: (item.gender as 'male' | 'female' | '') || '',
+            provider: 'sherpa-onnx',
+            model: item.model,
+            ttsId: sherpaConfig.configId
+          })
+        })
+      }
 
       allVoices.value = voices
     } catch (error) {

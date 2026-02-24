@@ -16,23 +16,16 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 基于 sherpa-onnx 的本地语音合成服务
  * 支持 VITS、Kokoro、Matcha 等多种本地 TTS 模型
- * 默认使用 vits-melo-tts-zh_en 中英文模型
- * 
- * voiceName 格式：
- *   kokoro:0       - Kokoro模型，speaker id=0
- *   vits:100       - VITS模型，speaker id=100
- *   matcha:0       - Matcha模型，speaker id=0
- *   0              - 默认使用配置的模型类型，speaker id=0
- * 
- * apiUrl 字段用于指定模型目录路径，默认：models/tts/vits-melo-tts-zh_en
+ *
+ * voiceName 格式：modelDir:modelType:speakerId
+ *   示例：vits-melo-tts-zh_en:vits:0
+ *         kokoro-multi-lang:kokoro:3
+ *         matcha-zh-baker:matcha:0
  */
 public class SherpaOnnxTtsService implements TtsService {
     private static final Logger logger = LoggerFactory.getLogger(SherpaOnnxTtsService.class);
 
     private static final String PROVIDER_NAME = "sherpa-onnx";
-
-    // 默认模型目录路径（vits-melo-tts-zh_en 中英文模型）
-    private static final String DEFAULT_MODEL_PATH = "models/tts/vits-melo-tts-zh_en";
 
     // 缓存 OfflineTts 实例，避免重复加载模型（key = modelPath）
     private static final Map<String, OfflineTts> ttsCache = new ConcurrentHashMap<>();
@@ -54,23 +47,16 @@ public class SherpaOnnxTtsService implements TtsService {
         this.pitch = pitch;
         this.speed = speed;
         this.outputPath = outputPath;
-        // apiUrl 字段存储模型目录路径，为空时使用默认 vits-melo-tts-zh_en
-        String configPath = config.getApiUrl();
-        this.modelPath = (configPath != null && !configPath.isBlank()) ? configPath : DEFAULT_MODEL_PATH;
 
-        // 解析 voiceName，格式：modelType:speakerId 或 纯数字speakerId
+        // 解析 voiceName，格式：modelDir:modelType:speakerId
+        // 如：vits-melo-tts-zh_en:vits:0、kokoro-multi-lang:kokoro:3
         String[] parts = voiceName != null ? voiceName.split(":") : new String[]{};
-        if (parts.length >= 2) {
-            this.modelType = parts[0].toLowerCase();
-            this.speakerId = parseSpeakerId(parts[1]);
-        } else if (parts.length == 1) {
-            // 纯数字则为 speakerId，模型类型自动检测
-            this.modelType = detectModelType(modelPath);
-            this.speakerId = parseSpeakerId(parts[0]);
-        } else {
-            this.modelType = detectModelType(modelPath);
-            this.speakerId = 0;
+        if (parts.length != 3) {
+            throw new IllegalArgumentException("voiceName 格式错误，期望 modelDir:modelType:speakerId，实际: " + voiceName);
         }
+        this.modelPath = "models/tts/" + parts[0];
+        this.modelType = parts[1].toLowerCase();
+        this.speakerId = parseSpeakerId(parts[2]);
     }
 
     private int parseSpeakerId(String s) {
@@ -79,27 +65,6 @@ public class SherpaOnnxTtsService implements TtsService {
         } catch (NumberFormatException e) {
             return 0;
         }
-    }
-
-    /**
-     * 根据模型目录中的文件自动检测模型类型
-     */
-    private String detectModelType(String path) {
-        if (path == null) return "kokoro";
-        File dir = new File(path);
-        if (!dir.isDirectory()) return "kokoro";
-
-        // 检查是否有 voices.bin（Kokoro 特征文件）
-        if (new File(dir, "voices.bin").exists()) return "kokoro";
-        // 检查是否有 vocoder（Matcha 特征）
-        File[] files = dir.listFiles();
-        if (files != null) {
-            for (File f : files) {
-                if (f.getName().contains("vocoder")) return "matcha";
-            }
-        }
-        // 默认 VITS
-        return "vits";
     }
 
     @Override
@@ -212,7 +177,7 @@ public class SherpaOnnxTtsService implements TtsService {
             case "matcha" -> {
                 OfflineTtsMatchaModelConfig matchaConfig = OfflineTtsMatchaModelConfig.builder()
                         .setAcousticModel(findFileByPattern(dir, "model-steps"))
-                        .setVocoder(findFileByPattern(dir, "vocoder"))
+                        .setVocoder(findFileByPattern(dir, "vocoder", "vocos"))
                         .setTokens(findFile(dir, "tokens.txt"))
                         .setLexicon(findFileOptional(dir, "lexicon.txt"))
                         .setDataDir(findDirOptional(dir, "espeak-ng-data"))
@@ -262,12 +227,18 @@ public class SherpaOnnxTtsService implements TtsService {
     }
 
     /**
-     * 查找匹配模式的 .onnx 文件
+     * 查找匹配任意一个模式的 .onnx 文件
      */
-    private String findFileByPattern(File dir, String pattern) {
-        File[] files = dir.listFiles((d, n) -> n.contains(pattern) && n.endsWith(".onnx"));
+    private String findFileByPattern(File dir, String... patterns) {
+        File[] files = dir.listFiles((d, n) -> {
+            if (!n.endsWith(".onnx")) return false;
+            for (String p : patterns) {
+                if (n.contains(p)) return true;
+            }
+            return false;
+        });
         if (files == null || files.length == 0) {
-            throw new RuntimeException("未找到匹配 '" + pattern + "' 的 .onnx 文件，目录: " + dir.getAbsolutePath());
+            throw new RuntimeException("未找到匹配 " + java.util.Arrays.toString(patterns) + " 的 .onnx 文件，目录: " + dir.getAbsolutePath());
         }
         return files[0].getAbsolutePath();
     }

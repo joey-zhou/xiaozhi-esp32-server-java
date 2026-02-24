@@ -18,6 +18,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import org.springframework.beans.BeanUtils;
+
+import java.util.Objects;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -79,13 +81,6 @@ public class ConfigController extends BaseController {
     @Operation(summary = "更新配置信息", description = "更新LLM/STT/TTS配置")
     public ResultMessage update(@PathVariable Integer configId, @Valid @RequestBody ConfigUpdateParam param) {
         try {
-            if ("tts".equals(param.getConfigType())) {
-                SysConfig configForValidation = new SysConfig();
-                BeanUtils.copyProperties(param, configForValidation);
-                String err = ttsServiceFactory.validateConfig(configForValidation);
-                if (err != null) return ResultMessage.error(err);
-            }
-
             SysConfig config = new SysConfig();
             BeanUtils.copyProperties(param, config);
             config.setConfigId(configId);
@@ -96,10 +91,10 @@ public class ConfigController extends BaseController {
             if (rows > 0) {
                 if (oldSysConfig != null) {
                     if ("stt".equals(oldSysConfig.getConfigType())
-                            && !oldSysConfig.getApiKey().equals(config.getApiKey())) {
+                            && !Objects.equals(oldSysConfig.getApiKey(), config.getApiKey())) {
                         sttServiceFactory.removeCache(oldSysConfig);
                     } else if ("tts".equals(oldSysConfig.getConfigType())
-                            && !oldSysConfig.getApiKey().equals(config.getApiKey())) {
+                            && !Objects.equals(oldSysConfig.getApiKey(), config.getApiKey())) {
                         ttsServiceFactory.removeCache(oldSysConfig);
                     }
                 }
@@ -125,13 +120,6 @@ public class ConfigController extends BaseController {
     @Operation(summary = "添加配置信息", description = "添加新的LLM/STT/TTS配置")
     public ResultMessage create(@Valid @RequestBody ConfigAddParam param) {
         try {
-            if ("tts".equals(param.getConfigType())) {
-                SysConfig configForValidation = new SysConfig();
-                BeanUtils.copyProperties(param, configForValidation);
-                String err = ttsServiceFactory.validateConfig(configForValidation);
-                if (err != null) return ResultMessage.error(err);
-            }
-
             SysConfig config = new SysConfig();
             BeanUtils.copyProperties(param, config);
             config.setUserId(CmsUtils.getUserId());

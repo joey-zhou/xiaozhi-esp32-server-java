@@ -302,6 +302,14 @@
             <artifactId>coze-api</artifactId>
             <version>LATEST</version>
         </dependency>
+        <!-- sherpa-onnx Java绑定 -->
+        <dependency>
+            <groupId>com.k2fsa</groupId>
+            <artifactId>sherpa-onnx</artifactId>
+            <version>1.11.4</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/sherpa-onnx-v1.12.21.jar</systemPath>
+        </dependency>
         <!-- 腾讯云COS SDK -->
         <dependency>
             <groupId>com.qcloud</groupId>

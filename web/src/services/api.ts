@@ -32,6 +32,7 @@ export default {
     update: '/role',
     delete: '/role',
     testVoice: '/role/testVoice',
+    sherpaVoices: '/role/sherpaVoices',
   },
   template: {
     query: '/template',
