@@ -132,9 +132,9 @@ public class ChatService {
     private SttService initSttService(SysRole role){
         Assert.notNull(role, "role cannot be null");
         var sttId = role.getSttId();
-        if(sttId ==null){
-            logger.warn("角色没有配置STT服务 - Role: {}", role.getRoleName());
-            return null;
+        if (sttId == null) {
+            logger.warn("角色没有配置STT服务 - Role: {},默认使用vosk", role.getRoleName());
+            return sttFactory.getSttService(null);
         }
         var sttConfig = configService.selectConfigById(sttId);
         if(sttConfig == null){
