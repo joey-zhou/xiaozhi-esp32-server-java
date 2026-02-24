@@ -32,6 +32,7 @@ export default {
     update: '/role',
     delete: '/role',
     testVoice: '/role/testVoice',
+    localVoices: '/role/localVoices',
   },
   template: {
     query: '/template',

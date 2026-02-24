@@ -1,8 +1,11 @@
 # Use Eclipse Temurin for both build and runtime stages
 FROM eclipse-temurin:21-jdk AS builder
 
-# 添加构建参数，默认使用标准模型
-ARG VOSK_MODEL_SIZE=standard
+# 构建参数
+# Vosk模型大小: small(~50MB) 或 standard(~1.3GB)
+ARG VOSK_MODEL_SIZE=small
+# TTS本地模型，默认 vits-melo-tts-zh_en（中英文），设为 none 则不下载
+ARG TTS_MODEL=vits-melo-tts-zh_en
 
 # 安装必要的构建工具
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -14,54 +17,87 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-# 复制源代码
+# 复制源代码并构建
 COPY ./src ./src
 COPY ./db ./db
 COPY pom.xml ./
-# 构建应用
 RUN mvn -Dmaven.repo.local=/root/.m2/repository package -DskipTests
 
-# 正确提取项目版本号 - 使用更精确的grep模式匹配项目版本而非父项目版本
+# 提取项目版本号
 RUN APP_VERSION=$(grep -A1 "<artifactId>xiaozhi.server</artifactId>" pom.xml | grep "<version>" | sed -e 's/<version>//' -e 's/<\/version>//' -e 's/[[:space:]]//g') && \
     echo "APP_VERSION=${APP_VERSION}" > /build/app_version.env && \
     cat /build/app_version.env
 
-# 确保模型目录存在
-RUN mkdir -p /build/models
+# ============================================================
+# 模型处理：优先使用本地预下载的模型，不存在则在线下载
+# 本地模型通过 scripts/download_models.sh 预先下载
+# ============================================================
 
-# 复制模型文件
-COPY ./models/silero_vad.onnx /build/models/silero_vad.onnx
+RUN mkdir -p /build/models /build/lib
 
-# 下载并准备Vosk模型
-RUN mkdir -p /vosk_cache && \
-    if [ "$VOSK_MODEL_SIZE" = "small" ]; then \
-        if [ ! -d "/vosk_cache/vosk-model-small-cn-0.22" ]; then \
-            echo "Downloading small Vosk model..." && \
-            cd /vosk_cache && \
-            wget https://alphacephei.com/vosk/models/vosk-model-small-cn-0.22.zip && \
-            unzip vosk-model-small-cn-0.22.zip && \
-            rm vosk-model-small-cn-0.22.zip; \
-        else \
-            echo "Using cached small Vosk model"; \
-        fi && \
-        cp -r /vosk_cache/vosk-model-small-cn-0.22 /build/models/vosk-model; \
+# 复制整个 models 目录（包含 silero_vad.onnx 和可能预下载的模型）
+COPY ./models/ /build/models/
+
+# 复制整个 lib 目录（包含可能预下载的 JNI 库）
+COPY ./lib/ /build/lib/
+
+# Vosk STT 模型：本地有则跳过下载
+RUN if [ -d "/build/models/vosk-model" ] && [ "$(ls -A /build/models/vosk-model 2>/dev/null)" ]; then \
+        echo ">>> 使用本地预下载的 Vosk 模型"; \
     else \
-        if [ ! -d "/vosk_cache/vosk-model-cn-0.22" ]; then \
-            echo "Downloading standard Vosk model..." && \
-            cd /vosk_cache && \
-            wget https://alphacephei.com/vosk/models/vosk-model-cn-0.22.zip && \
-            unzip vosk-model-cn-0.22.zip && \
-            rm vosk-model-cn-0.22.zip; \
+        echo ">>> 本地无 Vosk 模型，开始在线下载..."; \
+        mkdir -p /vosk_cache; \
+        if [ "$VOSK_MODEL_SIZE" = "small" ]; then \
+            VOSK_NAME="vosk-model-small-cn-0.22"; \
         else \
-            echo "Using cached standard Vosk model"; \
-        fi && \
-        cp -r /vosk_cache/vosk-model-cn-0.22 /build/models/vosk-model; \
+            VOSK_NAME="vosk-model-cn-0.22"; \
+        fi; \
+        if [ ! -d "/vosk_cache/${VOSK_NAME}" ]; then \
+            echo "下载 ${VOSK_NAME} ..."; \
+            cd /vosk_cache && \
+            wget -q https://alphacephei.com/vosk/models/${VOSK_NAME}.zip && \
+            unzip -q ${VOSK_NAME}.zip && \
+            rm -f ${VOSK_NAME}.zip; \
+        fi; \
+        cp -r /vosk_cache/${VOSK_NAME} /build/models/vosk-model; \
     fi
 
-# 使用更小的JRE镜像作为运行时环境
+# sherpa-onnx TTS 模型：本地有则跳过下载
+RUN if [ "$TTS_MODEL" = "none" ] || [ -z "$TTS_MODEL" ]; then \
+        echo ">>> 跳过 TTS 模型下载 (TTS_MODEL=none)"; \
+    elif [ -f "/build/models/tts/${TTS_MODEL}/model.onnx" ]; then \
+        echo ">>> 使用本地预下载的 TTS 模型: ${TTS_MODEL}"; \
+    else \
+        echo ">>> 本地无 TTS 模型，开始在线下载 ${TTS_MODEL} ..."; \
+        mkdir -p /build/models/tts && \
+        cd /build/models/tts && \
+        wget -q -c https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/${TTS_MODEL}.tar.bz2 && \
+        tar xf ${TTS_MODEL}.tar.bz2 && \
+        rm -f ${TTS_MODEL}.tar.bz2; \
+        echo "TTS 模型下载完成: ${TTS_MODEL}"; \
+    fi
+
+# sherpa-onnx JNI 原生库：从 native jar 中提取，本地有则跳过
+RUN if [ -f "/build/lib/libsherpa-onnx-jni.so" ] && [ -f "/build/lib/libonnxruntime.so" ]; then \
+        echo ">>> 使用本地预下载的 sherpa-onnx JNI 库"; \
+    else \
+        SHERPA_VERSION="1.12.23"; \
+        echo ">>> 本地无 JNI 库，从 native jar 下载 sherpa-onnx v${SHERPA_VERSION} ..."; \
+        cd /tmp && \
+        wget -q -c https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/sherpa-onnx-native-lib-linux-x64-v${SHERPA_VERSION}.jar \
+             -O sherpa-native.jar && \
+        unzip -o sherpa-native.jar "sherpa-onnx/native/linux-x64/*" -d /tmp/sherpa-extract && \
+        cp /tmp/sherpa-extract/sherpa-onnx/native/linux-x64/libsherpa-onnx-jni.so /build/lib/ && \
+        cp /tmp/sherpa-extract/sherpa-onnx/native/linux-x64/libonnxruntime.so /build/lib/ && \
+        rm -rf /tmp/sherpa-native.jar /tmp/sherpa-extract; \
+        echo "sherpa-onnx JNI 库提取完成"; \
+    fi
+
+# ============================================================
+# 运行时镜像
+# ============================================================
 FROM eclipse-temurin:21-jre
 
-# 安装必要的运行时依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libxcomposite1 \
@@ -74,20 +110,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# 复制构建阶段的JAR文件和版本信息
+# 复制构建产物
 COPY --from=builder /build/target/xiaozhi.server-*.jar /app/
 COPY --from=builder /build/app_version.env /app/
-# 复制模型文件夹
 COPY --from=builder /build/models /app/models
+COPY --from=builder /build/lib /app/lib
 
-# 设置启动脚本 - 使用 . 代替 source，并确保使用 bash
+# 设置 sherpa-onnx 原生库路径
+ENV LD_LIBRARY_PATH=/app/lib:$LD_LIBRARY_PATH
+
+# 启动脚本
+# 使用 -Dsherpa_onnx.native.path 指定 native 库路径
+# LibraryUtils.load() 会优先从该路径加载，跳过 jar 内置的库
 RUN echo '#!/bin/bash\n\
 if [ -f /app/app_version.env ]; then\n\
   . /app/app_version.env\n\
 fi\n\
 echo "Starting application version: ${APP_VERSION}"\n\
-java -Xms512m -Xmx1024m -jar /app/xiaozhi.server-${APP_VERSION}.jar\n\
+java -Xms512m -Xmx1024m \\\n\
+  -Dsherpa_onnx.native.path=/app/lib \\\n\
+  -Djava.library.path=/app/lib \\\n\
+  -jar /app/xiaozhi.server-${APP_VERSION}.jar\n\
 ' > /app/start.sh && chmod +x /app/start.sh
 
-# 使用 bash 执行启动脚本
 CMD ["/bin/bash", "/app/start.sh"]

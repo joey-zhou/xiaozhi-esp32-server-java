@@ -36,6 +36,7 @@ services:
       dockerfile: Dockerfile-server
       args:
         - VOSK_MODEL_SIZE=${VOSK_MODEL_SIZE:-small}
+        - TTS_MODEL=${TTS_MODEL:-vits-melo-tts-zh_en}
       # 添加构建缓存设置
       cache_from:
         - eclipse-temurin:21-jre
@@ -53,7 +54,6 @@ services:
       - SPRING_DATASOURCE_PASSWORD=123456
     volumes:
       - maven_repo:/root/.m2/repository  # 持久化Maven仓库
-      - vosk_models:/vosk_cache  # 持久化Vosk模型
     restart: on-failure  # 添加重启策略，如果启动失败会自动重试
 
   redis:
@@ -68,6 +68,5 @@ networks:
     driver: bridge
 
 volumes:
-  mysql_data:  # 定义持久化卷
+  mysql_data:  # 持久化数据卷
   maven_repo:  # 持久化Maven仓库
-  vosk_models:  # 持久化Vosk模型

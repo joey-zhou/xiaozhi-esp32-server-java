@@ -1167,7 +1167,8 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
       { label: 'Aliyun NLS', value: 'aliyun-nls', key: '2' },
       { label: 'Volcengine(doubao)', value: 'volcengine', key: '3' },
       { label: 'Xfyun', value: 'xfyun', key: '4' },
-      { label: 'Minimax', value: 'minimax', key: '5' }
+      { label: 'Minimax', value: 'minimax', key: '5' },
+      { label: 'Sherpa-ONNX（本地）', value: 'sherpa-onnx', key: '6' }
     ],
     typeFields: {
       tencent: [
@@ -1294,6 +1295,35 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           help: '在 https://platform.minimaxi.com/user-center/basic-information/interface-key 申请',
           placeholder: 'your-api-key'
         }
+      ],
+      'sherpa-onnx': [
+        {
+          name: 'apiUrl',
+          label: '模型目录路径',
+          required: false,
+          inputType: 'text',
+          span: 24,
+          help: '本地 TTS 模型文件所在目录路径，支持 VITS / Kokoro / Matcha 模型。留空则默认使用 vits-melo-tts-zh_en（中英文）模型，需先下载到 models/tts/ 目录。模型类型会根据目录内文件自动检测：含 voices.bin 为 Kokoro，含 vocoder 为 Matcha，其余为 VITS',
+          placeholder: 'models/tts/vits-melo-tts-zh_en'
+        },
+        {
+          name: 'appId',
+          label: '模型类型',
+          required: false,
+          inputType: 'text',
+          span: 12,
+          help: '可选，用于备注模型类型：vits / kokoro / matcha。不影响实际运行（系统会自动检测），仅作为配置标识方便管理',
+          placeholder: 'vits'
+        },
+        {
+          name: 'apiKey',
+          label: '默认 Speaker ID',
+          required: false,
+          inputType: 'text',
+          span: 12,
+          help: '可选，用于备注默认说话人 ID（如 0、1、100 等）。实际使用时在角色配置的语音名称中指定，格式如 vits:0 或 kokoro:1',
+          placeholder: '0'
+        },
       ],
     }
   }
