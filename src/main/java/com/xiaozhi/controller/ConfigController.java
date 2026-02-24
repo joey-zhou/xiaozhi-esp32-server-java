@@ -1,14 +1,10 @@
 package com.xiaozhi.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.xiaozhi.common.web.ResultMessage;
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.dialogue.stt.factory.SttServiceFactory;
 import com.xiaozhi.dialogue.tts.factory.TtsServiceFactory;
 import com.xiaozhi.dto.param.ConfigAddParam;
-import com.xiaozhi.dto.param.ConfigGetModelsParam;
 import com.xiaozhi.dto.param.ConfigUpdateParam;
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.service.SysConfigService;
@@ -22,16 +18,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import org.springframework.beans.BeanUtils;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
-import java.util.Map;
+
 
 /**
  * 配置管理
@@ -89,6 +79,13 @@ public class ConfigController extends BaseController {
     @Operation(summary = "更新配置信息", description = "更新LLM/STT/TTS配置")
     public ResultMessage update(@PathVariable Integer configId, @Valid @RequestBody ConfigUpdateParam param) {
         try {
+            if ("tts".equals(param.getConfigType())) {
+                SysConfig configForValidation = new SysConfig();
+                BeanUtils.copyProperties(param, configForValidation);
+                String err = ttsServiceFactory.validateConfig(configForValidation);
+                if (err != null) return ResultMessage.error(err);
+            }
+
             SysConfig config = new SysConfig();
             BeanUtils.copyProperties(param, config);
             config.setConfigId(configId);
@@ -128,6 +125,13 @@ public class ConfigController extends BaseController {
     @Operation(summary = "添加配置信息", description = "添加新的LLM/STT/TTS配置")
     public ResultMessage create(@Valid @RequestBody ConfigAddParam param) {
         try {
+            if ("tts".equals(param.getConfigType())) {
+                SysConfig configForValidation = new SysConfig();
+                BeanUtils.copyProperties(param, configForValidation);
+                String err = ttsServiceFactory.validateConfig(configForValidation);
+                if (err != null) return ResultMessage.error(err);
+            }
+
             SysConfig config = new SysConfig();
             BeanUtils.copyProperties(param, config);
             config.setUserId(CmsUtils.getUserId());
@@ -142,56 +146,4 @@ public class ConfigController extends BaseController {
         }
     }
 
-    @PostMapping("/getModels")
-    @ResponseBody
-    @Operation(summary = "获取模型列表", description = "从指定API地址获取可用的模型列表")
-    public ResultMessage getModels(@Valid @RequestBody ConfigGetModelsParam param) {
-        try {
-            RestTemplate restTemplate = new RestTemplate();
-            // 设置请求头
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + param.getApiKey());
-
-            // 构建请求实体
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-
-            // 调用 /v1/models 接口，解析为 JSON 字符串
-            ResponseEntity<String> response = restTemplate.exchange(
-                    param.getApiUrl() + "/models",
-                    HttpMethod.GET,
-                    entity,
-                    String.class);
-
-            // 使用 ObjectMapper 解析 JSON 响应
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode rootNode = objectMapper.readTree(response.getBody());
-
-            // 提取 "data" 字段
-            JsonNode dataNode = rootNode.get("data");
-            if (dataNode == null || !dataNode.isArray()) {
-                return ResultMessage.error("响应数据格式错误，缺少 data 字段或 data 不是数组");
-            }
-
-            // 将 "data" 字段解析为 List<Map<String, Object>>
-            List<Map<String, Object>> modelList = objectMapper.convertValue(
-                    dataNode,
-                    new TypeReference<List<Map<String, Object>>>() {
-                    });
-
-            // 返回成功结果
-            ResultMessage result = ResultMessage.success();
-            result.put("data", modelList);
-            return result;
-
-        } catch (HttpClientErrorException e) {
-            // 捕获 HTTP 客户端异常并返回详细错误信息
-            String errorMessage = e.getResponseBodyAsString();
-            // 返回详细错误信息到前端
-            return ResultMessage.error("调用模型接口失败: " + errorMessage);
-
-        } catch (Exception e) {
-            // 捕获其他异常并记录日志
-            return ResultMessage.error();
-        }
-    }
 }

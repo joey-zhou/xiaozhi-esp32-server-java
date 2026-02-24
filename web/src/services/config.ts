@@ -25,14 +25,6 @@ export function updateConfig(data: Partial<Config>) {
 }
 
 /**
- * 获取模型列表（从API）
- */
-export function getModels(data: { configName: string; provider: string; apiKey?: string; ak?: string; sk?: string }) {
-  return http.postJSON<string[]>(api.config.getModels, data)
-}
-
-
-/**
  * 查询平台配置
  */
 export function queryPlatformConfig(configType: string, provider: string) {

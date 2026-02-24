@@ -7,6 +7,8 @@ import org.gagravarr.opus.*;
 import org.slf4j.Logger;
 
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -382,6 +384,18 @@ public class AudioUtils {
         }
 
         return output;
+    }
+
+    /**
+     * 将 float[] PCM 样本（范围 -1.0 ~ 1.0）转换为 16-bit PCM byte[]（小端序）
+     */
+    public static byte[] floatToPcm16(float[] samples) {
+        ByteBuffer buffer = ByteBuffer.allocate(samples.length * 2).order(ByteOrder.LITTLE_ENDIAN);
+        for (float sample : samples) {
+            float clamped = Math.max(-1.0f, Math.min(1.0f, sample));
+            buffer.putShort((short) (clamped * 32767));
+        }
+        return buffer.array();
     }
 
     private static short readShortLE(byte[] data, int index) {

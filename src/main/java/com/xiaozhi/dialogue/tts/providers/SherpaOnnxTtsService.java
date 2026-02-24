@@ -9,8 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -145,7 +143,7 @@ public class SherpaOnnxTtsService implements TtsService {
                     elapsed, String.format("%.2f", audioDuration), String.format("%.3f", rtf));
 
             // 将 float[] samples 转为 16-bit PCM byte[]
-            byte[] pcmData = floatToPcm16(audio.getSamples());
+            byte[] pcmData = AudioUtils.floatToPcm16(audio.getSamples());
 
             // 如果采样率不是16000，需要重采样
             int sampleRate = audio.getSampleRate();
@@ -233,20 +231,6 @@ public class SherpaOnnxTtsService implements TtsService {
                 .build();
 
         return new OfflineTts(config);
-    }
-
-    /**
-     * float[] PCM 样本转 16-bit PCM byte[]
-     */
-    private byte[] floatToPcm16(float[] samples) {
-        ByteBuffer buffer = ByteBuffer.allocate(samples.length * 2).order(ByteOrder.LITTLE_ENDIAN);
-        for (float sample : samples) {
-            // 限幅到 [-1.0, 1.0]
-            float clamped = Math.max(-1.0f, Math.min(1.0f, sample));
-            short s = (short) (clamped * 32767);
-            buffer.putShort(s);
-        }
-        return buffer.array();
     }
 
     // ========== 文件查找辅助方法 ==========

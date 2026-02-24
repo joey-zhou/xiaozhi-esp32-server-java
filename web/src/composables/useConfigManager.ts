@@ -2,7 +2,7 @@ import { ref, computed, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import type { ConfigType, Config, ConfigField, ModelOption, LLMModel, LLMFactory } from '@/types/config'
-import { queryConfigs, addConfig, updateConfig, getModels } from '@/services/config'
+import { queryConfigs, addConfig, updateConfig } from '@/services/config'
 import { configTypeMap } from '@/config/providerConfig'
 import llmFactoriesData from '@/config/llm_factories.json'
 import { useTable } from './useTable'
@@ -241,27 +241,6 @@ export function useConfigManager(configType: ConfigType) {
     }
   }
 
-  /**
-   * 获取API模型列表
-   */
-  async function fetchModels(formData: Config) {
-    if (!formData.apiKey || !formData.apiUrl) {
-      return
-    }
-
-    try {
-      const res = await getModels(formData)
-      if (res.code === 200) {
-        modelOptions.value = res.data.map((id: string) => ({
-          value: id,
-          label: id,
-        }))
-      }
-    } catch (error) {
-      console.error('获取模型列表失败:', error)
-    }
-  }
-
   // 初始化
   if (configType === 'llm') {
     initLlmFactoriesData()
@@ -289,7 +268,6 @@ export function useConfigManager(configType: ConfigType) {
     setAsDefault,
     updateModelOptions,
     getModelsByProviderAndType,
-    fetchModels,
   }
 }
 

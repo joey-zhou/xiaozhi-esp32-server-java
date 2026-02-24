@@ -90,6 +90,32 @@ public class TtsServiceFactory {
     }
 
 
+    /**
+     * 校验 TTS 配置的本地资源是否就绪，返回错误信息，null 表示校验通过。
+     * 仅对依赖本地资源的 provider 做校验，云服务 provider 直接返回 null。
+     */
+    public String validateConfig(SysConfig config) {
+        if (config == null) return null;
+        return switch (config.getProvider()) {
+            case "sherpa-onnx" -> validateSherpaModelPath(config.getApiUrl());
+            // case "indextts" -> validateHttpEndpoint(config.getApiUrl());
+            default -> null;
+        };
+    }
+
+    private String validateSherpaModelPath(String apiUrl) {
+        String modelPath = (apiUrl != null && !apiUrl.isBlank()) ? apiUrl : "models/tts/vits-melo-tts-zh_en";
+        File dir = new File(modelPath);
+        if (!dir.exists() || !dir.isDirectory()) {
+            return "模型目录不存在: " + modelPath;
+        }
+        File[] onnxFiles = dir.listFiles((d, n) -> n.endsWith(".onnx"));
+        if (onnxFiles == null || onnxFiles.length == 0) {
+            return "模型目录中未找到 .onnx 文件: " + modelPath;
+        }
+        return null;
+    }
+
     private void ensureOutputPath(String outputPath) {
         File dir = new File(outputPath);
         if (!dir.exists()) dir.mkdirs();

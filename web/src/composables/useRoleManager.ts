@@ -7,7 +7,6 @@ import { ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { queryConfigs } from '@/services/config'
 import { queryAgents } from '@/services/agent'
-import { queryLocalVoices } from '@/services/role'
 import type { ModelOption, VoiceOption, SttOption, VoiceProvider } from '@/types/role'
 import type { Config } from '@/types/config'
 import type { Agent } from '@/types/agent'
@@ -184,32 +183,6 @@ export function useRoleManager() {
         }
       })
 
-      // 4. 加载后端动态扫描的本地模型音色（补充静态JSON中没有的）
-      try {
-        const localRes = await queryLocalVoices()
-        if (localRes.code === 200 && localRes.data && Array.isArray(localRes.data)) {
-          const sherpaConfig = ttsConfigs.value.find(c => c.provider === 'sherpa-onnx')
-          if (sherpaConfig) {
-            const existingKeys = new Set(voices.map(v => `${v.value}|${v.model || ''}`))
-            localRes.data.forEach((item: Record<string, string>) => {
-              const key = `${item.value}|${item.model || ''}`
-              if (!existingKeys.has(key)) {
-                voices.push({
-                  label: item.label,
-                  value: item.value,
-                  gender: (item.gender as 'male' | 'female' | '') || '',
-                  provider: 'sherpa-onnx',
-                  model: item.model,
-                  ttsId: sherpaConfig.configId
-                })
-              }
-            })
-          }
-        }
-      } catch (e) {
-        console.warn('加载本地模型音色失败（非致命）:', e)
-      }
-
       allVoices.value = voices
     } catch (error) {
       console.error('加载语音列表失败:', error)
@@ -334,7 +307,7 @@ export function useRoleManager() {
       xfyun: '讯飞云',
       minimax: 'Minimax',
       tencent: '腾讯云',
-      'sherpa-onnx': '本地模型',
+      'sherpa-onnx': 'Sherpa-ONNX',
       coze: 'Coze',
       dify: 'Dify',
       xingchen: 'XingChen'

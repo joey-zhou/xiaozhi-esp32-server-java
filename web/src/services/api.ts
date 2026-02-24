@@ -32,7 +32,6 @@ export default {
     update: '/role',
     delete: '/role',
     testVoice: '/role/testVoice',
-    localVoices: '/role/localVoices',
   },
   template: {
     query: '/template',
@@ -50,7 +49,6 @@ export default {
     add: '/config',
     query: '/config',
     update: '/config',
-    getModels: '/config/getModels',
   },
   mcpTool: {
     toggleStatus: '/mcpTool/toggleStatus',
