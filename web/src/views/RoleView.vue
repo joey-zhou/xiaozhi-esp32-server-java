@@ -450,7 +450,8 @@ const handleVoiceTypeChange = () => {
 }
 
 // 播放音色示例
-const handlePlayVoice = async (voiceName: string) => {
+const handlePlayVoice = async (voiceName?: string) => {
+  if (!voiceName) return
   try {
     // 如果正在播放同一个音色，则停止
     if (playingVoiceId.value === voiceName) {

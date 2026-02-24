@@ -56,8 +56,8 @@ export interface RoleQueryParams extends BaseQueryParams {
 
 // 语音选项
 export interface VoiceOption {
-  label: string
-  value: string
+  label?: string
+  value?: string
   gender: VoiceGender
   provider: VoiceProvider
   ttsId?: number // 关联的TTS配置ID
