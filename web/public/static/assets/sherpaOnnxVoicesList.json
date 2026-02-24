@@ -1,0 +1,240 @@
+[
+  {
+    "label": "MeloTTS 中英女声",
+    "value": "vits:0",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "vits-melo-tts-zh_en"
+  },
+  {
+    "label": "Kokoro 多语种 AF",
+    "value": "kokoro:0",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 多语种 AF_SKY",
+    "value": "kokoro:1",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 多语种 AF_BELLA",
+    "value": "kokoro:2",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 多语种 AF_NICOLE",
+    "value": "kokoro:3",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 多语种 AF_SARAH",
+    "value": "kokoro:4",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 多语种 AF_HEART",
+    "value": "kokoro:5",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 多语种 AM_ADAM",
+    "value": "kokoro:6",
+    "gender": "male",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 多语种 AM_MICHAEL",
+    "value": "kokoro:7",
+    "gender": "male",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 多语种 BF_EMMA",
+    "value": "kokoro:8",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 多语种 BF_ISABELLA",
+    "value": "kokoro:9",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 多语种 BM_GEORGE",
+    "value": "kokoro:10",
+    "gender": "male",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 多语种 BM_LEWIS",
+    "value": "kokoro:11",
+    "gender": "male",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-multi-lang"
+  },
+  {
+    "label": "Kokoro 英文 AF",
+    "value": "kokoro:0",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-en"
+  },
+  {
+    "label": "Kokoro 英文 AF_SKY",
+    "value": "kokoro:1",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-en"
+  },
+  {
+    "label": "Kokoro 英文 AF_BELLA",
+    "value": "kokoro:2",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-en"
+  },
+  {
+    "label": "Kokoro 英文 AF_NICOLE",
+    "value": "kokoro:3",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-en"
+  },
+  {
+    "label": "Kokoro 英文 AF_SARAH",
+    "value": "kokoro:4",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-en"
+  },
+  {
+    "label": "Kokoro 英文 AM_ADAM",
+    "value": "kokoro:5",
+    "gender": "male",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-en"
+  },
+  {
+    "label": "Kokoro 英文 AM_MICHAEL",
+    "value": "kokoro:6",
+    "gender": "male",
+    "provider": "sherpa-onnx",
+    "model": "kokoro-en"
+  },
+  {
+    "label": "Matcha 中文 Baker",
+    "value": "matcha:0",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "matcha-zh-baker"
+  },
+  {
+    "label": "Matcha 英文 LJSpeech",
+    "value": "matcha:0",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "matcha-en-ljspeech"
+  },
+  {
+    "label": "VITS 中文 AISHELL3 Speaker-0",
+    "value": "vits:0",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "vits-zh-aishell3"
+  },
+  {
+    "label": "VITS 中文 AISHELL3 Speaker-10",
+    "value": "vits:10",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "vits-zh-aishell3"
+  },
+  {
+    "label": "VITS 中文 AISHELL3 Speaker-21",
+    "value": "vits:21",
+    "gender": "male",
+    "provider": "sherpa-onnx",
+    "model": "vits-zh-aishell3"
+  },
+  {
+    "label": "VITS 中文 AISHELL3 Speaker-33",
+    "value": "vits:33",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "vits-zh-aishell3"
+  },
+  {
+    "label": "VITS 中文 AISHELL3 Speaker-50",
+    "value": "vits:50",
+    "gender": "male",
+    "provider": "sherpa-onnx",
+    "model": "vits-zh-aishell3"
+  },
+  {
+    "label": "VITS 中文 AISHELL3 Speaker-66",
+    "value": "vits:66",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "vits-zh-aishell3"
+  },
+  {
+    "label": "VITS 中文 AISHELL3 Speaker-88",
+    "value": "vits:88",
+    "gender": "male",
+    "provider": "sherpa-onnx",
+    "model": "vits-zh-aishell3"
+  },
+  {
+    "label": "VITS 中文 AISHELL3 Speaker-99",
+    "value": "vits:99",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "vits-zh-aishell3"
+  },
+  {
+    "label": "VITS Piper 英文 Amy",
+    "value": "vits:0",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "vits-piper-en-amy"
+  },
+  {
+    "label": "VITS 中文 zh-ll Speaker-0",
+    "value": "vits:0",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "vits-zh-ll"
+  },
+  {
+    "label": "VITS 中文 zh-ll Speaker-1",
+    "value": "vits:1",
+    "gender": "male",
+    "provider": "sherpa-onnx",
+    "model": "vits-zh-ll"
+  },
+  {
+    "label": "VITS 中文 zh-ll Speaker-2",
+    "value": "vits:2",
+    "gender": "female",
+    "provider": "sherpa-onnx",
+    "model": "vits-zh-ll"
+  }
+]

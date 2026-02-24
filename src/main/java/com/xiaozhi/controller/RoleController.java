@@ -21,7 +21,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.io.File;
+import java.util.*;
 
 /**
  * 角色管理
@@ -171,5 +172,110 @@ public class RoleController extends BaseController {
             logger.error(e.getMessage(), e);
             return ResultMessage.error();
         }
+    }
+
+    /**
+     * 扫描本地 models/tts 目录，返回可用的 sherpa-onnx 本地模型音色列表
+     */
+    @GetMapping("/localVoices")
+    @ResponseBody
+    @Operation(summary = "获取本地模型音色", description = "扫描 models/tts 目录返回可用的 sherpa-onnx 本地 TTS 模型音色")
+    public ResultMessage listLocalVoices() {
+        try {
+            List<Map<String, Object>> voices = new ArrayList<>();
+            File ttsDir = new File("models/tts");
+            if (!ttsDir.exists() || !ttsDir.isDirectory()) {
+                ResultMessage result = ResultMessage.success();
+                result.put("data", voices);
+                return result;
+            }
+
+            File[] modelDirs = ttsDir.listFiles(File::isDirectory);
+            if (modelDirs == null) {
+                ResultMessage result = ResultMessage.success();
+                result.put("data", voices);
+                return result;
+            }
+
+            for (File modelDir : modelDirs) {
+                String dirName = modelDir.getName();
+                String modelType = detectLocalModelType(modelDir);
+
+                switch (modelType) {
+                    case "kokoro" -> {
+                        // Kokoro 模型支持多 speaker
+                        String[] defaultSpeakers = {"0", "1", "2", "3", "4", "5", "6", "7"};
+                        for (String sid : defaultSpeakers) {
+                            Map<String, Object> voice = new LinkedHashMap<>();
+                            voice.put("label", dirName + " Speaker-" + sid);
+                            voice.put("value", "kokoro:" + sid);
+                            voice.put("gender", "");
+                            voice.put("provider", "sherpa-onnx");
+                            voice.put("model", dirName);
+                            voice.put("modelPath", modelDir.getPath());
+                            voices.add(voice);
+                        }
+                    }
+                    case "matcha" -> {
+                        Map<String, Object> voice = new LinkedHashMap<>();
+                        voice.put("label", dirName + " (Matcha)");
+                        voice.put("value", "matcha:0");
+                        voice.put("gender", "");
+                        voice.put("provider", "sherpa-onnx");
+                        voice.put("model", dirName);
+                        voice.put("modelPath", modelDir.getPath());
+                        voices.add(voice);
+                    }
+                    default -> {
+                        // VITS 模型
+                        if (dirName.contains("aishell3") || dirName.contains("vctk")) {
+                            // 多 speaker 模型
+                            String[] defaultSpeakers = {"0", "10", "21", "33", "50", "66", "88", "99"};
+                            for (String sid : defaultSpeakers) {
+                                Map<String, Object> voice = new LinkedHashMap<>();
+                                voice.put("label", dirName + " Speaker-" + sid);
+                                voice.put("value", "vits:" + sid);
+                                voice.put("gender", "");
+                                voice.put("provider", "sherpa-onnx");
+                                voice.put("model", dirName);
+                                voice.put("modelPath", modelDir.getPath());
+                                voices.add(voice);
+                            }
+                        } else {
+                            // 单 speaker 模型
+                            Map<String, Object> voice = new LinkedHashMap<>();
+                            voice.put("label", dirName + " (VITS)");
+                            voice.put("value", "vits:0");
+                            voice.put("gender", "");
+                            voice.put("provider", "sherpa-onnx");
+                            voice.put("model", dirName);
+                            voice.put("modelPath", modelDir.getPath());
+                            voices.add(voice);
+                        }
+                    }
+                }
+            }
+
+            ResultMessage result = ResultMessage.success();
+            result.put("data", voices);
+            return result;
+        } catch (Exception e) {
+            logger.error("扫描本地TTS模型失败: " + e.getMessage(), e);
+            return ResultMessage.error("扫描本地模型失败");
+        }
+    }
+
+    /**
+     * 检测本地模型目录的模型类型
+     */
+    private String detectLocalModelType(File dir) {
+        if (new File(dir, "voices.bin").exists()) return "kokoro";
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.getName().contains("vocoder")) return "matcha";
+            }
+        }
+        return "vits";
     }
 }

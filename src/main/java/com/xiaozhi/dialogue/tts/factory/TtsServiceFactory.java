@@ -84,6 +84,7 @@ public class TtsServiceFactory {
             case "xfyun" -> new XfyunTtsService(config, voiceName, pitch, speed, outputPath);
             case "minimax" -> new MiniMaxTtsService(config, voiceName, pitch, speed, outputPath);
             case "tencent" -> new TencentTtsService(config, voiceName, pitch, speed, outputPath);
+            case "sherpa-onnx" -> new SherpaOnnxTtsService(config, voiceName, pitch, speed, outputPath);
             default -> new EdgeTtsService(voiceName, pitch, speed, outputPath);
         };
     }
@@ -105,6 +106,11 @@ public class TtsServiceFactory {
         // 如果是阿里云NLS，需要额外清理NlsClient缓存
         if ("aliyun-nls".equals(provider)) {
             com.xiaozhi.dialogue.tts.providers.AliyunNlsTtsService.clearClientCache(configId);
+        }
+
+        // 如果是sherpa-onnx，需要额外清理模型缓存
+        if ("sherpa-onnx".equals(provider) && config.getApiUrl() != null) {
+            com.xiaozhi.dialogue.tts.providers.SherpaOnnxTtsService.clearModelCache(config.getApiUrl());
         }
 
         // 遍历缓存的所有键，找到匹配的键并移除

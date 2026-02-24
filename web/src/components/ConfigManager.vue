@@ -564,6 +564,23 @@ fetchData()
               size="small"
               :bordered="false"
             >
+              <!-- 本地模型使用说明 -->
+              <a-alert
+                v-if="currentType === 'sherpa-onnx' && configType === 'tts'"
+                type="info"
+                show-icon
+                style="margin-bottom: 16px"
+              >
+                <template #message>本地语音合成模型配置说明</template>
+                <template #description>
+                  <div style="font-size: 13px; line-height: 1.8">
+                    <p style="margin: 0">1. 支持 VITS、Kokoro、Matcha 三种模型，系统会根据模型目录中的文件自动检测类型</p>
+                    <p style="margin: 0">2. 默认使用 <code>models/tts/vits-melo-tts-zh_en</code> 中英文模型，需先下载模型文件到对应目录</p>
+                    <p style="margin: 0">3. 角色配置中的「语音名称」格式为 <code>模型类型:说话人ID</code>，如 <code>vits:0</code>、<code>kokoro:1</code></p>
+                    <p style="margin: 0">4. 本地模型无需 API 密钥，所有字段均为可选</p>
+                  </div>
+                </template>
+              </a-alert>
               <a-row :gutter="20">
                 <a-col
                   v-for="field in currentTypeFields"
@@ -580,7 +597,7 @@ fetchData()
                   >
                     <a-input
                       v-model:value="formData[field.name]"
-                      :placeholder="editingConfigId && ['apiKey', 'apiSecret', 'ak', 'sk'].includes(field.name) ? '不修改请留空' : (field.placeholder || t('config.enterField', { field: field.label }))"
+                      :placeholder="(editingConfigId && ['apiKey', 'apiSecret', 'ak', 'sk'].includes(field.name) && currentType !== 'sherpa-onnx') ? '不修改请留空' : (field.placeholder || t('config.enterField', { field: field.label }))"
                       :type="field.inputType || 'text'"
                     >
                       <template v-if="field.suffix" #suffix>

@@ -204,11 +204,11 @@
             <artifactId>webrtc-java</artifactId>
             <version>0.14.0</version>
         </dependency>
-        <!-- ONNX -->
+        <!-- ONNX Runtime (与 sherpa-onnx v1.12.23 native 库匹配) -->
         <dependency>
             <groupId>com.microsoft.onnxruntime</groupId>
             <artifactId>onnxruntime</artifactId>
-            <version>1.20.0</version>
+            <version>1.23.2</version>
         </dependency>
         <!-- TarsosDSP -->
         <dependency>
@@ -343,6 +343,12 @@
             <groupId>cn.dev33</groupId>
             <artifactId>sa-token-jwt</artifactId>
             <version>1.39.0</version>
+        </dependency>
+        <!-- Sherpa-ONNX 本地语音合成 -->
+        <dependency>
+            <groupId>com.litongjava</groupId>
+            <artifactId>sherpa-onnx-java-api</artifactId>
+            <version>1.0.1</version>
         </dependency>
     </dependencies>
 

@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       proxy: {
         '/api': {
-          target: env.VITE_BACKEND_URL || 'http://localhost:8091',
+          target: process.env.API_URL || env.VITE_BACKEND_URL || 'http://localhost:8091',
           changeOrigin: true,
           secure: true, // 支持 https
           rewrite: (path) => path.replace(/^\/api/, '/api')
