@@ -13,11 +13,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 public class AudioUtils {
     public static final String AUDIO_PATH = "audio/";
+    public static final int AUDIO_RETENTION_DAYS = 30;
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(AudioUtils.class);
     public static final int FRAME_SIZE = 960;
     public static final int SAMPLE_RATE = 16000; // 采样率
@@ -103,6 +106,38 @@ public class AudioUtils {
             } catch (IOException e) {
                 logger.warn("删除临时PCM文件失败", e);
             }
+        }
+    }
+
+
+    /**
+     * 删除文件（静默处理异常）
+     */
+    public static void deleteFile(String path) {
+        if (path == null || path.isBlank()) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(Path.of(path));
+        } catch (IOException e) {
+            logger.warn("删除文件失败: {}", path, e);
+        }
+    }
+
+    public static void deleteDirectory(Path dir) {
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (Stream<Path> files = Files.walk(dir)) {
+            files.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.delete(path);
+                } catch (IOException e) {
+                    logger.warn("删除失败: {}", path, e);
+                }
+            });
+        } catch (IOException e) {
+            logger.warn("删除目录失败: {}", dir, e);
         }
     }
 

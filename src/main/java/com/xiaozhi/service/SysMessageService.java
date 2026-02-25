@@ -34,6 +34,11 @@ public interface SysMessageService {
   List<SysMessage> query(SysMessage message, PageFilter pageFilter);
 
   /**
+   * 根据消息ID查询消息
+   */
+  SysMessage findById(Integer messageId);
+
+  /**
    * 删除记忆
    * 
    * @param message

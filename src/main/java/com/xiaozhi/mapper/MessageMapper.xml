@@ -147,4 +147,12 @@
         WHERE deviceId = #{deviceId} AND roleId = #{roleId} AND sender = #{sender} AND createTime = #{createTime}
     </update>
 
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Message_Column_List"></include>
+        FROM sys_message
+        WHERE sys_message.messageId = #{messageId}
+        AND sys_message.state = 1
+    </select>
+
 </mapper>

@@ -31,4 +31,9 @@ public interface MessageMapper {
      * @param sysMessage
      */
   void updateMessageByAudioFile(SysMessage sysMessage);
+
+  /**
+   * 根据消息ID查询消息
+   */
+  SysMessage findById(Integer messageId);
 }

@@ -155,11 +155,11 @@ public abstract class ChatSession {
     }
 
     /**
-     * 音频文件约定路径为：audio/{device-id}/{role-id}/{timestamp}-user.wav
-     * {device-id}/{role-id}/{timestamp}-user 能确定唯一性，不会有并发的麻烦。
-     * 除非多设备在嵌入式软件里强行修改mac地址（deviceId目前是基于mac地址的)
+     * 音频文件约定路径为：audio/{date}/{device-id}/{role-id}/{timestamp}-{who}.wav|ogg
+     * 按日期分目录，便于批量清理过期数据（直接删整个日期目录）
      *
      * @param who
+     * @param instant
      * @return
      */
     public Path getAudioPath(String who, Instant instant) {
@@ -167,15 +167,15 @@ public abstract class ChatSession {
         instant = instant.truncatedTo(ChronoUnit.SECONDS);
 
         LocalDateTime localDateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+        String date = localDateTime.format(DateTimeFormatter.ISO_LOCAL_DATE);
         String datetime = localDateTime.format(DateTimeFormatter.ISO_DATE_TIME).replace(":", "");
         SysDevice device = this.getSysDevice();
         // 判断设备ID是否有不适合路径的特殊字符，它很可能是mac地址需要转换。
         String deviceId = device.getDeviceId().replace(":", "-");
         String roleId = device.getRoleId().toString();
-        String extension = Conversation.MESSAGE_TYPE_USER.equals(who) ? "wav" : "opus";
+        String extension = Conversation.MESSAGE_TYPE_USER.equals(who) ? "wav" : "ogg";
         String filename = "%s-%s.%s".formatted(datetime, who, extension);
-        Path path = Path.of(AudioUtils.AUDIO_PATH, deviceId, roleId, filename);
-        return path;
+        return Path.of(AudioUtils.AUDIO_PATH, date, deviceId, roleId, filename);
     }
 
     public ToolsSessionHolder getFunctionSessionHolder() {

@@ -63,10 +63,8 @@ public abstract class PlayerWithOpusFile extends Player {
     private void openOpusFile() {
         // 快照时间戳，防止外部在文件关闭前将其置 null（如发送告别语时）
         opusFileCreatedAt = assistantMessageCreatedAt;
-        // 生成音频文件路径
+        // 生成音频文件路径（OGG/Opus 容器，扩展名 .ogg）
         audioPath = session.getAudioPath(MessageType.ASSISTANT.getValue(), opusFileCreatedAt);
-        // 将audioPath的尾缀转换为 ".ogg"，不要使用绝对路径
-        audioPath = audioPath.getParent().resolve(audioPath.getFileName().toString().replace(".wav", ".ogg"));
         try {
             // 确保目录存在
             Files.createDirectories(audioPath.getParent());
