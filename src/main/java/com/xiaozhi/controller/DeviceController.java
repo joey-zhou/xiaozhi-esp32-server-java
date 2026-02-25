@@ -1,7 +1,6 @@
 package com.xiaozhi.controller;
 
 import java.util.Arrays;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -329,8 +328,6 @@ public class DeviceController extends BaseController {
 
             final String deviceId = deviceIdAuth;
             device.setDeviceId(deviceId);
-            device.setLastLogin(new Date().toString());
-
             // 设置设备IP地址
             device.setIp(CmsUtils.getClientIp(request));
             // 根据设备的IP地址获取地理位置信息

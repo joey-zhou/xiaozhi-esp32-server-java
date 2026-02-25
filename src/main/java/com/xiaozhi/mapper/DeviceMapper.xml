@@ -35,7 +35,7 @@
     <sql id="Device_Column_List">
         sys_device.deviceId, sys_device.deviceName, sys_device.ip, sys_device.wifiName,
         sys_device.chipModelName, sys_device.type, sys_device.version, sys_device.state,
-        sys_device.roleId, sys_device.userId, sys_device.lastLogin, sys_device.createTime,
+        sys_device.roleId, sys_device.userId, sys_device.createTime,
         sys_device.location
     </sql>
 
@@ -49,7 +49,8 @@
         SELECT
         <include refid="Device_Column_List"></include>,
         <include refid="Role_Column_List"></include>,
-        (SELECT COUNT(*) FROM sys_message WHERE sys_message.deviceId = sys_device.deviceId AND sys_message.state = '1') AS totalMessage
+        (SELECT COUNT(*) FROM sys_message WHERE sys_message.deviceId = sys_device.deviceId) AS totalMessage,
+        sys_device.updateTime
         FROM
             sys_device
             LEFT JOIN sys_role ON sys_device.roleId = sys_role.roleId
@@ -124,7 +125,6 @@
             <if test="type != null and type != ''">type = #{type},</if>
             <if test="version != null and version != ''">version = #{version},</if>
             <if test="ip != null and ip != ''">ip = #{ip},</if>
-            <if test="lastLogin != null and lastLogin != ''">lastLogin = NOW(),</if>
             <if test="roleId != null and roleId != ''">roleId = #{roleId},</if>
             <if test="location != null and location != ''">location = #{location},</if>
         </set>

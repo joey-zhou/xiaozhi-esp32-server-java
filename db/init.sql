@@ -71,7 +71,6 @@ CREATE TABLE `xiaozhi`.`sys_device` (
   `userId` int NOT NULL COMMENT '创建人',
   `createTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updateTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `lastLogin` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '最后登录时间',
   PRIMARY KEY (`deviceId`),
   KEY `deviceName` (`deviceName`),
   KEY `userId` (`userId`)

@@ -29,7 +29,6 @@ export interface Device {
   deviceName?: string
   totalMessage?: number
   audioPath?: string
-  lastLogin?: string
   wifiName?: string
   ip?: string
   chipModelName?: string

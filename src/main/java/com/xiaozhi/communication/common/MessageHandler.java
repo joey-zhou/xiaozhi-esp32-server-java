@@ -26,7 +26,6 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import java.nio.file.Path;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -133,8 +132,7 @@ public class MessageHandler {
             // 更新设备状态
             deviceService.update(new SysDevice()
                     .setDeviceId(device.getDeviceId())
-                    .setState(chatSession instanceof WebSocketSession ? SysDevice.DEVICE_STATE_ONLINE : SysDevice.DEVICE_STATE_STANDBY)
-                    .setLastLogin(new Date().toString()));
+                    .setState(chatSession instanceof WebSocketSession ? SysDevice.DEVICE_STATE_ONLINE : SysDevice.DEVICE_STATE_STANDBY));
 
         } catch (Exception e) {
             logger.error("设备初始化失败 - DeviceId: " + deviceId, e);
@@ -178,8 +176,7 @@ public class MessageHandler {
 
                         deviceService.update(new SysDevice()
                                 .setDeviceId(deviceId)
-                                .setState(newState)
-                                .setLastLogin(new Date().toString()));
+                                .setState(newState));
                         logger.info("连接已关闭 - SessionId: {}, DeviceId: {}, 新状态: {}",
                                 sessionId, deviceId, newState);
                     } catch (Exception e) {

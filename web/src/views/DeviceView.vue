@@ -153,7 +153,7 @@ const columns = computed(() => [
   },
   {
     title: t('device.activeTime'),
-    dataIndex: 'lastLogin',
+    dataIndex: 'updateTime',
     width: 180,
     align: 'center',
   },
@@ -539,7 +539,7 @@ fetchData()
           </template>
 
           <!-- 时间列 -->
-          <template v-else-if="column.dataIndex === 'lastLogin' || column.dataIndex === 'createTime'">
+          <template v-else-if="column.dataIndex === 'updateTime' || column.dataIndex === 'createTime'">
             {{ record[column.dataIndex] || '-' }}
           </template>
 
