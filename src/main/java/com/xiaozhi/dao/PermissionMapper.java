@@ -2,7 +2,6 @@ package com.xiaozhi.dao;
 
 import com.xiaozhi.entity.SysPermission;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 

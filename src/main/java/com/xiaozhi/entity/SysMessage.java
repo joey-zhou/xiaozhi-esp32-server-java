@@ -1,16 +1,9 @@
 package com.xiaozhi.entity;
 
-import com.xiaozhi.utils.AudioUtils;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
-
-import java.math.BigDecimal;
-import java.nio.file.Paths;
-import java.sql.Date;
-import java.text.SimpleDateFormat;
 
 /**
  * 聊天记录表
