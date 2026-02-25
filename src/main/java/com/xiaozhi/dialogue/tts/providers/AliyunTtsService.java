@@ -367,7 +367,16 @@ public class AliyunTtsService implements TtsService {
                 Future<ByteBuffer> future = sharedExecutor.submit(() -> {
                     com.alibaba.dashscope.audio.ttsv2.SpeechSynthesizer synthesizer =
                         new com.alibaba.dashscope.audio.ttsv2.SpeechSynthesizer(param, null);
-                    return synthesizer.call(text);
+                    try {
+                        return synthesizer.call(text);
+                    } finally {
+                        // 主动关闭WebSocket连接，避免僵尸连接占满连接池
+                        try {
+                            synthesizer.getDuplexApi().close(1000, "completed");
+                        } catch (Exception e) {
+                            logger.debug("关闭CosyVoice TTS连接时发生错误", e);
+                        }
+                    }
                 });
 
                 // 等待结果，设置超时

@@ -118,10 +118,18 @@ public class AliyunSttService implements SttService {
             }
         });
 
-        return recognition.reduce(new StringBuffer(), StringBuffer::append)
-                .blockOptional()
-                .map(StringBuffer::toString)
-                .orElse("");
+        try {
+            return recognition.reduce(new StringBuffer(), StringBuffer::append)
+                    .blockOptional()
+                    .map(StringBuffer::toString)
+                    .orElse("");
+        } finally {
+            // 主动关闭WebSocket连接，避免连接进入"无引用状态"后等待61秒才释放
+            try {
+                recognizer.getDuplexApi().close(1000, "completed");
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     /**
