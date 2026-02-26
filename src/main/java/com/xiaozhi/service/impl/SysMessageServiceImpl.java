@@ -2,6 +2,7 @@ package com.xiaozhi.service.impl;
 
 import com.github.pagehelper.PageHelper;
 import com.xiaozhi.common.web.PageFilter;
+import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.dao.MessageMapper;
 import com.xiaozhi.entity.SysMessage;
 import com.xiaozhi.service.SysMessageService;
@@ -31,6 +32,9 @@ public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessage
 
     @Resource
     private MessageMapper messageMapper;
+
+    @Resource
+    private SessionManager sessionManager;
 
     /**
      * 新增聊天记录
@@ -95,6 +99,8 @@ public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessage
                 Path deviceDir = Path.of(AudioUtils.AUDIO_PATH, date, deviceId);
                 AudioUtils.deleteDirectory(deviceDir);
             }
+            // 清除内存中的对话历史，避免数据库已清空但LLM仍能看到旧上下文
+            sessionManager.findConversation(message.getDeviceId()).ifPresent(conversation -> conversation.clear());
         }
 
         return messageMapper.delete(message);
