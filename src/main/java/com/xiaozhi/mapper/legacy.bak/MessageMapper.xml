@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaozhi.dao.MessageMapper">
+
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysMessage">
+        <id property="messageId" column="messageId" />
+        <result property="deviceId" column="deviceId" />
+        <result property="message" column="message" />
+        <result property="sender" column="sender" />
+        <result property="roleId" column="roleId" />
+        <result property="state" column="state" />
+        <result property="createTime" column="createTime" />
+        <result property="messageType" column="messageType" />
+        <result property="audioPath" column="audioPath" />
+        <result property="toolCalls" column="toolCalls" />
+        <result property="deviceName" column="deviceName" />
+        <result property="userId" column="userId" />
+        <result property="roleName" column="roleName" />
+    </resultMap>
+
+    <resultMap id="SummaryResultMap" type="com.xiaozhi.entity.SysSummary">
+        <result property="deviceId" column="deviceId" />
+        <result property="roleId" column="roleId" />
+        <result property="lastMessageTimestamp" column="lastMessageTimestamp" />
+        <result property="summary" column="summary" />
+        <result property="createTime" column="createTime" />
+        <result property="promptTokens" column="promptTokens" />
+        <result property="completionTokens" column="completionTokens" />
+    </resultMap>
+
+    <sql id="Message_Column_List">
+        sys_message.messageId, sys_message.deviceId, sys_message.message, sys_message.sender, sys_message.roleId, sys_message.state, sys_message.createTime, sys_message.messageType, sys_message.audioPath, sys_message.toolCalls
+    </sql>
+
+    <sql id="Device_Column_List">
+        sys_device.deviceName, sys_device.userId
+    </sql>
+
+    <sql id="Role_Column_List">
+        sys_role.roleName
+    </sql>
+
+    <select id="query" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Message_Column_List"></include>,
+        <include refid="Device_Column_List"></include>,
+        <include refid="Role_Column_List"></include>
+        FROM
+            sys_message
+            LEFT JOIN sys_device ON sys_message.deviceId = sys_device.deviceId
+            LEFT JOIN sys_role ON sys_message.roleId = sys_role.roleId
+        WHERE
+            1 = 1
+            <if test="userId != null and userId != ''">AND sys_device.userId = #{userId}</if>
+            <if test="deviceId != null and deviceId != ''">
+                AND sys_message.deviceId = #{deviceId}
+            </if>
+            <if test="messageType != null and messageType != ''">
+                AND sys_message.messageType = #{messageType}
+            </if>
+            <if test="deviceName != null and deviceName != ''">
+                AND sys_device.deviceName = #{deviceName}
+            </if>
+            <if test="startTime != null">
+                AND sys_message.createTime &gt;= #{startTime} AND sys_message.createTime &lt;= #{endTime}
+            </if>
+            <if test="sender != null and sender != ''">
+                AND sys_message.sender = #{sender}
+            </if>
+            <if test="roleId != null">
+                AND sys_message.roleId = #{roleId}
+            </if>
+        ORDER BY sys_message.createTime DESC, sender DESC
+    </select>
+
+    <!-- 查找历史对话记录 -->
+    <select id="find" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Message_Column_List"></include>
+        FROM sys_message
+        WHERE sys_message.state = 1 and sys_message.messageType = "NORMAL"
+        and sys_message.deviceId = #{deviceId} and sys_message.roleId = #{roleId}
+        ORDER BY sys_message.createTime DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 查找历史对话记录(在指定时间戳后的消息 -->
+    <select id="findAfter" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Message_Column_List"></include>
+        FROM sys_message
+        WHERE sys_message.state = 1 and sys_message.messageType = "NORMAL"
+        and sys_message.deviceId = #{deviceId} and sys_message.roleId = #{roleId}
+        and sys_message.createTime >= #{timeMillis, jdbcType=TIMESTAMP}
+    </select>
+
+    <insert id="add" parameterType="com.xiaozhi.entity.SysMessage">
+        INSERT INTO sys_message ( deviceId, sessionId, sender, roleId, message, messageType, createTime)
+        SELECT #{deviceId}, #{sessionId}, #{sender}, #{roleId}, #{message}, #{messageType}, #{createTime,jdbcType=TIMESTAMP}
+    </insert>
+
+    <!-- 批量保存消息 -->
+    <insert id="saveAll" parameterType="java.util.List">
+        INSERT INTO sys_message ( deviceId, sessionId, sender, roleId, message, messageType, audioPath, createTime, toolCalls)
+        VALUES
+        <foreach collection="messages" item="message" separator=",">
+            (#{message.deviceId}, #{message.sessionId}, #{message.sender}, #{message.roleId}, #{message.message}, #{message.messageType}, #{message.audioPath}, #{message.createTime,jdbcType=TIMESTAMP}, #{message.toolCalls})
+        </foreach>
+    </insert>
+
+    <!-- 保存摘要 -->
+    <insert id="saveSummary" parameterType="com.xiaozhi.entity.SysSummary">
+        INSERT INTO sys_summary ( deviceId, roleId, lastMessageTimestamp, summary, promptTokens, completionTokens, createTime)
+        VALUES (#{deviceId}, #{roleId}, #{lastMessageTimestamp,jdbcType=TIMESTAMP}, #{summary}, #{promptTokens}, #{completionTokens}, #{createTime,jdbcType=TIMESTAMP})
+    </insert>
+
+    <select id="findLastSummary" resultMap="SummaryResultMap">
+        SELECT deviceId, roleId, lastMessageTimestamp, summary, createTime
+        FROM sys_summary
+        WHERE
+        sys_summary.deviceId = #{deviceId}
+        AND sys_summary.roleId = #{roleId}
+        ORDER BY sys_summary.createTime DESC
+        LIMIT 1
+    </select>
+
+    <update id="delete" parameterType="com.xiaozhi.entity.SysMessage">
+        UPDATE sys_message
+        INNER JOIN sys_device ON sys_message.deviceId = sys_device.deviceId
+        SET sys_message.state = '0'
+        WHERE
+            sys_device.userId = #{userId}
+            AND sys_message.state = '1'
+        <if test="messageId != null and messageId != ''">
+            AND sys_message.messageId = #{messageId}
+        </if>
+        <if test="deviceId != null and deviceId != ''">
+            AND sys_message.deviceId = #{deviceId}
+        </if>
+    </update>
+
+    <update id="updateMessageByAudioFile" parameterType="com.xiaozhi.entity.SysMessage">
+        UPDATE sys_message
+        <set>
+            <if test="audioPath != null">audioPath = #{audioPath},</if>
+        </set>
+        WHERE deviceId = #{deviceId} AND roleId = #{roleId} AND sender = #{sender} AND createTime = #{createTime}
+    </update>
+
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Message_Column_List"></include>
+        FROM sys_message
+        WHERE sys_message.messageId = #{messageId}
+        AND sys_message.state = 1
+    </select>
+
+</mapper>

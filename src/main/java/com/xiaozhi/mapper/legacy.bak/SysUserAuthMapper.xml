@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaozhi.dao.SysUserAuthMapper">
+
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysUserAuth">
+        <id property="id" column="id" />
+        <result property="userId" column="user_id" />
+        <result property="openId" column="open_id" />
+        <result property="unionId" column="union_id" />
+        <result property="platform" column="platform" />
+        <result property="profile" column="profile" />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, user_id, open_id, union_id, platform, profile, create_time, update_time
+    </sql>
+
+    <!-- 根据openid和平台查询认证信息 -->
+    <select id="selectByOpenIdAndPlatform" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM sys_user_auth
+        WHERE open_id = #{openId}
+        AND platform = #{platform}
+        LIMIT 1
+    </select>
+
+    <!-- 根据用户ID和平台查询认证信息 -->
+    <select id="selectByUserIdAndPlatform" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM sys_user_auth
+        WHERE user_id = #{userId}
+        AND platform = #{platform}
+        LIMIT 1
+    </select>
+
+    <!-- 插入认证信息 -->
+    <insert id="insert" parameterType="com.xiaozhi.entity.SysUserAuth" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_user_auth (
+            user_id,
+            open_id,
+            union_id,
+            platform,
+            profile
+        ) VALUES (
+            #{userId},
+            #{openId},
+            #{unionId},
+            #{platform},
+            #{profile}
+        )
+    </insert>
+
+    <!-- 更新认证信息 -->
+    <update id="update" parameterType="com.xiaozhi.entity.SysUserAuth">
+        UPDATE sys_user_auth
+        <set>
+            <if test="userId != null">
+                user_id = #{userId},
+            </if>
+            <if test="openId != null and openId != ''">
+                open_id = #{openId},
+            </if>
+            <if test="unionId != null">
+                union_id = #{unionId},
+            </if>
+            <if test="platform != null and platform != ''">
+                platform = #{platform},
+            </if>
+            <if test="profile != null">
+                profile = #{profile},
+            </if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除认证信息 -->
+    <delete id="deleteById">
+        DELETE FROM sys_user_auth
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

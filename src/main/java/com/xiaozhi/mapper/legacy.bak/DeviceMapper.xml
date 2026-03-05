@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaozhi.dao.DeviceMapper">
+
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysDevice">
+        <id property="deviceId" column="deviceId" />
+        <result property="deviceName" column="deviceName" />
+        <result property="ip" column="ip" />
+        <result property="wifiName" column="wifiName" />
+        <result property="chipModelName" column="chipModelName" />
+        <result property="type" column="type" />
+        <result property="version" column="version" />
+        <result property="state" column="state" />
+        <result property="roleId" column="roleId" />
+        <result property="userId" column="userId" />
+        <result property="lastLogin" column="lastLogin" />
+        <result property="createTime" column="createTime" />
+        <result property="location" column="location" />
+        <result property="totalMessage" column="totalMessage" />
+        <result property="roleName" column="roleName" />
+        <result property="roleDesc" column="roleDesc" />
+        <result property="voiceName" column="voiceName" />
+        <result property="modelId" column="modelId" />
+        <result property="sttId" column="sttId" />
+        <result property="ttsId" column="ttsId" />
+        <result property="vadSpeechTh" column="vadSpeechTh" />
+        <result property="vadSilenceTh" column="vadSilenceTh" />
+        <result property="vadEnergyTh" column="vadEnergyTh" />
+        <result property="vadSilenceMs" column="vadSilenceMs" />
+        <result property="code" column="code" />
+        <result property="audioPath" column="audioPath" />
+        <result property="sessionId" column="sessionId" />
+    </resultMap>
+
+    <sql id="Device_Column_List">
+        sys_device.deviceId, sys_device.deviceName, sys_device.ip, sys_device.wifiName,
+        sys_device.chipModelName, sys_device.type, sys_device.version, sys_device.state,
+        sys_device.roleId, sys_device.userId, sys_device.createTime,
+        sys_device.location
+    </sql>
+
+    <sql id="Role_Column_List">
+        sys_role.roleName, sys_role.roleDesc, sys_role.voiceName,
+        sys_role.modelId, sys_role.sttId, sys_role.ttsId,
+        sys_role.vadSpeechTh, sys_role.vadSilenceTh, sys_role.vadEnergyTh, sys_role.vadSilenceMs
+    </sql>
+
+    <select id="query" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Device_Column_List"></include>,
+        <include refid="Role_Column_List"></include>,
+        (SELECT COUNT(*) FROM sys_message WHERE sys_message.deviceId = sys_device.deviceId) AS totalMessage,
+        sys_device.updateTime
+        FROM
+            sys_device
+            LEFT JOIN sys_role ON sys_device.roleId = sys_role.roleId
+        WHERE
+            1 = 1
+            <if test="userId != null and userId != ''">AND sys_device.userId = #{userId}</if>
+            <if test="deviceId != null and deviceId != ''">AND deviceId = #{deviceId}</if>
+            <if test="deviceName != null and deviceName != ''">AND deviceName LIKE CONCAT('%', #{deviceName}, '%')</if>
+            <if test="roleName != null and roleName != ''">AND roleName LIKE CONCAT('%', #{roleName}, '%')</if>
+            <if test="state != null and state != ''">AND sys_device.state = #{state}</if>
+            <if test="roleId != null and roleId != ''">AND sys_device.roleId = #{roleId}</if>
+        ORDER BY sys_device.createTime DESC
+    </select>
+
+    <select id="selectDeviceById" resultMap="BaseResultMap">
+        SELECT
+            <include refid="Device_Column_List"></include>
+        FROM
+            sys_device
+        WHERE
+            deviceId = #{deviceId}
+    </select>
+
+    <select id="queryVerifyCode" parameterType="com.xiaozhi.entity.SysDevice" resultMap="BaseResultMap">
+        SELECT
+            code, audioPath, deviceId, type
+        FROM
+            sys_code
+        WHERE
+            1 = 1
+            <if test="deviceId != null and deviceId != ''">AND deviceId = #{deviceId}</if>
+            <if test="sessionId != null and sessionId != ''">AND sessionId = #{sessionId}</if>
+            <if test="code != null and code != ''">AND code = #{code}</if>
+            <if test="createTime != null">AND createTime &gt;= #{createTime}</if>
+            <if test="createTime == null">AND createTime &gt;= DATE_SUB(NOW(),INTERVAL 10 MINUTE)</if>
+            ORDER BY createTime DESC
+        LIMIT 1
+    </select>
+
+    <update id="updateCode" parameterType="com.xiaozhi.entity.SysDevice">
+        UPDATE
+            sys_code
+        SET
+            audioPath = #{audioPath}
+        WHERE
+            deviceId = #{deviceId}
+            AND sessionId = #{sessionId}
+            AND code = #{code}
+    </update>
+
+    <insert id="generateCode" parameterType="com.xiaozhi.entity.SysDevice">
+        <selectKey keyProperty="code" order="BEFORE" resultType="java.lang.String">
+            SELECT LPAD(FLOOR(RAND() * 1000000), 6, '0') as code
+        </selectKey>
+        INSERT INTO sys_code (deviceId, sessionId, type, code, createTime)
+        VALUES (#{deviceId}, #{sessionId}, #{type}, #{code}, NOW())
+    </insert>
+
+    <insert id="insertCode">
+        INSERT INTO sys_code (deviceId, type, code, createTime)
+        VALUES (#{deviceId}, 'access_token', #{code}, NOW())
+    </insert>
+
+    <update id="update" parameterType="com.xiaozhi.entity.SysDevice">
+        UPDATE
+            sys_device
+        <set>
+            <if test="state != null and state != ''">state = #{state},</if>
+            <if test="deviceName != null and deviceName != ''">deviceName = #{deviceName},</if>
+            <if test="wifiName != null and wifiName != ''">wifiName = #{wifiName},</if>
+            <if test="chipModelName != null and chipModelName != ''">chipModelName = #{chipModelName},</if>
+            <if test="type != null and type != ''">type = #{type},</if>
+            <if test="version != null and version != ''">version = #{version},</if>
+            <if test="ip != null and ip != ''">ip = #{ip},</if>
+            <if test="roleId != null and roleId != ''">roleId = #{roleId},</if>
+            <if test="location != null and location != ''">location = #{location},</if>
+        </set>
+        WHERE
+            1 = 1
+            <if test="userId != null and userId != ''">AND userId = #{userId}</if>
+            <if test="deviceId != null and deviceId != ''">AND deviceId = #{deviceId}</if>
+    </update>
+
+    <insert id="add" useGeneratedKeys="true" keyProperty="deviceName" parameterType="com.xiaozhi.entity.SysDevice">
+        INSERT INTO sys_device (deviceId, deviceName, type, userId, roleId) VALUES (
+            #{deviceId},
+            #{deviceName},
+            #{type},
+            #{userId},
+            #{roleId}
+        )
+    </insert>
+
+    <delete id="delete" parameterType="com.xiaozhi.entity.SysDevice">
+        DELETE FROM sys_device 
+        WHERE deviceId = #{deviceId} AND userId = #{userId}
+    </delete>
+
+</mapper>

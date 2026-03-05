@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.xiaozhi.dao.RolePermissionMapper">
+    
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysRolePermission">
+        <id property="id" column="id" />
+        <result property="roleId" column="roleId" />
+        <result property="permissionId" column="permissionId" />
+        <result property="createTime" column="createTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, roleId, permissionId, createTime
+    </sql>
+    
+    <select id="selectByRoleId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" /> FROM sys_role_permission WHERE roleId = #{roleId}
+    </select>
+    
+    <insert id="add" parameterType="com.xiaozhi.entity.SysRolePermission" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_role_permission (
+            roleId, permissionId
+        ) VALUES (
+            #{roleId}, #{permissionId}
+        )
+    </insert>
+    
+    <insert id="batchAdd" parameterType="java.util.List">
+        INSERT INTO sys_role_permission (
+            roleId, permissionId
+        ) VALUES 
+        <foreach collection="list" item="item" separator=",">
+            (#{item.roleId}, #{item.permissionId})
+        </foreach>
+    </insert>
+    
+    <delete id="deleteByRoleId" parameterType="java.lang.Integer">
+        DELETE FROM sys_role_permission WHERE roleId = #{roleId}
+    </delete>
+    
+    <delete id="deleteByRoleIdAndPermissionId">
+        DELETE FROM sys_role_permission WHERE roleId = #{roleId} AND permissionId = #{permissionId}
+    </delete>
+</mapper>

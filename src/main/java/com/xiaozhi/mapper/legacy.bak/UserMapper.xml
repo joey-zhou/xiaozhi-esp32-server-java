@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaozhi.dao.UserMapper">
+
+    <resultMap id="BaseResultMap" type="com.xiaozhi.entity.SysUser">
+        <id property="userId" column="userId" />
+        <result property="username" column="username" />
+        <result property="wxOpenId" column="wxOpenId" />
+        <result property="wxUnionId" column="wxUnionId" />
+        <result property="name" column="name" />
+        <result property="tel" column="tel" />
+        <result property="email" column="email" />
+        <result property="avatar" column="avatar" />
+        <result property="password" column="password" />
+        <result property="state" column="state" />
+        <result property="isAdmin" column="isAdmin" />
+        <result property="roleId" column="roleId" />
+        <result property="loginIp" column="loginIp" />
+        <result property="loginTime" column="loginTime" />
+        <result property="createTime" column="createTime" />
+        <result property="totalDevice" column="totalDevice" />
+        <result property="totalMessage" column="totalMessage" />
+        <result property="aliveNumber" column="aliveNumber" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        sys_user.userId, sys_user.username, sys_user.wxOpenId, sys_user.wxUnionId, sys_user.`name`, sys_user.tel, sys_user.email, sys_user.avatar, sys_user.password, sys_user.state, sys_user.isAdmin, sys_user.roleId, sys_user.loginIp, sys_user.loginTime, sys_user.createTime
+    </sql>
+
+    <select id="selectUserByUsername" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"></include>
+        FROM
+            sys_user
+        WHERE
+            username = #{username}
+        LIMIT 1
+    </select>
+
+    <select id="selectUserByWxOpenId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"></include>
+        FROM
+            sys_user
+        WHERE
+            wxOpenId = #{wxOpenId}
+        LIMIT 1
+    </select>
+
+    <select id="selectUserByEmail" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"></include>
+        FROM
+            sys_user
+        WHERE
+            email = #{email}
+        LIMIT 1
+    </select>
+
+    <select id="selectUserByTel" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"></include>
+        FROM
+            sys_user
+        WHERE
+            tel = #{tel}
+        LIMIT 1
+    </select>
+
+    <select id="query" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"></include>,
+        (
+            SELECT count(*) FROM sys_device WHERE sys_device.userId = sys_user.userId
+        ) AS totalDevice,
+        (
+            SELECT
+                count(*)
+            FROM
+                sys_message
+                LEFT JOIN sys_device ON sys_device.deviceId = sys_message.deviceId
+            WHERE
+                sys_device.userId = sys_user.userId
+                <if test="startTime != null">
+                    AND sys_message.createTime &gt;= #{startTime} AND sys_message.createTime &lt;= #{endTime}
+                </if>
+        ) AS totalMessage,
+        (
+            SELECT count(*) FROM sys_device WHERE sys_device.userId = sys_user.userId
+        ) AS aliveNumber
+        FROM
+            sys_user
+        WHERE
+            username = #{username}
+    </select>
+
+    <select id="queryUsers" parameterType="com.xiaozhi.entity.SysUser" resultMap="BaseResultMap">
+        SELECT
+            sys_user.userId,
+            sys_user.`name`,
+            sys_user.username,
+            <!-- 电话号码脱敏：显示前3位和后4位，中间用****替代 -->
+            CASE 
+                WHEN LENGTH(sys_user.tel) &gt; 7 THEN 
+                    CONCAT(LEFT(sys_user.tel, 3), '****', RIGHT(sys_user.tel, 4))
+                ELSE sys_user.tel
+            END AS tel,
+            <!-- 邮箱脱敏：显示@前面的前3位和@后面的所有内容，中间用***替代 -->
+            sys_user.email,
+            sys_user.avatar,
+            sys_user.state,
+            sys_user.isAdmin,
+            sys_user.loginIp,
+            sys_user.loginTime,
+            sys_user.createTime,
+        (
+            SELECT count(*) FROM sys_device WHERE sys_device.userId = sys_user.userId
+        ) AS totalDevice,
+        (
+            SELECT
+                count(*)
+            FROM
+                sys_message
+                JOIN sys_device ON sys_device.deviceId = sys_message.deviceId
+            WHERE
+                sys_device.userId = sys_user.userId
+                <if test="startTime != null">
+                    AND sys_message.createTime &gt;= #{startTime} AND sys_message.createTime &lt;= #{endTime}
+                </if>
+        ) AS totalMessage,
+        (
+            SELECT count(*) FROM sys_device WHERE sys_device.userId = sys_user.userId and sys_device.state = 1
+        ) AS aliveNumber
+        FROM
+            sys_user
+        WHERE
+            1 = 1
+            <if test="email != null and email != ''">AND sys_user.email = #{email}</if>
+            <if test="tel != null and tel != ''">AND sys_user.tel = #{tel}</if>
+            <if test="name != null and name != ''">AND name LIKE CONCAT('%', #{name}, '%')</if>
+            <if test="isAdmin != null and isAdmin != ''">AND isAdmin = #{isAdmin}</if>
+        ORDER BY createTime DESC
+    </select>
+
+
+    <select id="selectUserByUserId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"></include>
+        FROM
+            sys_user
+        WHERE
+            userId = #{userId}
+    </select>
+
+    <insert id="add" parameterType="com.xiaozhi.entity.SysUser" useGeneratedKeys="true" keyProperty="userId">
+        INSERT INTO sys_user ( username, `name`, tel, email, password, wxOpenId, state, roleId, isAdmin )
+        VALUES
+            (#{username}, #{name}, #{tel}, #{email}, #{password}, #{wxOpenId}, '1', #{roleId}, '0')
+    </insert>
+
+    <update id="update" parameterType="com.xiaozhi.entity.SysUser">
+        UPDATE
+            sys_user
+        <set>
+            <if test="name != null and name != ''">`name` = #{name},</if>
+            <if test="tel != null and tel != ''">tel = #{tel},</if>
+            <if test="email != null and email != ''">email = #{email},</if>
+            <if test="password != null and password != ''">password = #{password},</if>
+            <if test="avatar != null and avatar != ''">avatar = #{avatar},</if>
+            <if test="roleId != null and roleId != ''">roleId = #{roleId},</if>
+            <if test="wxOpenId != null and wxOpenId != ''">wxOpenId = #{wxOpenId},</if>
+            <if test="state != null and state != ''">state = #{state},</if>
+            <if test="loginIp != null">loginIp = #{loginIp},</if>
+            <if test="loginTime != null">loginTime = #{loginTime},</if>
+        </set>
+        <where>
+            <!-- 优先使用 userId（主键，最可靠） -->
+            <choose>
+                <when test="userId != null and userId != ''">
+                    userId = #{userId}
+                </when>
+                <!-- 如果没有 userId，使用 username -->
+                <when test="username != null and username != ''">
+                    `username` = #{username}
+                </when>
+                <!-- 安全检查：如果既没有 userId 也没有 username，禁止更新 -->
+                <otherwise>
+                    1 = 0
+                </otherwise>
+            </choose>
+        </where>
+    </update>
+
+    <insert id="generateCode" parameterType="com.xiaozhi.entity.SysUser">
+        <selectKey keyProperty="code" order="BEFORE" resultType="java.lang.String">
+            SELECT LPAD(FLOOR(RAND() * 1000000), 6, '0') as code
+        </selectKey>
+        INSERT INTO sys_code (email, code, createTime)
+        VALUES (#{email}, #{code}, NOW())
+    </insert>
+
+    <select id="queryCaptcha" resultType="java.lang.Integer">
+        SELECT
+            count(*)
+        FROM
+            sys_code
+        WHERE
+            code = #{code}
+            AND email = #{email}
+            AND createTime &gt;= DATE_SUB(NOW(),INTERVAL 10 MINUTE)
+            ORDER BY createTime
+            DESC
+            LIMIT 1
+    </select>
+
+</mapper>
