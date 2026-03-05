@@ -5,6 +5,7 @@ import java.util.Date;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
@@ -12,7 +13,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 /**
  * 用户第三方认证信息表
- * 支持一个用户绑定多个第三方平台(微信/QQ/支付宝等)
+ * 支持一个用户绑定多个第三方平台 (微信/QQ/支付宝等)
  *
  * @author Joey
  */
@@ -20,6 +21,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 @Accessors(chain = true)
 @EqualsAndHashCode(callSuper = true)
 @Schema(description = "用户第三方认证信息")
+@Entity
+@Table(name = "sys_user_auth")
 public class SysUserAuth extends Base<SysUserAuth> {
 
     /**
@@ -29,39 +32,46 @@ public class SysUserAuth extends Base<SysUserAuth> {
     private static final long serialVersionUID = -8923456789012345678L;
 
     /**
-     * 主键ID
+     * 主键 ID
      */
-    @Schema(description = "主键ID")
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Schema(description = "主键 ID")
     private Long id;
 
     /**
-     * 用户ID,关联sys_user.user_id
+     * 用户 ID，关联 sys_user.user_id
      */
-    @Schema(description = "用户ID")
+    @Column(nullable = false)
+    @Schema(description = "用户 ID")
     private Integer userId;
 
     /**
-     * 第三方平台的唯一标识(如微信openid)
+     * 第三方平台的唯一标识 (如微信 openid)
      */
+    @Column(nullable = false, length = 100)
     @Schema(description = "第三方平台唯一标识")
     private String openId;
 
     /**
-     * 微信unionid(用于同一主体的不同应用)
+     * 微信 unionid(用于同一主体的不同应用)
      */
-    @Schema(description = "微信UnionID")
+    @Column(length = 100)
+    @Schema(description = "微信 UnionID")
     private String unionId;
 
     /**
-     * 平台标识: wechat/qq/alipay/apple等
+     * 平台标识：wechat/qq/alipay/apple 等
      */
+    @Column(nullable = false, length = 20)
     @Schema(description = "平台标识")
     private String platform;
 
     /**
-     * 第三方返回的原始JSON数据
+     * 第三方返回的原始 JSON 数据
      */
-    @Schema(description = "第三方原始JSON数据")
+    @Column(columnDefinition = "text")
+    @Schema(description = "第三方原始 JSON 数据")
     private String profile;
 
     /**

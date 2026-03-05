@@ -2,8 +2,8 @@ package com.xiaozhi.service.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xiaozhi.dao.McpToolExcludeMapper;
 import com.xiaozhi.entity.SysMcpToolExclude;
+import com.xiaozhi.repository.SysMcpToolExcludeRepository;
 import com.xiaozhi.service.McpToolExcludeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,10 +25,10 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
     
     private static final Logger logger = LoggerFactory.getLogger(McpToolExcludeServiceImpl.class);
     private static final String CACHE_NAME = "XiaoZhi:McpToolExclude";
-    
+
     @Autowired
-    private McpToolExcludeMapper mcpToolExcludeMapper;
-    
+    private SysMcpToolExcludeRepository sysMcpToolExcludeRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     
     @Override
@@ -58,7 +58,7 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
         String bindKey = roleId.toString();
         
         // 查询现有配置
-        List<SysMcpToolExclude> existingConfigs = mcpToolExcludeMapper.selectByCondition(
+        List<SysMcpToolExclude> existingConfigs = sysMcpToolExcludeRepository.selectByCondition(
             "role", bindType, bindCode, bindKey);
         
         if (enabled) {
@@ -70,13 +70,13 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
                 
                 if (excludeList.isEmpty()) {
                     // 如果没有排除的工具了，删除配置
-                    mcpToolExcludeMapper.delete(config.getId());
+                    sysMcpToolExcludeRepository.deleteById(config.getId());
                 } else {
                     // 更新排除列表
                     try {
                         config.setExcludeTools(objectMapper.writeValueAsString(excludeList));
                         config.setUpdateTime(LocalDateTime.now());
-                        mcpToolExcludeMapper.update(config);
+                        sysMcpToolExcludeRepository.save(config);
                     } catch (Exception e) {
                         logger.error("更新排除工具列表失败", e);
                         throw new RuntimeException("更新失败", e);
@@ -96,7 +96,7 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
                     newConfig.setExcludeTools(objectMapper.writeValueAsString(Arrays.asList(toolName)));
                     newConfig.setCreateTime(LocalDateTime.now());
                     newConfig.setUpdateTime(LocalDateTime.now());
-                    mcpToolExcludeMapper.add(newConfig);
+                    sysMcpToolExcludeRepository.save(newConfig);
                 } catch (Exception e) {
                     logger.error("创建排除工具配置失败", e);
                     throw new RuntimeException("创建失败", e);
@@ -110,7 +110,7 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
                     try {
                         config.setExcludeTools(objectMapper.writeValueAsString(excludeList));
                         config.setUpdateTime(LocalDateTime.now());
-                        mcpToolExcludeMapper.update(config);
+                        sysMcpToolExcludeRepository.save(config);
                     } catch (Exception e) {
                         logger.error("更新排除工具列表失败", e);
                         throw new RuntimeException("更新失败", e);
@@ -129,7 +129,7 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
         String bindKey = "0";
         
         // 查询现有配置
-        List<SysMcpToolExclude> existingConfigs = mcpToolExcludeMapper.selectByCondition(
+        List<SysMcpToolExclude> existingConfigs = sysMcpToolExcludeRepository.selectByCondition(
             "global", bindType, bindCode, bindKey);
         
         if (enabled) {
@@ -141,13 +141,13 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
                 
                 if (excludeList.isEmpty()) {
                     // 如果没有排除的工具了，删除配置
-                    mcpToolExcludeMapper.delete(config.getId());
+                    sysMcpToolExcludeRepository.deleteById(config.getId());
                 } else {
                     // 更新排除列表
                     try {
                         config.setExcludeTools(objectMapper.writeValueAsString(excludeList));
                         config.setUpdateTime(LocalDateTime.now());
-                        mcpToolExcludeMapper.update(config);
+                        sysMcpToolExcludeRepository.save(config);
                     } catch (Exception e) {
                         logger.error("更新排除工具列表失败", e);
                         throw new RuntimeException("更新失败", e);
@@ -167,7 +167,7 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
                     newConfig.setExcludeTools(objectMapper.writeValueAsString(Arrays.asList(toolName)));
                     newConfig.setCreateTime(LocalDateTime.now());
                     newConfig.setUpdateTime(LocalDateTime.now());
-                    mcpToolExcludeMapper.add(newConfig);
+                    sysMcpToolExcludeRepository.save(newConfig);
                 } catch (Exception e) {
                     logger.error("创建排除工具配置失败", e);
                     throw new RuntimeException("创建失败", e);
@@ -181,7 +181,7 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
                     try {
                         config.setExcludeTools(objectMapper.writeValueAsString(excludeList));
                         config.setUpdateTime(LocalDateTime.now());
-                        mcpToolExcludeMapper.update(config);
+                        sysMcpToolExcludeRepository.save(config);
                     } catch (Exception e) {
                         logger.error("更新排除工具列表失败", e);
                         throw new RuntimeException("更新失败", e);
@@ -197,7 +197,7 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
         List<String> allDisabled = new ArrayList<>();
         
         // 查询所有角色的禁用工具配置
-        List<SysMcpToolExclude> configs = mcpToolExcludeMapper.selectByCondition(
+        List<SysMcpToolExclude> configs = sysMcpToolExcludeRepository.selectByCondition(
             "role", null, null, roleId.toString());
         
         for (SysMcpToolExclude config : configs) {
@@ -213,7 +213,7 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
         List<String> allDisabled = new ArrayList<>();
         
         // 查询所有全局禁用工具配置
-        List<SysMcpToolExclude> configs = mcpToolExcludeMapper.selectByCondition(
+        List<SysMcpToolExclude> configs = sysMcpToolExcludeRepository.selectByCondition(
             "global", null, null, "0");
         
         for (SysMcpToolExclude config : configs) {
@@ -233,11 +233,11 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
      * 获取全局排除的工具
      */
     @Cacheable(value = CACHE_NAME, key = "'global_excluded'")
-    private Set<String> getGlobalExcludedTools() {
+    public Set<String> getGlobalExcludedTools() {
         Set<String> tools = new HashSet<>();
         
         // 查询所有全局排除工具配置
-        List<SysMcpToolExclude> configs = mcpToolExcludeMapper.selectByCondition(
+        List<SysMcpToolExclude> configs = sysMcpToolExcludeRepository.selectByCondition(
             "global", null, null, "0");
         
         for (SysMcpToolExclude config : configs) {
@@ -251,11 +251,11 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
      * 获取角色排除的工具
      */
     @Cacheable(value = CACHE_NAME, key = "'role_excluded:' + #roleId")
-    private Set<String> getRoleExcludedTools(Integer roleId) {
+    public Set<String> getRoleExcludedTools(Integer roleId) {
         Set<String> tools = new HashSet<>();
         
         // 查询所有角色排除工具配置
-        List<SysMcpToolExclude> configs = mcpToolExcludeMapper.selectByCondition(
+        List<SysMcpToolExclude> configs = sysMcpToolExcludeRepository.selectByCondition(
             "role", null, null, roleId.toString());
         
         for (SysMcpToolExclude config : configs) {
@@ -301,13 +301,13 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
         String bindKey = roleId.toString();
         
         // 查询现有配置
-        List<SysMcpToolExclude> existingConfigs = mcpToolExcludeMapper.selectByCondition(
+        List<SysMcpToolExclude> existingConfigs = sysMcpToolExcludeRepository.selectByCondition(
             "role", bindType, bindCode, bindKey);
         
         if (excludeTools == null || excludeTools.isEmpty()) {
             // 如果排除列表为空，删除现有配置
             if (!existingConfigs.isEmpty()) {
-                mcpToolExcludeMapper.delete(existingConfigs.get(0).getId());
+                sysMcpToolExcludeRepository.deleteById(existingConfigs.get(0).getId());
             }
         } else {
             try {
@@ -323,13 +323,13 @@ public class McpToolExcludeServiceImpl extends BaseServiceImpl implements McpToo
                     newConfig.setExcludeTools(excludeToolsJson);
                     newConfig.setCreateTime(LocalDateTime.now());
                     newConfig.setUpdateTime(LocalDateTime.now());
-                    mcpToolExcludeMapper.add(newConfig);
+                    sysMcpToolExcludeRepository.save(newConfig);
                 } else {
                     // 更新现有配置
                     SysMcpToolExclude config = existingConfigs.get(0);
                     config.setExcludeTools(excludeToolsJson);
                     config.setUpdateTime(LocalDateTime.now());
-                    mcpToolExcludeMapper.update(config);
+                    sysMcpToolExcludeRepository.save(config);
                 }
             } catch (Exception e) {
                 logger.error("批量设置角色排除工具失败", e);

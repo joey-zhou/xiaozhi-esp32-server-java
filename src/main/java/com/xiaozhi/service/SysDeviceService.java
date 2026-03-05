@@ -1,8 +1,8 @@
 package com.xiaozhi.service;
 
+import com.xiaozhi.common.exception.NotFoundException;
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.entity.SysDevice;
-import org.apache.ibatis.javassist.NotFoundException;
 
 import java.util.List;
 

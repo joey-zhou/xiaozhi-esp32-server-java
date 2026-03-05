@@ -1,10 +1,26 @@
 package com.xiaozhi.controller;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.xiaozhi.common.web.PageFilter;
+import com.xiaozhi.common.web.ResultMessage;
+import com.xiaozhi.communication.common.ChatSession;
+import com.xiaozhi.communication.common.SessionManager;
+import com.xiaozhi.dto.param.DeviceAddParam;
+import com.xiaozhi.dto.param.DeviceBatchUpdateParam;
+import com.xiaozhi.dto.param.DeviceUpdateParam;
+import com.xiaozhi.entity.SysDevice;
+import com.xiaozhi.security.annotation.AnonymousAccess;
+import com.xiaozhi.service.SysDeviceService;
+import com.xiaozhi.utils.CmsUtils;
+import com.xiaozhi.utils.DtoConverter;
+import com.xiaozhi.utils.JsonUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
@@ -13,38 +29,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.ObjectUtils;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.xiaozhi.common.web.PageFilter;
-import com.xiaozhi.common.web.ResultMessage;
-import com.xiaozhi.communication.common.ChatSession;
-import com.xiaozhi.communication.common.SessionManager;
-import com.xiaozhi.dto.param.*;
-import com.xiaozhi.entity.SysDevice;
-import com.xiaozhi.service.SysDeviceService;
-import com.xiaozhi.utils.CmsUtils;
-import com.xiaozhi.utils.DtoConverter;
-import com.xiaozhi.utils.JsonUtil;
-
-import cn.dev33.satoken.annotation.SaIgnore;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.annotation.Resource;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 设备管理
@@ -260,7 +250,7 @@ public class DeviceController extends BaseController {
         }
     }
 
-    @SaIgnore
+    @AnonymousAccess
     @RequestMapping(value = "/ota", method = {RequestMethod.GET, RequestMethod.POST})
     @ResponseBody
     @Operation(summary = "处理OTA请求", description = "返回OTA结果")
@@ -419,7 +409,7 @@ public class DeviceController extends BaseController {
         }
     }
 
-    @SaIgnore
+    @AnonymousAccess
     @PostMapping("/ota/activate")
     @ResponseBody
     @Operation(summary = "查询OTA激活状态", description = "返回OTA激活状态")

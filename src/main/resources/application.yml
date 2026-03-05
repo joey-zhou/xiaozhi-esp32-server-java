@@ -17,6 +17,7 @@ mybatis:
 spring:
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
+    name: XiaoZhiDataSource
     hikari:
       minimum-idle: 10
       maximum-pool-size: 100
@@ -30,7 +31,45 @@ spring:
       leak-detection-threshold: 60000
       keepalive-time: 30000
       register-mbeans: true
-
+  jpa:
+    open-in-view: true
+    show-sql: true
+    # Hibernate 配置
+    hibernate:
+      ddl-auto: validate
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+    properties:
+      hibernate:
+        # SQL 格式化
+        format_sql: false
+        show_sql: false
+        # 方言配置（MariaDB/MySQL）
+        dialect: org.hibernate.dialect.MariaDBDialect
+        # 批处理配置
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+        # 二级缓存配置
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
+        # 统计信息
+        generate_statistics: false
+        # 连接释放模式
+        connection:
+          release_mode: after_transaction
+        # 标识符生成策略
+        id:
+          generator:
+            sequence:
+              increment_size: 1
+        # 验证查询
+        query:
+          plan_cache_max_size: 2048
+          default_null_ordering: none
   # Redis 缓存配置
   cache:
     type: redis
@@ -45,7 +84,7 @@ spring:
       redisson:
         config: classpath:redisson-config.yml
 
-  # 禁用Groovy模板位置检查
+  # 禁用 Groovy 模板位置检查
   groovy:
     template:
       check-template-location: false
@@ -76,7 +115,7 @@ spring:
   # 虚拟线程
   threads:
     virtual:
-      enabled: true
+      enabled: false
 
   # 静态资源配置
   web:
@@ -116,41 +155,13 @@ springdoc:
     url: /v3/api-docs
 
 # ============================================================
-# Sa-Token 认证框架配置
+# JWT 配置
 # ============================================================
-sa-token:
-  # Token名称 (同时也是cookie名称)
-  token-name: Authorization
-
-  # Token有效期 (单位:秒) 30天 = 2592000秒, -1表示永不过期
-  timeout: 2592000
-
-  # Token最低活跃频率 (单位:秒), 如果token超过此时间没有访问系统就会被冻结, -1 表示不限制
-  active-timeout: -1
-
-  # 是否允许同一账号多地同时登录 (为true时允许一起登录, 为false时新登录挤掉旧登录)
-  is-concurrent: true
-
-  # 在多人登录同一账号时,是否共用一个token (为true时所有登录共用一个token, 为false时每次登录新建一个token)
-  is-share: false
-
-  # Token风格 (uuid、simple-uuid、random-32、random-64、random-128、tik)
-  token-style: uuid
-
-  # 是否输出操作日志
-  is-log: false
-
-  # 是否从cookie中读取token
-  is-read-cookie: true
-
-  # 是否从header中读取token
-  is-read-header: true
-
-  # token前缀, 例如填写 Bearer 之后客户端应该发送: Bearer {token}
-  token-prefix: Bearer
-
-  # JWT秘钥 (使用JWT Simple模式时必须配置，至少32位)
-  jwt-secret-key: xiaozhi-esp32-server-java-jwt-secret-key
+jwt:
+  # JWT 签名密钥（至少 32 位）
+  secret: XiaoZhiESP32ServerSecretKey2026ABC
+  # Token 有效期（毫秒）30 天 = 2592000000 毫秒
+  expiration: 2592000000
 
 # ============================================================
 # 自定义配置

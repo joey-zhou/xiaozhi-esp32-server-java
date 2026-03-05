@@ -907,7 +907,7 @@ public class CmsUtils {
                 } else {
                     logger.warn("IP信息服务返回非200状态码: {} - {}", service, connection.getResponseCode());
                 }
-            } catch (java.net.SocketTimeoutException e) {
+            } catch (SocketTimeoutException e) {
                 logger.warn("获取IP信息超时，切换到下一个服务: {} - {}", service, e.getMessage());
             } catch (Exception e) {
                 logger.warn("获取IP信息失败: {} - {}", service, e.getMessage());

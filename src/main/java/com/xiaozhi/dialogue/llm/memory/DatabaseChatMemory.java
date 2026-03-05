@@ -1,9 +1,11 @@
 package com.xiaozhi.dialogue.llm.memory;
 
-import com.xiaozhi.dao.MessageMapper;
-import com.xiaozhi.dao.SummaryMapper;
+// import com.xiaozhi.dao.MessageMapper;
+// import com.xiaozhi.dao.SummaryMapper;
 import com.xiaozhi.entity.SysSummary;
 import com.xiaozhi.entity.SysMessage;
+import com.xiaozhi.repository.SysMessageRepository;
+import com.xiaozhi.repository.SysSummaryRepository;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -26,30 +28,30 @@ public class DatabaseChatMemory  implements ChatMemory {
     private static final Logger logger = LoggerFactory.getLogger(DatabaseChatMemory.class);
 
 
-    private final SummaryMapper summaryMapper;
-    private final MessageMapper messageMapper;
+    private final SysSummaryRepository sysSummaryRepository;
+    private final SysMessageRepository sysMessageRepository;
 
     @Autowired
-    public DatabaseChatMemory(MessageMapper messageMapper,SummaryMapper summaryMapper) {
-        this.messageMapper = messageMapper;
-        this.summaryMapper = summaryMapper;
+    public DatabaseChatMemory(SysMessageRepository sysMessageRepository, SysSummaryRepository sysSummaryRepository) {
+        this.sysMessageRepository = sysMessageRepository;
+        this.sysSummaryRepository = sysSummaryRepository;
     }
 
     @Override
     public void save(SysSummary summary) {
-        summaryMapper.saveSummary(summary);
+        sysSummaryRepository.save(summary);
     }
 
     @Override
     public SysSummary findLastSummary(String deviceId, int roleId) {
-        SysSummary summary = summaryMapper.findLastSummary(deviceId, roleId);
+        SysSummary summary = sysSummaryRepository.findLastSummary(deviceId, roleId);
         return summary;
     }
 
     @Override
     public List<Message> find(String deviceId, int roleId, int limit) {
         try {
-            List<SysMessage> messages = messageMapper.find(deviceId, roleId, limit);
+            List<SysMessage> messages = sysMessageRepository.find(deviceId, roleId, limit);
             messages = new ArrayList<>(messages);
             // 按时间升序排序，时间相同时按sender降序排序，保持user在assistant前面
             messages.sort(Comparator.<SysMessage, Date>comparing(SysMessage::getCreateTime)
@@ -103,7 +105,7 @@ public class DatabaseChatMemory  implements ChatMemory {
 
     @Override
     public List<Message> find(String deviceId, int roleId, Instant timeMillis){
-        List<SysMessage> messages = messageMapper.findAfter(deviceId, roleId, timeMillis);
+        List<SysMessage> messages = sysMessageRepository.findAfter(deviceId, roleId, timeMillis);
         if (messages == null || messages.isEmpty()) {
             return Collections.emptyList();
         }

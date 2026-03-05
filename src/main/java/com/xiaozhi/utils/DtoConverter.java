@@ -136,31 +136,6 @@ public class DtoConverter {
     }
 
     /**
-     * SysAgent -> AgentDTO
-     */
-    public static AgentDTO toAgentDTO(SysAgent agent) {
-        if (agent == null) {
-            return null;
-        }
-        AgentDTO dto = new AgentDTO();
-        BeanUtils.copyProperties(agent, dto);
-        // 注意: apiKey, apiSecret, ak, sk 等敏感字段不会被复制到DTO中(DTO中没有这些字段)
-        return dto;
-    }
-
-    /**
-     * List<SysAgent> -> List<AgentDTO>
-     */
-    public static List<AgentDTO> toAgentDTOList(List<SysAgent> agentList) {
-        if (agentList == null || agentList.isEmpty()) {
-            return new ArrayList<>();
-        }
-        return agentList.stream()
-            .map(DtoConverter::toAgentDTO)
-            .collect(Collectors.toList());
-    }
-
-    /**
      * SysMessage -> MessageDTO
      */
     public static MessageDTO toMessageDTO(SysMessage message) {

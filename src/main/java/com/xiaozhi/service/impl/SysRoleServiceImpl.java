@@ -1,15 +1,17 @@
 package com.xiaozhi.service.impl;
 
-import com.github.pagehelper.PageHelper;
 import com.xiaozhi.common.cache.CacheHelper;
 import com.xiaozhi.common.web.PageFilter;
-import com.xiaozhi.dao.RoleMapper;
 import com.xiaozhi.entity.SysRole;
+import com.xiaozhi.repository.SysRoleRepository;
 import com.xiaozhi.service.SysRoleService;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +29,7 @@ public class SysRoleServiceImpl extends BaseServiceImpl implements SysRoleServic
     private final static String CACHE_NAME = "XiaoZhi:SysRole";
 
     @Resource
-    private RoleMapper roleMapper;
+    private SysRoleRepository sysRoleRepository;
 
     @Autowired(required = false)
     private CacheManager cacheManager;
@@ -46,10 +48,11 @@ public class SysRoleServiceImpl extends BaseServiceImpl implements SysRoleServic
     public int add(SysRole role) {
         // 如果当前配置被设置为默认，则将同类型同用户的其他配置设置为非默认
         if (role.getIsDefault() != null && role.getIsDefault().equals("1")) {
-            roleMapper.resetDefault(role);
+            sysRoleRepository.resetDefault(role.getUserId());
         }
         // 添加角色
-        return roleMapper.add(role);
+        sysRoleRepository.save(role);
+        return 1;
     }
 
     /**
@@ -61,10 +64,21 @@ public class SysRoleServiceImpl extends BaseServiceImpl implements SysRoleServic
      */
     @Override
     public List<SysRole> query(SysRole role, PageFilter pageFilter) {
-        if(pageFilter != null){
-            PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
+        if (pageFilter != null) {
+            Page<SysRole> page = sysRoleRepository.findRoles(
+                    role.getUserId(),
+                    role.getState(),
+                    role.getIsDefault(),
+                    PageRequest.of(pageFilter.getStart() - 1, pageFilter.getLimit(), Sort.by(Sort.Direction.DESC, "createTime"))
+            );
+            return page.getContent();
         }
-        return roleMapper.query(role);
+        return sysRoleRepository.findRoles(
+                role.getUserId(),
+                role.getState(),
+                role.getIsDefault(),
+                PageRequest.of(0, 10)
+        ).getContent();
     }
 
     /**
@@ -78,15 +92,16 @@ public class SysRoleServiceImpl extends BaseServiceImpl implements SysRoleServic
     public int update(SysRole role) {
         // 如果当前配置被设置为默认，则将同类型同用户的其他配置设置为非默认
         if (role.getIsDefault() != null && role.getIsDefault().equals("1")) {
-            roleMapper.resetDefault(role);
+            sysRoleRepository.resetDefault(role.getUserId());
         }
-        
-        int result = roleMapper.update(role);
-        
-        // 如果更新成功且roleId不为空，直接将更新后的完整对象加载到缓存中
-        if (result > 0 && role.getRoleId() != null && cacheManager != null) {
+
+        sysRoleRepository.save(role);
+        int result = 1;
+
+        // 如果更新成功且 roleId 不为空，直接将更新后的完整对象加载到缓存中
+        if (role.getRoleId() != null && cacheManager != null) {
             // 直接从数据库查询最新数据
-            SysRole updatedRole = roleMapper.selectRoleById(role.getRoleId());
+            SysRole updatedRole = sysRoleRepository.findRoleById(role.getRoleId()).orElse(null);
             // 手动更新缓存
             if (updatedRole != null) {
                 Cache cache = cacheManager.getCache(CACHE_NAME);
@@ -108,7 +123,7 @@ public class SysRoleServiceImpl extends BaseServiceImpl implements SysRoleServic
     @Override
     @Transactional
     public int deleteById(Integer roleId) {
-        int result = roleMapper.deleteById(roleId);
+        int result = sysRoleRepository.deleteRoleById(roleId);
 
         // 如果删除成功，清除缓存
         if (result > 0 && cacheManager != null) {
@@ -123,7 +138,7 @@ public class SysRoleServiceImpl extends BaseServiceImpl implements SysRoleServic
 
     @Override
     public SysRole selectRoleById(Integer roleId) {
-        // 使用分布式锁防止缓存击穿(特别是默认角色的高并发访问)
+        // 使用分布式锁防止缓存击穿 (特别是默认角色的高并发访问)
         return cacheHelper.getWithLock(
             "role:" + roleId,
             // 从缓存获取
@@ -141,7 +156,7 @@ public class SysRoleServiceImpl extends BaseServiceImpl implements SysRoleServic
             },
             // 从数据库获取
             () -> {
-                SysRole role = roleMapper.selectRoleById(roleId);
+                SysRole role = sysRoleRepository.findRoleById(roleId).orElse(null);
 
                 // 手动写入缓存
                 if (role != null && cacheManager != null) {

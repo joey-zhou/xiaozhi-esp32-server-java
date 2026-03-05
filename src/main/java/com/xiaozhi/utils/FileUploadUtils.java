@@ -7,6 +7,7 @@ import com.qcloud.cos.auth.COSCredentials;
 import com.qcloud.cos.model.ObjectMetadata;
 import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.region.Region;
+import org.apache.commons.io.IOUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -15,7 +16,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 import java.util.UUID;
-import org.apache.commons.io.IOUtils;
 
 /**
  * 文件上传工具类

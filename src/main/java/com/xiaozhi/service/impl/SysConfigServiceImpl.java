@@ -1,14 +1,13 @@
 package com.xiaozhi.service.impl;
 
-import com.github.pagehelper.PageHelper;
 import com.xiaozhi.common.cache.CacheHelper;
 import com.xiaozhi.common.web.PageFilter;
-import com.xiaozhi.dao.ConfigMapper;
 import com.xiaozhi.dialogue.stt.factory.SttServiceFactory;
 import com.xiaozhi.dialogue.token.factory.TokenServiceFactory;
 import com.xiaozhi.dialogue.tts.factory.TtsServiceFactory;
 import com.xiaozhi.dialogue.tts.providers.AliyunNlsTtsService;
 import com.xiaozhi.entity.SysConfig;
+import com.xiaozhi.repository.SysConfigRepository;
 import com.xiaozhi.service.SysConfigService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.Cache;
@@ -16,6 +15,9 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +35,7 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
     private final static String CACHE_NAME = "XiaoZhi:SysConfig";
 
     @Resource
-    private ConfigMapper configMapper;
+    private SysConfigRepository sysConfigRepository;
 
     @Resource
     private TokenServiceFactory tokenService;
@@ -63,7 +65,8 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
         if (config.getIsDefault() != null && config.getIsDefault().equals("1")) {
             resetDefaultConfig(config);
         }
-        return configMapper.add(config);
+        sysConfigRepository.save(config);
+        return 1;
     }
 
     /**
@@ -83,15 +86,22 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
         if (config.getIsDefault() != null && config.getIsDefault().equals("1")) {
             resetDefaultConfig(config);
         }
-        int rows = configMapper.update(config);
+        sysConfigRepository.save(config);
+        int rows = 1;
         if (rows > 0) {
             sttServiceFactory.removeCache(config);
             ttsServiceFactory.removeCache(config);
-            // 清除阿里云NLS的NlsClient连接缓存，确保下次使用新配置重建连接
+            // 清除阿里云 NLS 的 NlsClient 连接缓存，确保下次使用新配置重建连接
             AliyunNlsTtsService.clearClientCache(config.getConfigId());
-            List<SysConfig> configs = configMapper.query(config);
+            List<SysConfig> configs = sysConfigRepository.findConfigs(
+                    config.getUserId(),
+                    config.getConfigType(),
+                    config.getProvider(),
+                    config.getState(),
+                    PageRequest.of(0, 100)
+            ).getContent();
             // 这里可能为 null，
-            if (configs.size() > 0) {
+            if (!configs.isEmpty()) {
                 tokenService.removeCache(configs.getFirst());
             }
         }
@@ -104,13 +114,7 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
      * @param config
      */
     private void resetDefaultConfig(SysConfig config) {
-        // 创建一个用于重置的配置对象
-        SysConfig resetConfig = new SysConfig();
-        resetConfig.setUserId(config.getUserId());
-        // 其他类型正常处理，只重置同类型的配置
-        resetConfig.setConfigType(config.getConfigType());
-        resetConfig.setModelType(config.getModelType());
-        configMapper.resetDefault(resetConfig);
+        sysConfigRepository.resetDefault(config.getUserId(), config.getConfigType());
     }
 
     /**
@@ -122,21 +126,34 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
     @Override
     public List<SysConfig> query(SysConfig config, PageFilter pageFilter) {
         if (pageFilter != null) {
-            PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
+            Page<SysConfig> page = sysConfigRepository.findConfigs(
+                    config.getUserId(),
+                    config.getConfigType(),
+                    config.getProvider(),
+                    config.getState(),
+                    PageRequest.of(pageFilter.getStart() - 1, pageFilter.getLimit(), Sort.by(Sort.Direction.DESC, "createTime"))
+            );
+            return page.getContent();
         }
-        return configMapper.query(config);
+        return sysConfigRepository.findConfigs(
+                config.getUserId(),
+                config.getConfigType(),
+                config.getProvider(),
+                config.getState(),
+                PageRequest.of(0, 10)
+        ).getContent();
     }
 
     /**
      * 查询配置
      *
-     * @param configId 配置id
+     * @param configId 配置 id
      * @return 具体的配置
      */
     @Override
     @Cacheable(value = CACHE_NAME, key = "#configId", unless = "#result == null")
     public SysConfig selectConfigById(Integer configId) {
-        return configMapper.selectConfigById(configId);
+        return sysConfigRepository.findConfigById(configId).orElse(null);
     }
 
     /**
@@ -167,7 +184,11 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
                 SysConfig queryConfig = new SysConfig();
                 queryConfig.setModelType(modelType);
 
-                List<SysConfig> modelConfigs = configMapper.query(queryConfig);
+                List<SysConfig> modelConfigs = sysConfigRepository.findAll();
+                // 过滤出相同 modelType 的配置
+                modelConfigs = modelConfigs.stream()
+                        .filter(c -> modelType.equals(c.getModelType()))
+                        .toList();
 
                 SysConfig result = null;
                 for (SysConfig config : modelConfigs) {

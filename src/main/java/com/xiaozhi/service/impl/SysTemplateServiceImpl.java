@@ -1,7 +1,7 @@
 package com.xiaozhi.service.impl;
 
-import com.xiaozhi.dao.TemplateMapper;
 import com.xiaozhi.entity.SysTemplate;
+import com.xiaozhi.repository.SysTemplateRepository;
 import com.xiaozhi.service.SysTemplateService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -14,9 +14,9 @@ import java.util.List;
  */
 @Service
 public class SysTemplateServiceImpl implements SysTemplateService {
-    
+
     @Resource
-    private TemplateMapper templateMapper;
+    private SysTemplateRepository sysTemplateRepository;
 
     /**
      * 添加模板
@@ -26,11 +26,12 @@ public class SysTemplateServiceImpl implements SysTemplateService {
     public int add(SysTemplate template) {
         // 如果是默认模板，先重置其他默认模板
         if (template.getIsDefault() != null && template.getIsDefault().equals("1")) {
-            templateMapper.resetDefault(template);
+            sysTemplateRepository.resetDefault(template.getUserId());
         }
-        return templateMapper.add(template);
+        sysTemplateRepository.save(template);
+        return 1;
     }
-    
+
     /**
      * 修改模板
      */
@@ -39,33 +40,38 @@ public class SysTemplateServiceImpl implements SysTemplateService {
     public int update(SysTemplate template) {
         // 如果是默认模板，先重置其他默认模板
         if (template.getIsDefault() != null && template.getIsDefault().equals("1")) {
-            templateMapper.resetDefault(template);
+            sysTemplateRepository.resetDefault(template.getUserId());
         }
-        return templateMapper.update(template);
+        sysTemplateRepository.save(template);
+        return 1;
     }
-    
+
     /**
      * 删除模板
      */
     @Override
     public int delete(Integer templateId) {
-        return templateMapper.delete(templateId);
+        return sysTemplateRepository.deleteTemplateById(templateId);
     }
-    
+
     /**
      * 查询模板列表
      */
     @Override
     public List<SysTemplate> query(SysTemplate template) {
-        return templateMapper.query(template);
+        return sysTemplateRepository.findTemplates(
+                template.getUserId(),
+                template.getCategory(),
+                template.getState()
+        );
     }
-    
+
     /**
      * 查询模板详情
      */
     @Override
     public SysTemplate selectTemplateById(Integer templateId) {
-        return templateMapper.selectTemplateById(templateId);
+        return sysTemplateRepository.findTemplateById(templateId);
     }
 
 }

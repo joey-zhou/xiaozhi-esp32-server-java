@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.8</version>
-        <relativePath /> <!-- lookup parent from repository -->
-    </parent>
+<!--    <parent>-->
+<!--        <groupId>org.springframework.boot</groupId>-->
+<!--        <artifactId>spring-boot-starter-parent</artifactId>-->
+<!--        <version>3.5.6</version>-->
+<!--        <relativePath /> &lt;!&ndash; lookup parent from repository &ndash;&gt;-->
+<!--    </parent>-->
     <groupId>com.xiaozhi.server</groupId>
     <artifactId>xiaozhi.server</artifactId>
     <version>4.1.0</version>
@@ -15,6 +15,11 @@
 
     <properties>
         <java.version>21</java.version>
+        <kotlin.version>1.9.25</kotlin.version>
+        <netty.version>4.2.10.Final</netty.version>
+        <okhttp.version>4.12.0</okhttp.version>
+        <websdk-java-core.version>2.0.12</websdk-java-core.version>
+        <jna.version>5.18.1</jna.version>
     </properties>
     <!-- Spring AI -->
     <dependencyManagement>
@@ -23,6 +28,13 @@
                 <groupId>org.springframework.ai</groupId>
                 <artifactId>spring-ai-bom</artifactId>
                 <version>1.1.2</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>3.5.6</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -39,7 +51,10 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
-        
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
         <!-- Spring WebSocket -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -80,12 +95,39 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-mcp-client</artifactId>
         </dependency>
-        <!-- 数据库 -->
+        <!-- Spring Data JPA -->
         <dependency>
-            <groupId>org.mybatis.spring.boot</groupId>
-            <artifactId>mybatis-spring-boot-starter</artifactId>
-            <version>3.0.3</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+        <!-- Spring Security -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <!-- JWT -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.mybatis.spring.boot</groupId>-->
+<!--            <artifactId>mybatis-spring-boot-starter</artifactId>-->
+<!--            <version>3.0.3</version>-->
+<!--        </dependency>-->
         <!-- 分页 -->
         <dependency>
             <groupId>com.github.pagehelper</groupId>
@@ -101,7 +143,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
-        <!-- Redis连接池（Sa-Token Redis集成需要） -->
+
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-pool2</artifactId>
@@ -110,13 +152,17 @@
         <dependency>
             <groupId>org.redisson</groupId>
             <artifactId>redisson-spring-boot-starter</artifactId>
-            <version>3.25.0</version>
+            <version>4.2.0</version>
         </dependency>
-        <!-- Mysql -->
         <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
+            <groupId>org.mariadb.jdbc</groupId>
+            <artifactId>mariadb-java-client</artifactId>
         </dependency>
+<!--        &lt;!&ndash; Mysql &ndash;&gt;-->
+<!--        <dependency>-->
+<!--            <groupId>com.mysql</groupId>-->
+<!--            <artifactId>mysql-connector-j</artifactId>-->
+<!--        </dependency>-->
         <!-- 测试 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -135,7 +181,7 @@
             <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
             <version>4.5.0</version>
         </dependency>
-        <!-- 手动指定 springdoc-openapi 版本以兼容 Spring Boot 3.5.x -->
+        <!-- 手动指定 springdoc-openapi 版本以兼�?Spring Boot 3.5.x -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -179,14 +225,14 @@
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>javacv</artifactId>
-            <version>1.5.10</version>
+            <version>1.5.13</version>
         </dependency>
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>ffmpeg</artifactId>
-            <version>6.1.1-1.5.10</version>
+            <version>8.0.1-1.5.13</version>
         </dependency>
-        <!-- vorbis-java（用于封装Ogg文件头+opus帧）-->
+        <!-- vorbis-java（用于封装Ogg文件�?opus帧）-->
         <dependency>
             <groupId>org.gagravarr</groupId>
             <artifactId>vorbis-java-core</artifactId>
@@ -204,7 +250,7 @@
             <artifactId>webrtc-java</artifactId>
             <version>0.14.0</version>
         </dependency>
-        <!-- ONNX Runtime (与 sherpa-onnx v1.12.23 native 库匹配) -->
+        <!-- ONNX Runtime (�?sherpa-onnx v1.12.23 native 库匹�? -->
         <dependency>
             <groupId>com.microsoft.onnxruntime</groupId>
             <artifactId>onnxruntime</artifactId>
@@ -225,28 +271,28 @@
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
-            <version>4.9.3</version>
+            <version>${okhttp.version}</version>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp-sse</artifactId>
-            <version>4.9.3</version>
+            <version>${okhttp.version}</version>
         </dependency>
         <dependency>
             <groupId>com.squareup.okio</groupId>
             <artifactId>okio</artifactId>
             <version>3.13.0</version>
         </dependency>
-        <!-- Kotlin 运行时 -->
+        <!-- Kotlin 运行�?-->
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
-            <version>1.9.22</version>
+            <version>${kotlin.version}</version>
         </dependency>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-reflect</artifactId>
-            <version>1.9.22</version>
+            <version>${kotlin.version}</version>
         </dependency>
         <!-- Email -->
         <dependency>
@@ -264,31 +310,49 @@
         <dependency>    
             <groupId>com.alibaba.nls</groupId>  
             <artifactId>nls-sdk-transcriber</artifactId>   
-            <version>2.2.18</version>
+            <version>2.2.19</version>
         </dependency>
         <!-- 阿里云TTS -->
         <dependency>
             <groupId>com.alibaba.nls</groupId>
             <artifactId>nls-sdk-tts</artifactId>
-            <version>2.2.18</version>
+            <version>2.2.19</version>
         </dependency>
-        <!-- 阿里云 DashScope SDK -->
+        <!-- 阿里�?DashScope SDK -->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>dashscope-sdk-java</artifactId>
-            <version>2.22.7</version>
+            <version>2.22.9</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>slf4j-simple</artifactId>
+                    <groupId>org.slf4j</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- 阿里云Token -->
         <dependency>
             <groupId>com.aliyun</groupId>
             <artifactId>aliyun-java-sdk-core</artifactId>
-            <version>3.7.1</version>
+            <version>4.7.8</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>commons-logging</artifactId>
+                    <groupId>commons-logging</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
-        <!-- 阿里云短信服务 -->
+        <!-- 阿里云短信服�?-->
         <dependency>
             <groupId>com.aliyun</groupId>
             <artifactId>dysmsapi20170525</artifactId>
-            <version>2.0.24</version>
+            <version>4.5.0</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>bcprov-jdk18on</artifactId>
+                    <groupId>org.bouncycastle</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- 讯飞 -->
         <dependency>
@@ -300,15 +364,13 @@
         <dependency>
             <groupId>com.coze</groupId>
             <artifactId>coze-api</artifactId>
-            <version>LATEST</version>
-        </dependency>
-        <!-- sherpa-onnx Java绑定 -->
-        <dependency>
-            <groupId>com.k2fsa</groupId>
-            <artifactId>sherpa-onnx</artifactId>
-            <version>1.11.4</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/lib/sherpa-onnx-v1.12.21.jar</systemPath>
+            <version>0.4.2</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>jjwt-api</artifactId>
+                    <groupId>io.jsonwebtoken</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- 腾讯云COS SDK -->
         <dependency>
@@ -322,7 +384,7 @@
             <artifactId>dify-java-client</artifactId>
             <version>1.0.7</version>
         </dependency>
-        <!-- Jakarta EE API - Spring Boot 3 需要 -->
+        <!-- Jakarta EE API - Spring Boot 3 需�?-->
         <dependency>
             <groupId>jakarta.annotation</groupId>
             <artifactId>jakarta.annotation-api</artifactId>
@@ -331,27 +393,18 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
-            <version>4.1.110.Final</version>
+            <version>${netty.version}</version>
         </dependency>
-        <!-- Sa-Token -->
+        <!-- Source: https://mvnrepository.com/artifact/net.java.dev.jna/jna -->
         <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-spring-boot3-starter</artifactId>
-            <version>1.39.0</version>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+            <version>${jna.version}</version>
         </dependency>
 
-        <!-- Sa-Token Redis集成 (使用Jackson序列化) -->
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-redis-jackson</artifactId>
-            <version>1.39.0</version>
-        </dependency>
-        <!-- Sa-Token JWT集成 -->
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-jwt</artifactId>
-            <version>1.39.0</version>
-        </dependency>
+        
+
+        
         <!-- Sherpa-ONNX 本地语音合成 -->
         <dependency>
             <groupId>com.litongjava</groupId>
