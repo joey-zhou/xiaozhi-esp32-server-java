@@ -7,6 +7,10 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
+
+import org.hibernate.annotations.GenericGenerator;
 
 /**
  * 设备表
@@ -21,6 +25,8 @@ import lombok.experimental.Accessors;
 @Schema(description = "设备信息")
 @Entity
 @Table(name = "sys_device")
+@DynamicUpdate
+@DynamicInsert
 public class SysDevice extends Base<SysDevice> {
     public static final String DEVICE_STATE_STANDBY = "2";//已在线，未激活对话
     public static final String DEVICE_STATE_ONLINE = "1";//已在线，已激活对话
@@ -32,6 +38,8 @@ public class SysDevice extends Base<SysDevice> {
     @Id
     @Column(length = 255)
     @Schema(description = "设备唯一标识 ID", example = "ESP32_001")
+    @GeneratedValue(generator = "assigned")
+    @GenericGenerator(name = "assigned", strategy = "assigned")
     private String deviceId;
 
     /**

@@ -4,9 +4,8 @@ import com.xiaozhi.entity.SysUser;
 import com.xiaozhi.security.AuthenticationService;
 import com.xiaozhi.security.CustomUserDetailsService;
 import com.xiaozhi.security.jwt.JwtTokenProvider;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -22,13 +21,14 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
-public class JwtAuthenticationService {
 
-    private final AuthenticationManager authenticationManager;
-    private final JwtTokenProvider jwtTokenProvider;
-    private final CustomUserDetailsService userDetailsService;
-    private final AuthenticationService passwordService;
+public class JwtAuthenticationService {
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+    @Autowired
+    private CustomUserDetailsService userDetailsService;
+    @Autowired
+    private AuthenticationService passwordService;
 
     /**
      * 用户登录
@@ -44,18 +44,20 @@ public class JwtAuthenticationService {
             // 通过用户名/邮箱/手机号查询用户
             SysUser user = userDetailsService.findUserByUsername(username);
             if (user == null) {
-                throw new AuthenticationException("用户不存在") {};
+                throw new AuthenticationException("用户不存在") {
+                };
             }
 
             // 验证密码（支持 MD5 和 BCrypt 两种格式）
             if (!passwordService.isPasswordValid(password, user.getPassword())) {
-                throw new AuthenticationException("密码错误") {};
+                throw new AuthenticationException("密码错误") {
+                };
             }
 
             // 创建认证令牌
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
             UsernamePasswordAuthenticationToken authToken =
-                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
 
             // 认证成功，设置到 SecurityContext
             SecurityContextHolder.getContext().setAuthentication(authToken);

@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Sinks;
@@ -40,6 +41,7 @@ import java.util.concurrent.TimeUnit;
  * TODO 实际底层驱动力来自于 Handler，后续服务都是基于 Session 而不需要 SessionManager 的。
  */
 @Service
+@Lazy
 public class SessionManager {
     private static final Logger logger = LoggerFactory.getLogger(SessionManager.class);
 
@@ -80,10 +82,10 @@ public class SessionManager {
     @PostConstruct
 //    @EventListener(Starteve.class)
     public void init() {
-        if(checkInactiveSession){
+        if (checkInactiveSession) {
             // 项目启动时，将所有设备状态设置为离线
             // 延迟执行设备状态重置，避免循环依赖
-            scheduler.schedule(() -> {
+//            scheduler.schedule(() -> {
                 try {
                     transactionTemplate.execute(status -> {
                         SysDevice device = new SysDevice();
@@ -96,7 +98,7 @@ public class SessionManager {
                 } catch (Exception e) {
                     logger.error("项目启动时设置设备状态为离线失败", e);
                 }
-            }, 15, TimeUnit.SECONDS);
+//            }, 15, TimeUnit.SECONDS);
 
             // 定期检查不活跃的会话
             scheduler.scheduleAtFixedRate(this::checkInactiveSessions, 10, 10, TimeUnit.SECONDS);
@@ -133,7 +135,7 @@ public class SessionManager {
         Thread.startVirtualThread(() -> {
             Instant now = Instant.now();
             sessions.values().forEach(session -> {
-                if(session instanceof  WebSocketSession) {
+                if (session instanceof WebSocketSession) {
                     Instant lastActivity = session.getLastActivityTime();
                     if (lastActivity != null) {
                         Duration inactiveDuration = Duration.between(lastActivity, now);
@@ -142,11 +144,11 @@ public class SessionManager {
                                     session.getSessionId(), inactiveDuration.getSeconds());
                             // 长时间不活跃，可以直接清理 ASR 还没有被识别的音频数据
                             session.clearAudioSinks();
-                            if(session.getPersona() !=null){
+                            if (session.getPersona() != null) {
                                 // 不涉及 ASR 了
                                 session.getPersona().sendGoodbyeMessage();
                             }
-                            if(session instanceof WebSocketSession){
+                            if (session instanceof WebSocketSession) {
                                 // 解绑 WebSocket 会话，回收 Session 对象。
                                 removeSession(session.getSessionId());
                             }
@@ -166,7 +168,7 @@ public class SessionManager {
      */
     public void updateLastActivity(String sessionId) {
         ChatSession session = sessions.get(sessionId);
-        if(session != null){
+        if (session != null) {
             session.setLastActivityTime(Instant.now());
         }
     }
@@ -174,8 +176,8 @@ public class SessionManager {
     /**
      * 注册新的会话
      *
-     * @param sessionId 会话 ID
-     * @param chatSession  会话
+     * @param sessionId   会话 ID
+     * @param chatSession 会话
      */
     public void registerSession(String sessionId, ChatSession chatSession) {
         sessions.put(sessionId, chatSession);
@@ -189,7 +191,7 @@ public class SessionManager {
      *
      * @param sessionId 会话 ID
      */
-    public void removeSession(String sessionId){
+    public void removeSession(String sessionId) {
         sessions.remove(sessionId);
     }
 
@@ -198,9 +200,9 @@ public class SessionManager {
      *
      * @param sessionId 会话 ID
      */
-    public void closeSession(String sessionId){
+    public void closeSession(String sessionId) {
         ChatSession chatSession = sessions.get(sessionId);
-        if(chatSession != null) {
+        if (chatSession != null) {
             closeSession(chatSession);
         }
     }
@@ -212,11 +214,11 @@ public class SessionManager {
      * @param chatSession 聊天 session
      */
     public void closeSession(ChatSession chatSession) {
-        if(chatSession == null){
+        if (chatSession == null) {
             return;
         }
         try {
-            if(chatSession instanceof WebSocketSession){
+            if (chatSession instanceof WebSocketSession) {
                 removeSession(chatSession.getSessionId());
                 // 先关闭 WebSocket 连接
                 chatSession.close();
@@ -241,7 +243,7 @@ public class SessionManager {
     public void registerDevice(String sessionId, SysDevice device) {
         // 先检查是否已存在该 sessionId 的配置
         ChatSession chatSession = sessions.get(sessionId);
-        if(chatSession != null){
+        if (chatSession != null) {
             chatSession.setSysDevice(device);
             updateLastActivity(sessionId); // 更新活动时间
             logger.debug("设备配置已注册 - SessionId: {}, DeviceId: {}", sessionId, device.getDeviceId());
@@ -355,7 +357,7 @@ public class SessionManager {
      * 设备状态
      *
      * @param sessionId
-     * @param mode  设备状态 auto/realTime
+     * @param mode      设备状态 auto/realTime
      */
     public void setMode(String sessionId, ListenMode mode) {
         ChatSession chatSession = sessions.get(sessionId);
@@ -436,7 +438,7 @@ public class SessionManager {
      * 发送音频数据
      *
      * @param sessionId 会话 ID
-     * @param data 音频数据
+     * @param data      音频数据
      */
     public void sendAudioData(String sessionId, byte[] data) {
         Sinks.Many<byte[]> sink = getAudioStream(sessionId);

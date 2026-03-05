@@ -8,13 +8,21 @@ server:
 # ============================================================
 # MyBatis 配置
 # ============================================================
-mybatis:
-  mapper-locations: classpath*:com/xiaozhi/mapper/*.xml
+#mybatis:
+#  mapper-locations: classpath*:com/xiaozhi/mapper/*.xml
 
 # ============================================================
 # 数据源配置
 # ============================================================
 spring:
+#  main:
+    # 启用懒加载 - Bean 在首次使用时才创建，显著加快启动速度
+#    lazy-initialization: true
+    # 允许 bean 定义覆盖
+#    allow-bean-definition-overriding: true
+    # 优化日志处理
+#    log-startup-info: true
+
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
     name: XiaoZhiDataSource
@@ -42,7 +50,7 @@ spring:
     properties:
       hibernate:
         # SQL 格式化
-        format_sql: false
+        format_sql: true
         show_sql: false
         # 方言配置（MariaDB/MySQL）
         dialect: org.hibernate.dialect.MariaDBDialect
@@ -61,11 +69,6 @@ spring:
         # 连接释放模式
         connection:
           release_mode: after_transaction
-        # 标识符生成策略
-        id:
-          generator:
-            sequence:
-              increment_size: 1
         # 验证查询
         query:
           plan_cache_max_size: 2048
@@ -136,12 +139,7 @@ spring:
 # ============================================================
 # 日志配置
 # ============================================================
-logging:
-  level:
-    root: INFO
-    org.springframework: INFO
-    io.github.imfangs.dify.client.impl.StreamEventDispatcher: ERROR
-    io.netty.handler: ERROR
+
 
 # ============================================================
 # SpringDoc OpenAPI 配置

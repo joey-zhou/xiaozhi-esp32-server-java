@@ -3,6 +3,7 @@ package com.xiaozhi.security;
 import com.xiaozhi.security.annotation.AnonymousAccess;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
@@ -20,6 +21,7 @@ import java.util.Set;
  */
 @Slf4j
 @Component
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class AnonymousAccessManager implements InitializingBean {
 
     @Resource

@@ -91,28 +91,15 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
     int insertCode(@Param("deviceId") String deviceId, @Param("code") String code);
 
     /**
-     * 更新设备信息
+     * 批量更新所有设备状态（用于项目启动时重置设备状态）
      *
-     * @param device 设备信息
+     * @param state 设备状态
      * @return 影响行数
      */
     @Modifying
     @Transactional
-    @Query(value = "UPDATE sys_device SET " +
-            "device_name = :#{#device.deviceName}, " +
-            "role_id = :#{#device.roleId}, " +
-            "function_names = :#{#device.functionNames}, " +
-            "ip = :#{#device.ip}, " +
-            "location = :#{#device.location}, " +
-            "wifi_name = :#{#device.wifiName}, " +
-            "chip_model_name = :#{#device.chipModelName}, " +
-            "type = :#{#device.type}, " +
-            "version = :#{#device.version}, " +
-            "state = :#{#device.state}, " +
-            "user_id = :#{#device.userId} " +
-            "WHERE device_id = :#{#device.deviceId}",
-            nativeQuery = true)
-    int updateDevice(@Param("device") SysDevice device);
+    @Query(value = "UPDATE sys_device SET state = :state", nativeQuery = true)
+    int updateAllStates(@Param("state") String state);
 
     /**
      * 批量更新设备用户和角色

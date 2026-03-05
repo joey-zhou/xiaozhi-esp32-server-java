@@ -26,3 +26,10 @@ email:
 dashscope:
   api:
     key: xxx
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO
+    io.github.imfangs.dify.client.impl.StreamEventDispatcher: ERROR
+    io.netty.handler: ERROR
+    com.xiaozhi: debug

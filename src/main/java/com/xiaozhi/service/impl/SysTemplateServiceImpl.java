@@ -50,6 +50,7 @@ public class SysTemplateServiceImpl implements SysTemplateService {
      * 删除模板
      */
     @Override
+    @Transactional
     public int delete(Integer templateId) {
         return sysTemplateRepository.deleteTemplateById(templateId);
     }

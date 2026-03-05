@@ -8,7 +8,6 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
-import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 
@@ -19,7 +18,7 @@ import java.lang.reflect.Method;
  * @author Joey
  */
 @Aspect
-@Component
+//@Component
 public class GlobalExceptionAspect {
 
     private static final Logger log = LogUtils.getLogger(GlobalExceptionAspect.class);

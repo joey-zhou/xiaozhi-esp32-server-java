@@ -121,6 +121,7 @@ public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessage
     }
 
     @Override
+    @Transactional
     public void updateMessageByAudioFile(String deviceId, Integer roleId, String sender,
                                          String createTime, String audioPath) {
         sysMessageRepository.updateAudioPath(deviceId, roleId, sender, createTime, audioPath);
