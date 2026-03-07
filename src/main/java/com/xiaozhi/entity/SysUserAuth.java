@@ -49,7 +49,7 @@ public class SysUserAuth extends Base<SysUserAuth> {
     /**
      * 第三方平台的唯一标识 (如微信 openid)
      */
-    @Column( nullable = false, length = 100)
+    @Column(name="open_id", nullable = false, length = 100)
     @Schema(description = "第三方平台唯一标识")
     private String openId;
 
