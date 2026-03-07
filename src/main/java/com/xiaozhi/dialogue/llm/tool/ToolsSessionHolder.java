@@ -9,7 +9,7 @@ import org.springframework.ai.tool.ToolCallback;
 import java.util.*;
 
 /**
- * 与session绑定的functionTools
+ * 与 session 绑定的 functionTools
  */
 public class ToolsSessionHolder {
     private final Logger logger = LoggerFactory.getLogger(ToolsSessionHolder.class);
@@ -105,19 +105,26 @@ public class ToolsSessionHolder {
     }
 
     /**
-     * 注册全局函数到FunctionHolder
+     * 注册全局函数到 FunctionHolder
      */
     public void registerGlobalFunctionTools(ChatSession chatSession) {
         String functionNames = sysDevice == null? null : sysDevice.getFunctionNames();
-        if(functionNames != null && !functionNames.isEmpty()){//如果指定了function配置，则只加载指定的
+        if(functionNames != null && !functionNames.isEmpty()){//如果指定了 function 配置，则只加载指定的
             String[] functionNameArr = functionNames.split(",");
             for(String functionName : functionNameArr){
                 registerFunction(functionName);
             }
-        }else{//否则加载所有的全局function
-            // 注意：这里不再自动注册所有全局函数，而是由McpSessionManager统一管理
+        }else{//否则加载所有的全局 function
+            // 注意：这里不再自动注册所有全局函数，而是由 McpSessionManager 统一管理
             // globalFunctionRegistry.getAllFunctions(chatSession).forEach(this::registerFunction);
-            logger.debug("[{}] - SessionId:{} 跳过自动注册全局函数，由McpSessionManager统一管理", TAG, sessionId);
+            logger.debug("[{}] - SessionId:{} 跳过自动注册全局函数，由 McpSessionManager 统一管理", TAG, sessionId);
         }
     }
+
+    // Getters
+    public String getSessionId() { return sessionId; }
+    public SysDevice getSysDevice() { return sysDevice; }
+    public ToolsGlobalRegistry getGlobalFunctionRegistry() { return globalFunctionRegistry; }
+    public List<ToolCallback> getMcpToolCallbacks() { return new ArrayList<>(); }
+    public com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpHolder getDeviceMcpHolder() { return null; }
 }

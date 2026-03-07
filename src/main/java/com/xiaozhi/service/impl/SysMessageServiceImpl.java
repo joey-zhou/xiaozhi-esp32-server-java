@@ -1,13 +1,10 @@
 package com.xiaozhi.service.impl;
 
-import com.github.pagehelper.PageHelper;
 import com.xiaozhi.common.web.PageFilter;
-import com.xiaozhi.communication.common.SessionManager;
-import com.xiaozhi.dao.MessageMapper;
 import com.xiaozhi.entity.SysMessage;
+import com.xiaozhi.repository.SysMessageRepository;
 import com.xiaozhi.service.SysMessageService;
 import com.xiaozhi.utils.AudioUtils;
-import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,106 +15,81 @@ import java.math.RoundingMode;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
 import java.util.List;
 
 /**
  * 聊天记录
  *
  * @author Joey
- *
  */
-
 @Service
-public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessageService {
+public class SysMessageServiceImpl implements SysMessageService {
 
     @Resource
-    private MessageMapper messageMapper;
+    private SysMessageRepository messageRepository;
 
-    @Resource
-    private SessionManager sessionManager;
-
-    /**
-     * 新增聊天记录
-     *
-     * @param message
-     * @return
-     */
     @Override
     @Transactional
     public int add(SysMessage message) {
-        return messageMapper.add(message);
+        return messageRepository.add(message);
     }
 
     @Override
     @Transactional
     public int saveAll(List<SysMessage> messages) {
-        return messageMapper.saveAll(messages);
+        return messageRepository.saveAll(messages);
     }
 
-    /**
-     * 查询聊天记录
-     *
-     * @param message
-     * @return
-     */
     @Override
     public List<SysMessage> query(SysMessage message, PageFilter pageFilter) {
-        if(pageFilter != null){
-            PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
+        if (pageFilter != null) {
+            return messageRepository.findMessages(
+                    message.getDeviceId(),
+                    message.getSender(),
+                    message.getRoleId(),
+                    message.getMessageType(),
+                    org.springframework.data.domain.PageRequest.of(pageFilter.getStart() - 1, pageFilter.getLimit())
+            ).getContent();
         }
-        return messageMapper.query(message);
+        return messageRepository.findAll();
     }
 
     @Override
     public SysMessage findById(Integer messageId) {
-        return messageMapper.findById(messageId);
+        return messageRepository.findByMessageId(messageId);
     }
 
-    /**
-     * 删除记忆，同步删除关联的音频文件
-     * - 单条删除（messageId不为空）：直接从记录中拿 audioPath 删文件
-     * - 批量删除（deviceId不为空）：遍历最近 RETENTION_DAYS 天的日期目录，删除对应 device 子目录
-     *
-     * @param message
-     * @return
-     */
     @Override
     @Transactional
     public int delete(SysMessage message) {
         if (message.getMessageId() != null) {
-            // 单条：直接拿 audioPath 删文件
-            SysMessage existing = messageMapper.findById(message.getMessageId());
-            if (existing != null && StringUtils.hasText(existing.getAudioPath())) {
-                AudioUtils.deleteFile(existing.getAudioPath());
+            SysMessage msg = messageRepository.findByMessageId(message.getMessageId());
+            if (msg != null && StringUtils.hasText(msg.getAudioPath())) {
+                AudioUtils.deleteFile(msg.getAudioPath());
             }
+            return messageRepository.deleteMessage(message);
         } else if (StringUtils.hasText(message.getDeviceId())) {
-            // 批量：遍历最近 RETENTION_DAYS 天的日期目录，删除 device 子目录
-            String deviceId = message.getDeviceId().replace(":", "-");
+            int retentionDays = 7;
             LocalDate today = LocalDate.now();
-            for (int i = 0; i <= AudioUtils.AUDIO_RETENTION_DAYS; i++) {
-                String date = today.minusDays(i).format(DateTimeFormatter.ISO_LOCAL_DATE);
-                Path deviceDir = Path.of(AudioUtils.AUDIO_PATH, date, deviceId);
-                AudioUtils.deleteDirectory(deviceDir);
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            for (int i = 0; i < retentionDays; i++) {
+                String dateDir = today.minusDays(i).format(formatter);
+                Path audioDir = Path.of("audio", dateDir, message.getDeviceId());
+                if (message.getRoleId() != null) {
+                    audioDir = audioDir.resolve(message.getRoleId().toString());
+                }
+                AudioUtils.deleteFile(audioDir.toString());
             }
-            // 清除内存中的对话历史，避免数据库已清空但LLM仍能看到旧上下文
-            sessionManager.findConversation(message.getDeviceId()).ifPresent(conversation -> conversation.clear());
+            messageRepository.deleteByDeviceAndUser(message.getDeviceId(), message.getUserId());
+            return 1;
         }
-
-        return messageMapper.delete(message);
+        return 0;
     }
 
     @Override
-    public void updateMessageByAudioFile(String deviceId, Integer roleId, String sender,
-                                         String createTime, String audioPath) {
-        SysMessage sysMessage = new SysMessage();
-        // 设置消息的where条件
-        sysMessage.setDeviceId(deviceId);
-        sysMessage.setRoleId(roleId);
-        sysMessage.setSender(sender);
-        sysMessage.setCreateTime(DateUtils.toDate(createTime.replace("T", " "), "yyyy-MM-dd HHmmss"));
-        // 设置音频路径和TTS时长
-        sysMessage.setAudioPath(audioPath);
-        messageMapper.updateMessageByAudioFile(sysMessage);
+    public void updateMessageByAudioFile(String deviceId, Integer roleId, String sender, String createTime,
+                                         String audioPath) {
+        messageRepository.updateAudioPath(deviceId, roleId, sender, createTime, audioPath);
     }
-
 }

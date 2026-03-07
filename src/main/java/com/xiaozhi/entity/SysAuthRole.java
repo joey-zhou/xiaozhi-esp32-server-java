@@ -3,7 +3,8 @@ package com.xiaozhi.entity;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -15,7 +16,8 @@ import java.util.Date;
  * @author Joey
  *
  */
-@Data
+@Getter
+@Setter
 @Accessors(chain = true)
 @Schema(description = "角色信息")
 @Entity
@@ -74,4 +76,11 @@ public class SysAuthRole {
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "更新时间")
     private Date updateTime;
+
+    /**
+     * 用户 ID（非数据库字段）
+     */
+    @Transient
+    @Schema(description = "用户 ID")
+    private Integer userId;
 }

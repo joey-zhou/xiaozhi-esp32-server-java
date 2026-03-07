@@ -1,7 +1,7 @@
 package com.xiaozhi.service.impl;
 
-import com.xiaozhi.dao.SysUserAuthMapper;
 import com.xiaozhi.entity.SysUserAuth;
+import com.xiaozhi.repository.SysUserAuthRepository;
 import com.xiaozhi.service.SysUserAuthService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -15,30 +15,30 @@ import org.springframework.stereotype.Service;
 public class SysUserAuthServiceImpl implements SysUserAuthService {
 
     @Resource
-    private SysUserAuthMapper userAuthMapper;
+    private SysUserAuthRepository userAuthRepository;
 
     @Override
     public SysUserAuth getByOpenIdAndPlatform(String openId, String platform) {
-        return userAuthMapper.selectByOpenIdAndPlatform(openId, platform);
+        return userAuthRepository.selectByOpenIdAndPlatform(openId, platform);
     }
 
     @Override
     public SysUserAuth getByUserIdAndPlatform(Integer userId, String platform) {
-        return userAuthMapper.selectByUserIdAndPlatform(userId, platform);
+        return userAuthRepository.selectByUserIdAndPlatform(userId, platform);
     }
 
     @Override
     public boolean save(SysUserAuth userAuth) {
-        return userAuthMapper.insert(userAuth) > 0;
+        return userAuthRepository.insert(userAuth) > 0;
     }
 
     @Override
     public boolean update(SysUserAuth userAuth) {
-        return userAuthMapper.update(userAuth) > 0;
+        return userAuthRepository.update(userAuth) > 0;
     }
 
     @Override
     public boolean deleteById(Long id) {
-        return userAuthMapper.deleteById(id) > 0;
+        return userAuthRepository.deleteAuthById(id) > 0;
     }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
@@ -16,7 +17,7 @@ import org.springframework.format.annotation.DateTimeFormat;
  *
  * @author Joey
  * @param <T> 泛型参数，用于支持链式调用
- * 
+ *
  */
 @Getter
 @Accessors(chain = true)
@@ -40,10 +41,10 @@ public class Base<T extends Base<T>> implements java.io.Serializable {
     protected Date updateTime;
 
     /**
-     * 用户ID
+     * 用户 ID
      */
-    @Schema(description = "用户ID")
-    private Integer userId;
+    @Schema(description = "用户 ID")
+    protected Integer userId;
 
     /**
      * 查询开始时间

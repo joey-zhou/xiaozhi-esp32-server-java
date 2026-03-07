@@ -8,7 +8,7 @@ import lombok.EqualsAndHashCode;
 import java.util.List;
 
 @Data
-@EqualsAndHashCode(callSuper = true)
+
 public final class IotMessage extends Message {
     public IotMessage() {
         super("iot");
@@ -18,4 +18,21 @@ public final class IotMessage extends Message {
     private String sessionId;
     private List<IotState> states;
     private List<IotDescriptor> descriptors;
+
+    // 显式添加 getter 方法
+    public boolean isUpdate() {
+        return update;
+    }
+
+    public String getSessionId() {
+        return sessionId;
+    }
+
+    public List<IotState> getStates() {
+        return states;
+    }
+
+    public List<IotDescriptor> getDescriptors() {
+        return descriptors;
+    }
 }

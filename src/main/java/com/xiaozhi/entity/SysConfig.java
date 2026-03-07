@@ -3,20 +3,19 @@ package com.xiaozhi.entity;
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.experimental.Accessors;
 
 /**
- * LLM\STT\TTS配置
- * 
+ * LLM\STT\TTS 配置
+ *
  * @author Joey
- * 
+ *
  */
-@Data
+@Getter
+@Setter
 @Accessors(chain = true)
-@EqualsAndHashCode(callSuper = true)
 @Schema(description = "配置信息")
 @Entity
 @Table(name = "sys_config")
@@ -43,21 +42,21 @@ public class SysConfig extends Base<SysConfig> {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Schema(description = "配置ID")
+    @Schema(description = "配置 ID")
     private Integer configId;
 
     /**
      * 用户 ID
      */
     @Column(nullable = false)
-    @Schema(description = "用户ID")
+    @Schema(description = "用户 ID")
     private Integer userId;
 
-    @Schema(description = "设备ID")
+    @Schema(description = "设备 ID")
     @Transient
     private String deviceId;
 
-    @Schema(description = "角色ID")
+    @Schema(description = "角色 ID")
     @Transient
     private Integer roleId;
 
@@ -76,66 +75,66 @@ public class SysConfig extends Base<SysConfig> {
     private String configDesc;
 
     /**
-     * 配置类型（llm\stt\tts）
+     * 配置类型（llm\stt\tts 等）
      */
     @Column(nullable = false, length = 30)
-    @Schema(description = "配置类型（llm\\stt\\tts）")
+    @Schema(description = "配置类型（llm\\stt\\tts 等）")
     private String configType;
 
     /**
-     * 模型类型（chat\vision\intent\embedding）
+     * 模型类型（chat\vision\intent\embedding 等）
      */
     @Column(length = 30)
-    @Schema(description = "模型类型（chat\\vision\\intent\\embedding）")
+    @Schema(description = "模型类型（chat\\vision\\intent\\embedding 等）")
     private String modelType;
 
     /**
-     * 服务提供商 (openai\quen\vosk\aliyun\tencent等)
+     * 服务提供商 (openai\quen\vosk\aliyun\tencent 等)
      */
     @Column(nullable = false, length = 30)
-    @Schema(description = "服务提供商 (openai\\quen\\vosk\\aliyun\\tencent等)")
+    @Schema(description = "服务提供商 (openai\\quen\\vosk\\aliyun\\tencent 等)")
     private String provider;
 
     /**
      * APP ID
      */
     @Column(length = 100)
-    @Schema(description = "服务提供商分配的AppId")
+    @Schema(description = "服务提供商分配的 AppId")
     private String appId;
 
     /**
      * API Key
      */
     @Column(columnDefinition = "text")
-    @Schema(description = "服务提供商分配的ApiKey")
+    @Schema(description = "服务提供商分配的 ApiKey")
     private String apiKey;
 
     /**
      * API Secret
      */
     @Column(length = 255)
-    @Schema(description = "服务提供商分配的ApiSecret")
+    @Schema(description = "服务提供商分配的 ApiSecret")
     private String apiSecret;
 
     /**
      * Access Key
      */
     @Column(length = 255)
-    @Schema(description = "服务提供商分配的Access Key")
+    @Schema(description = "服务提供商分配的 Access Key")
     private String ak;
 
     /**
      * Secret Key
      */
     @Column(columnDefinition = "text")
-    @Schema(description = "服务提供商分配的Secret Key")
+    @Schema(description = "服务提供商分配的 Secret Key")
     private String sk;
 
     /**
      * API 地址
      */
     @Column(length = 255)
-    @Schema(description = "服务提供商的API地址")
+    @Schema(description = "服务提供商的 API 地址")
     private String apiUrl;
 
     /**

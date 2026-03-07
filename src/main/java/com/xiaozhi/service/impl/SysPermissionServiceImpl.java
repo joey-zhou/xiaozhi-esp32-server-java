@@ -1,7 +1,7 @@
 package com.xiaozhi.service.impl;
 
-import com.xiaozhi.dao.PermissionMapper;
 import com.xiaozhi.entity.SysPermission;
+import com.xiaozhi.repository.SysPermissionRepository;
 import com.xiaozhi.service.SysPermissionService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 public class SysPermissionServiceImpl implements SysPermissionService {
 
     @Resource
-    private PermissionMapper permissionMapper;
+    private SysPermissionRepository permissionRepository;
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
@@ -25,36 +25,35 @@ public class SysPermissionServiceImpl implements SysPermissionService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String PERMISSION_CACHE_PREFIX = "USER_PERMISSION:";
-    private static final long CACHE_EXPIRE_TIME = 30; // 30分钟
+    private static final long CACHE_EXPIRE_TIME = 30;
 
     @Override
     public List<SysPermission> selectAll() {
-        return permissionMapper.selectAll();
+        return permissionRepository.selectAll();
     }
 
     @Override
     public SysPermission selectById(Integer permissionId) {
-        return permissionMapper.selectById(permissionId);
+        return permissionRepository.selectById(permissionId);
     }
 
     @Override
     public List<SysPermission> selectByType(String permissionType) {
-        return permissionMapper.selectByType(permissionType);
+        return permissionRepository.selectByType(permissionType);
     }
 
     @Override
     public List<SysPermission> selectByParentId(Integer parentId) {
-        return permissionMapper.selectByParentId(parentId);
+        return permissionRepository.selectByParentId(parentId);
     }
 
     @Override
     public List<SysPermission> selectByRoleId(Integer roleId) {
-        return permissionMapper.selectByRoleId(roleId);
+        return permissionRepository.selectByRoleId(roleId);
     }
 
     @Override
     public List<SysPermission> selectByUserId(Integer userId) {
-        // 1. 尝试从缓存获取
         String cacheKey = PERMISSION_CACHE_PREFIX + userId;
         try {
             String cachedJson = stringRedisTemplate.opsForValue().get(cacheKey);
@@ -65,10 +64,8 @@ public class SysPermissionServiceImpl implements SysPermissionService {
             // 缓存读取失败，继续从数据库查询
         }
 
-        // 2. 从数据库查询
-        List<SysPermission> permissions = permissionMapper.selectByUserId(userId);
+        List<SysPermission> permissions = permissionRepository.selectByUserId(userId);
 
-        // 3. 存入缓存
         try {
             String json = objectMapper.writeValueAsString(permissions);
             stringRedisTemplate.opsForValue().set(cacheKey, json, CACHE_EXPIRE_TIME, TimeUnit.MINUTES);
@@ -79,11 +76,6 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         return permissions;
     }
 
-    /**
-     * 清除用户权限缓存
-     *
-     * @param userId 用户ID
-     */
     public void clearUserPermissionCache(Integer userId) {
         String cacheKey = PERMISSION_CACHE_PREFIX + userId;
         try {
@@ -93,9 +85,6 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         }
     }
 
-    /**
-     * 清除所有权限缓存
-     */
     public void clearAllPermissionCache() {
         try {
             var keys = stringRedisTemplate.keys(PERMISSION_CACHE_PREFIX + "*");
@@ -110,20 +99,16 @@ public class SysPermissionServiceImpl implements SysPermissionService {
     @Override
     public List<SysPermission> buildPermissionTree(List<SysPermission> permissions) {
         List<SysPermission> returnList = new ArrayList<>();
-        
-        // 先找出所有的一级菜单
+
         for (SysPermission permission : permissions) {
-            // 一级菜单没有parentId或parentId为0
             if (permission.getParentId() == null || permission.getParentId() == 0) {
                 permission.setChildren(new ArrayList<>());
                 returnList.add(permission);
             }
         }
-        
-        // 为一级菜单设置子菜单
+
         for (SysPermission permission : permissions) {
             if (permission.getParentId() != null && permission.getParentId() != 0) {
-                // 获取父菜单
                 for (SysPermission parent : returnList) {
                     if (parent.getPermissionId().equals(permission.getParentId())) {
                         if (parent.getChildren() == null) {
@@ -135,22 +120,22 @@ public class SysPermissionServiceImpl implements SysPermissionService {
                 }
             }
         }
-        
+
         return returnList;
     }
 
     @Override
     public int add(SysPermission permission) {
-        return permissionMapper.add(permission);
+        return permissionRepository.add(permission);
     }
 
     @Override
     public int update(SysPermission permission) {
-        return permissionMapper.update(permission);
+        return permissionRepository.update(permission);
     }
 
     @Override
     public int delete(Integer permissionId) {
-        return permissionMapper.delete(permissionId);
+        return permissionRepository.delete(permissionId);
     }
 }

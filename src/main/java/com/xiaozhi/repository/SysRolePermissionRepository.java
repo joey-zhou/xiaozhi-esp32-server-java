@@ -22,19 +22,19 @@ public interface SysRolePermissionRepository extends JpaRepository<SysRolePermis
     /**
      * 根据角色 ID 查询角色权限关联
      */
-    @Query(value = "SELECT * FROM sys_role_permission WHERE role_id = :roleId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_role_permission WHERE roleId = :roleId", nativeQuery = true)
     List<SysRolePermission> findByRoleId(@Param("roleId") Integer roleId);
 
     /**
      * 根据权限 ID 查询角色权限关联
      */
-    @Query(value = "SELECT * FROM sys_role_permission WHERE permission_id = :permissionId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_role_permission WHERE permissionId = :permissionId", nativeQuery = true)
     List<SysRolePermission> findByPermissionId(@Param("permissionId") Integer permissionId);
 
     /**
      * 根据角色 ID 和权限 ID 查询角色权限关联
      */
-    @Query(value = "SELECT * FROM sys_role_permission WHERE role_id = :roleId AND permission_id = :permissionId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_role_permission WHERE roleId = :roleId AND permissionId = :permissionId", nativeQuery = true)
     SysRolePermission findByRoleIdAndPermissionId(@Param("roleId") Integer roleId, @Param("permissionId") Integer permissionId);
 
     /**
@@ -42,7 +42,7 @@ public interface SysRolePermissionRepository extends JpaRepository<SysRolePermis
      */
     @Modifying
     @Transactional
-    @Query(value = "DELETE FROM sys_role_permission WHERE role_id = :roleId", nativeQuery = true)
+    @Query(value = "DELETE FROM sys_role_permission WHERE roleId = :roleId", nativeQuery = true)
     int deleteByRoleId(@Param("roleId") Integer roleId);
 
     /**
@@ -50,10 +50,24 @@ public interface SysRolePermissionRepository extends JpaRepository<SysRolePermis
      */
     @Modifying
     @Transactional
-    @Query(value = "DELETE FROM sys_role_permission WHERE permission_id = :permissionId", nativeQuery = true)
+    @Query(value = "DELETE FROM sys_role_permission WHERE permissionId = :permissionId", nativeQuery = true)
     int deleteByPermissionId(@Param("permissionId") Integer permissionId);
 
-    default int batchAdd(List<SysRolePermission> rolePermissions){
-        return saveAll(rolePermissions).size();
+    default List<SysRolePermission> selectByRoleId(Integer roleId) {
+        return findByRoleId(roleId);
     }
+
+    default int add(SysRolePermission rolePermission) {
+        save(rolePermission);
+        return 1;
+    }
+
+    default int batchAdd(List<SysRolePermission> list) {
+        return saveAll(list).size();
+    }
+
+    @Modifying
+    @Transactional
+    @Query(value = "DELETE FROM sys_role_permission WHERE roleId = :roleId AND permissionId = :permissionId", nativeQuery = true)
+    int deleteByRoleIdAndPermissionId(@Param("roleId") Integer roleId, @Param("permissionId") Integer permissionId);
 }

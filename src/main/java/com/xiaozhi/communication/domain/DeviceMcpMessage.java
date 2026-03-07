@@ -8,7 +8,7 @@ import lombok.EqualsAndHashCode;
  * MCP请求类，用于处理向设备发送相关的MCP请求
  */
 @Data
-@EqualsAndHashCode(callSuper = true)
+
 public final  class DeviceMcpMessage extends Message {
     public DeviceMcpMessage() {
         super("mcp");

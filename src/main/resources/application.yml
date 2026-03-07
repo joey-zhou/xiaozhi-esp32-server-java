@@ -46,7 +46,8 @@ spring:
     hibernate:
       ddl-auto: validate
       naming:
-        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+        # 使用标准命名策略：不转换，保持驼峰 (deviceName → deviceName)
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     properties:
       hibernate:
         # SQL 格式化
@@ -128,6 +129,9 @@ spring:
   # 激活的配置文件（默认为开发环境）
   profiles:
     active: dev
+  # 允许循环依赖（用于解决 authUtilsConfig -> sysUserServiceImpl -> authenticationServiceImpl -> securityConfig -> customUserDetailsService -> authUtilsConfig 的循环依赖）
+  main:
+    allow-circular-references: true
 
   # Neo4j 配置（公共部分）
   neo4j:

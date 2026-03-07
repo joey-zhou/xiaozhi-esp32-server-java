@@ -5,9 +5,7 @@ import com.xiaozhi.common.exception.NotFoundException;
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
-import com.xiaozhi.dao.ConfigMapper;
 import com.xiaozhi.entity.SysDevice;
-import com.xiaozhi.entity.SysMessage;
 import com.xiaozhi.entity.SysRole;
 import com.xiaozhi.repository.SysDeviceRepository;
 import com.xiaozhi.repository.SysMessageRepository;
@@ -31,30 +29,20 @@ import java.util.List;
  * 设备操作
  *
  * @author Joey
- *
  */
-
 @Service
 public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceService {
     private static final Logger logger = LoggerFactory.getLogger(SysDeviceServiceImpl.class);
-
     private final static String CACHE_NAME = "XiaoZhi:SysDevice";
 
-    //    @Resource
-//    private DeviceMapper deviceMapper;
     @Autowired
     private SysDeviceRepository sysDeviceRepository;
-    //    @Resource
-//    private MessageMapper messageMapper;
+
     @Autowired
     private SysMessageRepository sysMessageRepository;
 
-    @Resource
-    private ConfigMapper configMapper;
     @Autowired
     private SysRoleRepository sysRoleRepository;
-//    @Resource
-//    private RoleMapper roleMapper;
 
     @Resource
     private SysConfigService configService;
@@ -68,23 +56,14 @@ public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceSe
     @Resource
     private BloomFilterManager bloomFilterManager;
 
-    /**
-     * 添加设备
-     *
-     * @param device
-     * @return
-     * @throws NotFoundException 如果没有配置角色
-     */
     @Override
     @Transactional
     public int add(SysDevice device) throws NotFoundException {
-
         SysDevice existingDevice = sysDeviceRepository.selectDeviceById(device.getDeviceId());
         if (existingDevice != null) {
             return 1;
         }
 
-        // 查询是否有默认角色
         SysRole queryRole = new SysRole();
         queryRole.setUserId(device.getUserId());
         List<SysRole> roles = sysRoleRepository.query(queryRole);
@@ -94,8 +73,6 @@ public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceSe
         }
 
         SysRole selectedRole = null;
-
-        // 优先绑定默认角色
         for (SysRole role : roles) {
             if (("1").equals(role.getIsDefault())) {
                 selectedRole = role;
@@ -107,146 +84,116 @@ public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceSe
         }
 
         device.setRoleId(selectedRole.getRoleId());
-        int result = sysDeviceRepository.add(device);
+        sysDeviceRepository.save(device);
 
-        // 添加成功后,将设备ID加入布隆过滤器
-        if (result > 0 && device.getDeviceId() != null) {
+        if (device.getDeviceId() != null) {
             bloomFilterManager.addDeviceId(device.getDeviceId());
         }
 
-        return result;
-
+        return 1;
     }
 
-    /**
-     * 删除设备
-     *
-     * @param device
-     * @return
-     */
     @Override
     @Transactional
-    @CacheEvict(value = CACHE_NAME, key = "#device.deviceId.replace(\":\", \"-\")")
+    @CacheEvict(value = CACHE_NAME, key = "#device.deviceId?.replace(\":\", \"-\")", condition = "#device.deviceId != null")
     public int delete(SysDevice device) {
-        int row = deviceMapper.delete(device);
+        int row = sysDeviceRepository.deleteDevice(device);
         if (row > 0) {
-            SysMessage message = new SysMessage();
-            message.setUserId(device.getUserId());
-            message.setDeviceId(device.getDeviceId());
-            // 清空设备聊天记录
-            messageMapper.delete(message);
+            sysMessageRepository.deleteByDeviceAndUser(device.getDeviceId(), device.getUserId());
         }
         return row;
     }
 
-    /**
-     * 查询设备信息
-     *
-     * @param device
-     * @return
-     */
     @Override
     public List<SysDevice> query(SysDevice device, PageFilter pageFilter) {
         if (pageFilter != null) {
-            PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
+            return sysDeviceRepository.findDevices(
+                    device.getUserId(),
+                    device.getDeviceName(),
+                    device.getState(),
+                    org.springframework.data.domain.PageRequest.of(pageFilter.getStart() - 1, pageFilter.getLimit())
+            ).getContent();
         }
-        return deviceMapper.query(device);
+        return sysDeviceRepository.query(device);
     }
 
     @Override
     @Cacheable(value = CACHE_NAME, key = "#deviceId.replace(\":\", \"-\")", unless = "#result == null")
     public SysDevice selectDeviceById(String deviceId) {
-        // 使用布隆过滤器快速判断设备是否不存在
         if (!bloomFilterManager.mightContain(deviceId)) {
-            logger.debug("布隆过滤器拦截: 设备ID不存在 - {}", deviceId);
-            return null;  // 布隆过滤器判断一定不存在,直接返回null
+            logger.debug("布隆过滤器拦截：设备 ID 不存在 - {}", deviceId);
+            return null;
         }
-
-        // 布隆过滤器判断可能存在,继续查询数据库
-        return deviceMapper.selectDeviceById(deviceId);
+        return sysDeviceRepository.selectDeviceById(deviceId);
     }
 
-    /**
-     * 查询验证码
-     */
     @Override
     public SysDevice queryVerifyCode(SysDevice device) {
-        return deviceMapper.queryVerifyCode(device);
+        return sysDeviceRepository.queryVerifyCode(device);
     }
 
-    /**
-     * 查询并生成验证码
-     *
-     */
     @Override
     public SysDevice generateCode(SysDevice device) {
-        SysDevice result = deviceMapper.queryVerifyCode(device);
+        SysDevice result = sysDeviceRepository.queryVerifyCode(device);
         if (result == null) {
             result = new SysDevice();
-            deviceMapper.generateCode(device);
+            sysDeviceRepository.generateCode(device);
             result.setCode(device.getCode());
         }
         return result;
     }
 
-    /**
-     * 关系设备验证码语音路径
-     */
     @Override
     public int updateCode(SysDevice device) {
-        return deviceMapper.updateCode(device);
+        return sysDeviceRepository.updateCode(device);
     }
 
     @Override
-    @Transactional
     public int batchUpdate(List<String> deviceIds, Integer userId, Integer roleId) {
         if (deviceIds == null || deviceIds.isEmpty()) {
             return 0;
         }
-
-        int successCount = 0;
-
-        for (String deviceId : deviceIds) {
-            SysDevice device = new SysDevice();
-            device.setDeviceId(deviceId.trim());
-            device.setUserId(userId);
-
-            if (roleId != null) {
-                device.setRoleId(roleId);
-            }
-
-            // 更新设备
-            successCount += update(device);
-            ;
-        }
-
-        return successCount;
+        return sysDeviceRepository.batchUpdateDevices(deviceIds, userId, roleId);
     }
 
-    /**
-     * 更新设备信息
-     *
-     * @param device
-     * @return
-     */
     @Override
-    @CacheEvict(value = CACHE_NAME, key = "#device.deviceId.replace(\":\", \"-\")")
+    @CacheEvict(value = CACHE_NAME, key = "#device.deviceId?.replace(\":\", \"-\")")
     public int update(SysDevice device) {
-        int rows = deviceMapper.update(device);
-        // 更新设备信息后清空记忆缓存并重新注册设备信息
-        if (device.getDeviceId() != null) {
-            device = deviceMapper.selectDeviceById(device.getDeviceId());
+        if (device.getDeviceId() == null || device.getDeviceId().isEmpty()) {
+            return updateAllDevices(device);
         }
+
+        String deviceId = device.getDeviceId();
+        SysDevice existingDevice = sysDeviceRepository.findById(deviceId)
+                .orElseThrow(() -> new RuntimeException("设备不存在：" + deviceId));
+
+        existingDevice.setDeviceName(device.getDeviceName())
+                .setRoleId(device.getRoleId())
+                .setFunctionNames(device.getFunctionNames())
+                .setIp(device.getIp())
+                .setLocation(device.getLocation())
+                .setWifiName(device.getWifiName())
+                .setChipModelName(device.getChipModelName())
+                .setType(device.getType())
+                .setVersion(device.getVersion())
+                .setState(device.getState())
+                .setUserId(device.getUserId());
+        sysDeviceRepository.save(existingDevice);
+
+        device = existingDevice;
         ChatSession session = null;
         if (device != null) {
-            // Use ApplicationContext to get SessionManager to avoid circular dependency
             SessionManager sessionManager = applicationContext.getBean(SessionManager.class);
             session = sessionManager.getSessionByDeviceId(device.getDeviceId());
         }
         if (session != null) {
             session.setSysDevice(device);
         }
-        return rows;
+        return 1;
     }
 
+    @Transactional
+    public int updateAllDevices(SysDevice device) {
+        return sysDeviceRepository.updateAllStates(device.getState());
+    }
 }

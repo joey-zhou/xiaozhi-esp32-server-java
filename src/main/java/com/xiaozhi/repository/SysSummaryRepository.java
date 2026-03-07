@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * 聊天消息摘要数据访问层 - Spring Data JPA Repository
@@ -30,8 +31,8 @@ public interface SysSummaryRepository extends JpaRepository<SysSummary, SysSumma
      * @return 摘要信息
      */
     @Query(value = "SELECT * FROM sys_summary " +
-            "WHERE device_id = :deviceId AND role_id = :roleId " +
-            "ORDER BY create_time DESC LIMIT 1",
+            "WHERE deviceId = :deviceId AND roleId = :roleId " +
+            "ORDER BY createTime DESC LIMIT 1",
             nativeQuery = true)
     SysSummary findLastSummary(@Param("deviceId") String deviceId, @Param("roleId") int roleId);
 
@@ -44,10 +45,10 @@ public interface SysSummaryRepository extends JpaRepository<SysSummary, SysSumma
      * @return 摘要分页列表
      */
     @Query(value = "SELECT * FROM sys_summary " +
-            "WHERE device_id = :deviceId AND role_id = :roleId " +
-            "ORDER BY create_time DESC",
+            "WHERE deviceId = :deviceId AND roleId = :roleId " +
+            "ORDER BY createTime DESC",
             countQuery = "SELECT COUNT(*) FROM sys_summary " +
-            "WHERE device_id = :deviceId AND role_id = :roleId",
+            "WHERE deviceId = :deviceId AND roleId = :roleId",
             nativeQuery = true)
     Page<SysSummary> findSummary(
             @Param("deviceId") String deviceId,
@@ -65,11 +66,15 @@ public interface SysSummaryRepository extends JpaRepository<SysSummary, SysSumma
     @Modifying
     @Transactional
     @Query(value = "DELETE FROM sys_summary " +
-            "WHERE role_id = :roleId AND device_id = :deviceId AND create_time = :createTime",
+            "WHERE roleId = :roleId AND deviceId = :deviceId AND createTime = :createTime",
             nativeQuery = true)
     int deleteSummary(@Param("roleId") int roleId, @Param("deviceId") String deviceId, @Param("createTime") Instant createTime);
 
-    default void saveSummary(SysSummary summary){
+    default void saveSummary(SysSummary summary) {
         save(summary);
+    }
+
+    default List<SysSummary> findSummary(SysSummary summary) {
+        return findAll();
     }
 }

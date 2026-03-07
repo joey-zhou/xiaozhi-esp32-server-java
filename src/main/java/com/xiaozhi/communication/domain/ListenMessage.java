@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 @Data
-@EqualsAndHashCode(callSuper = true)
+
 public final class ListenMessage extends Message {
     public ListenMessage(){
         super("listen");
@@ -15,4 +15,17 @@ public final class ListenMessage extends Message {
     private ListenState state;
     private ListenMode mode;
     private String text;
+
+    // 显式添加 getter 方法
+    public ListenState getState() {
+        return state;
+    }
+
+    public ListenMode getMode() {
+        return mode;
+    }
+
+    public String getText() {
+        return text;
+    }
 }

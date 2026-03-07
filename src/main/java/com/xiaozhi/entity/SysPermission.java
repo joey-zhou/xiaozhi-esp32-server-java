@@ -3,7 +3,8 @@ package com.xiaozhi.entity;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -15,7 +16,8 @@ import java.util.List;
  *
  * @author Joey
  */
-@Data
+@Getter
+@Setter
 @Accessors(chain = true)
 @Schema(description = "权限信息")
 @Entity
@@ -97,7 +99,7 @@ public class SysPermission {
     @Column(length = 1)
     @Schema(description = "状态 (1 正常 0 禁用)")
     private String status;
-    
+
     /**
      * 创建时间
      */

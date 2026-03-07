@@ -29,7 +29,7 @@ public interface SysConfigRepository extends JpaRepository<SysConfig, Integer>, 
      * @param configId 配置 ID
      * @return 配置信息
      */
-    @Query(value = "SELECT * FROM sys_config WHERE config_id = :configId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_config WHERE configId = :configId", nativeQuery = true)
     Optional<SysConfig> findConfigById(@Param("configId") Integer configId);
 
     /**
@@ -43,16 +43,16 @@ public interface SysConfigRepository extends JpaRepository<SysConfig, Integer>, 
      * @return 配置分页列表
      */
     @Query(value = "SELECT * FROM sys_config WHERE 1=1 " +
-            "AND (:userId IS NULL OR user_id = :userId) " +
-            "AND (:configType IS NULL OR :configType = '' OR config_type = :configType) " +
+            "AND (:userId IS NULL OR userId = :userId) " +
+            "AND (:configType IS NULL OR :configType = '' OR configType = :configType) " +
             "AND (:provider IS NULL OR :provider = '' OR provider = :provider) " +
             "AND (:state IS NULL OR :state = '' OR state = :state) " +
-            "ORDER BY create_time DESC",
+            "ORDER BY createTime DESC",
             countQuery = "SELECT COUNT(*) FROM sys_config WHERE 1=1 " +
-                    "AND (:userId IS NULL OR user_id = :userId) " +
-                    "AND (:configType IS NULL OR :configType = '' OR config_type = :configType) " +
-                    "AND (:provider IS NULL OR :provider = '' OR provider = :provider) " +
-                    "AND (:state IS NULL OR :state = '' OR state = :state)",
+            "AND (:userId IS NULL OR userId = :userId) " +
+            "AND (:configType IS NULL OR :configType = '' OR configType = :configType) " +
+            "AND (:provider IS NULL OR :provider = '' OR provider = :provider) " +
+            "AND (:state IS NULL OR :state = '' OR state = :state)",
             nativeQuery = true)
     Page<SysConfig> findConfigs(
             @Param("userId") Integer userId,
@@ -62,7 +62,7 @@ public interface SysConfigRepository extends JpaRepository<SysConfig, Integer>, 
             Pageable pageable);
 
     /**
-     * 重置默认配置（不支持 modelType 过滤）
+     * 重置默认配置
      *
      * @param userId     用户 ID
      * @param configType 配置类型
@@ -70,11 +70,11 @@ public interface SysConfigRepository extends JpaRepository<SysConfig, Integer>, 
      */
     @Modifying
     @Transactional
-    @Query(value = "UPDATE sys_config SET is_default = '0' WHERE user_id = :userId AND config_type = :configType", nativeQuery = true)
+    @Query(value = "UPDATE sys_config SET isDefault = '0' WHERE userId = :userId AND configType = :configType", nativeQuery = true)
     int resetDefault(@Param("userId") Integer userId, @Param("configType") String configType);
 
     /**
-     * 重置默认配置（支持 modelType 过滤）
+     * 重置默认配置（支持 modelType）
      *
      * @param userId     用户 ID
      * @param configType 配置类型
@@ -83,8 +83,8 @@ public interface SysConfigRepository extends JpaRepository<SysConfig, Integer>, 
      */
     @Modifying
     @Transactional
-    @Query(value = "UPDATE sys_config SET is_default = '0' WHERE user_id = :userId AND config_type = :configType" +
-            " AND (:modelType IS NULL OR :modelType = '' OR model_type = :modelType)", nativeQuery = true)
+    @Query(value = "UPDATE sys_config SET isDefault = '0' WHERE userId = :userId AND configType = :configType" +
+            " AND (:modelType IS NULL OR :modelType = '' OR modelType = :modelType)", nativeQuery = true)
     int resetDefault(@Param("userId") Integer userId,
                      @Param("configType") String configType,
                      @Param("modelType") String modelType);
@@ -96,7 +96,7 @@ public interface SysConfigRepository extends JpaRepository<SysConfig, Integer>, 
      * @param configType 配置类型
      * @return 默认配置
      */
-    @Query(value = "SELECT * FROM sys_config WHERE user_id = :userId AND config_type = :configType AND is_default = '1' LIMIT 1", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_config WHERE userId = :userId AND configType = :configType AND isDefault = '1' LIMIT 1", nativeQuery = true)
     Optional<SysConfig> findDefaultConfig(@Param("userId") Integer userId, @Param("configType") String configType);
 
     /**
@@ -117,10 +117,8 @@ public interface SysConfigRepository extends JpaRepository<SysConfig, Integer>, 
      */
     default List<SysConfig> query(SysConfig sysConfig, Pageable pageable) {
         Specification<SysConfig> spec = (root, query, cb) -> {
-            // 添加 DISTINCT
             query.distinct(true);
 
-            // 构建查询条件
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
 
             // state = '1'
@@ -150,53 +148,42 @@ public interface SysConfigRepository extends JpaRepository<SysConfig, Integer>, 
             if (sysConfig.getProvider() != null && !sysConfig.getProvider().isEmpty()) {
                 predicates.add(cb.equal(root.get("provider"), sysConfig.getProvider()));
             } else {
-                // 默认排除 coze, dify, xingchen
                 predicates.add(cb.not(root.get("provider").in("coze", "dify", "xingchen")));
             }
 
             // configName 模糊查询
             if (sysConfig.getConfigName() != null && !sysConfig.getConfigName().isEmpty()) {
-                predicates.add(cb.like(root.get("configName"), "%"+sysConfig.getConfigName() + " %"));
+                predicates.add(cb.like(root.get("configName"), "%" + sysConfig.getConfigName() + "%"));
             }
 
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
         if (pageable != null) {
             return findAll(spec, pageable).getContent();
-
         } else {
             return findAll(spec);
         }
-
     }
 
-    default int add(SysConfig newLlmConfig) {
-        save(newLlmConfig);
+    default int add(SysConfig config) {
+        save(config);
         return 1;
     }
 
-    default int update(SysConfig sysConfig) {
-        save(sysConfig);
-        return 0;
+    default int update(SysConfig config) {
+        save(config);
+        return 1;
     }
 
-    /**
-     * 重置默认配置
-     *
-     * @param resetConfig 包含 userId、configType、modelType 的配置对象
-     */
     default void resetDefault(SysConfig resetConfig) {
-        // 参数验证
         if (resetConfig == null || resetConfig.getUserId() == null
                 || resetConfig.getConfigType() == null || resetConfig.getConfigType().isEmpty()) {
             return;
         }
-
-        // 调用 JPA Query 方法重置默认配置（支持 modelType 条件）
         resetDefault(resetConfig.getUserId(), resetConfig.getConfigType(), resetConfig.getModelType());
     }
 
-    default SysConfig selectConfigById(Integer configId){
+    default SysConfig selectConfigById(Integer configId) {
         return findById(configId).orElse(null);
     }
 }

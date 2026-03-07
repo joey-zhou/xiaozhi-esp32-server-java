@@ -3,186 +3,174 @@ SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- 创建本地用户并设置密码（使用mysql_native_password插件）
-CREATE USER IF NOT EXISTS 'xiaozhi'@'localhost' IDENTIFIED WITH mysql_native_password BY '123456';
 
--- 创建远程用户并设置密码（使用mysql_native_password插件）
-CREATE USER IF NOT EXISTS 'xiaozhi'@'%' IDENTIFIED WITH mysql_native_password BY '123456';
-
--- 仅授予本地用户对 xiaozhi 数据库的所有权限
-GRANT ALL PRIVILEGES ON xiaozhi.* TO 'xiaozhi'@'localhost';
-
--- 仅授予远程用户对 xiaozhi 数据库的所有权限
-GRANT ALL PRIVILEGES ON xiaozhi.* TO 'xiaozhi'@'%';
 
 -- 刷新权限以使更改生效
 FLUSH PRIVILEGES;
 
--- 查看用户权限
-SHOW GRANTS FOR 'xiaozhi'@'localhost';
-SHOW GRANTS FOR 'xiaozhi'@'%';
+
 
 -- 创建数据库（如果不存在）
-CREATE DATABASE IF NOT EXISTS `xiaozhi` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS `xiaozhi_jpa` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- xiaozhi.sys_user definition
-DROP TABLE IF EXISTS `sys_user`;
-CREATE TABLE `sys_user` (
-  `user_id` int unsigned NOT NULL AUTO_INCREMENT,
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_user`;
+CREATE TABLE `xiaozhi_jpa`.`sys_user` (
+  `userId` int unsigned NOT NULL AUTO_INCREMENT,
   `username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `wx_open_id` VARCHAR(100) NULL COMMENT '微信OpenId',
-  `wx_union_id` VARCHAR(100) NULL COMMENT '微信UnionId',
+  `wxOpenId` VARCHAR(100) NULL COMMENT '微信OpenId',
+  `wxUnionId` VARCHAR(100) NULL COMMENT '微信UnionId',
   `tel` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `email` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `role_id` int unsigned NOT NULL DEFAULT 2 COMMENT '角色ID',
+  `roleId` int unsigned NOT NULL DEFAULT 2 COMMENT '角色ID',
   `avatar` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '头像',
   `state` enum('1','0') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '1' COMMENT '1-正常 0-禁用',
-  `login_ip` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `is_admin` enum('1','0') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `login_time` datetime DEFAULT NULL,
+  `loginIp` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `isAdmin` enum('1','0') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `loginTime` datetime DEFAULT NULL,
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
-  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`user_id`),
+  `createTime` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updateTime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`userId`),
   UNIQUE KEY `username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert admin user only if it doesn't exist
-INSERT INTO xiaozhi.sys_user (username, password, state, is_admin, role_id, name, create_time, update_time)
+INSERT INTO xiaozhi.sys_user (username, password, state, isAdmin, roleId, name, createTime, updateTime)
 VALUES ('admin', '11cd9c061d614dcf37ec60c44c11d2ad', '1', '1', 1, '小智', '2025-03-09 18:32:29', '2025-03-09 18:32:35');
 
-update `sys_user` set name = '小智' where username = 'admin';
+update `xiaozhi_jpa`.`sys_user` set name = '小智' where username = 'admin';
 
 -- xiaozhi.sys_device definition
-DROP TABLE IF EXISTS `sys_device`;
-CREATE TABLE `sys_device` (
-  `device_id` varchar(255) NOT NULL COMMENT '设备ID，主键',
-  `device_name` varchar(100) NOT NULL COMMENT '设备名称',
-  `role_id` int unsigned DEFAULT NULL COMMENT '角色ID，主键',
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_device`;
+CREATE TABLE `xiaozhi_jpa`.`sys_device` (
+  `deviceId` varchar(255) NOT NULL COMMENT '设备ID，主键',
+  `deviceName` varchar(100) NOT NULL COMMENT '设备名称',
+  `roleId` int unsigned DEFAULT NULL COMMENT '角色ID，主键',
   `function_names` varchar(250) NULL COMMENT '可用全局function的名称列表(逗号分割)，为空则使用所有全局function',
   `ip` varchar(45) DEFAULT NULL COMMENT 'IP地址',
   `location` varchar(255) DEFAULT NULL COMMENT '地理位置',
-  `wifi_name` varchar(100) DEFAULT NULL COMMENT 'WiFi名称',
-  `chip_model_name` varchar(100) DEFAULT NULL COMMENT '芯片型号',
+  `wifiName` varchar(100) DEFAULT NULL COMMENT 'WiFi名称',
+  `chipModelName` varchar(100) DEFAULT NULL COMMENT '芯片型号',
   `type` varchar(50) DEFAULT NULL COMMENT '设备类型',
   `version` varchar(50) DEFAULT NULL COMMENT '固件版本',
   `state` enum('0','1','2') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '0' COMMENT '设备状态：1-在线，0-离线，2-待机',
-  `user_id` int NOT NULL COMMENT '创建人',
-  `create_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`device_id`),
-  KEY `device_name` (`device_name`),
-  KEY `user_id` (`user_id`)
+  `userId` int NOT NULL COMMENT '创建人',
+  `createTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updateTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`deviceId`),
+  KEY `deviceName` (`deviceName`),
+  KEY `userId` (`userId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='设备信息表';
 
 -- xiaozhi.sys_message definition
-DROP TABLE IF EXISTS `sys_message`;
-CREATE TABLE `sys_message` (
-  `message_id` bigint NOT NULL AUTO_INCREMENT COMMENT '消息ID，主键，自增',
-  `device_id` varchar(30) NOT NULL COMMENT '设备ID',
-  `session_id` varchar(100) NOT NULL COMMENT '会话ID',
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_message`;
+CREATE TABLE `xiaozhi_jpa`.`sys_message` (
+  `messageId` bigint NOT NULL AUTO_INCREMENT COMMENT '消息ID，主键，自增',
+  `deviceId` varchar(30) NOT NULL COMMENT '设备ID',
+  `sessionId` varchar(100) NOT NULL COMMENT '会话ID',
   `sender` enum('user','assistant') NOT NULL COMMENT '消息发送方：user-用户，assistant-人工智能',
-  `role_id` bigint COMMENT 'AI扮演的角色ID',
+  `roleId` bigint COMMENT 'AI扮演的角色ID',
   `message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '消息内容',
-  `message_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '消息类型',
-  `audio_path` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '语音文件路径',
+  `messageType` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '消息类型',
+  `audioPath` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '语音文件路径',
   `state` enum('1','0') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '1' COMMENT '状态：1-有效，0-删除',
-  `tool_calls` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工具调用详情JSON，包含name/arguments/result',
-  `create_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '消息发送时间',
-  PRIMARY KEY (`message_id`),
-  KEY `device_id` (`device_id`),
-  KEY `session_id` (`session_id`)
+  `toolCalls` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工具调用详情JSON，包含name/arguments/result',
+  `createTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '消息发送时间',
+  PRIMARY KEY (`messageId`),
+  KEY `deviceId` (`deviceId`),
+  KEY `sessionId` (`sessionId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='人与AI对话消息表';
 
 -- xiaozhi.sys_role definition
-DROP TABLE IF EXISTS `sys_role`;
-CREATE TABLE `sys_role` (
-  `role_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '角色ID，主键',
-  `role_name` varchar(100) NOT NULL COMMENT '角色名称',
-  `role_desc` TEXT DEFAULT NULL COMMENT '角色描述',
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_role`;
+CREATE TABLE `xiaozhi_jpa`.`sys_role` (
+  `roleId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '角色ID，主键',
+  `roleName` varchar(100) NOT NULL COMMENT '角色名称',
+  `roleDesc` TEXT DEFAULT NULL COMMENT '角色描述',
   `avatar` varchar(255) DEFAULT NULL COMMENT '角色头像',
-  `tts_id` int DEFAULT NULL COMMENT 'TTS服务ID',
-  `model_id` int unsigned DEFAULT NULL COMMENT '模型ID',
-  `stt_id` int unsigned DEFAULT NULL COMMENT 'STT服务ID',
-  `vad_speech_th` FLOAT DEFAULT 0.5 COMMENT '语音检测阈值',
-  `vad_silence_th` FLOAT DEFAULT 0.3 COMMENT '静音检测阈值',
-  `vad_energy_th` FLOAT DEFAULT 0.01 COMMENT '能量检测阈值',
-  `vad_silence_ms` INT DEFAULT 800 COMMENT '静音检测时间',
-  `voice_name` varchar(100) NOT NULL COMMENT '角色语音名称',
-  `tts_pitch` FLOAT DEFAULT 1.0 COMMENT '语音音调',
-  `tts_speed` FLOAT DEFAULT 1.0 COMMENT '语音语速',
+  `ttsId` int DEFAULT NULL COMMENT 'TTS服务ID',
+  `modelId` int unsigned DEFAULT NULL COMMENT '模型ID',
+  `sttId` int unsigned DEFAULT NULL COMMENT 'STT服务ID',
+  `vadSpeechTh` FLOAT DEFAULT 0.5 COMMENT '语音检测阈值',
+  `vadSilenceTh` FLOAT DEFAULT 0.3 COMMENT '静音检测阈值',
+  `vadEnergyTh` FLOAT DEFAULT 0.01 COMMENT '能量检测阈值',
+  `vadSilenceMs` INT DEFAULT 800 COMMENT '静音检测时间',
+  `voiceName` varchar(100) NOT NULL COMMENT '角色语音名称',
+  `ttsPitch` FLOAT DEFAULT 1.0 COMMENT '语音音调',
+  `ttsSpeed` FLOAT DEFAULT 1.0 COMMENT '语音语速',
   `temperature` DOUBLE DEFAULT 0.7 COMMENT '温度参数',
-  `top_p` DOUBLE DEFAULT 1.0 COMMENT 'Top-P参数',
-  `memory_type` enum('summary','window') DEFAULT 'window' COMMENT '记忆类型',
+  `topP` DOUBLE DEFAULT 1.0 COMMENT 'Top-P参数',
+  `memoryType` enum('summary','window') DEFAULT 'window' COMMENT '记忆类型',
   `state` enum('1','0') DEFAULT '1' COMMENT '状态：1-启用，0-禁用',
-  `is_default` enum('1','0') DEFAULT '0' COMMENT '是否默认角色：1-是，0-否',
-  `user_id` int NOT NULL COMMENT '创建人',
-  `create_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`role_id`),
-  KEY `user_id` (`user_id`)
+  `isDefault` enum('1','0') DEFAULT '0' COMMENT '是否默认角色：1-是，0-否',
+  `userId` int NOT NULL COMMENT '创建人',
+  `createTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`roleId`),
+  KEY `userId` (`userId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
 
 -- xiaozhi.sys_code definition
-DROP TABLE IF EXISTS `sys_code`;
-CREATE TABLE `sys_code` (
-  `code_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_code`;
+CREATE TABLE `xiaozhi_jpa`.`sys_code` (
+  `codeId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
   `code` varchar(100) NOT NULL COMMENT '验证码',
   `type` varchar(50) DEFAULT NULL COMMENT '设备类型',
   `email` varchar(100) DEFAULT NULL COMMENT '邮箱',
-  `device_id` varchar(30) DEFAULT NULL COMMENT '设备ID',
-  `session_id` varchar(100) DEFAULT NULL COMMENT 'sessionID',
-  `audio_path` text COMMENT '语音文件路径',
-  `create_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`code_id`)
+  `deviceId` varchar(30) DEFAULT NULL COMMENT '设备ID',
+  `sessionId` varchar(100) DEFAULT NULL COMMENT 'sessionID',
+  `audioPath` text COMMENT '语音文件路径',
+  `createTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`codeId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='验证码表';
 
 -- xiaozhi.sys_config definition
-DROP TABLE IF EXISTS `sys_config`;
-CREATE TABLE `sys_config` (
-  `config_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '配置ID，主键',
-  `user_id` int NOT NULL COMMENT '创建用户ID',
-  `config_type` varchar(30) NOT NULL COMMENT '配置类型(llm, stt, tts等)',
-  `model_type` varchar(30) DEFAULT NULL COMMENT 'LLM模型类型(chat, vision, intent, embedding等)',
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_config`;
+CREATE TABLE `xiaozhi_jpa`.`sys_config` (
+  `configId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '配置ID，主键',
+  `userId` int NOT NULL COMMENT '创建用户ID',
+  `configType` varchar(30) NOT NULL COMMENT '配置类型(llm, stt, tts等)',
+  `modelType` varchar(30) DEFAULT NULL COMMENT 'LLM模型类型(chat, vision, intent, embedding等)',
   `provider` varchar(30) NOT NULL COMMENT '服务提供商(openai, vosk, aliyun, tencent等)',
-  `config_name` varchar(50) DEFAULT NULL COMMENT '配置名称',
-  `config_desc` TEXT DEFAULT NULL COMMENT '配置描述',
-  `app_id` varchar(100) DEFAULT NULL COMMENT 'APP ID',
-  `api_key` text DEFAULT NULL COMMENT 'API密钥',
-  `api_secret` varchar(255) DEFAULT NULL COMMENT 'API密钥',
+  `configName` varchar(50) DEFAULT NULL COMMENT '配置名称',
+  `configDesc` TEXT DEFAULT NULL COMMENT '配置描述',
+  `appId` varchar(100) DEFAULT NULL COMMENT 'APP ID',
+  `apiKey` text DEFAULT NULL COMMENT 'API密钥',
+  `apiSecret` varchar(255) DEFAULT NULL COMMENT 'API密钥',
   `ak` varchar(255) DEFAULT NULL COMMENT 'Access Key',
   `sk` text DEFAULT NULL COMMENT 'Secret Key',
-  `api_url` varchar(255) DEFAULT NULL COMMENT 'API地址',
-  `is_default` enum('1','0') DEFAULT '0' COMMENT '是否为默认配置: 1-是, 0-否',
+  `apiUrl` varchar(255) DEFAULT NULL COMMENT 'API地址',
+  `isDefault` enum('1','0') DEFAULT '0' COMMENT '是否为默认配置: 1-是, 0-否',
   `state` enum('1','0') DEFAULT '1' COMMENT '状态：1-启用，0-禁用',
-  `create_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`config_id`),
-  KEY `user_id` (`user_id`),
-  KEY `config_type` (`config_type`),
+  `createTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updateTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`configId`),
+  KEY `userId` (`userId`),
+  KEY `configType` (`configType`),
   KEY `provider` (`provider`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表(模型、语音识别、语音合成等)';
 
 -- xiaozhi.sys_template definition
-DROP TABLE IF EXISTS `sys_template`;
-CREATE TABLE `sys_template` (
-  `user_id` int NOT NULL COMMENT '创建用户ID',
-  `template_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '模板ID',
-  `template_name` varchar(100) NOT NULL COMMENT '模板名称',
-  `template_desc` varchar(500) DEFAULT NULL COMMENT '模板描述',
-  `template_content` text NOT NULL COMMENT '模板内容',
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_template`;
+CREATE TABLE `xiaozhi_jpa`.`sys_template` (
+  `userId` int NOT NULL COMMENT '创建用户ID',
+  `templateId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '模板ID',
+  `templateName` varchar(100) NOT NULL COMMENT '模板名称',
+  `templateDesc` varchar(500) DEFAULT NULL COMMENT '模板描述',
+  `templateContent` text NOT NULL COMMENT '模板内容',
   `category` varchar(50) DEFAULT NULL COMMENT '模板分类',
-  `is_default` enum('1','0') DEFAULT '0' COMMENT '是否为默认配置: 1-是, 0-否',
+  `isDefault` enum('1','0') DEFAULT '0' COMMENT '是否为默认配置: 1-是, 0-否',
   `state` enum('1','0') DEFAULT '1' COMMENT '状态(1启用 0禁用)',
-  `create_time` timestamp DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`template_id`),
+  `createTime` timestamp DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updateTime` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`templateId`),
   KEY `category` (`category`),
-  KEY `template_name` (`template_name`)
+  KEY `templateName` (`templateName`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='提示词模板表';
 
 -- Insert default template
-INSERT INTO `sys_template` (`user_id`, `template_name`, `template_desc`, `template_content`, `category`, `is_default`) VALUES
+INSERT INTO `xiaozhi_jpa`.`sys_template` (`userId`, `templateName`, `templateDesc`, `templateContent`, `category`, `isDefault`) VALUES
 (1, '通用助手', '适合日常对话的通用AI助手', '你是一个乐于助人的AI助手。请以友好、专业的方式回答用户的问题。提供准确、有用的信息，并尽可能简洁明了。避免使用复杂的符号或格式，保持自然流畅的对话风格。当用户的问题不明确时，可以礼貌地请求更多信息。请记住，你的回答将被转换为语音，所以要使用清晰、易于朗读的语言。', '基础角色', '0'),
 
 (1, '教育老师', '擅长解释复杂概念的教师角色', '你是一位经验丰富的教师，擅长通过简单易懂的方式解释复杂概念。回答问题时，考虑不同学习水平的学生，使用适当的比喻和例子，并鼓励批判性思考。避免使用难以在语音中表达的符号或公式，使用清晰的语言描述概念。引导学习过程而不是直接给出答案。使用自然的语调和节奏，就像在课堂上讲解一样。', '专业角色', '0'),
@@ -245,81 +233,81 @@ INSERT INTO `sys_template` (`user_id`, `template_name`, `template_desc`, `templa
 理解用户的信息，酝酿你的愤怒情绪，你越想越生气。', '社交角色', '1');
 
 -- 创建mcp工具过滤配置表
-DROP TABLE IF EXISTS `sys_mcp_tool_exclude`;
-CREATE TABLE `sys_mcp_tool_exclude` (
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_mcp_tool_exclude`;
+CREATE TABLE `xiaozhi_jpa`.`sys_mcp_tool_exclude` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `exclude_type` varchar(20) NOT NULL COMMENT '过滤类型：global-全局过滤，role-角色过滤',
-  `bind_type` varchar(20) NOT NULL COMMENT '绑定类型：mcp_server-MCP服务器，mcp_endpoint-MCP接入点',
-  `bind_code` varchar(100) NOT NULL COMMENT '绑定的MCP服务器代码或接入点标识',
-  `bind_key` varchar(50) DEFAULT NULL COMMENT '绑定键：role_id，全局过滤时为0',
-  `exclude_tools` text NOT NULL COMMENT '要排除的工具函数名称列表，JSON数组格式',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `excludeType` varchar(20) NOT NULL COMMENT '过滤类型：global-全局过滤，role-角色过滤',
+  `bindType` varchar(20) NOT NULL COMMENT '绑定类型：mcp_server-MCP服务器，mcp_endpoint-MCP接入点',
+  `bindCode` varchar(100) NOT NULL COMMENT '绑定的MCP服务器代码或接入点标识',
+  `bindKey` varchar(50) DEFAULT NULL COMMENT '绑定键：roleId，全局过滤时为0',
+  `excludeTools` text NOT NULL COMMENT '要排除的工具函数名称列表，JSON数组格式',
+  `createTime` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updateTime` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_bind` (`exclude_type`,`bind_type`,`bind_code`,`bind_key`),
-  KEY `idx_bind_key` (`bind_key`)
+  UNIQUE KEY `uk_bind` (`excludeType`,`bindType`,`bindCode`,`bindKey`),
+  KEY `idx_bind_key` (`bindKey`)
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='MCP工具过滤配置表';
 
 -- 创建聊天消息摘要记录表
-DROP TABLE IF EXISTS `sys_summary`;
-CREATE TABLE `sys_summary` (
-  `device_id` varchar(255) NOT NULL COMMENT '设备ID，联合索引第一个字段',
-  `role_id` int unsigned NOT NULL COMMENT '角色ID，联合索引第二个字段',
-  `last_message_timestamp` timestamp(3) NOT NULL COMMENT '最后一条消息的创建时间戳，精确到毫秒，联合索引第三个字段',
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_summary`;
+CREATE TABLE `xiaozhi_jpa`.`sys_summary` (
+  `deviceId` varchar(255) NOT NULL COMMENT '设备ID，联合索引第一个字段',
+  `roleId` int unsigned NOT NULL COMMENT '角色ID，联合索引第二个字段',
+  `lastMessageTimestamp` timestamp(3) NOT NULL COMMENT '最后一条消息的创建时间戳，精确到毫秒，联合索引第三个字段',
   `summary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '摘要内容。提炼出来的重要信息',
-  `prompt_tokens` int unsigned DEFAULT 0 COMMENT '摘要动作本身消耗的promptTokens',
-  `completion_tokens` int unsigned DEFAULT 0 COMMENT '摘要动作本身消耗的completionTokens',
-  `create_time` timestamp(3) NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建日期，进行摘要的实际时间戳，精确到毫秒',
-  PRIMARY KEY (`device_id`, `role_id`, `last_message_timestamp` DESC)
+  `promptTokens` int unsigned DEFAULT 0 COMMENT '摘要动作本身消耗的promptTokens',
+  `completionTokens` int unsigned DEFAULT 0 COMMENT '摘要动作本身消耗的completionTokens',
+  `createTime` timestamp(3) NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建日期，进行摘要的实际时间戳，精确到毫秒',
+  PRIMARY KEY (`deviceId`, `roleId`, `lastMessageTimestamp` DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='聊天消息摘要记录表';
 
 -- 创建权限表
-DROP TABLE IF EXISTS `sys_permission`;
-CREATE TABLE `sys_permission` (
-  `permission_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '权限ID',
-  `parent_id` int unsigned DEFAULT NULL COMMENT '父权限ID',
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_permission`;
+CREATE TABLE `xiaozhi_jpa`.`sys_permission` (
+  `permissionId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '权限ID',
+  `parentId` int unsigned DEFAULT NULL COMMENT '父权限ID',
   `name` varchar(100) NOT NULL COMMENT '权限名称',
-  `permission_key` varchar(100) NOT NULL COMMENT '权限标识',
-  `permission_type` enum('menu','button','api') NOT NULL COMMENT '权限类型：菜单、按钮、接口',
+  `permissionKey` varchar(100) NOT NULL COMMENT '权限标识',
+  `permissionType` enum('menu','button','api') NOT NULL COMMENT '权限类型：菜单、按钮、接口',
   `path` varchar(255) DEFAULT NULL COMMENT '前端路由路径',
   `component` varchar(255) DEFAULT NULL COMMENT '前端组件路径',
   `icon` varchar(100) DEFAULT NULL COMMENT '图标',
   `sort` int DEFAULT '0' COMMENT '排序',
   `visible` enum('1','0') DEFAULT '1' COMMENT '是否可见(1可见 0隐藏)',
   `status` enum('1','0') DEFAULT '1' COMMENT '状态(1正常 0禁用)',
-  `create_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`permission_id`),
-  UNIQUE KEY `uk_permission_key` (`permission_key`)
+  `createTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updateTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`permissionId`),
+  UNIQUE KEY `uk_permission_key` (`permissionKey`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='权限表';
 
 -- 创建角色表
-DROP TABLE IF EXISTS `sys_auth_role`;
-CREATE TABLE `sys_auth_role` (
-  `role_id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '角色ID',
-  `role_name` varchar(100) NOT NULL COMMENT '角色名称',
-  `role_key` varchar(100) NOT NULL COMMENT '角色标识',
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_auth_role`;
+CREATE TABLE `xiaozhi_jpa`.`sys_auth_role` (
+  `roleId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '角色ID',
+  `roleName` varchar(100) NOT NULL COMMENT '角色名称',
+  `roleKey` varchar(100) NOT NULL COMMENT '角色标识',
   `description` varchar(500) DEFAULT NULL COMMENT '角色描述',
   `status` enum('1','0') DEFAULT '1' COMMENT '状态(1正常 0禁用)',
-  `create_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`role_id`),
-  UNIQUE KEY `uk_role_key` (`role_key`)
+  `createTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updateTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`roleId`),
+  UNIQUE KEY `uk_role_key` (`roleKey`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='权限角色表';
 
 -- 创建角色-权限关联表
-DROP TABLE IF EXISTS `sys_role_permission`;
-CREATE TABLE `sys_role_permission` (
+DROP TABLE IF EXISTS `xiaozhi_jpa`.`sys_role_permission`;
+CREATE TABLE `xiaozhi_jpa`.`sys_role_permission` (
   `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT 'ID',
-  `role_id` int unsigned NOT NULL COMMENT '角色ID',
-  `permission_id` int unsigned NOT NULL COMMENT '权限ID',
-  `create_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `roleId` int unsigned NOT NULL COMMENT '角色ID',
+  `permissionId` int unsigned NOT NULL COMMENT '权限ID',
+  `createTime` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_role_permission` (`role_id`,`permission_id`)
+  UNIQUE KEY `uk_role_permission` (`roleId`,`permissionId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色-权限关联表';
 
 -- 插入菜单权限
-INSERT INTO `sys_permission` (`parent_id`, `name`, `permission_key`, `permission_type`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
+INSERT INTO `xiaozhi_jpa`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
 -- 主菜单
 (NULL, 'Dashboard', 'system:dashboard', 'menu', '/dashboard', 'page/Dashboard', 'dashboard', 1, '1', '1'),
 (NULL, '用户管理', 'system:user', 'menu', '/user', 'page/User', 'team', 2, '1', '1'),
@@ -331,30 +319,34 @@ INSERT INTO `sys_permission` (`parent_id`, `name`, `permission_key`, `permission
 (NULL, '设置', 'system:setting', 'menu', '/setting', 'common/PageView', 'setting', 8, '1', '1');
 
 -- 配置管理子菜单
-INSERT INTO `sys_permission` (`parent_id`, `name`, `permission_key`, `permission_type`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
+INSERT INTO `xiaozhi_jpa`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
 (7, '模型配置', 'system:config:model', 'menu', '/config/model', 'page/config/ModelConfig', NULL, 1, '1', '1'),
 (7, '智能体管理', 'system:config:agent', 'menu', '/config/agent', 'page/config/Agent', NULL, 2, '1', '1'),
 (7, '语音识别配置', 'system:config:stt', 'menu', '/config/stt', 'page/config/SttConfig', NULL, 3, '1', '1'),
 (7, '语音合成配置', 'system:config:tts', 'menu', '/config/tts', 'page/config/TtsConfig', NULL, 4, '1', '1');
 
 -- 设置子菜单
-INSERT INTO `sys_permission` (`parent_id`, `name`, `permission_key`, `permission_type`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
+INSERT INTO `xiaozhi_jpa`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
 (8, '个人中心', 'system:setting:account', 'menu', '/setting/account', 'page/setting/Account', NULL, 1, '1', '1'),
 (8, '个人设置', 'system:setting:config', 'menu', '/setting/config', 'page/setting/Config', NULL, 2, '1', '1');
 
 -- 插入角色
-INSERT INTO `sys_auth_role` (`role_name`, `role_key`, `description`, `status`) VALUES
+INSERT INTO `xiaozhi_jpa`.`sys_auth_role` (`roleName`, `roleKey`, `description`, `status`) VALUES
 ('管理员', 'admin', '系统管理员，拥有所有权限', '1'),
 ('普通用户', 'user', '普通用户，拥有基本操作权限', '1');
 
 -- 管理员角色权限（所有权限）
-INSERT INTO `sys_role_permission` (`role_id`, `permission_id`)
-SELECT 1, permission_id FROM `sys_permission`;
+INSERT INTO `xiaozhi_jpa`.`sys_role_permission` (`roleId`, `permissionId`)
+SELECT 1, permissionId FROM `xiaozhi_jpa`.`sys_permission`;
 
 -- 将admin用户设为管理员角色
-UPDATE `sys_user` SET `role_id` = 1 WHERE `username` = 'admin';
+UPDATE `xiaozhi_jpa`.`sys_user` SET `roleId` = 1 WHERE `username` = 'admin';
 
 -- 将其他用户设为普通用户角色
-UPDATE `sys_user` SET `role_id` = 2 WHERE `username` != 'admin';
+UPDATE `xiaozhi_jpa`.`sys_user` SET `roleId` = 2 WHERE `username` != 'admin';
 
 SET FOREIGN_KEY_CHECKS = 1;
+-- 删除 sys_device 表的 lastLogin 字段
+-- 该字段已废弃，设备最后活跃时间改用 updateTime 字段替代
+-- 执行时间：2026-02-25
+ALTER TABLE `xiaozhi_jpa`.`sys_device` DROP COLUMN `lastLogin`;

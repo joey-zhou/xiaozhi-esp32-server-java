@@ -21,37 +21,48 @@ public interface SysUserAuthRepository extends JpaRepository<SysUserAuth, Long>,
     /**
      * 根据 openId 和平台查询认证信息
      */
-    @Query(value = "SELECT * FROM sys_user_auth WHERE open_id = :openId AND platform = :platform", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_user_auth WHERE openId = :openId AND platform = :platform", nativeQuery = true)
     SysUserAuth selectByOpenIdAndPlatform(@Param("openId") String openId, @Param("platform") String platform);
 
     /**
      * 根据用户 ID 和平台查询认证信息
      */
-    @Query(value = "SELECT * FROM sys_user_auth WHERE user_id = :userId AND platform = :platform", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_user_auth WHERE userId = :userId AND platform = :platform", nativeQuery = true)
     SysUserAuth selectByUserIdAndPlatform(@Param("userId") Integer userId, @Param("platform") String platform);
 
     /**
      * 根据 openId 和平台查询认证信息
      */
-    @Query(value = "SELECT * FROM sys_user_auth WHERE open_id = :openId AND platform = :platform", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_user_auth WHERE openId = :openId AND platform = :platform", nativeQuery = true)
     SysUserAuth findByOpenIdAndPlatform(@Param("openId") String openId, @Param("platform") String platform);
 
     /**
      * 根据用户 ID 和平台查询认证信息
      */
-    @Query(value = "SELECT * FROM sys_user_auth WHERE user_id = :userId AND platform = :platform", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_user_auth WHERE userId = :userId AND platform = :platform", nativeQuery = true)
     SysUserAuth findByUserIdAndPlatform(@Param("userId") Integer userId, @Param("platform") String platform);
-
-    /**
-     * 删除认证信息
-     */
-    @Modifying
-    @Query(value = "DELETE FROM sys_user_auth WHERE id = :id", nativeQuery = true)
-    int deleteByAuthId(@Param("id") Long id);
 
     /**
      * 根据用户 ID 查询认证信息
      */
-    @Query(value = "SELECT * FROM sys_user_auth WHERE user_id = :userId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_user_auth WHERE userId = :userId", nativeQuery = true)
     List<SysUserAuth> findByUserId(@Param("userId") Integer userId);
+
+    default int insert(SysUserAuth userAuth) {
+        save(userAuth);
+        return 1;
+    }
+
+    default int update(SysUserAuth userAuth) {
+        save(userAuth);
+        return 1;
+    }
+
+    @Modifying
+    @Query(value = "DELETE FROM sys_user_auth WHERE id = :id", nativeQuery = true)
+    int deleteByAuthId(@Param("id") Long id);
+
+    default int deleteAuthById(@Param("id") Long id) {
+        return deleteByAuthId(id);
+    }
 }

@@ -22,19 +22,19 @@ public interface SysTemplateRepository extends JpaRepository<SysTemplate, Intege
     /**
      * 根据模板 ID 查询模板
      */
-    @Query(value = "SELECT * FROM sys_template WHERE template_id = :templateId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_template WHERE templateId = :templateId", nativeQuery = true)
     SysTemplate findByTemplateId(@Param("templateId") Integer templateId);
 
     /**
      * 根据用户 ID 查询模板列表
      */
-    @Query(value = "SELECT * FROM sys_template WHERE user_id = :userId ORDER BY create_time DESC", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_template WHERE userId = :userId ORDER BY createTime DESC", nativeQuery = true)
     List<SysTemplate> findByUserId(@Param("userId") Integer userId);
 
     /**
      * 根据模板名称查询模板
      */
-    @Query(value = "SELECT * FROM sys_template WHERE template_name = :templateName", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_template WHERE templateName = :templateName", nativeQuery = true)
     SysTemplate findByTemplateName(@Param("templateName") String templateName);
 
     /**
@@ -42,7 +42,7 @@ public interface SysTemplateRepository extends JpaRepository<SysTemplate, Intege
      */
     @Modifying
     @Transactional
-    @Query(value = "UPDATE sys_template SET is_default = '0' WHERE user_id = :userId", nativeQuery = true)
+    @Query(value = "UPDATE sys_template SET isDefault = '0' WHERE userId = :userId", nativeQuery = true)
     int resetDefault(@Param("userId") Integer userId);
 
     /**
@@ -50,33 +50,49 @@ public interface SysTemplateRepository extends JpaRepository<SysTemplate, Intege
      */
     @Modifying
     @Transactional
-    @Query(value = "DELETE FROM sys_template WHERE template_id = :templateId", nativeQuery = true)
+    @Query(value = "DELETE FROM sys_template WHERE templateId = :templateId", nativeQuery = true)
     int deleteTemplateById(@Param("templateId") Integer templateId);
 
     /**
      * 查询模板列表
      */
     @Query(value = "SELECT * FROM sys_template WHERE 1=1 " +
-            "AND (:userId IS NULL OR user_id = :userId) " +
-            "AND (:templateName IS NULL OR :templateName = '' OR template_name LIKE %:templateName%) " +
+            "AND (:userId IS NULL OR userId = :userId) " +
+            "AND (:templateName IS NULL OR :templateName = '' OR templateName LIKE %:templateName%) " +
             "AND (:category IS NULL OR :category = '' OR category = :category) " +
-            "ORDER BY create_time DESC", nativeQuery = true)
+            "ORDER BY createTime DESC", nativeQuery = true)
     List<SysTemplate> findTemplates(
             @Param("userId") Integer userId,
             @Param("templateName") String templateName,
             @Param("category") String category);
 
-    /**
-     * 根据模板 ID 查询模板
-     */
-    @Query(value = "SELECT * FROM sys_template WHERE template_id = :templateId", nativeQuery = true)
-    SysTemplate findTemplateById(@Param("templateId") Integer templateId);
+    default SysTemplate findTemplateById(Integer templateId) {
+        return findByTemplateId(templateId);
+    }
 
-    /**
-     * 删除模板
-     */
-    @Modifying
-    @Transactional
-    @Query(value = "DELETE FROM sys_template WHERE template_id = :templateId", nativeQuery = true)
-    int delete(@Param("templateId") Integer templateId);
+    default int add(SysTemplate template) {
+        save(template);
+        return 1;
+    }
+
+    default int update(SysTemplate template) {
+        save(template);
+        return 1;
+    }
+
+    default int delete(Integer templateId) {
+        return deleteTemplateById(templateId);
+    }
+
+    default List<SysTemplate> query(SysTemplate template) {
+        return findTemplates(template.getUserId(), template.getTemplateName(), template.getCategory());
+    }
+
+    default SysTemplate selectTemplateById(Integer templateId) {
+        return findTemplateById(templateId);
+    }
+
+    default int resetDefault(SysTemplate template) {
+        return resetDefault(template.getUserId());
+    }
 }

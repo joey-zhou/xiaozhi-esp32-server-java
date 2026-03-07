@@ -424,6 +424,17 @@ public class VadService {
         }
     }
 
+    public float getSpeechProbability(String sessionId) {
+        Object lock = getLock(sessionId);
+        synchronized (lock) {
+            VadState state = states.get(sessionId);
+            if (state != null && !state.originalProbs.isEmpty()) {
+                return state.originalProbs.get(state.originalProbs.size() - 1);
+            }
+            return 0.0f;
+        }
+    }
+
 
 
     public List<byte[]> getPcmData(String sessionId) {

@@ -2,8 +2,8 @@ package com.xiaozhi.entity;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.experimental.Accessors;
 
 /**
@@ -12,27 +12,21 @@ import lombok.experimental.Accessors;
  * @author Joey
  *
  */
-@Data
+@Getter
+@Setter
 @Accessors(chain = true)
-@EqualsAndHashCode(callSuper = true)
 @Schema(description = "提示词模板信息")
 @Entity
 @Table(name = "sys_template")
 public class SysTemplate extends Base<SysTemplate> {
 
     /**
-     * 模板ID
+     * 模板 ID
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Schema(description = "模板ID")
+    @Schema(description = "模板 ID")
     private Integer templateId;
-    /**
-     * 用户 ID
-     */
-    @Column(nullable = false)
-    @Schema(description = "用户 ID")
-    private Integer userId;
 
     /**
      * 模板名称
@@ -63,16 +57,16 @@ public class SysTemplate extends Base<SysTemplate> {
     private String category;
 
     /**
-     * 是否默认模板(1是 0否)
+     * 是否默认模板 (1 是 0 否)
      */
     @Column(length = 1)
-    @Schema(description = "是否默认模板(1是 0否)")
+    @Schema(description = "是否默认模板 (1 是 0 否)")
     private String isDefault;
 
     /**
-     * 状态(1启用 0禁用)
+     * 状态 (1 启用 0 禁用)
      */
     @Column(length = 1)
-    @Schema(description = "状态(1启用 0禁用)")
+    @Schema(description = "状态 (1 启用 0 禁用)")
     private String state;
 }

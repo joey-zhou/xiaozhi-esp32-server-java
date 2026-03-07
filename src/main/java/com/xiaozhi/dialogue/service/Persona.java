@@ -302,4 +302,20 @@ public class Persona {
                 .mapNotNull(AssistantMessage::getText);
 
     }
+
+    // Getters
+    public ChatSession getSession() { return session; }
+    public SttService getSttService() { return sttService; }
+    public ChatModel getChatModel() { return chatModel; }
+    public GoodbyeMessageSupplier getGoodbyeMessages() { return goodbyeMessages; }
+    public Synthesizer getSynthesizer() { return synthesizer; }
+    public Player getPlayer() { return player; }
+    public Conversation getConversation() { return conversation; }
+    public SysMessageService getMessageService() { return messageService; }
+
+    // Setters
+    public void setSession(ChatSession session) { this.session = session; }
+    public void setPlayer(Player player) { this.player = player; }
+    public void setSynthesizer(Synthesizer synthesizer) { this.synthesizer = synthesizer; }
+    public java.nio.file.Path getAudioFilePath() { return player != null ? player.getAudioFilePath() : null; }
 }
