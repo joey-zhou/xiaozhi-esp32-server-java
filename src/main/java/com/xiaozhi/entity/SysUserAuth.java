@@ -29,7 +29,7 @@ public class SysUserAuth extends Base<SysUserAuth> {
      * serialVersionUID
      */
     @Serial
-    private static final long serialVersionUID = -8923456789012345678L;
+    private static final long serialVersionUID = 1L;
 
     /**
      * 主键 ID

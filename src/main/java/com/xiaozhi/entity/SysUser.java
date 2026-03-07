@@ -28,7 +28,7 @@ import java.util.Date;
 public class SysUser extends Base<SysUser> {
 
     @Serial
-    private static final long serialVersionUID = -3406166342385856305L;
+    private static final long serialVersionUID = 1L;
 
     /**
      * 用户 ID，主键
