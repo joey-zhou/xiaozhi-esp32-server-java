@@ -52,4 +52,8 @@ public interface SysRolePermissionRepository extends JpaRepository<SysRolePermis
     @Transactional
     @Query(value = "DELETE FROM sys_role_permission WHERE permission_id = :permissionId", nativeQuery = true)
     int deleteByPermissionId(@Param("permissionId") Integer permissionId);
+
+    default int batchAdd(List<SysRolePermission> rolePermissions){
+        return saveAll(rolePermissions).size();
+    }
 }

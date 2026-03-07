@@ -46,4 +46,16 @@ public interface SysMcpToolExcludeRepository extends JpaRepository<SysMcpToolExc
             @Param("bindType") String bindType,
             @Param("bindCode") String bindCode,
             @Param("bindKey") String bindKey);
+
+    default void delete(Long id){
+        deleteById(id);
+    }
+
+    default void update(SysMcpToolExclude config){
+        save(config);
+    }
+
+    default void add(SysMcpToolExclude sysMcpToolExclude){
+        save(sysMcpToolExclude);
+    }
 }

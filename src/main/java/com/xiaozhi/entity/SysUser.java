@@ -1,11 +1,7 @@
 package com.xiaozhi.entity;
 
-import java.io.Serial;
-import java.util.Date;
-
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -13,11 +9,14 @@ import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 import org.springframework.format.annotation.DateTimeFormat;
 
+import java.io.Serial;
+import java.util.Date;
+
 /**
  * 用户表
- *
+ * 
  * @author Joey
- *
+ * 
  */
 @Data
 @Accessors(chain = true)
@@ -57,17 +56,17 @@ public class SysUser extends Base<SysUser> {
     private String password;
 
     /**
-     * 微信 openid
+     * 微信openid
      */
     @Column(length = 100)
-    @Schema(description = "微信 openid，用于微信登录", example = "oABC123...")
+    @Schema(description = "微信openid，用于微信登录", example = "oABC123...")
     private String wxOpenId;
 
     /**
-     * 微信 unionid
+     * 微信unionid
      */
     @Column(length = 100)
-    @Schema(description = "微信 unionid，用于微信开放平台统一账号", example = "uABC123...")
+    @Schema(description = "微信unionid，用于微信开放平台统一账号", example = "uABC123...")
     private String wxUnionId;
 
     /**
@@ -77,11 +76,41 @@ public class SysUser extends Base<SysUser> {
     @Schema(description = "用户姓名/昵称", example = "张三")
     private String name;
 
+    /*
+     * Token限制
+     */
+    @Schema(description = "Token使用限制数量", example = "10")
+    private Integer tokenLimit;
+
+    /*
+     * Token提醒开关
+     */
+    @Schema(description = "Token不足时是否提醒（1-开启，0-关闭）", example = "1", allowableValues = {"0", "1"})
+    private String tokenNotify;
+
+    /**
+     * 对话次数
+     */
+    @Schema(description = "用户累计对话次数", example = "100")
+    private Integer totalMessage;
+
+    /**
+     * 参加人数
+     */
+    @Schema(description = "参与的活动人数", example = "5")
+    private Integer aliveNumber;
+
+    /**
+     * 总设备数
+     */
+    @Schema(description = "用户拥有的设备总数", example = "3")
+    private Integer totalDevice;
+
     /**
      * 头像
      */
     @Column(length = 100)
-    @Schema(description = "用户头像 URL", example = "https://example.com/avatar.jpg")
+    @Schema(description = "用户头像URL", example = "https://example.com/avatar.jpg")
     private String avatar;
 
     /**
@@ -102,7 +131,7 @@ public class SysUser extends Base<SysUser> {
      * 角色权限
      */
     @Column(nullable = false)
-    @Schema(description = "用户角色 ID", example = "2")
+    @Schema(description = "用户角色ID", example = "2")
     private Integer roleId;
 
     /**
@@ -120,11 +149,13 @@ public class SysUser extends Base<SysUser> {
     private String email;
 
     /**
-     * 上次登录 IP
+     * 上次登录IP
      */
     @Column(length = 100)
-    @Schema(description = "用户上次登录的 IP 地址", example = "192.168.1.100")
+    @Schema(description = "用户上次登录的IP地址", example = "192.168.1.100")
     private String loginIp;
+
+
 
     /**
      * 上次登录时间

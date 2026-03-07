@@ -413,10 +413,9 @@ public class VadService {
             if (state != null) state.reset();
             states.remove(sessionId);
             locks.remove(sessionId);
-            logger.info("VAD 会话已重置：{}", sessionId);
+            logger.info("VAD会话已重置: {}", sessionId);
         }
     }
-
     public boolean isSpeaking(String sessionId) {
         Object lock = getLock(sessionId);
         synchronized (lock) {
@@ -425,16 +424,7 @@ public class VadService {
         }
     }
 
-    public float getSpeechProbability(String sessionId) {
-        Object lock = getLock(sessionId);
-        synchronized (lock) {
-            VadState state = states.get(sessionId);
-            if (state != null && !state.originalProbs.isEmpty()) {
-                return state.originalProbs.get(state.originalProbs.size() - 1);
-            }
-            return 0.0f;
-        }
-    }
+
 
     public List<byte[]> getPcmData(String sessionId) {
         Object lock = getLock(sessionId);

@@ -1,8 +1,5 @@
 package com.xiaozhi.utils;
 
-import net.coobird.thumbnailator.Thumbnails;
-
-import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
@@ -12,6 +9,10 @@ import java.util.Locale;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import net.coobird.thumbnailator.Thumbnails;
+
+import javax.imageio.ImageIO;
 
 public class ImageUtils {
 

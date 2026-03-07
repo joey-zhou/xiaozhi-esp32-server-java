@@ -28,12 +28,12 @@ public class SysAuthRoleServiceImpl implements SysAuthRoleService {
 
     @Override
     public List<SysAuthRole> selectAll() {
-        return sysAuthRoleRepository.findAll();
+        return sysAuthRoleRepository.selectAll();
     }
 
     @Override
     public SysAuthRole selectById(Integer roleId) {
-        return sysAuthRoleRepository.findRoleById(roleId);
+        return sysAuthRoleRepository.selectById(roleId);
     }
 
     @Override
@@ -43,14 +43,12 @@ public class SysAuthRoleServiceImpl implements SysAuthRoleService {
 
     @Override
     public int add(SysAuthRole role) {
-        sysAuthRoleRepository.save(role);
-        return 1;
+        return sysAuthRoleRepository.add(role);
     }
 
     @Override
     public int update(SysAuthRole role) {
-        sysAuthRoleRepository.save(role);
-        return 1;
+        return sysAuthRoleRepository.update(role);
     }
 
     @Override
@@ -58,8 +56,7 @@ public class SysAuthRoleServiceImpl implements SysAuthRoleService {
         // 先删除角色权限关联
         sysRolePermissionRepository.deleteByRoleId(roleId);
         // 再删除角色
-        sysAuthRoleRepository.deleteById(roleId);
-        return 1;
+        return sysAuthRoleRepository.delete(roleId);
     }
 
     @Override
@@ -67,12 +64,12 @@ public class SysAuthRoleServiceImpl implements SysAuthRoleService {
     public int assignPermissions(Integer roleId, List<Integer> permissionIds) {
         // 先删除原有的角色权限关联
         sysRolePermissionRepository.deleteByRoleId(roleId);
-
-        // 如果权限 ID 列表为空，则直接返回
+        
+        // 如果权限ID列表为空，则直接返回
         if (permissionIds == null || permissionIds.isEmpty()) {
             return 0;
         }
-
+        
         // 批量添加新的角色权限关联
         List<SysRolePermission> rolePermissions = new ArrayList<>();
         for (Integer permissionId : permissionIds) {
@@ -81,13 +78,12 @@ public class SysAuthRoleServiceImpl implements SysAuthRoleService {
             rolePermission.setPermissionId(permissionId);
             rolePermissions.add(rolePermission);
         }
-
-        sysRolePermissionRepository.saveAll(rolePermissions);
-        return rolePermissions.size();
+        
+        return sysRolePermissionRepository.batchAdd(rolePermissions);
     }
 
     @Override
     public List<SysPermission> getRolePermissions(Integer roleId) {
-        return sysPermissionRepository.findPermissionsByRoleId(roleId);
+        return sysPermissionRepository.selectByRoleId(roleId);
     }
 }

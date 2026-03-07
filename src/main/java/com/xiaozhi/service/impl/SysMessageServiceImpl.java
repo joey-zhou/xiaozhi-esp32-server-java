@@ -1,19 +1,20 @@
 package com.xiaozhi.service.impl;
 
+import com.github.pagehelper.PageHelper;
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.communication.common.SessionManager;
+import com.xiaozhi.dao.MessageMapper;
 import com.xiaozhi.entity.SysMessage;
-import com.xiaozhi.repository.SysMessageRepository;
 import com.xiaozhi.service.SysMessageService;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -30,7 +31,7 @@ import java.util.List;
 public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessageService {
 
     @Resource
-    private SysMessageRepository sysMessageRepository;
+    private MessageMapper messageMapper;
 
     @Resource
     private SessionManager sessionManager;
@@ -44,15 +45,13 @@ public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessage
     @Override
     @Transactional
     public int add(SysMessage message) {
-        sysMessageRepository.save(message);
-        return 1;
+        return messageMapper.add(message);
     }
 
     @Override
     @Transactional
     public int saveAll(List<SysMessage> messages) {
-        sysMessageRepository.saveAll(messages);
-        return messages.size();
+        return messageMapper.saveAll(messages);
     }
 
     /**
@@ -63,34 +62,21 @@ public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessage
      */
     @Override
     public List<SysMessage> query(SysMessage message, PageFilter pageFilter) {
-        if (pageFilter != null) {
-            Page<SysMessage> page = sysMessageRepository.findMessages(
-                    message.getDeviceId(),
-                    message.getSender(),
-                    message.getRoleId(),
-                    message.getMessageType(),
-                    PageRequest.of(pageFilter.getStart() - 1, pageFilter.getLimit(), Sort.by(Sort.Direction.DESC, "createTime"))
-            );
-            return page.getContent();
+        if(pageFilter != null){
+            PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
         }
-        return sysMessageRepository.findMessages(
-                message.getDeviceId(),
-                message.getSender(),
-                message.getRoleId(),
-                message.getMessageType(),
-                PageRequest.of(0, 10)
-        ).getContent();
+        return messageMapper.query(message);
     }
 
     @Override
     public SysMessage findById(Integer messageId) {
-        return sysMessageRepository.findByIdAndActive(messageId).orElse(null);
+        return messageMapper.findById(messageId);
     }
 
     /**
      * 删除记忆，同步删除关联的音频文件
-     * - 单条删除（messageId 不为空）：直接从记录中拿 audioPath 删文件
-     * - 批量删除（deviceId 不为空）：遍历最近 RETENTION_DAYS 天的日期目录，删除对应 device 子目录
+     * - 单条删除（messageId不为空）：直接从记录中拿 audioPath 删文件
+     * - 批量删除（deviceId不为空）：遍历最近 RETENTION_DAYS 天的日期目录，删除对应 device 子目录
      *
      * @param message
      * @return
@@ -100,7 +86,7 @@ public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessage
     public int delete(SysMessage message) {
         if (message.getMessageId() != null) {
             // 单条：直接拿 audioPath 删文件
-            SysMessage existing = sysMessageRepository.findByIdAndActive(message.getMessageId()).orElse(null);
+            SysMessage existing = messageMapper.findById(message.getMessageId());
             if (existing != null && StringUtils.hasText(existing.getAudioPath())) {
                 AudioUtils.deleteFile(existing.getAudioPath());
             }
@@ -113,18 +99,25 @@ public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessage
                 Path deviceDir = Path.of(AudioUtils.AUDIO_PATH, date, deviceId);
                 AudioUtils.deleteDirectory(deviceDir);
             }
-            // 清除内存中的对话历史，避免数据库已清空但 LLM 仍能看到旧上下文
+            // 清除内存中的对话历史，避免数据库已清空但LLM仍能看到旧上下文
             sessionManager.findConversation(message.getDeviceId()).ifPresent(conversation -> conversation.clear());
         }
 
-        return sysMessageRepository.deleteByDeviceAndUser(message.getDeviceId(), message.getUserId());
+        return messageMapper.delete(message);
     }
 
     @Override
-    @Transactional
     public void updateMessageByAudioFile(String deviceId, Integer roleId, String sender,
                                          String createTime, String audioPath) {
-        sysMessageRepository.updateAudioPath(deviceId, roleId, sender, createTime, audioPath);
+        SysMessage sysMessage = new SysMessage();
+        // 设置消息的where条件
+        sysMessage.setDeviceId(deviceId);
+        sysMessage.setRoleId(roleId);
+        sysMessage.setSender(sender);
+        sysMessage.setCreateTime(DateUtils.toDate(createTime.replace("T", " "), "yyyy-MM-dd HHmmss"));
+        // 设置音频路径和TTS时长
+        sysMessage.setAudioPath(audioPath);
+        messageMapper.updateMessageByAudioFile(sysMessage);
     }
 
 }

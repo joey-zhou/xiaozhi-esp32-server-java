@@ -1,12 +1,9 @@
 package com.xiaozhi.dialogue.llm.memory;
 
-// import com.xiaozhi.dao.MessageMapper;
-// import com.xiaozhi.dao.SummaryMapper;
-import com.xiaozhi.entity.SysSummary;
 import com.xiaozhi.entity.SysMessage;
+import com.xiaozhi.entity.SysSummary;
 import com.xiaozhi.repository.SysMessageRepository;
 import com.xiaozhi.repository.SysSummaryRepository;
-
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,20 +23,22 @@ import java.util.stream.Collectors;
 @Service
 public class DatabaseChatMemory  implements ChatMemory {
     private static final Logger logger = LoggerFactory.getLogger(DatabaseChatMemory.class);
-
-
-    private final SysSummaryRepository sysSummaryRepository;
-    private final SysMessageRepository sysMessageRepository;
-
+@Autowired
+    private   SysSummaryRepository sysSummaryRepository;
     @Autowired
-    public DatabaseChatMemory(SysMessageRepository sysMessageRepository, SysSummaryRepository sysSummaryRepository) {
-        this.sysMessageRepository = sysMessageRepository;
-        this.sysSummaryRepository = sysSummaryRepository;
-    }
+    private   SysMessageRepository sysMessageRepository;
+//    private final SummaryMapper summaryMapper;
+//    private final MessageMapper messageMapper;
+
+//    @Autowired
+//    public DatabaseChatMemory(MessageMapper messageMapper,SummaryMapper summaryMapper) {
+//        this.messageMapper = messageMapper;
+//        this.summaryMapper = summaryMapper;
+//    }
 
     @Override
     public void save(SysSummary summary) {
-        sysSummaryRepository.save(summary);
+        sysSummaryRepository.saveSummary(summary);
     }
 
     @Override

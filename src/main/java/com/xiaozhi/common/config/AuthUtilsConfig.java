@@ -1,8 +1,10 @@
 package com.xiaozhi.common.config;
 
 import com.xiaozhi.service.SysUserService;
+import com.xiaozhi.utils.AuthUtils;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 
 /**
@@ -14,11 +16,11 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AuthUtilsConfig {
 
-    @Autowired
+    @Resource
     private SysUserService userService;
 
-//    @PostConstruct
-//    public void init() {
-//        AuthUtils.setUserService(userService);
-//    }
+    @PostConstruct
+    public void init() {
+        AuthUtils.setUserService(userService);
+    }
 }

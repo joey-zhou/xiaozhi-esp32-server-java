@@ -137,7 +137,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
 
         ToolContext toolContext = buildToolContext(prompt, assistantMessage);
 
-        XiaoZhiToolCallingManager.InternalToolExecutionResult internalToolExecutionResult = executeToolCall(prompt, assistantMessage,
+        InternalToolExecutionResult internalToolExecutionResult = executeToolCall(prompt, assistantMessage,
                 toolContext);
 
         List<Message> conversationHistory = buildConversationHistoryAfterToolExecution(prompt.getInstructions(),
@@ -304,7 +304,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
     /**
      * Execute the tool call and return the response message.
      */
-    private XiaoZhiToolCallingManager.InternalToolExecutionResult executeToolCall(Prompt prompt, AssistantMessage assistantMessage,
+    private InternalToolExecutionResult executeToolCall(Prompt prompt, AssistantMessage assistantMessage,
                                                                                   ToolContext toolContext) {
         List<ToolCallback> toolCallbacks = List.of();
         if (prompt.getOptions() instanceof ToolCallingChatOptions toolCallingChatOptions) {
@@ -383,7 +383,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
                     toolCallResult != null ? toolCallResult : ""));
         }
 
-        return new XiaoZhiToolCallingManager.InternalToolExecutionResult(ToolResponseMessage.builder().responses(toolResponses).build(),
+        return new InternalToolExecutionResult(ToolResponseMessage.builder().responses(toolResponses).build(),
                 returnDirect != null && returnDirect);
     }
 
@@ -414,8 +414,8 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         this.observationConvention = observationConvention;
     }
 
-    public static XiaoZhiToolCallingManager.Builder builder() {
-        return new XiaoZhiToolCallingManager.Builder();
+    public static Builder builder() {
+        return new Builder();
     }
 
     private record InternalToolExecutionResult(ToolResponseMessage toolResponseMessage, boolean returnDirect) {
@@ -432,17 +432,17 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         private Builder() {
         }
 
-        public XiaoZhiToolCallingManager.Builder observationRegistry(ObservationRegistry observationRegistry) {
+        public Builder observationRegistry(ObservationRegistry observationRegistry) {
             this.observationRegistry = observationRegistry;
             return this;
         }
 
-        public XiaoZhiToolCallingManager.Builder toolCallbackResolver(ToolCallbackResolver toolCallbackResolver) {
+        public Builder toolCallbackResolver(ToolCallbackResolver toolCallbackResolver) {
             this.toolCallbackResolver = toolCallbackResolver;
             return this;
         }
 
-        public XiaoZhiToolCallingManager.Builder toolExecutionExceptionProcessor(
+        public Builder toolExecutionExceptionProcessor(
                 ToolExecutionExceptionProcessor toolExecutionExceptionProcessor) {
             this.toolExecutionExceptionProcessor = toolExecutionExceptionProcessor;
             return this;

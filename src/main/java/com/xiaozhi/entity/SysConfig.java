@@ -1,7 +1,7 @@
 package com.xiaozhi.entity;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import com.fasterxml.jackson.annotation.JsonValue;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -9,10 +9,10 @@ import lombok.Getter;
 import lombok.experimental.Accessors;
 
 /**
- * LLM\STT\TTS 配置
- *
+ * LLM\STT\TTS配置
+ * 
  * @author Joey
- *
+ * 
  */
 @Data
 @Accessors(chain = true)
@@ -43,15 +43,23 @@ public class SysConfig extends Base<SysConfig> {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Schema(description = "配置 ID")
+    @Schema(description = "配置ID")
     private Integer configId;
 
     /**
      * 用户 ID
      */
     @Column(nullable = false)
-    @Schema(description = "用户 ID")
+    @Schema(description = "用户ID")
     private Integer userId;
+
+    @Schema(description = "设备ID")
+    @Transient
+    private String deviceId;
+
+    @Schema(description = "角色ID")
+    @Transient
+    private Integer roleId;
 
     /**
      * 配置名称
@@ -82,52 +90,52 @@ public class SysConfig extends Base<SysConfig> {
     private String modelType;
 
     /**
-     * 服务提供商 (openai\quen\vosk\aliyun\tencent 等)
+     * 服务提供商 (openai\quen\vosk\aliyun\tencent等)
      */
     @Column(nullable = false, length = 30)
-    @Schema(description = "服务提供商 (openai\\quen\\vosk\\aliyun\\tencent 等)")
+    @Schema(description = "服务提供商 (openai\\quen\\vosk\\aliyun\\tencent等)")
     private String provider;
 
     /**
      * APP ID
      */
     @Column(length = 100)
-    @Schema(description = "服务提供商分配的 AppId")
+    @Schema(description = "服务提供商分配的AppId")
     private String appId;
 
     /**
      * API Key
      */
     @Column(columnDefinition = "text")
-    @Schema(description = "服务提供商分配的 ApiKey")
+    @Schema(description = "服务提供商分配的ApiKey")
     private String apiKey;
 
     /**
      * API Secret
      */
     @Column(length = 255)
-    @Schema(description = "服务提供商分配的 ApiSecret")
+    @Schema(description = "服务提供商分配的ApiSecret")
     private String apiSecret;
 
     /**
      * Access Key
      */
     @Column(length = 255)
-    @Schema(description = "服务提供商分配的 Access Key")
+    @Schema(description = "服务提供商分配的Access Key")
     private String ak;
 
     /**
      * Secret Key
      */
     @Column(columnDefinition = "text")
-    @Schema(description = "服务提供商分配的 Secret Key")
+    @Schema(description = "服务提供商分配的Secret Key")
     private String sk;
 
     /**
      * API 地址
      */
     @Column(length = 255)
-    @Schema(description = "服务提供商的 API 地址")
+    @Schema(description = "服务提供商的API地址")
     private String apiUrl;
 
     /**

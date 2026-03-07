@@ -67,12 +67,12 @@ spring:
         # 统计信息
         generate_statistics: false
         # 连接释放模式
-        connection:
-          release_mode: after_transaction
+#        connection:
+#          release_mode: after_transaction
         # 验证查询
-        query:
-          plan_cache_max_size: 2048
-          default_null_ordering: none
+#        query:
+#          plan_cache_max_size: 2048
+#          default_null_ordering: none
   # Redis 缓存配置
   cache:
     type: redis

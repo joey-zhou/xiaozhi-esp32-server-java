@@ -77,4 +77,23 @@ public interface SysPermissionRepository extends JpaRepository<SysPermission, In
     @Transactional
     @Query(value = "DELETE FROM sys_permission WHERE permission_id = :permissionId", nativeQuery = true)
     int delete(@Param("permissionId") Integer permissionId);
+
+    /**
+     * 根据角色 ID 查询权限列表
+     *
+     * @param roleId 角色 ID
+     * @return 权限列表
+     */
+    default List<SysPermission> selectByRoleId(Integer roleId) {
+        return findPermissionsByRoleIdAndStatus(roleId, "1");
+    }
+
+    /**
+     * 根据角色 ID 和状态查询权限
+     */
+    @Query(value = "SELECT p.* FROM sys_permission p " +
+            "INNER JOIN sys_role_permission rp ON p.permission_id = rp.permission_id " +
+            "WHERE rp.role_id = :roleId AND p.status = :status " +
+            "ORDER BY p.sort ASC", nativeQuery = true)
+    List<SysPermission> findPermissionsByRoleIdAndStatus(@Param("roleId") Integer roleId, @Param("status") String status);
 }

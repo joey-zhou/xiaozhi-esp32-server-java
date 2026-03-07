@@ -265,7 +265,7 @@ public class DialogueService{
      * @param intent 检测到的意图
      * @param userInput 用户输入文本
      */
-    private void handleIntent(ChatSession session, IntentDetector.UserIntent intent, String userInput) {
+    private void handleIntent(ChatSession session, UserIntent intent, String userInput) {
 
         logger.info("处理用户意图: type={}, input=\"{}\"", intent.getType(), userInput);
 

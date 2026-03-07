@@ -1,5 +1,6 @@
 package com.xiaozhi.controller;
 
+import cn.dev33.satoken.annotation.SaIgnore;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.common.web.ResultMessage;
@@ -249,8 +250,8 @@ public class DeviceController extends BaseController {
             return ResultMessage.error("删除设备时发生错误");
         }
     }
-
     @AnonymousAccess
+    @SaIgnore
     @RequestMapping(value = "/ota", method = {RequestMethod.GET, RequestMethod.POST})
     @ResponseBody
     @Operation(summary = "处理OTA请求", description = "返回OTA结果")
@@ -408,8 +409,8 @@ public class DeviceController extends BaseController {
             }
         }
     }
-
     @AnonymousAccess
+    @SaIgnore
     @PostMapping("/ota/activate")
     @ResponseBody
     @Operation(summary = "查询OTA激活状态", description = "返回OTA激活状态")

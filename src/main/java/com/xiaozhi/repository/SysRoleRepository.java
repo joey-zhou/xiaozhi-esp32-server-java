@@ -77,4 +77,43 @@ public interface SysRoleRepository extends JpaRepository<SysRole, Integer>, JpaS
     @Transactional
     @Query(value = "DELETE FROM sys_role WHERE role_id = :roleId", nativeQuery = true)
     int deleteRoleById(@Param("roleId") Integer roleId);
+
+    /**
+     * 查询角色列表（带关联配置和设备统计）
+     *
+     * @param userId    用户 ID（可选）
+     * @param roleId    角色 ID（可选）
+     * @param roleName  角色名称（可选，模糊匹配）
+     * @param isDefault 是否默认（可选）
+     * @return 角色列表（包含关联的配置信息和设备总数）
+     */
+    @Query(value = "SELECT r.*, " +
+            "tts_config.config_name AS ttsConfigName, tts_config.provider AS ttsProvider, " +
+            "model_config.config_name AS modelConfigName, model_config.provider AS modelProvider, " +
+            "stt_config.config_name AS sttConfigName, stt_config.provider AS sttProvider, " +
+            "(SELECT COUNT(*) FROM sys_device WHERE sys_device.role_Id = r.role_Id) AS totalDevice " +
+            "FROM sys_role r " +
+            "LEFT JOIN sys_config tts_config ON r.tts_id = tts_config.config_Id AND tts_config.config_type = 'tts' " +
+            "LEFT JOIN sys_config model_config ON r.model_id = model_config.config_id AND model_config.config_type = 'llm' " +
+            "LEFT JOIN sys_config stt_config ON r.tts_id = stt_config.config_id AND stt_config.config_type = 'stt' " +
+            "WHERE r.state = '1' " +
+            "AND (:userId IS NULL OR :userId = '' OR r.user_id = :userId) " +
+            "AND (:roleId IS NULL OR :roleId = '' OR r.user_id = :roleId) " +
+            "AND (:roleName IS NULL OR :roleName = '' OR r.role_name LIKE CONCAT('%', :roleName, '%')) " +
+            "AND (:isDefault IS NULL OR :isDefault = '' OR r.is_default = :isDefault)",
+            nativeQuery = true)
+    List<SysRole> queryRoles(
+            @Param("userId") Integer userId,
+            @Param("roleId") Integer roleId,
+            @Param("roleName") String roleName,
+            @Param("isDefault") String isDefault);
+
+    default List<SysRole> query(SysRole queryRole){
+        return queryRoles(
+                queryRole.getUserId(),
+                queryRole.getRoleId(),
+                queryRole.getRoleName(),
+                queryRole.getIsDefault()
+        );
+    }
 }

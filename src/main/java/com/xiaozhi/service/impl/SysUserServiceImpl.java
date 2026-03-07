@@ -1,28 +1,29 @@
 package com.xiaozhi.service.impl;
 
+import com.github.pagehelper.PageHelper;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
 import com.xiaozhi.common.exception.UsernameNotFoundException;
 import com.xiaozhi.common.web.PageFilter;
+import com.xiaozhi.dao.ConfigMapper;
+import com.xiaozhi.dao.DeviceMapper;
+import com.xiaozhi.dao.MessageMapper;
+import com.xiaozhi.dao.RoleMapper;
+import com.xiaozhi.dao.TemplateMapper;
+import com.xiaozhi.dao.UserMapper;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysRole;
 import com.xiaozhi.entity.SysTemplate;
 import com.xiaozhi.entity.SysUser;
-import com.xiaozhi.repository.SysDeviceRepository;
-import com.xiaozhi.repository.SysRoleRepository;
-import com.xiaozhi.repository.SysTemplateRepository;
-import com.xiaozhi.repository.SysUserRepository;
 import com.xiaozhi.security.AuthenticationService;
 import com.xiaozhi.service.SysUserService;
 import com.xiaozhi.utils.DateUtils;
+import com.xiaozhi.utils.EmailUtils;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
@@ -33,9 +34,9 @@ import java.util.List;
 
 /**
  * 用户操作
- *
+ * 
  * @author Joey
- *
+ * 
  */
 
 @Service
@@ -47,22 +48,28 @@ public class SysUserServiceImpl extends BaseServiceImpl implements SysUserServic
     private static final String dayOfMonthEnd = DateUtils.dayOfMonthEnd();
 
     @Resource
-    private SysUserRepository sysUserRepository;
+    private UserMapper userMapper;
 
     @Resource
-    private SysDeviceRepository sysDeviceRepository;
-
-
+    private MessageMapper messageMapper;
 
     @Resource
-    private SysRoleRepository sysRoleRepository;
+    private ConfigMapper configMapper;
 
     @Resource
-    private SysTemplateRepository sysTemplateRepository;
+    private RoleMapper roleMapper;
+
+    @Resource
+    private TemplateMapper templateMapper;
+
+    @Resource
+    private DeviceMapper deviceMapper;
 
     @Resource
     private AuthenticationService authenticationService;
 
+    @Resource
+    private EmailUtils emailUtils;
 
     /**
      * 用户登录（支持用户名、邮箱、手机号登录）
@@ -76,14 +83,14 @@ public class SysUserServiceImpl extends BaseServiceImpl implements SysUserServic
     @Override
     public SysUser login(String username, String password)
             throws UsernameNotFoundException, UserPasswordNotMatchException {
-        SysUser user = sysUserRepository.findByUsername(username).orElse(null);
+        SysUser user = userMapper.selectUserByUsername(username);
         // 如果用户名查不到，尝试用邮箱查询
         if (ObjectUtils.isEmpty(user)) {
-            user = sysUserRepository.findByEmail(username).orElse(null);
+            user = userMapper.selectUserByEmail(username);
         }
         // 如果邮箱也查不到，尝试用手机号查询
         if (ObjectUtils.isEmpty(user)) {
-            user = sysUserRepository.findByTel(username).orElse(null);
+            user = userMapper.selectUserByTel(username);
         }
         if (ObjectUtils.isEmpty(user)) {
             throw new UsernameNotFoundException();
@@ -95,77 +102,62 @@ public class SysUserServiceImpl extends BaseServiceImpl implements SysUserServic
 
     /**
      * 用户信息查询
-     *
+     * 
      * @param username
      * @return 用户信息
      */
     @Override
     public SysUser query(String username) {
-        return sysUserRepository.findByUsername(username).orElse(null);
+        return userMapper.query(username, dayOfMonthStart, dayOfMonthEnd);
     }
 
     /**
      * 用户列表查询
-     *
+     * 
      * @param user
      * @return 用户列表
      */
     @Override
     public List<SysUser> queryUsers(SysUser user, PageFilter pageFilter) {
-        if (pageFilter != null) {
-            Page<SysUser> page = sysUserRepository.findUsersWithStats(
-                    user.getUsername(),
-                    user.getEmail(),
-                    user.getTel(),
-                    user.getName(),
-                    user.getIsAdmin(),
-                    PageRequest.of(pageFilter.getStart() - 1, pageFilter.getLimit(), Sort.by(Sort.Direction.DESC, "createTime"))
-            );
-            return page.getContent();
+        if(pageFilter != null){
+            PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
         }
-        return sysUserRepository.findUsersWithStats(
-                user.getUsername(),
-                user.getEmail(),
-                user.getTel(),
-                user.getName(),
-                user.getIsAdmin(),
-                PageRequest.of(0, 10)
-        ).getContent();
+        return userMapper.queryUsers(user);
     }
 
     @Override
     @Cacheable(value = CACHE_NAME, key = "#userId", unless = "#result == null")
     public SysUser selectUserByUserId(Integer userId) {
-        return sysUserRepository.findById(userId).orElse(null);
+        return userMapper.selectUserByUserId(userId);
     }
 
     @Override
     @Cacheable(value = CACHE_NAME, key = "'username:' + #username", unless = "#result == null")
     public SysUser selectUserByUsername(String username) {
-        return sysUserRepository.findByUsername(username).orElse(null);
+        return userMapper.selectUserByUsername(username);
     }
 
     @Override
     @Cacheable(value = CACHE_NAME, key = "'wxOpenId:' + #wxOpenId", unless = "#result == null")
     public SysUser selectUserByWxOpenId(String wxOpenId) {
-        return sysUserRepository.findByWxOpenId(wxOpenId).orElse(null);
+        return userMapper.selectUserByWxOpenId(wxOpenId);
     }
 
     @Override
     @Cacheable(value = CACHE_NAME, key = "'email:' + #email", unless = "#result == null")
     public SysUser selectUserByEmail(String email) {
-        return sysUserRepository.findByEmail(email).orElse(null);
+        return userMapper.selectUserByEmail(email);
     }
 
     @Override
     @Cacheable(value = CACHE_NAME, key = "'tel:' + #tel", unless = "#result == null")
     public SysUser selectUserByTel(String tel) {
-        return sysUserRepository.findByTel(tel).orElse(null);
+        return userMapper.selectUserByTel(tel);
     }
 
     /**
      * 新增用户
-     *
+     * 
      * @param user
      * @return
      */
@@ -173,27 +165,24 @@ public class SysUserServiceImpl extends BaseServiceImpl implements SysUserServic
     @Transactional
     public int add(SysUser user) {
         // 用户注册默认应该是普通用户，roleId 目前写死为 2
-        SysUser savedUser = sysUserRepository.save(user.setRoleId(2));
-        if (savedUser != null && savedUser.getUserId() != null) {
+        int rows = userMapper.add(user.setRoleId(2));
+        if (rows > 0) {
+            SysUser queryUser = userMapper.selectUserByUsername(user.getUsername());
             int adminUserId = 1;
 
             // 查询是否有默认角色
             SysRole queryRole = new SysRole();
+
             queryRole.setIsDefault("1");
             queryRole.setUserId(1);
-            List<SysRole> adminRoles = sysRoleRepository.findAll();
-            // 过滤出默认角色
-            adminRoles = adminRoles.stream()
-                    .filter(r -> "1".equals(r.getIsDefault()) && adminUserId == r.getUserId())
-                    .toList();
-
-            // 遍历获取默认 roleId，用于创建虚拟设备
+            List<SysRole> adminRoles = roleMapper.query(queryRole);
+            // 遍历获取默认roleId
             Integer defaultRoleId = null;
-            Integer userId = savedUser.getUserId();
+            Integer userId = queryUser.getUserId();
             for (SysRole role : adminRoles) {
                 role.setUserId(userId);
-                sysRoleRepository.save(role);
-                // 记录默认角色 ID
+                roleMapper.add(role);
+                // 记录默认角色ID，用于创建虚拟设备
                 if (defaultRoleId == null && "1".equals(role.getIsDefault())) {
                     defaultRoleId = role.getRoleId();
                 }
@@ -201,18 +190,14 @@ public class SysUserServiceImpl extends BaseServiceImpl implements SysUserServic
             // 把管理员所有模板复制给用户一份
             SysTemplate template = new SysTemplate();
             template.setUserId(adminUserId);
-            List<SysTemplate> queryTemplate = sysTemplateRepository.findAll();
-            queryTemplate = queryTemplate.stream()
-                    .filter(t -> adminUserId == t.getUserId())
-                    .toList();
+            List<SysTemplate> queryTemplate = templateMapper.query(template);
             for (SysTemplate temp : queryTemplate) {
-                temp.setUserId(userId);
-                temp.setTemplateId(null); // 清空 ID 以便保存为新记录
-                sysTemplateRepository.save(temp);
+                temp.setUserId(queryUser.getUserId());
+                templateMapper.add(temp);
             }
 
             // 自动创建一个默认虚拟设备，用于网页端对话
-            // 生成设备 ID：user_ + 用户 ID
+            // 生成设备ID：user_ + 用户ID
             String virtualDeviceId = "user_chat_" + userId;
             // 创建虚拟设备
             SysDevice virtualDevice = new SysDevice();
@@ -222,9 +207,9 @@ public class SysUserServiceImpl extends BaseServiceImpl implements SysUserServic
             virtualDevice.setType("web");
             virtualDevice.setState(SysDevice.DEVICE_STATE_OFFLINE);
             virtualDevice.setRoleId(defaultRoleId);
-            sysDeviceRepository.save(virtualDevice);
+            deviceMapper.add(virtualDevice);
         }
-        return 1;
+        return rows;
     }
 
     /**
@@ -244,24 +229,24 @@ public class SysUserServiceImpl extends BaseServiceImpl implements SysUserServic
         @CacheEvict(value = CACHE_NAME, key = "'wxOpenId:' + #user.wxOpenId", condition = "#user.wxOpenId != null")
     })
     public int update(SysUser user) {
-        sysUserRepository.save(user);
-        return 1;
+        return userMapper.update(user);
     }
 
     /**
      * 生成验证码
-     *
+     * 
      */
     @Override
     public SysUser generateCode(SysUser user) {
-        // TODO: 验证码逻辑需要单独处理，这里暂时返回空
         SysUser result = new SysUser();
+        userMapper.generateCode(user);
+        result.setCode(user.getCode());
         return result;
     }
 
     /**
      * 查询验证码是否有效
-     *
+     * 
      * @param code
      * @param email
      * @return
@@ -269,7 +254,7 @@ public class SysUserServiceImpl extends BaseServiceImpl implements SysUserServic
     @Override
     public int queryCaptcha(SysUser user) {
         String email = StringUtils.hasText(user.getEmail()) ? user.getEmail() : user.getTel();
-        return sysUserRepository.countValidCaptcha(user.getCode(), email);
+        return userMapper.queryCaptcha(user.getCode(), email);
     }
 
 }

@@ -1,15 +1,20 @@
 package com.xiaozhi.entity;
 
-import java.time.Instant;
-
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
+import java.time.Instant;
+
 /**
- * Summary 表达一组聊天消息的总结摘要与重要信息提炼。
+ * Summary表达一组聊天消息的总结摘要与重要信息提炼。
+ * 可以理解为中期记忆而非长期记忆，当时间拉长，device-role自诞生以来的所有对话消息的内容太多，难以进行良好的摘要。
+ * 所以只能对一段时期的一定规模的消息列表进行摘要。
+ * 在sys_summary表增加最后一条消息的 timestamp，表达已sumary的消息。
+ * 目前只是记录一组消息的最后一条的时间戳，用来表达summary的消息范围。
+ * 后续如果有找到需要这组消息起点的场景。也可修改代码记录起始的那一条，可能更好更完整。
  *
  * @author Able
  */
@@ -23,7 +28,7 @@ public class SysSummary implements java.io.Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 设备 ID，必填，不为空字符串。联合主键第一个字段。
+     * 设备ID,必填，不为空字符串。联合索引第一个字段。
      */
     @Id
     @Column(nullable = false, length = 255)
@@ -31,7 +36,7 @@ public class SysSummary implements java.io.Serializable {
     private String deviceId = "";
 
     /**
-     * 角色 ID，必填，大于零的整数。联合主键第二个字段。
+     * 角色ID,必填，大于零的整数。联合索引第二个字段。
      */
     @Id
     @Column(nullable = false)
@@ -39,12 +44,15 @@ public class SysSummary implements java.io.Serializable {
     private Integer roleId;
 
     /**
-     * 最后一条消息的创建时间戳。联合主键第三个字段。
+     * 最后一条消息的创建时间戳。联合索引第三个字段。
+     * 用于关联messages表中的消息。
+     * 只有当lastMessage.promptTokens + lastMessage.completionTokens > completionTokens 时，
+     * 摘要动作才有较多的节省tokens成本意义。
      */
     @Id
     @Column(nullable = false)
     @Schema(description = "最后一条消息时间戳")
-    private Instant lastMessageTimestamp;
+    private Instant lastMessageTimestamp ;
 
     /**
      * 摘要内容。提炼出来的重要信息。
@@ -52,24 +60,22 @@ public class SysSummary implements java.io.Serializable {
     @Column(columnDefinition = "text")
     @Schema(description = "摘要内容")
     private String summary;
-
     /**
-     * 摘要动作本身消耗的 promptTokens。
+     * 摘要动作本身消耗的promptTokens。
      */
     @Schema(description = "消耗的 prompt tokens 数量")
     private Integer promptTokens = 0;
 
     /**
-     * 摘要动作本身消耗的 completionTokens。
+     * 摘要动作本身消耗的completionTokens。
      */
     @Schema(description = "消耗的 completion tokens 数量")
     private Integer completionTokens = 0;
-
     /**
      * 创建日期
      */
     @JsonFormat(timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
     @Column
     @Schema(description = "创建时间")
-    private Instant createTime;
-}
+    private Instant  createTime;
+    }

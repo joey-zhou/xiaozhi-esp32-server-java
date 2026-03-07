@@ -1,14 +1,14 @@
 package com.xiaozhi.entity;
 
-import java.util.Date;
-import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.experimental.Accessors;
 import org.springframework.format.annotation.DateTimeFormat;
+
+import java.util.Date;
+import java.util.List;
 
 /**
  * 权限类
@@ -97,7 +97,7 @@ public class SysPermission {
     @Column(length = 1)
     @Schema(description = "状态 (1 正常 0 禁用)")
     private String status;
-
+    
     /**
      * 创建时间
      */
@@ -121,4 +121,5 @@ public class SysPermission {
     @Transient
     @Schema(description = "子权限列表")
     private List<SysPermission> children;
+
 }

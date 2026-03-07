@@ -13,7 +13,6 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.List;
 
 /**
  * 聊天消息摘要数据访问层 - Spring Data JPA Repository
@@ -69,4 +68,8 @@ public interface SysSummaryRepository extends JpaRepository<SysSummary, SysSumma
             "WHERE role_id = :roleId AND device_id = :deviceId AND create_time = :createTime",
             nativeQuery = true)
     int deleteSummary(@Param("roleId") int roleId, @Param("deviceId") String deviceId, @Param("createTime") Instant createTime);
+
+    default void saveSummary(SysSummary summary){
+        save(summary);
+    }
 }

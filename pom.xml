@@ -129,11 +129,11 @@
 <!--            <version>3.0.3</version>-->
 <!--        </dependency>-->
         <!-- 分页 -->
-        <dependency>
-            <groupId>com.github.pagehelper</groupId>
-            <artifactId>pagehelper-spring-boot-starter</artifactId>
-            <version>2.1.0</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>com.github.pagehelper</groupId>-->
+<!--            <artifactId>pagehelper-spring-boot-starter</artifactId>-->
+<!--            <version>2.1.0</version>-->
+<!--        </dependency>-->
         <!-- 缓存 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

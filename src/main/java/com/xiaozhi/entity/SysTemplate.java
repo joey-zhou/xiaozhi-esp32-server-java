@@ -21,13 +21,12 @@ import lombok.experimental.Accessors;
 public class SysTemplate extends Base<SysTemplate> {
 
     /**
-     * 模板 ID
+     * 模板ID
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Schema(description = "模板 ID")
+    @Schema(description = "模板ID")
     private Integer templateId;
-
     /**
      * 用户 ID
      */
@@ -64,16 +63,16 @@ public class SysTemplate extends Base<SysTemplate> {
     private String category;
 
     /**
-     * 是否默认模板 (1 是 0 否)
+     * 是否默认模板(1是 0否)
      */
     @Column(length = 1)
-    @Schema(description = "是否默认模板 (1 是 0 否)")
+    @Schema(description = "是否默认模板(1是 0否)")
     private String isDefault;
 
     /**
-     * 状态 (1 启用 0 禁用)
+     * 状态(1启用 0禁用)
      */
     @Column(length = 1)
-    @Schema(description = "状态 (1 启用 0 禁用)")
+    @Schema(description = "状态(1启用 0禁用)")
     private String state;
 }

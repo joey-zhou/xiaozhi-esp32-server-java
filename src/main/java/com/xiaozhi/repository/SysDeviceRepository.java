@@ -1,6 +1,8 @@
 package com.xiaozhi.repository;
 
 import com.xiaozhi.entity.SysDevice;
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.ExampleMatcher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,7 +14,6 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * 设备数据访问层 - Spring Data JPA Repository
@@ -29,8 +30,8 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
      * @return 设备信息
      */
     @Query(value = "SELECT * FROM sys_device WHERE device_id = :deviceId", nativeQuery = true)
-    Optional<SysDevice> findDeviceById(@Param("deviceId") String deviceId);
-
+    SysDevice findDeviceById(@Param("deviceId") String deviceId);
+      
     /**
      * 查询设备列表 - 分页
      *
@@ -46,9 +47,9 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
             "AND (:state IS NULL OR :state = '' OR state = :state) " +
             "ORDER BY create_time DESC",
             countQuery = "SELECT COUNT(*) FROM sys_device WHERE 1=1 " +
-            "AND (:userId IS NULL OR user_id = :userId) " +
-            "AND (:deviceName IS NULL OR :deviceName = '' OR device_name LIKE %:deviceName%) " +
-            "AND (:state IS NULL OR :state = '' OR state = :state)",
+                    "AND (:userId IS NULL OR user_id = :userId) " +
+                    "AND (:deviceName IS NULL OR :deviceName = '' OR device_name LIKE %:deviceName%) " +
+                    "AND (:state IS NULL OR :state = '' OR state = :state)",
             nativeQuery = true)
     Page<SysDevice> findDevices(
             @Param("userId") Integer userId,
@@ -110,7 +111,6 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
      * @return 影响行数
      */
     @Modifying
-    @Transactional
     @Query(value = "UPDATE sys_device SET user_id = :userId, role_id = :roleId " +
             "WHERE device_id IN :deviceIds",
             nativeQuery = true)
@@ -129,7 +129,21 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
     @Query(value = "DELETE FROM sys_device WHERE device_id = :deviceId", nativeQuery = true)
     int deleteDevice(@Param("deviceId") String deviceId);
 
-    default List<SysDevice> query(){
-        return findAll( );
+    default List<SysDevice> query(SysDevice query) {
+      return this.findAll(Example.of(query));
+    }
+
+    default int update(SysDevice device) {
+        save(device);
+        return 1;
+    }
+
+   default SysDevice selectDeviceById(String deviceId){
+        return findDeviceById(deviceId);
+    }
+
+    default int add(SysDevice sysDevice){
+        save(sysDevice);
+        return 1;
     }
 }

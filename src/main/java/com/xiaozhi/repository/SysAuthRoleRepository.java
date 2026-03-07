@@ -58,4 +58,18 @@ public interface SysAuthRoleRepository extends JpaRepository<SysAuthRole, Intege
      */
     @Query(value = "SELECT * FROM sys_auth_role WHERE role_key = :roleKey", nativeQuery = true)
     SysAuthRole findByRoleKey(@Param("roleKey") String roleKey);
+
+    default List<SysAuthRole> selectAll(){
+        return findAll();
+    }
+
+    default int add(SysAuthRole role){
+         save(role);
+         return 1;
+    }
+
+    default int update(SysAuthRole role){
+        save(role);
+        return 1;
+    }
 }

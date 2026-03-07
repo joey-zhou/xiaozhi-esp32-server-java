@@ -1,6 +1,5 @@
 package com.xiaozhi.common.cache;
 
-// import com.xiaozhi.dao.DeviceMapper;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.repository.SysDeviceRepository;
 import jakarta.annotation.PostConstruct;
@@ -28,7 +27,7 @@ public class BloomFilterManager {
     private RedissonClient redissonClient;
 
     @Resource
-    private SysDeviceRepository sysDeviceRepository;
+    private SysDeviceRepository sysDeviceRepository;;
 
     private RBloomFilter<String> deviceIdBloomFilter;
 
@@ -72,7 +71,8 @@ public class BloomFilterManager {
      */
     private void loadAllDeviceIds() {
         try {
-             List<SysDevice> devices = sysDeviceRepository.query( );
+            SysDevice query = new SysDevice();
+            List<SysDevice> devices = sysDeviceRepository.query(query);
 
             int count = 0;
             for (SysDevice device : devices) {

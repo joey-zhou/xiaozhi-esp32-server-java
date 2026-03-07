@@ -1,11 +1,11 @@
 package com.xiaozhi.controller;
 
+import cn.dev33.satoken.annotation.SaIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xiaozhi.security.annotation.AnonymousAccess;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.dialogue.llm.factory.ChatModelFactory;
-
+import com.xiaozhi.security.annotation.AnonymousAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,10 +15,14 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.content.Media;
 import org.springframework.util.MimeType;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 视觉对话
@@ -38,6 +42,7 @@ public class VLChatController extends BaseController {
      * 视觉对话
      */
     @AnonymousAccess
+    @SaIgnore
     @PostMapping(value = "/chat", produces = "application/json;charset=UTF-8")
     @Operation(summary = "图片识别", description = "根据问题返回识别结果")
     public String vlChat(
