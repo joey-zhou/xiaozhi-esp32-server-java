@@ -94,8 +94,8 @@ public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceSe
     }
 
     @Override
+    @CacheEvict(value = CACHE_NAME)
     @Transactional
-    @CacheEvict(value = CACHE_NAME, key = "#device.deviceId?.replace(\":\", \"-\")", condition = "#device.deviceId != null")
     public int delete(SysDevice device) {
         int row = sysDeviceRepository.deleteDevice(device);
         if (row > 0) {
@@ -118,7 +118,7 @@ public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceSe
     }
 
     @Override
-    @Cacheable(value = CACHE_NAME, key = "#deviceId.replace(\":\", \"-\")", unless = "#result == null")
+    @Cacheable(value = CACHE_NAME, unless = "#result == null")
     public SysDevice selectDeviceById(String deviceId) {
         if (!bloomFilterManager.mightContain(deviceId)) {
             logger.debug("布隆过滤器拦截：设备 ID 不存在 - {}", deviceId);
@@ -157,43 +157,46 @@ public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceSe
     }
 
     @Override
-    @CacheEvict(value = CACHE_NAME, key = "#device.deviceId?.replace(\":\", \"-\")")
-    public int update(SysDevice device) {
-        if (device.getDeviceId() == null || device.getDeviceId().isEmpty()) {
-            return updateAllDevices(device);
+    @CacheEvict(value = CACHE_NAME, key = "#sysDevice.deviceId?.replace(':', '-')")
+    @Transactional
+    public int update(SysDevice sysDevice) {
+        if (sysDevice.getDeviceId() == null || sysDevice.getDeviceId().isEmpty()) {
+            return updateAllDevices(sysDevice);
         }
 
-        String deviceId = device.getDeviceId();
+        String deviceId = sysDevice.getDeviceId();
         SysDevice existingDevice = sysDeviceRepository.findById(deviceId)
                 .orElseThrow(() -> new RuntimeException("设备不存在：" + deviceId));
 
-        existingDevice.setDeviceName(device.getDeviceName())
-                .setRoleId(device.getRoleId())
-                .setFunctionNames(device.getFunctionNames())
-                .setIp(device.getIp())
-                .setLocation(device.getLocation())
-                .setWifiName(device.getWifiName())
-                .setChipModelName(device.getChipModelName())
-                .setType(device.getType())
-                .setVersion(device.getVersion())
-                .setState(device.getState())
-                .setUserId(device.getUserId());
+        existingDevice.setDeviceName(sysDevice.getDeviceName())
+                .setRoleId(sysDevice.getRoleId())
+                .setFunctionNames(sysDevice.getFunctionNames())
+                .setIp(sysDevice.getIp())
+                .setLocation(sysDevice.getLocation())
+                .setWifiName(sysDevice.getWifiName())
+                .setChipModelName(sysDevice.getChipModelName())
+                .setType(sysDevice.getType())
+                .setVersion(sysDevice.getVersion())
+                .setState(sysDevice.getState())
+                .setUserId(sysDevice.getUserId());
         sysDeviceRepository.save(existingDevice);
 
-        device = existingDevice;
+        sysDevice = existingDevice;
         ChatSession session = null;
-        if (device != null) {
+        if (sysDevice != null) {
             SessionManager sessionManager = applicationContext.getBean(SessionManager.class);
-            session = sessionManager.getSessionByDeviceId(device.getDeviceId());
+            session = sessionManager.getSessionByDeviceId(sysDevice.getDeviceId());
         }
         if (session != null) {
-            session.setSysDevice(device);
+            session.setSysDevice(sysDevice);
         }
         return 1;
     }
 
     @Transactional
-    public int updateAllDevices(SysDevice device) {
-        return sysDeviceRepository.updateAllStates(device.getState());
+    @Override
+    public int updateAllDevices(SysDevice sysDevice) {
+        sysDeviceRepository.updateAllDevicesByState(sysDevice.getState());
+        return 1;
     }
 }

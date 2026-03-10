@@ -80,14 +80,14 @@ public interface SysCodeRepository extends JpaRepository<SysCode, Integer>, JpaS
     /**
      * 根据 ID 查询验证码
      */
-    @Query(value = "SELECT * FROM sys_code WHERE codeId = :codeId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_code WHERE code_id = :codeId", nativeQuery = true)
     SysCode selectByCodeId(@Param("codeId") Integer codeId);
 
     /**
      * 生成验证码
      */
     @Modifying
-    @Query(value = "INSERT INTO sys_code (deviceId, sessionId, type, code, createTime) " +
+    @Query(value = "INSERT INTO sys_code (device_id, session_id, type, code, create_time) " +
                    "VALUES (:deviceId, :sessionId, :type, LPAD(FLOOR(RAND() * 1000000), 6, '0'), NOW())", nativeQuery = true)
     int generateCode(@Param("sysCode") SysCode sysCode);
     default int generateCode(SysDevice sysDevice){
@@ -97,13 +97,13 @@ public interface SysCodeRepository extends JpaRepository<SysCode, Integer>, JpaS
     /**
      * 根据邮箱和类型查询
      */
-    @Query(value = "SELECT * FROM sys_code WHERE email = :email AND type = :type ORDER BY createTime DESC LIMIT 1", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_code WHERE email = :email AND type = :type ORDER BY create_time DESC LIMIT 1", nativeQuery = true)
     SysCode selectByEmailAndType(@Param("email") String email, @Param("type") String type);
 
     /**
      * 删除验证码
      */
     @Modifying
-    @Query(value = "DELETE FROM sys_code WHERE codeId = :codeId", nativeQuery = true)
+    @Query(value = "DELETE FROM sys_code WHERE code_id = :codeId", nativeQuery = true)
     int delete(@Param("codeId") Integer codeId);
 }

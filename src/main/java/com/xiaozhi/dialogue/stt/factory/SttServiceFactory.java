@@ -5,20 +5,18 @@ import com.xiaozhi.dialogue.stt.providers.*;
 import com.xiaozhi.dialogue.token.TokenService;
 import com.xiaozhi.dialogue.token.factory.TokenServiceFactory;
 import com.xiaozhi.entity.SysConfig;
-
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-
-import jakarta.annotation.PostConstruct;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-public class SttServiceFactory {
+public class SttServiceFactory implements CommandLineRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(SttServiceFactory.class);
     
@@ -40,7 +38,7 @@ public class SttServiceFactory {
     /**
      * 应用启动时自动初始化Vosk服务
      */
-    @PostConstruct
+
     public void initializeDefaultSttService() {
         logger.info("正在初始化默认语音识别服务(Vosk)...");
         initializeVosk();
@@ -148,5 +146,10 @@ public class SttServiceFactory {
         String provider = config.getProvider();
         String cacheKey = provider + ":" + (configId != null ? configId : "default");
         serviceCache.remove(cacheKey);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        initializeDefaultSttService();
     }
 }

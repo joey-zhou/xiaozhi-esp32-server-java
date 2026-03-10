@@ -4,8 +4,10 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.xiaozhi.common.cache.SmartKeyGenerator;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.interceptor.KeyGenerator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -29,6 +31,15 @@ import java.util.concurrent.ThreadLocalRandom;
 @Configuration
 @EnableCaching
 public class RedisCacheConfig {
+
+    /**
+     * 配置默认的 KeyGenerator
+     * 自动识别参数类型并生成合适的缓存 Key
+     */
+    @Bean
+    public KeyGenerator keyGenerator() {
+        return new SmartKeyGenerator();
+    }
 
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory factory) {

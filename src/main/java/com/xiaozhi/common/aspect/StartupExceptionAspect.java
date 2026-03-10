@@ -3,12 +3,14 @@ package com.xiaozhi.common.aspect;
 import com.xiaozhi.utils.LogUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -23,8 +25,8 @@ import java.time.Instant;
  *
  * @author Joey
  */
-//@Aspect
-//@Component
+@Aspect
+@Component
 public class StartupExceptionAspect {
 
     private static final Logger log = LogUtils.getLogger(StartupExceptionAspect.class);

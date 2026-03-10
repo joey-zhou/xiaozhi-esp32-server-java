@@ -21,8 +21,8 @@ public interface SysMcpToolExcludeRepository extends JpaRepository<SysMcpToolExc
      * 根据条件查询 MCP 工具过滤配置
      */
     @Query(value = "SELECT * FROM sys_mcp_tool_exclude " +
-            "WHERE excludeType = :excludeType AND bindType = :bindType " +
-            "AND bindCode = :bindCode AND bindKey = :bindKey",
+            "WHERE exclude_type = :excludeType AND bind_type = :bindType " +
+            "AND bind_code = :bindCode AND bind_key = :bindKey",
             nativeQuery = true)
     List<SysMcpToolExclude> findByCondition(
             @Param("excludeType") String excludeType,
@@ -60,8 +60,8 @@ public interface SysMcpToolExcludeRepository extends JpaRepository<SysMcpToolExc
     @Modifying
     @Transactional
     @Query(value = "DELETE FROM sys_mcp_tool_exclude " +
-            "WHERE excludeType = :excludeType AND bindType = :bindType " +
-            "AND bindCode = :bindCode AND bindKey = :bindKey",
+            "WHERE exclude_type = :excludeType AND bind_type = :bindType " +
+            "AND bind_code = :bindCode AND bind_key = :bindKey",
             nativeQuery = true)
     int deleteByCondition(@Param("excludeType") String excludeType,
                           @Param("bindType") String bindType,

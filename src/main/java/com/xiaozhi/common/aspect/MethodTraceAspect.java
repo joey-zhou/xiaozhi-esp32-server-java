@@ -9,6 +9,9 @@ import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -22,9 +25,9 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * @author Joey
  */
-//@Aspect
-//@Component
-//@Order(Ordered.LOWEST_PRECEDENCE)
+@Aspect
+@Component
+@Order(Ordered.LOWEST_PRECEDENCE)
 public class MethodTraceAspect {
 
     private static final Logger log = LogUtils.getLogger(MethodTraceAspect.class);

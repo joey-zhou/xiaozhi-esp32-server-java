@@ -28,7 +28,7 @@ public interface SysRoleRepository extends JpaRepository<SysRole, Integer>, JpaS
      * @param roleId 角色 ID
      * @return 角色信息
      */
-    @Query(value = "SELECT * FROM sys_role WHERE roleId = :roleId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_role WHERE role_id = :roleId", nativeQuery = true)
     Optional<SysRole> findRoleById(@Param("roleId") Integer roleId);
 
     /**
@@ -41,14 +41,14 @@ public interface SysRoleRepository extends JpaRepository<SysRole, Integer>, JpaS
      * @return 角色分页列表
      */
     @Query(value = "SELECT * FROM sys_role WHERE 1=1 " +
-            "AND (:userId IS NULL OR userId = :userId) " +
+            "AND (:userId IS NULL OR user_id = :userId) " +
             "AND (:state IS NULL OR :state = '' OR state = :state) " +
-            "AND (:isDefault IS NULL OR :isDefault = '' OR isDefault = :isDefault) " +
-            "ORDER BY createTime DESC",
+            "AND (:isDefault IS NULL OR :isDefault = '' OR is_default = :isDefault) " +
+            "ORDER BY create_time DESC",
             countQuery = "SELECT COUNT(*) FROM sys_role WHERE 1=1 " +
-            "AND (:userId IS NULL OR userId = :userId) " +
+            "AND (:userId IS NULL OR user_id = :userId) " +
             "AND (:state IS NULL OR :state = '' OR state = :state) " +
-            "AND (:isDefault IS NULL OR :isDefault = '' OR isDefault = :isDefault)",
+            "AND (:isDefault IS NULL OR :isDefault = '' OR is_default = :isDefault)",
             nativeQuery = true)
     Page<SysRole> findRoles(
             @Param("userId") Integer userId,
@@ -64,7 +64,7 @@ public interface SysRoleRepository extends JpaRepository<SysRole, Integer>, JpaS
      */
     @Modifying
     @Transactional
-    @Query(value = "UPDATE sys_role SET isDefault = '0' WHERE userId = :userId", nativeQuery = true)
+    @Query(value = "UPDATE sys_role SET is_default = '0' WHERE user_id = :userId", nativeQuery = true)
     int resetDefault(@Param("userId") Integer userId);
 
     /**
@@ -75,7 +75,7 @@ public interface SysRoleRepository extends JpaRepository<SysRole, Integer>, JpaS
      */
     @Modifying
     @Transactional
-    @Query(value = "DELETE FROM sys_role WHERE roleId = :roleId", nativeQuery = true)
+    @Query(value = "DELETE FROM sys_role WHERE role_id = :roleId", nativeQuery = true)
     int deleteRoleById(@Param("roleId") Integer roleId);
 
     /**
@@ -88,19 +88,19 @@ public interface SysRoleRepository extends JpaRepository<SysRole, Integer>, JpaS
      * @return 角色列表（包含关联的配置信息和设备总数）
      */
     @Query(value = "SELECT r.*, " +
-            "tts_config.configName AS ttsConfigName, tts_config.provider AS ttsProvider, " +
-            "model_config.configName AS modelConfigName, model_config.provider AS modelProvider, " +
-            "stt_config.configName AS sttConfigName, stt_config.provider AS sttProvider, " +
-            "(SELECT COUNT(*) FROM sys_device WHERE sys_device.roleId = r.roleId) AS totalDevice " +
+            "tts_config.config_name AS ttsConfigName, tts_config.provider AS ttsProvider, " +
+            "model_config.config_name AS modelConfigName, model_config.provider AS modelProvider, " +
+            "stt_config.config_name AS sttConfigName, stt_config.provider AS sttProvider, " +
+            "(SELECT COUNT(*) FROM sys_device WHERE sys_device.role_id = r.role_id) AS totalDevice " +
             "FROM sys_role r " +
-            "LEFT JOIN sys_config tts_config ON r.ttsId = tts_config.configId AND tts_config.configType = 'tts' " +
-            "LEFT JOIN sys_config model_config ON r.modelId = model_config.configId AND model_config.configType = 'llm' " +
-            "LEFT JOIN sys_config stt_config ON r.ttsId = stt_config.configId AND stt_config.configType = 'stt' " +
+            "LEFT JOIN sys_config tts_config ON r.tts_id = tts_config.config_id AND tts_config.config_type = 'tts' " +
+            "LEFT JOIN sys_config model_config ON r.model_id = model_config.config_id AND model_config.config_type = 'llm' " +
+            "LEFT JOIN sys_config stt_config ON r.tts_id = stt_config.config_id AND stt_config.config_type = 'stt' " +
             "WHERE r.state = '1' " +
-            "AND (:userId IS NULL OR :userId = '' OR r.userId = :userId) " +
-            "AND (:roleId IS NULL OR :roleId = '' OR r.userId = :roleId) " +
-            "AND (:roleName IS NULL OR :roleName = '' OR r.roleName LIKE CONCAT('%', :roleName, '%')) " +
-            "AND (:isDefault IS NULL OR :isDefault = '' OR r.isDefault = :isDefault)",
+            "AND (:userId IS NULL OR :userId = '' OR r.user_id = :userId) " +
+            "AND (:roleId IS NULL OR :roleId = '' OR r.user_id = :roleId) " +
+            "AND (:roleName IS NULL OR :roleName = '' OR r.role_name LIKE CONCAT('%', :roleName, '%')) " +
+            "AND (:isDefault IS NULL OR :isDefault = '' OR r.is_default = :isDefault)",
             nativeQuery = true)
     List<SysRole> queryRoles(
             @Param("userId") Integer userId,

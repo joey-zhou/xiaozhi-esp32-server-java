@@ -33,23 +33,23 @@ public interface SysMessageRepository extends JpaRepository<SysMessage, Integer>
      * @param pageable    分页参数
      * @return 消息分页列表
      */
-    @Query(value = "SELECT m.*, d.deviceName, r.roleName " +
+    @Query(value = "SELECT m.*, d.device_name AS deviceName, r.role_name AS roleName " +
             "FROM sys_message m " +
-            "LEFT JOIN sys_device d ON m.deviceId = d.deviceId " +
-            "LEFT JOIN sys_role r ON m.roleId = r.roleId " +
+            "LEFT JOIN sys_device d ON m.device_id = d.device_id " +
+            "LEFT JOIN sys_role r ON m.role_id = r.role_id " +
             "WHERE 1=1 " +
-            "AND (:deviceId IS NULL OR :deviceId = '' OR m.deviceId = :deviceId) " +
+            "AND (:deviceId IS NULL OR :deviceId = '' OR m.device_id = :deviceId) " +
             "AND (:sender IS NULL OR :sender = '' OR m.sender = :sender) " +
-            "AND (:roleId IS NULL OR m.roleId = :roleId) " +
-            "AND (:messageType IS NULL OR :messageType = '' OR m.messageType = :messageType) " +
-            "ORDER BY m.createTime DESC, m.sender DESC",
+            "AND (:roleId IS NULL OR m.role_id = :roleId) " +
+            "AND (:messageType IS NULL OR :messageType = '' OR m.message_type = :messageType) " +
+            "ORDER BY m.create_time DESC, m.sender DESC",
             countQuery = "SELECT COUNT(*) " +
             "FROM sys_message m " +
             "WHERE 1=1 " +
-            "AND (:deviceId IS NULL OR :deviceId = '' OR m.deviceId = :deviceId) " +
+            "AND (:deviceId IS NULL OR :deviceId = '' OR m.device_id = :deviceId) " +
             "AND (:sender IS NULL OR :sender = '' OR m.sender = :sender) " +
-            "AND (:roleId IS NULL OR m.roleId = :roleId) " +
-            "AND (:messageType IS NULL OR :messageType = '' OR m.messageType = :messageType)",
+            "AND (:roleId IS NULL OR m.role_id = :roleId) " +
+            "AND (:messageType IS NULL OR :messageType = '' OR m.message_type = :messageType)",
             nativeQuery = true)
     Page<SysMessage> findMessages(
             @Param("deviceId") String deviceId,
@@ -67,9 +67,9 @@ public interface SysMessageRepository extends JpaRepository<SysMessage, Integer>
      * @return 消息列表
      */
     @Query(value = "SELECT * FROM sys_message " +
-            "WHERE state = '1' AND messageType = 'NORMAL' " +
-            "AND deviceId = :deviceId AND roleId = :roleId " +
-            "ORDER BY createTime DESC LIMIT :limit",
+            "WHERE state = '1' AND message_type = 'NORMAL' " +
+            "AND device_id = :deviceId AND role_id = :roleId " +
+            "ORDER BY create_time DESC LIMIT :limit",
             nativeQuery = true)
     List<SysMessage> findHistoryMessages(
             @Param("deviceId") String deviceId,
@@ -85,9 +85,9 @@ public interface SysMessageRepository extends JpaRepository<SysMessage, Integer>
      * @return 消息列表
      */
     @Query(value = "SELECT * FROM sys_message " +
-            "WHERE state = '1' AND messageType = 'NORMAL' " +
-            "AND deviceId = :deviceId AND roleId = :roleId " +
-            "ORDER BY createTime DESC LIMIT :limit",
+            "WHERE state = '1' AND message_type = 'NORMAL' " +
+            "AND device_id = :deviceId AND role_id = :roleId " +
+            "ORDER BY create_time DESC LIMIT :limit",
             nativeQuery = true)
     List<SysMessage> find(
             @Param("deviceId") String deviceId,
@@ -103,9 +103,9 @@ public interface SysMessageRepository extends JpaRepository<SysMessage, Integer>
      * @return 消息列表
      */
     @Query(value = "SELECT * FROM sys_message " +
-            "WHERE state = '1' AND messageType = 'NORMAL' " +
-            "AND deviceId = :deviceId AND roleId = :roleId " +
-            "AND createTime >= :timeMillis",
+            "WHERE state = '1' AND message_type = 'NORMAL' " +
+            "AND device_id = :deviceId AND role_id = :roleId " +
+            "AND create_time >= :timeMillis",
             nativeQuery = true)
     List<SysMessage> findMessagesAfter(
             @Param("deviceId") String deviceId,
@@ -121,9 +121,9 @@ public interface SysMessageRepository extends JpaRepository<SysMessage, Integer>
      * @return 消息列表
      */
     @Query(value = "SELECT * FROM sys_message " +
-            "WHERE state = '1' AND messageType = 'NORMAL' " +
-            "AND deviceId = :deviceId AND roleId = :roleId " +
-            "AND createTime >= :timeMillis",
+            "WHERE state = '1' AND message_type = 'NORMAL' " +
+            "AND device_id = :deviceId AND role_id = :roleId " +
+            "AND create_time >= :timeMillis",
             nativeQuery = true)
     List<SysMessage> findAfter(
             @Param("deviceId") String deviceId,
@@ -136,7 +136,7 @@ public interface SysMessageRepository extends JpaRepository<SysMessage, Integer>
      * @param messageId 消息 ID
      * @return 消息
      */
-    @Query(value = "SELECT * FROM sys_message WHERE messageId = :messageId AND state = '1'", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_message WHERE message_id = :messageId AND state = '1'", nativeQuery = true)
     Optional<SysMessage> findByIdAndActive(@Param("messageId") Integer messageId);
 
     /**
@@ -159,10 +159,10 @@ public interface SysMessageRepository extends JpaRepository<SysMessage, Integer>
     @Modifying
     @Transactional
     @Query(value = "UPDATE sys_message m " +
-            "INNER JOIN sys_device d ON m.deviceId = d.deviceId " +
+            "INNER JOIN sys_device d ON m.device_id = d.device_id " +
             "SET m.state = '0' " +
-            "WHERE d.userId = :userId AND m.state = '1' " +
-            "AND (:deviceId IS NULL OR :deviceId = '' OR m.deviceId = :deviceId)",
+            "WHERE d.user_id = :userId AND m.state = '1' " +
+            "AND (:deviceId IS NULL OR :deviceId = '' OR m.device_id = :deviceId)",
             nativeQuery = true)
     int deleteByDeviceAndUser(@Param("deviceId") String deviceId, @Param("userId") Integer userId);
 
@@ -178,9 +178,9 @@ public interface SysMessageRepository extends JpaRepository<SysMessage, Integer>
      */
     @Modifying
     @Transactional
-    @Query(value = "UPDATE sys_message SET audioPath = :audioPath " +
-            "WHERE deviceId = :deviceId AND roleId = :roleId " +
-            "AND sender = :sender AND createTime = :createTime",
+    @Query(value = "UPDATE sys_message SET audio_path = :audioPath " +
+            "WHERE device_id = :deviceId AND role_id = :roleId " +
+            "AND sender = :sender AND create_time = :createTime",
             nativeQuery = true)
     int updateAudioPath(@Param("deviceId") String deviceId,
                         @Param("roleId") Integer roleId,
@@ -200,7 +200,7 @@ public interface SysMessageRepository extends JpaRepository<SysMessage, Integer>
      */
     @Modifying
     @Transactional
-    @Query(value = "INSERT INTO sys_summary (deviceId, roleId, lastMessageTimestamp, summary, promptTokens, completionTokens, createTime) " +
+    @Query(value = "INSERT INTO sys_summary (device_id, role_id, last_message_timestamp, summary, prompt_tokens, completion_tokens, create_time) " +
             "VALUES (:deviceId, :roleId, :lastMessageTimestamp, :summary, :promptTokens, :completionTokens, NOW())",
             nativeQuery = true)
     void saveSummary(@Param("deviceId") String deviceId,
@@ -217,10 +217,10 @@ public interface SysMessageRepository extends JpaRepository<SysMessage, Integer>
      * @param roleId   角色 ID
      * @return 摘要信息
      */
-    @Query(value = "SELECT deviceId, roleId, lastMessageTimestamp, summary, createTime " +
+    @Query(value = "SELECT device_id, role_id, last_message_timestamp, summary, create_time " +
             "FROM sys_summary " +
-            "WHERE deviceId = :deviceId AND roleId = :roleId " +
-            "ORDER BY createTime DESC LIMIT 1",
+            "WHERE device_id = :deviceId AND role_id = :roleId " +
+            "ORDER BY create_time DESC LIMIT 1",
             nativeQuery = true)
     List<Object[]> findLastSummary(@Param("deviceId") String deviceId, @Param("roleId") Integer roleId);
 
@@ -234,7 +234,7 @@ public interface SysMessageRepository extends JpaRepository<SysMessage, Integer>
      */
     @Modifying
     @Transactional
-    @Query(value = "DELETE FROM sys_summary WHERE roleId = :roleId AND deviceId = :deviceId AND createTime = :createTime",
+    @Query(value = "DELETE FROM sys_summary WHERE role_id = :roleId AND device_id = :deviceId AND create_time = :createTime",
             nativeQuery = true)
     int deleteSummary(@Param("roleId") Integer roleId,
                       @Param("deviceId") String deviceId,

@@ -2,7 +2,6 @@ package com.xiaozhi.repository;
 
 import com.xiaozhi.entity.SysDevice;
 import org.springframework.data.domain.Example;
-import org.springframework.data.domain.ExampleMatcher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -29,7 +28,7 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
      * @param deviceId 设备 ID
      * @return 设备信息
      */
-    @Query(value = "SELECT * FROM sys_device WHERE deviceId = :deviceId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_device WHERE device_id = :deviceId", nativeQuery = true)
     SysDevice findDeviceById(@Param("deviceId") String deviceId);
 
     /**
@@ -42,13 +41,13 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
      * @return 设备分页列表
      */
     @Query(value = "SELECT * FROM sys_device WHERE 1=1 " +
-            "AND (:userId IS NULL OR userId = :userId) " +
-            "AND (:deviceName IS NULL OR :deviceName = '' OR deviceName LIKE %:deviceName%) " +
+            "AND (:userId IS NULL OR user_id = :userId) " +
+            "AND (:deviceName IS NULL OR :deviceName = '' OR device_name LIKE %:deviceName%) " +
             "AND (:state IS NULL OR :state = '' OR state = :state) " +
-            "ORDER BY createTime DESC",
+            "ORDER BY create_time DESC",
             countQuery = "SELECT COUNT(*) FROM sys_device WHERE 1=1 " +
-                    "AND (:userId IS NULL OR userId = :userId) " +
-                    "AND (:deviceName IS NULL OR :deviceName = '' OR deviceName LIKE %:deviceName%) " +
+                    "AND (:userId IS NULL OR user_id = :userId) " +
+                    "AND (:deviceName IS NULL OR :deviceName = '' OR device_name LIKE %:deviceName%) " +
                     "AND (:state IS NULL OR :state = '' OR state = :state)",
             nativeQuery = true)
     Page<SysDevice> findDevices(
@@ -64,7 +63,7 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
      * @param userId   用户 ID
      * @return 设备信息
      */
-    @Query(value = "SELECT * FROM sys_device WHERE deviceId = :deviceId AND userId = :userId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_device WHERE device_id = :deviceId AND user_id = :userId", nativeQuery = true)
     SysDevice findVerifyCode(@Param("deviceId") String deviceId, @Param("userId") Integer userId);
 
     /**
@@ -76,7 +75,7 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
      */
     @Modifying
     @Transactional
-    @Query(value = "UPDATE sys_device SET code = :code WHERE deviceId = :deviceId", nativeQuery = true)
+    @Query(value = "UPDATE sys_device SET code = :code WHERE device_id = :deviceId", nativeQuery = true)
     int updateCode(@Param("deviceId") String deviceId, @Param("code") String code);
 
     /**
@@ -88,7 +87,7 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
      */
     @Modifying
     @Transactional
-    @Query(value = "INSERT INTO sys_code (deviceId, code, createTime) VALUES (:deviceId, :code, NOW())", nativeQuery = true)
+    @Query(value = "INSERT INTO sys_code (device_id, code, create_time) VALUES (:deviceId, :code, NOW())", nativeQuery = true)
     int insertCode(@Param("deviceId") String deviceId, @Param("code") String code);
 
     /**
@@ -97,10 +96,6 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
      * @param state 设备状态
      * @return 影响行数
      */
-    @Modifying
-    @Transactional
-    @Query(value = "UPDATE sys_device SET state = :state", nativeQuery = true)
-    int updateAllStates(@Param("state") String state);
 
     /**
      * 批量更新设备用户和角色
@@ -111,8 +106,8 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
      * @return 影响行数
      */
     @Modifying
-    @Query(value = "UPDATE sys_device SET userId = :userId, roleId = :roleId " +
-            "WHERE deviceId IN :deviceIds",
+    @Query(value = "UPDATE sys_device SET user_id = :userId, role_id = :roleId " +
+            "WHERE device_id IN :deviceIds",
             nativeQuery = true)
     int batchUpdateDevices(@Param("deviceIds") List<String> deviceIds,
                            @Param("userId") Integer userId,
@@ -126,7 +121,7 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
      */
     @Modifying
     @Transactional
-    @Query(value = "DELETE FROM sys_device WHERE deviceId = :deviceId", nativeQuery = true)
+    @Query(value = "DELETE FROM sys_device WHERE device_id = :deviceId", nativeQuery = true)
     int deleteDevice(@Param("deviceId") String deviceId);
 
     default List<SysDevice> query(SysDevice query) {
@@ -162,4 +157,9 @@ public interface SysDeviceRepository extends JpaRepository<SysDevice, String>, J
     default int updateCode(SysDevice device) {
         return updateCode(device.getDeviceId(), device.getCode());
     }
+    @Modifying
+    @Query(value = "update sys_device set state=:state where 1=1  "  ,nativeQuery = true)
+    void updateAllDevicesByState(@Param(value = "state") String state);
+
+
 }

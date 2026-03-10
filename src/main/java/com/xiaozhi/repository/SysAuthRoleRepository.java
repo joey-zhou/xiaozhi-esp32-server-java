@@ -21,42 +21,42 @@ public interface SysAuthRoleRepository extends JpaRepository<SysAuthRole, Intege
     /**
      * 根据 ID 查询角色
      */
-    @Query(value = "SELECT * FROM sys_auth_role WHERE roleId = :roleId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_auth_role WHERE role_id = :roleId", nativeQuery = true)
     SysAuthRole selectById(@Param("roleId") Integer roleId);
 
     /**
      * 根据 ID 查询角色
      */
-    @Query(value = "SELECT * FROM sys_auth_role WHERE roleId = :roleId", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_auth_role WHERE role_id = :roleId", nativeQuery = true)
     SysAuthRole findRoleById(@Param("roleId") Integer roleId);
 
     /**
      * 根据用户 ID 查询角色
      */
     @Query(value = "SELECT r.* FROM sys_auth_role r " +
-            "INNER JOIN sys_user u ON u.roleId = r.roleId " +
-            "WHERE u.userId = :userId", nativeQuery = true)
+            "INNER JOIN sys_user u ON u.role_id = r.role_id " +
+            "WHERE u.user_id = :userId", nativeQuery = true)
     List<SysAuthRole> selectByUserId(@Param("userId") Integer userId);
 
     /**
      * 根据用户 ID 查询角色列表
      */
     @Query(value = "SELECT r.* FROM sys_auth_role r " +
-            "INNER JOIN sys_user u ON u.roleId = r.roleId " +
-            "WHERE u.userId = :userId", nativeQuery = true)
+            "INNER JOIN sys_user u ON u.role_id = r.role_id " +
+            "WHERE u.user_id = :userId", nativeQuery = true)
     List<SysAuthRole> findRolesByUserId(@Param("userId") Integer userId);
 
     /**
      * 删除角色
      */
     @Modifying
-    @Query(value = "DELETE FROM sys_auth_role WHERE roleId = :roleId", nativeQuery = true)
+    @Query(value = "DELETE FROM sys_auth_role WHERE role_id = :roleId", nativeQuery = true)
     int delete(@Param("roleId") Integer roleId);
 
     /**
      * 根据角色标识查询角色
      */
-    @Query(value = "SELECT * FROM sys_auth_role WHERE roleKey = :roleKey", nativeQuery = true)
+    @Query(value = "SELECT * FROM sys_auth_role WHERE role_key = :roleKey", nativeQuery = true)
     SysAuthRole findByRoleKey(@Param("roleKey") String roleKey);
 
     default List<SysAuthRole> selectAll() {

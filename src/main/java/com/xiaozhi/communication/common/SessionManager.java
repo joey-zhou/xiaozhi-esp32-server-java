@@ -80,16 +80,16 @@ public class SessionManager {
             // 项目启动时，将所有设备状态设置为离线
             // 延迟执行设备状态重置，避免循环依赖
             scheduler.schedule(() -> {
+                SysDevice device = new SysDevice();
+                device.setState(SysDevice.DEVICE_STATE_OFFLINE);
                 try {
-                    SysDevice device = new SysDevice();
-                    device.setState(SysDevice.DEVICE_STATE_OFFLINE);
                     // 不设置deviceId，这样会更新所有设备
                     int updatedRows = sysDeviceService.update(device);
                     logger.info("项目启动，重置 {} 个设备状态为离线", updatedRows);
                 } catch (Exception e) {
                     logger.error("项目启动时设置设备状态为离线失败", e);
                 }
-            }, 15, TimeUnit.SECONDS);
+            }, 1, TimeUnit.SECONDS);
         
             // 定期检查不活跃的会话
             scheduler.scheduleAtFixedRate(this::checkInactiveSessions, 10, 10, TimeUnit.SECONDS);

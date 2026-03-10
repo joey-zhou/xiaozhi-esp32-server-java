@@ -69,12 +69,12 @@ public interface SysUserRepository extends JpaRepository<SysUser, Integer>, JpaS
      * @return 用户信息
      */
     @Query(value = "SELECT " +
-            "u.userId, u.username, u.wxOpenId, u.wxUnionId, u.name, u.tel, u.email, u.avatar, " +
-            "u.password, u.state, u.isAdmin, u.roleId, u.loginIp, u.loginTime, u.createTime, " +
-            "(SELECT COUNT(*) FROM sys_device d WHERE d.userId = u.userId) AS totalDevice, " +
-            "(SELECT COUNT(*) FROM sys_message m JOIN sys_device d ON d.deviceId = m.deviceId WHERE d.userId = u.userId) AS totalMessage, " +
-            "(SELECT COUNT(*) FROM sys_device d WHERE d.userId = u.userId AND d.state = '1') AS aliveNumber " +
-            "FROM sys_user u WHERE u.userId = :userId",
+            "u.user_id, u.username, u.wx_open_id, u.wx_union_id, u.name, u.tel, u.email, u.avatar, " +
+            "u.password, u.state, u.is_admin, u.role_id, u.login_ip, u.login_time, u.create_time, " +
+            "(SELECT COUNT(*) FROM sys_device d WHERE d.user_id = u.user_id) AS totalDevice, " +
+            "(SELECT COUNT(*) FROM sys_message m JOIN sys_device d ON d.device_id = m.device_id WHERE d.user_id = u.user_id) AS totalMessage, " +
+            "(SELECT COUNT(*) FROM sys_device d WHERE d.user_id = u.user_id AND d.state = '1') AS aliveNumber " +
+            "FROM sys_user u WHERE u.user_id = :userId",
             nativeQuery = true)
     Optional<SysUser> findUserWithStats(@Param("userId") Integer userId);
 
@@ -90,26 +90,26 @@ public interface SysUserRepository extends JpaRepository<SysUser, Integer>, JpaS
      * @return 用户分页列表
      */
     @Query(value = "SELECT " +
-            "u.userId, u.username, u.name, " +
+            "u.user_id, u.username, u.name, " +
             "CASE WHEN LENGTH(u.tel) > 7 THEN CONCAT(LEFT(u.tel, 3), '****', RIGHT(u.tel, 4)) ELSE u.tel END AS tel, " +
-            "u.email, u.avatar, u.state, u.isAdmin, u.loginIp, u.loginTime, u.createTime, " +
-            "(SELECT COUNT(*) FROM sys_device d WHERE d.userId = u.userId) AS totalDevice, " +
-            "(SELECT COUNT(*) FROM sys_message m JOIN sys_device d ON d.deviceId = m.deviceId WHERE d.userId = u.userId) AS totalMessage, " +
-            "(SELECT COUNT(*) FROM sys_device d WHERE d.userId = u.userId AND d.state = '1') AS aliveNumber " +
+            "u.email, u.avatar, u.state, u.is_admin, u.login_ip, u.login_time, u.create_time, " +
+            "(SELECT COUNT(*) FROM sys_device d WHERE d.user_id = u.user_id) AS totalDevice, " +
+            "(SELECT COUNT(*) FROM sys_message m JOIN sys_device d ON d.device_id = m.device_id WHERE d.user_id = u.user_id) AS totalMessage, " +
+            "(SELECT COUNT(*) FROM sys_device d WHERE d.user_id = u.user_id AND d.state = '1') AS aliveNumber " +
             "FROM sys_user u WHERE 1=1 " +
             "AND (:username IS NULL OR :username = '') " +
             "AND (:email IS NULL OR :email = '' OR u.email = :email) " +
             "AND (:tel IS NULL OR :tel = '' OR u.tel = :tel) " +
             "AND (:name IS NULL OR :name = '' OR u.name LIKE %:name%) " +
-            "AND (:isAdmin IS NULL OR :isAdmin = '' OR u.isAdmin = :isAdmin) " +
-            "ORDER BY u.createTime DESC",
+            "AND (:isAdmin IS NULL OR :isAdmin = '' OR u.is_admin = :isAdmin) " +
+            "ORDER BY u.create_time DESC",
             countQuery = "SELECT COUNT(*) " +
             "FROM sys_user u WHERE 1=1 " +
             "AND (:username IS NULL OR :username = '') " +
             "AND (:email IS NULL OR :email = '' OR u.email = :email) " +
             "AND (:tel IS NULL OR :tel = '' OR u.tel = :tel) " +
             "AND (:name IS NULL OR :name = '' OR u.name LIKE %:name%) " +
-            "AND (:isAdmin IS NULL OR :isAdmin = '' OR u.isAdmin = :isAdmin)",
+            "AND (:isAdmin IS NULL OR :isAdmin = '' OR u.is_admin = :isAdmin)",
             nativeQuery = true)
     Page<SysUser> findUsersWithStats(
             @Param("username") String username,
@@ -126,7 +126,7 @@ public interface SysUserRepository extends JpaRepository<SysUser, Integer>, JpaS
      * @param email 邮箱
      * @return 有效验证码数量
      */
-    @Query(value = "SELECT COUNT(*) FROM sys_code WHERE code = :code AND email = :email AND createTime >= DATE_SUB(NOW(), INTERVAL 10 MINUTE) ORDER BY createTime DESC LIMIT 1",
+    @Query(value = "SELECT COUNT(*) FROM sys_code WHERE code = :code AND email = :email AND create_time >= DATE_SUB(NOW(), INTERVAL 10 MINUTE) ORDER BY create_time DESC LIMIT 1",
             nativeQuery = true)
     Integer countValidCaptcha(@Param("code") String code, @Param("email") String email);
 
@@ -176,7 +176,7 @@ public interface SysUserRepository extends JpaRepository<SysUser, Integer>, JpaS
 
     @Modifying
     @Transactional
-    @Query(value = "INSERT INTO sys_code (email, code, createTime) VALUES (:email, LPAD(FLOOR(RAND() * 1000000), 6, '0'), NOW())", nativeQuery = true)
+    @Query(value = "INSERT INTO sys_code (email, code, create_time) VALUES (:email, LPAD(FLOOR(RAND() * 1000000), 6, '0'), NOW())", nativeQuery = true)
     int generateCode(@Param("email") String email);
 
     default int generateCode(SysUser user) {

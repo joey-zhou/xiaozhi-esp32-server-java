@@ -31,8 +31,8 @@ public interface SysSummaryRepository extends JpaRepository<SysSummary, SysSumma
      * @return 摘要信息
      */
     @Query(value = "SELECT * FROM sys_summary " +
-            "WHERE deviceId = :deviceId AND roleId = :roleId " +
-            "ORDER BY createTime DESC LIMIT 1",
+            "WHERE device_id = :deviceId AND role_id = :roleId " +
+            "ORDER BY create_time DESC LIMIT 1",
             nativeQuery = true)
     SysSummary findLastSummary(@Param("deviceId") String deviceId, @Param("roleId") int roleId);
 
@@ -45,10 +45,10 @@ public interface SysSummaryRepository extends JpaRepository<SysSummary, SysSumma
      * @return 摘要分页列表
      */
     @Query(value = "SELECT * FROM sys_summary " +
-            "WHERE deviceId = :deviceId AND roleId = :roleId " +
-            "ORDER BY createTime DESC",
+            "WHERE device_id = :deviceId AND role_id = :roleId " +
+            "ORDER BY create_time DESC",
             countQuery = "SELECT COUNT(*) FROM sys_summary " +
-            "WHERE deviceId = :deviceId AND roleId = :roleId",
+            "WHERE device_id = :deviceId AND role_id = :roleId",
             nativeQuery = true)
     Page<SysSummary> findSummary(
             @Param("deviceId") String deviceId,
@@ -66,7 +66,7 @@ public interface SysSummaryRepository extends JpaRepository<SysSummary, SysSumma
     @Modifying
     @Transactional
     @Query(value = "DELETE FROM sys_summary " +
-            "WHERE roleId = :roleId AND deviceId = :deviceId AND createTime = :createTime",
+            "WHERE role_id = :roleId AND device_id = :deviceId AND create_time = :createTime",
             nativeQuery = true)
     int deleteSummary(@Param("roleId") int roleId, @Param("deviceId") String deviceId, @Param("createTime") Instant createTime);
 

@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * 角色配置实体类
@@ -20,6 +22,8 @@ import lombok.experimental.Accessors;
 @Schema(description = "角色信息")
 @Entity
 @Table(name = "sys_role")
+@DynamicUpdate
+@DynamicInsert
 public class SysRole extends Base<SysRole> {
     /**
      * 角色 ID
@@ -111,6 +115,7 @@ public class SysRole extends Base<SysRole> {
      * Top-P 参数，控制输出的多样性
      */
     @Schema(description = "Top-P 参数")
+    @Column(name = "top_p")
     private Double topP = 0.9;
 
     /**

@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * 聊天记录表
@@ -18,6 +20,8 @@ import lombok.experimental.Accessors;
 @Schema(description = "消息信息")
 @Entity
 @Table(name = "sys_message")
+@DynamicUpdate
+@DynamicInsert
 public class SysMessage extends Base<SysMessage> {
     public static final String MESSAGE_TYPE_NORMAL = "NORMAL";
     public static final String MESSAGE_TYPE_FUNCTION_CALL = "FUNCTION_CALL";

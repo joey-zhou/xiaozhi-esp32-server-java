@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * LLM\STT\TTS 配置
@@ -19,6 +21,8 @@ import lombok.experimental.Accessors;
 @Schema(description = "配置信息")
 @Entity
 @Table(name = "sys_config")
+@DynamicUpdate
+@DynamicInsert
 public class SysConfig extends Base<SysConfig> {
 
     @Getter

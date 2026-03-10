@@ -1,25 +1,27 @@
 package com.xiaozhi.common.config;
 
-import org.springframework.boot.web.embedded.tomcat.TomcatProtocolHandlerCustomizer;
+import org.springframework.boot.task.ThreadPoolTaskExecutorCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.AsyncTaskExecutor;
-import org.springframework.core.task.support.TaskExecutorAdapter;
-
-import java.util.concurrent.Executors;
 
 @Configuration
 public class ThreadConfig {
 
+//    @Bean
+//    public AsyncTaskExecutor applicationTaskExecutor() {
+//        return new TaskExecutorAdapter(Executors.newVirtualThreadPerTaskExecutor());
+//    }
     @Bean
-    public AsyncTaskExecutor applicationTaskExecutor() {
-        return new TaskExecutorAdapter(Executors.newVirtualThreadPerTaskExecutor());
-    }
-    
-    @Bean
-    public TomcatProtocolHandlerCustomizer<?> protocolHandlerVirtualThreadExecutorCustomizer() {
-        return protocolHandler -> {
-            protocolHandler.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+    public ThreadPoolTaskExecutorCustomizer threadPoolTaskExecutorCustomizer() {
+        return executor -> {
+            executor.setThreadNamePrefix("task-");
+
         };
     }
+//    @Bean
+//    public TomcatProtocolHandlerCustomizer<?> protocolHandlerVirtualThreadExecutorCustomizer() {
+//        return protocolHandler -> {
+//            protocolHandler.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+//        };
+//    }
 }

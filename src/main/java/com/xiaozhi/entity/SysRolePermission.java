@@ -7,6 +7,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.util.Date;
@@ -23,6 +25,8 @@ import java.util.Date;
 @Schema(description = "角色权限配置")
 @Entity
 @Table(name = "sys_role_permission")
+@DynamicUpdate
+@DynamicInsert
 public class SysRolePermission {
 
     /**

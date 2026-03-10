@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDateTime;
 
@@ -16,6 +18,8 @@ import java.time.LocalDateTime;
 @Accessors(chain = true)
 @Entity
 @Table(name = "sys_mcp_tool_exclude")
+@DynamicUpdate
+@DynamicInsert
 public class SysMcpToolExclude {
 
     /**

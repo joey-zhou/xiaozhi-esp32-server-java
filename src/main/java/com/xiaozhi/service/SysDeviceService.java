@@ -20,7 +20,7 @@ public interface SysDeviceService {
    * @param device
    * @return
    */
-  int add(SysDevice device) throws NotFoundException;
+  int add(SysDevice sysDevice) throws NotFoundException;
 
   /**
    * 查询设备信息
@@ -28,7 +28,7 @@ public interface SysDeviceService {
    * @param device
    * @return
    */
-  List<SysDevice> query(SysDevice device, PageFilter pageFilter);
+  List<SysDevice> query(SysDevice sysDevice, PageFilter pageFilter);
 
   /**
    * 查询设备信息，并join配置表联查，用来过滤不存在的configId
@@ -40,17 +40,17 @@ public interface SysDeviceService {
   /**
    * 查询验证码
    */
-  SysDevice queryVerifyCode(SysDevice device);
+  SysDevice queryVerifyCode(SysDevice sysDevice);
 
   /**
    * 查询并生成验证码
    */
-  SysDevice generateCode(SysDevice device);
+  SysDevice generateCode(SysDevice sysDevice);
 
   /**
    * 关系设备验证码语音路径
    */
-  int updateCode(SysDevice device);
+  int updateCode(SysDevice sysDevice);
 
   /**
    * 更新设备信息
@@ -74,6 +74,7 @@ public interface SysDeviceService {
    * @param device
    * @return
    */
-  int delete(SysDevice device);
+  int delete(SysDevice sysDevice);
 
+    int updateAllDevices(SysDevice sysDevice);
 }

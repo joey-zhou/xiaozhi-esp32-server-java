@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serial;
@@ -23,6 +25,8 @@ import java.util.Date;
 @Schema(description = "用户第三方认证信息")
 @Entity
 @Table(name = "sys_user_auth")
+@DynamicUpdate
+@DynamicInsert
 public class SysUserAuth extends Base<SysUserAuth> {
 
     /**

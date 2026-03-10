@@ -45,14 +45,14 @@ spring:
     # Hibernate 配置
     hibernate:
       ddl-auto: validate
-      naming:
+#      naming:
         # 使用标准命名策略：不转换，保持驼峰 (deviceName → deviceName)
-        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+#        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     properties:
       hibernate:
         # SQL 格式化
         format_sql: true
-        show_sql: false
+        show_sql: true
         # 方言配置（MariaDB/MySQL）
         dialect: org.hibernate.dialect.MariaDBDialect
         # 批处理配置
