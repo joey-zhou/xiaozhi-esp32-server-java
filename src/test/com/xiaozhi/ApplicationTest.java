@@ -1,16 +1,22 @@
 package com.xiaozhi;
 
+import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.entity.SysDevice;
+import com.xiaozhi.entity.SysUser;
 import com.xiaozhi.repository.SysDeviceRepository;
 import com.xiaozhi.service.SysDeviceService;
+import com.xiaozhi.service.SysUserService;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -42,6 +48,22 @@ public class ApplicationTest {
         SysDevice existingDevice=new SysDevice();
         existingDevice.setState(SysDevice.DEVICE_STATE_OFFLINE);
         sysDeviceRepository.save(existingDevice);
+    }
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Test
+    void genPassword(){
+        String password = "admin123";
+        String encode = passwordEncoder.encode(password);
+        System.out.println(encode);
+    }
+    @Autowired
+    private SysUserService sysUserService;
+    @Test
+    void sysUserServiceUpdate() {
+        // 手动启动事务
+        List<SysUser> sysUsers = sysUserService.queryUsers(new SysUser(), new PageFilter());
+        System.out.println("");
     }
 
 }

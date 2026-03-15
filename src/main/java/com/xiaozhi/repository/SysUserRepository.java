@@ -1,5 +1,6 @@
 package com.xiaozhi.repository;
 
+import com.xiaozhi.dto.repository.SysUserWithStats;
 import com.xiaozhi.entity.SysUser;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -89,6 +90,7 @@ public interface SysUserRepository extends JpaRepository<SysUser, Integer>, JpaS
      * @param pageable 分页参数
      * @return 用户分页列表
      */
+
     @Query(value = "SELECT " +
             "u.user_id, u.username, u.name, " +
             "CASE WHEN LENGTH(u.tel) > 7 THEN CONCAT(LEFT(u.tel, 3), '****', RIGHT(u.tel, 4)) ELSE u.tel END AS tel, " +
@@ -104,20 +106,50 @@ public interface SysUserRepository extends JpaRepository<SysUser, Integer>, JpaS
             "AND (:isAdmin IS NULL OR :isAdmin = '' OR u.is_admin = :isAdmin) " +
             "ORDER BY u.create_time DESC",
             countQuery = "SELECT COUNT(*) " +
-            "FROM sys_user u WHERE 1=1 " +
-            "AND (:username IS NULL OR :username = '') " +
-            "AND (:email IS NULL OR :email = '' OR u.email = :email) " +
-            "AND (:tel IS NULL OR :tel = '' OR u.tel = :tel) " +
-            "AND (:name IS NULL OR :name = '' OR u.name LIKE %:name%) " +
-            "AND (:isAdmin IS NULL OR :isAdmin = '' OR u.is_admin = :isAdmin)",
+                    "FROM sys_user u WHERE 1=1 " +
+                    "AND (:username IS NULL OR :username = '') " +
+                    "AND (:email IS NULL OR :email = '' OR u.email = :email) " +
+                    "AND (:tel IS NULL OR :tel = '' OR u.tel = :tel) " +
+                    "AND (:name IS NULL OR :name = '' OR u.name LIKE %:name%) " +
+                    "AND (:isAdmin IS NULL OR :isAdmin = '' OR u.is_admin = :isAdmin)",
             nativeQuery = true)
-    Page<SysUser> findUsersWithStats(
+    Page<SysUserWithStats> findUsersWithStatsDTO(
             @Param("username") String username,
             @Param("email") String email,
             @Param("tel") String tel,
             @Param("name") String name,
             @Param("isAdmin") String isAdmin,
             Pageable pageable);
+
+    default Page<SysUser> findUsersWithStats(
+            @Param("username") String username,
+            @Param("email") String email,
+            @Param("tel") String tel,
+            @Param("name") String name,
+            @Param("isAdmin") String isAdmin,
+            Pageable pageable) {
+        Page<SysUserWithStats> projectionPage = findUsersWithStatsDTO(username, email, tel, name, isAdmin, pageable);
+        return projectionPage.map(this::toEntity);
+    }
+
+    private SysUser toEntity(SysUserWithStats p) {
+        SysUser user = new SysUser();
+        user.setUserId(p.getUserId());
+        user.setUsername(p.getUsername());
+        user.setName(p.getName());
+        user.setTel(p.getTel());
+        user.setEmail(p.getEmail());
+        user.setAvatar(p.getAvatar());
+        user.setState(p.getState());
+        user.setIsAdmin(p.getIsAdmin());
+        user.setLoginIp(p.getLoginIp());
+//        user.setLoginTime(p.getLoginTime());
+//        user.setCreateTime(p.getCreateTime());
+        user.setTotalDevice(p.getTotalDevice());
+        user.setTotalMessage(p.getTotalMessage());
+        user.setAliveNumber(p.getAliveNumber());
+        return user;
+    }
 
     /**
      * 查询验证码是否有效
@@ -156,7 +188,7 @@ public interface SysUserRepository extends JpaRepository<SysUser, Integer>, JpaS
     SysUser findUserByUsername(@Param("username") String username);
 
     default SysUser query(@Param("username") String username, @Param("startTime") String startTime,
-            @Param("endTime") String endTime) {
+                          @Param("endTime") String endTime) {
         return findUserByUsername(username);
     }
 

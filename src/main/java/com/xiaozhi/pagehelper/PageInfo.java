@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  */
 
-package com.github.pagehelper;
+package com.xiaozhi.pagehelper;
 
 import java.util.ArrayList;
 import java.util.Collection;

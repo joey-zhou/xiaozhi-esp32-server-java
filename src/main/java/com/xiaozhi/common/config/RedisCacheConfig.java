@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.xiaozhi.common.cache.SmartKeyGenerator;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.interceptor.KeyGenerator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,7 +28,6 @@ import java.util.concurrent.ThreadLocalRandom;
  * @author Joey
  */
 @Configuration
-@EnableCaching
 public class RedisCacheConfig {
 
     /**

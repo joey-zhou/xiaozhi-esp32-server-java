@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
@@ -108,7 +109,7 @@ public class SysUserServiceImpl extends BaseServiceImpl implements SysUserServic
         if (pageFilter != null) {
             return userRepository.findUsersWithStats(
                     null, null, null, null, null,
-                    org.springframework.data.domain.PageRequest.of(pageFilter.getStart() - 1, pageFilter.getLimit())
+                     PageRequest.of(pageFilter.getStart() - 1, pageFilter.getLimit())
             ).getContent();
         }
         return userRepository.findAll();

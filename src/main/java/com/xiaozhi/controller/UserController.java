@@ -1,7 +1,7 @@
 package com.xiaozhi.controller;
 
 import cn.dev33.satoken.annotation.SaIgnore;
-import com.github.pagehelper.PageInfo;
+import com.xiaozhi.pagehelper.PageInfo;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
 import com.xiaozhi.common.exception.UsernameNotFoundException;
 import com.xiaozhi.common.web.PageFilter;
@@ -105,11 +105,14 @@ public class UserController extends BaseController {
             List<SysPermission> permissions = permissionService.selectByUserId(user.getUserId());
             List<SysPermission> permissionTree = permissionService.buildPermissionTree(permissions);
 
+            // 从当前认证信息中获取 JWT Token
+            String token = authentication.getCredentials().toString();
+
             // 返回用户信息
             LoginResponseDTO response = LoginResponseDTO.builder()
-//                .token()
-//                .refreshToken(StpUtil.getTokenValue())
-//                .expiresIn((int) (StpUtil.getTokenTimeout()))
+                .token(token)
+                .refreshToken(token)
+                .expiresIn(jwtTokenProvider.getExpirationTime(token).intValue())
                 .userId(user.getUserId())
                 .user(DtoConverter.toUserDTO(user))
                 .role(DtoConverter.toRoleDTO(role))

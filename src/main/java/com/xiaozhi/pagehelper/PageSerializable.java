@@ -1,6 +1,6 @@
 
 
-package com.github.pagehelper;
+package com.xiaozhi.pagehelper;
 
 
 import java.io.Serializable;

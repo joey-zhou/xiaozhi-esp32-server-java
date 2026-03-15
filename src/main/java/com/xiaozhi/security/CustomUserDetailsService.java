@@ -2,8 +2,8 @@ package com.xiaozhi.security;
 
 import com.xiaozhi.entity.SysUser;
 import com.xiaozhi.service.SysUserService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -23,35 +23,34 @@ import java.util.List;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
-
-    private final SysUserService userService;
+    @Autowired
+    private SysUserService userService;
 
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         log.debug("加载用户详情：{}", username);
-        
+
         SysUser user = findUserByUsername(username);
         if (user == null) {
             throw new UsernameNotFoundException("用户不存在：" + username);
         }
-        
+
         // 检查用户状态
         if ("0".equals(user.getState())) {
             throw new UsernameNotFoundException("用户已被禁用：" + username);
         }
-        
+
         // 构建用户权限列表
         List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-            new SimpleGrantedAuthority("ROLE_" + (user.getRoleId() != null ? user.getRoleId() : 2))
+                new SimpleGrantedAuthority("ROLE_" + (user.getRoleId() != null ? user.getRoleId() : 2))
         );
-        
+
         return new User(
-            user.getUsername(),
-            user.getPassword(),
-            authorities
+                user.getUsername(),
+                user.getPassword(),
+                authorities
         );
     }
 
@@ -78,26 +77,26 @@ public class CustomUserDetailsService implements UserDetailsService {
      */
     public UserDetails loadUserByUserId(Integer userId) {
         log.debug("根据用户 ID 加载用户详情：{}", userId);
-        
+
         SysUser user = userService.selectUserByUserId(userId);
         if (user == null) {
             throw new UsernameNotFoundException("用户不存在，ID: " + userId);
         }
-        
+
         // 检查用户状态
         if ("0".equals(user.getState())) {
             throw new UsernameNotFoundException("用户已被禁用：" + user.getUsername());
         }
-        
+
         // 构建用户权限列表
         List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-            new SimpleGrantedAuthority("ROLE_" + (user.getRoleId() != null ? user.getRoleId() : 2))
+                new SimpleGrantedAuthority("ROLE_" + (user.getRoleId() != null ? user.getRoleId() : 2))
         );
-        
+
         return new User(
-            user.getUsername(),
-            user.getPassword(),
-            authorities
+                user.getUsername(),
+                user.getPassword(),
+                authorities
         );
     }
 }

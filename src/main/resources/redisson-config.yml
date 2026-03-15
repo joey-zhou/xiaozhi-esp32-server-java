@@ -18,17 +18,17 @@ subscriptionConnectionPoolSize: 50
 # 订阅连接最小空闲数
 subscriptionConnectionMinimumIdleSize: 1
 
-# DNS监控间隔 (毫秒)
+# DNS 监控间隔 (毫秒)
 dnsMonitoringInterval: 5000
 
 # 编解码器（用于序列化）
 codec: !<org.redisson.codec.JsonJacksonCodec> {}
 
-# 线程池数量
-threads: 16
+# 线程池数量（默认：CPU 核心数 * 2，一般服务设置为 4-8 即可）
+threads: 2
 
-# Netty线程池数量
-nettyThreads: 32
+# Netty 线程池数量（默认：CPU 核心数 * 2，一般服务设置为 8-16 即可）
+nettyThreads: 2
 
 # 传输模式
 transportMode: "NIO"

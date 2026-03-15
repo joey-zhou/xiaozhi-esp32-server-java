@@ -37,8 +37,8 @@ CREATE TABLE `xiaozhi_jpa`.`sys_user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert admin user only if it doesn't exist
-INSERT INTO xiaozhi.sys_user (username, password, state, is_admin, role_id, name, create_time, update_time)
-VALUES ('admin', '11cd9c061d614dcf37ec60c44c11d2ad', '1', '1', 1, '小智', '2025-03-09 18:32:29', '2025-03-09 18:32:35');
+INSERT INTO xiaozhi_jpa.sys_user (username, password, state, is_admin, role_id, name, create_time, update_time)
+VALUES ('admin', '$2a$10$RCKiYnPc9BhWqiSKWVBkyOOZDlKIIs1EcNIpmuIqLF31fFoBOgko6', '1', '1', 1, '小智', '2025-03-09 18:32:29', '2025-03-09 18:32:35');
 
 update `xiaozhi_jpa`.`sys_user` set name = '小智' where username = 'admin';
 

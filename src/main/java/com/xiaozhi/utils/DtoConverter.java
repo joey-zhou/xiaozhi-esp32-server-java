@@ -1,6 +1,6 @@
 package com.xiaozhi.utils;
 
-import com.github.pagehelper.PageInfo;
+import com.xiaozhi.pagehelper.PageInfo;
 import com.xiaozhi.dto.response.*;
 import com.xiaozhi.entity.*;
 import org.springframework.beans.BeanUtils;

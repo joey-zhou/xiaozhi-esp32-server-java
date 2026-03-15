@@ -1,6 +1,6 @@
 package com.xiaozhi.controller;
 
-import com.github.pagehelper.PageInfo;
+import com.xiaozhi.pagehelper.PageInfo;
 import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.common.web.ResultMessage;
 import com.xiaozhi.entity.SysSummary;

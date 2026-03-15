@@ -39,45 +39,78 @@ spring:
       leak-detection-threshold: 60000
       keepalive-time: 30000
       register-mbeans: true
+  # ============================================================
+  # JPA / Hibernate 配置（Spring Boot 3.5.6 + Hibernate 6+ 高性能 API 服务）
+  # ============================================================
   jpa:
-    open-in-view: true
-    show-sql: true
-    # Hibernate 配置
+    # 禁用 Open-In-View，避免懒加载问题和性能开销
+    open-in-view: false
+    # 生产环境建议关闭 SQL 日志，如需调试可开启
+    show-sql: false
+    # Hibernate 核心配置
     hibernate:
+      # 生产环境：validate（验证表结构）；开发环境：update
       ddl-auto: validate
-#      naming:
-        # 使用标准命名策略：不转换，保持驼峰 (deviceName → deviceName)
-#        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+      # 【新增】命名策略：显式指定标准策略，确保驼峰转下划线行为一致（根据你的注释需求调整）
+      # 如果你希望 deviceName -> device_name (推荐数据库规范)，使用 ImplicitNamingStrategyJpaCompliantImpl
+      # 如果你希望 deviceName -> deviceName (保持原样)，使用 PhysicalNamingStrategyStandardImpl
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
     properties:
       hibernate:
-        # SQL 格式化
-        format_sql: true
-        show_sql: true
-        # 方言配置（MariaDB/MySQL）
+        # 【日志优化】生产环境关闭 format_sql，减少字符串格式化开销
+        format_sql: false
+        # 数据库方言（MariaDB 兼容 MySQL）
         dialect: org.hibernate.dialect.MariaDBDialect
-        # 批处理配置
+
+        # 批处理优化（Hibernate 6+ 标准配置）
         jdbc:
           batch_size: 50
           batch_versioned_data: true
+          time_zone: UTC
         order_inserts: true
         order_updates: true
-        # 二级缓存配置
+        # 【新增】查询计划缓存，提升重复查询性能
+        query:
+          plan_cache_max_size: 2048
+          plan_parameter_metadata_max_size: 128
+          default_null_ordering: none
+          plan_parameter_metadata_enabled: true
+        # 【新增】默认空值排序策略，避免不同数据库行为不一致
+        default_null_ordering: none
+
+        # 缓存配置（API 服务建议禁用二级缓存，避免脏读）
         cache:
           use_second_level_cache: false
           use_query_cache: false
-        # 统计信息
+          # 【新增】若未来开启缓存，需指定区域工厂，此处先预留注释
+          # region_factory: org.hibernate.cache.redis.RegionFactory
+       # 【统计信息】生产环境关闭，避免内存和 CPU 消耗
         generate_statistics: false
-        # 连接释放模式
-#        connection:
-#          release_mode: after_transaction
-        # 验证查询
-#        query:
-#          plan_cache_max_size: 2048
-#          default_null_ordering: none
+
+        # 【新增】事务上下文中 JDBC 连接释放模式
+        # on_close: 事务结束时释放（默认，适合大多数场景）
+        # after_transaction: 事务提交后立即释放（更激进，适合长事务）
+        connection:
+          release_mode: after_transaction
+        # 【新增】JPA 查询超时设置（单位秒），防止慢查询拖死线程
+        # 需要在代码中配合 @QueryHint 或使用 Spring 的 @Transactional(timeout=...)
+        # 这里设置一个全局默认值，例如 30 秒
+        query_timeout: 30
+        # 事务管理
+        transaction:
+          auto_flush_without_managed: false
+        # ID 生成器优化（pooled 策略减少序列访问）
+        id:
+          generator:
+            optimization_strategy: pooled
   # Redis 缓存配置
   cache:
     type: redis
-
+    redis:
+      enable-statistics: true
+      time-to-live: 86400
+      use-key-prefix: true
   data:
     redis:
       # Redis 服务器地址（Spring Data Redis 和 Redisson 自动共享此配置）
@@ -87,7 +120,6 @@ spring:
       # Redisson 高级配置文件（可选，用于连接池、超时等高级设置）
       redisson:
         config: classpath:redisson-config.yml
-
   # 禁用 Groovy 模板位置检查
   groovy:
     template:
@@ -107,7 +139,6 @@ spring:
   # WebSocket 配置
   websocket:
     allowed-origins: '*'
-
   # Session 配置
   session:
     cookie:
@@ -143,7 +174,18 @@ spring:
 # ============================================================
 # 日志配置
 # ============================================================
-
+logging:
+  level:
+    # 抑制 Spring Security UserDetailsService 警告
+    org.springframework.security.config.annotation.authentication.configuration.InitializeUserDetailsManagerConfigurer: ERROR
+    # 抑制 Spring AI MCP Sampling 警告（无采样方法）
+    org.springframework.ai.mcp.sampling.SyncMcpSamplingProvider: WARN
+    # 抑制 Spring AI MCP Elicitation 警告（无 elicitation 方法）
+    org.springframework.ai.mcp.elicitation.SyncMcpElicitationProvider: WARN
+# 【重要补充】日志配置 (替代 spring.jpa.show-sql)
+    # 【开发环境】开启 SQL 和参数绑定日志     # 【生产环境】建议调整为 INFO 或 WARN，只记录慢查询或错误
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 
 # ============================================================
 # SpringDoc OpenAPI 配置

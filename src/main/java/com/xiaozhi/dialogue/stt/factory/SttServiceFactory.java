@@ -62,7 +62,7 @@ public class SttServiceFactory implements CommandLineRunner {
             voskService.initialize();
             
             // 检查模型是否真正加载成功
-            if (voskService instanceof VoskSttService && !((VoskSttService)voskService).isModelLoaded()) {
+            if (voskService instanceof VoskSttService && !voskService.isModelLoaded()) {
                 throw new Exception("Vosk model was not properly loaded");
             }
             
