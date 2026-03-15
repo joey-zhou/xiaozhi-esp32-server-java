@@ -8,7 +8,7 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.format.annotation.DateTimeFormat;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * 智能体实体类
@@ -51,5 +51,5 @@ public class SysAgent extends SysConfig {
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Transient
     @Schema(description = "发布时间")
-    private Date publishTime;
+    private LocalDateTime publishTime;
 }

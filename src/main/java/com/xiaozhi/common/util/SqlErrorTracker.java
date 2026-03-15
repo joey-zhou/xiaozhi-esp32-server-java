@@ -1,10 +1,8 @@
 package com.xiaozhi.common.util;
 
-import com.xiaozhi.common.context.RequestContextHolder;
+import com.xiaozhi.utils.AuthUtils;
 import com.xiaozhi.utils.LogUtils;
 import org.slf4j.Logger;
-
-import java.util.Arrays;
 
 /**
  * SQL 错误追踪器
@@ -40,8 +38,8 @@ public class SqlErrorTracker {
 
         // 1. 添加请求信息
         sb.append("\n========== SQL 错误追踪 ==========\n");
-        sb.append("【请求信息】: ").append(RequestContextHolder.getFullRequestInfo()).append("\n");
-        sb.append("【API 路径】: ").append(RequestContextHolder.getApiPath()).append("\n");
+        sb.append("【请求信息】: ").append(AuthUtils.getFullRequestInfo()).append("\n");
+        sb.append("【API 路径】: ").append(AuthUtils.getApiPath()).append("\n");
 
         // 2. 添加错误信息
         sb.append("【错误信息】: ").append(errorMessage).append("\n");

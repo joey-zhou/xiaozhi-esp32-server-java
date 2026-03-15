@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.dialogue.llm.memory.ConversationIdentifier;
 import com.xiaozhi.entity.SysMessage;
+import com.xiaozhi.utils.SpringUtils;
 import lombok.Builder;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
@@ -18,8 +19,8 @@ import org.springframework.util.Assert;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -35,7 +36,6 @@ import java.util.List;
 @Value
 public class Dialogue {
     private static final String TIME_MILLIS_KEY = "TIME_MILLIS";
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     // 未来有需要时，再将UserMessage改为Prompt
     private UserMessage userMessage;
@@ -117,15 +117,17 @@ public class Dialogue {
                 if(userSpeechPath!=null) {
                     message.setAudioPath(userSpeechPath.toString());
                 }
-                message.setCreateTime(Date.from(instant));
+                message.setCreateTime(LocalDateTime.from(instant));
                 break;
 
             case ASSISTANT:
                 // 首次模型响应时间、首次TTFS响应时间都是AssistantMessage才具备的metadata，UserMessage没有实际也不应该有。
-                message.setCreateTime(Date.from(assistantMessageCreatedAt.truncatedTo(ChronoUnit.SECONDS)));
+                message.setCreateTime(LocalDateTime.from(assistantMessageCreatedAt.truncatedTo(ChronoUnit.SECONDS)));
                 // 工具调用详情只记录在 assistant 消息上
                 if (functionCalled) {
                     try {
+//                         ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+                        ObjectMapper OBJECT_MAPPER = SpringUtils.getApplicationContext().getBean(ObjectMapper.class);
                         message.setToolCalls(OBJECT_MAPPER.writeValueAsString(toolCallDetails));
                     } catch (JsonProcessingException e) {
                         log.warn("序列化工具调用详情失败", e);

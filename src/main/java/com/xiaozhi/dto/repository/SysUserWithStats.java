@@ -17,4 +17,10 @@ public interface SysUserWithStats {
     Integer getTotalDevice();
     Integer getTotalMessage();
     Integer getAliveNumber();
+    
+    // 以下字段用于扩展，避免 Hibernate 映射错误
+    String getWxOpenId();
+    String getWxUnionId();
+    String getPassword();
+    Integer getRoleId();
 }

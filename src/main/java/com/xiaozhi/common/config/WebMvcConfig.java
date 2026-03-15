@@ -2,7 +2,9 @@ package com.xiaozhi.common.config;
 
 import com.xiaozhi.common.interceptor.LogInterceptor;
 
+import com.xiaozhi.common.interceptor.RequestInterceptor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -21,9 +23,13 @@ public class WebMvcConfig implements WebMvcConfigurer {  // 实现接口而不�
 
     @Resource
     private LogInterceptor logInterceptor;
+    @Autowired
+    private RequestInterceptor requestInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(logInterceptor);
+        registry.addInterceptor(requestInterceptor);
     }
 
     @Override

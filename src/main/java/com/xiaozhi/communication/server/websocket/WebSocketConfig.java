@@ -4,6 +4,7 @@ import com.xiaozhi.utils.CmsUtils;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,12 +15,15 @@ import org.springframework.web.socket.server.standard.ServletServerContainerFact
 
 @Configuration
 @EnableWebSocket
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class WebSocketConfig implements WebSocketConfigurer {
 
     private static final Logger logger = LoggerFactory.getLogger(WebSocketConfig.class);
 
     // 定义为public static以便其他类可以访问
     public static final String WS_PATH = "/ws/xiaozhi/v1/";
+    @Value("${spring.websocket.allowed-origins:*}")
+    private String allowedOrigins;
 
     @Resource
     private WebSocketHandler webSocketHandler;
@@ -30,7 +34,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(webSocketHandler, WS_PATH)
-                .setAllowedOrigins("*");
+                .setAllowedOrigins(allowedOrigins);
 
         logger.info("==========================================================");
         logger.info("📡 WebSocket服务地址: {}", cmsUtils.getWebsocketAddress());

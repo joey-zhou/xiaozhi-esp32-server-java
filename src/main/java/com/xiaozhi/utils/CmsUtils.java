@@ -8,8 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -56,21 +54,12 @@ public class CmsUtils {
         }
     }
 
-    public static SysUser getUser() {
-        Object userObj = RequestContextHolder.currentRequestAttributes().getAttribute(USER_ATTRIBUTE_KEY, RequestAttributes.SCOPE_REQUEST);
-        if (userObj instanceof SysUser) {
-            return (SysUser) userObj;
-        } else {
-            return null;
-        }
-    }
 
-    public static void setUser(HttpServletRequest request, SysUser user) {
-        request.setAttribute(USER_ATTRIBUTE_KEY, user);
-    }
+
+
 
     public static Integer getUserId() {
-        SysUser user = getUser();
+        SysUser user = AuthUtils.getUser();
         if (user != null) {
             return user.getUserId();
         } else {
@@ -78,23 +67,7 @@ public class CmsUtils {
         }
     }
 
-    public static String getUsername() {
-        SysUser user = getUser();
-        if (user != null) {
-            return user.getUsername();
-        } else {
-            return null;
-        }
-    }
 
-    public static String getName() {
-        SysUser user = getUser();
-        if (user != null) {
-            return user.getName();
-        } else {
-            return null;
-        }
-    }
 
     // WebSocket地址
     public String getWebsocketAddress() {

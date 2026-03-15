@@ -35,6 +35,7 @@ public class SttServiceFactory implements CommandLineRunner {
     // 备选默认提供商（当Vosk初始化失败时使用）
     private String fallbackProvider = null;
 
+
     /**
      * 应用启动时自动初始化Vosk服务
      */

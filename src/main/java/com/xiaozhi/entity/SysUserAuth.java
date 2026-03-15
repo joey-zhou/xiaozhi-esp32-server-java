@@ -11,7 +11,7 @@ import org.hibernate.annotations.DynamicUpdate;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serial;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * 用户第三方认证信息表
@@ -84,7 +84,7 @@ public class SysUserAuth extends Base<SysUserAuth> {
     @JsonFormat(timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "创建时间")
-    private Date createTime;
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
@@ -92,5 +92,5 @@ public class SysUserAuth extends Base<SysUserAuth> {
     @JsonFormat(timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "更新时间")
-    private Date updateTime;
+    private LocalDateTime updateTime;
 }

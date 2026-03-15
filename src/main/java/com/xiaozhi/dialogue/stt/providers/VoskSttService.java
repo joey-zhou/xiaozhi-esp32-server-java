@@ -2,8 +2,6 @@ package com.xiaozhi.dialogue.stt.providers;
 
 import com.xiaozhi.dialogue.stt.SttService;
 import com.xiaozhi.utils.AudioUtils;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Vosk STT服务实现
  * 使用JDK 21虚拟线程实现异步处理
  */
+
 public class VoskSttService implements SttService {
 
     private static final Logger logger = LoggerFactory.getLogger(VoskSttService.class);
@@ -53,8 +52,7 @@ public class VoskSttService implements SttService {
      *
      * @throws Exception 如果模型加载失败
      */
-    @PostConstruct
-    public void initialize() throws Exception {
+     public void initialize() throws Exception {
         try {
             // 检查是否是 macOS 操作系统
             String osName = System.getProperty("os.name").toLowerCase();
@@ -98,7 +96,7 @@ public class VoskSttService implements SttService {
     /**
      * 释放资源
      */
-    @PreDestroy
+//    @PreDestroy
     public void destroy() {
         if (model != null) {
             try {

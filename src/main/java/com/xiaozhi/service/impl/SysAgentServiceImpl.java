@@ -23,6 +23,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -439,7 +442,7 @@ public class SysAgentServiceImpl implements SysAgentService {
                         botAgent.setAgentName(botName);
                         botAgent.setAgentDesc(description);
                         botAgent.setIconUrl(iconUrl);
-                        botAgent.setPublishTime(new Date(publishTime * 1000));
+                        botAgent.setPublishTime(LocalDateTime.ofInstant(Instant.ofEpochMilli(publishTime * 1000), ZoneId.systemDefault()));
                         botAgent.setProvider("coze");
 
                         // 同步到数据库

@@ -125,7 +125,8 @@ public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigSe
         PageRequest pageRequest = null;
         if (pageFilter != null) {
 //            PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
-            pageRequest = PageRequest.of(pageFilter.getStart() - 1, pageFilter.getLimit(), Sort.by(Sort.Direction.DESC, "createTime"));
+            pageRequest = PageRequest.of(pageFilter.getStart() - 1, pageFilter.getLimit(), Sort.by(Sort.Direction.DESC,
+                    "createTime"));
         }
         List<SysConfig> list = sysConfigRepository.query(config, pageRequest);
 

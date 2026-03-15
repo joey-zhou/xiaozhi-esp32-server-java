@@ -1,10 +1,11 @@
 package com.xiaozhi.common.interceptor;
 
-import com.xiaozhi.common.context.RequestContextHolder;
+import com.xiaozhi.utils.AuthUtils;
 import com.xiaozhi.utils.LogUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
+import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
@@ -13,7 +14,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
  *
  * @author Joey
  */
-//@Component
+@Component
 public class RequestInterceptor implements HandlerInterceptor {
 
     private static final Logger log = LogUtils.getLogger(RequestInterceptor.class);
@@ -31,8 +32,9 @@ public class RequestInterceptor implements HandlerInterceptor {
             apiPath += "?" + queryString;
         }
 
+
         // 存储到上下文
-        RequestContextHolder.setRequestInfo(requestUri, method, apiPath);
+        AuthUtils.setRequestInfo(requestUri, method, apiPath);
 
         log.debug("【请求开始】{} {}", method, requestUri);
 
@@ -43,7 +45,7 @@ public class RequestInterceptor implements HandlerInterceptor {
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
                                 Object handler, Exception ex) {
         // 请求完成后清除上下文
-        RequestContextHolder.clear();
+        AuthUtils.clear();
 
         log.debug("【请求结束】{} {} - Status: {}",
                 request.getMethod(),

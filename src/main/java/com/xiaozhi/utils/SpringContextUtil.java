@@ -1,5 +1,6 @@
 package com.xiaozhi.utils;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
@@ -10,7 +11,7 @@ public class SpringContextUtil
         implements ApplicationContextAware {
     public   static ApplicationContext ac;
     @Override
-    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+    public void setApplicationContext(@NonNull ApplicationContext applicationContext) throws BeansException {
         SpringContextUtil.ac = applicationContext;
     }
 }

@@ -1,6 +1,6 @@
 package com.xiaozhi.common.aspect;
 
-import com.xiaozhi.common.context.RequestContextHolder;
+import com.xiaozhi.utils.AuthUtils;
 import com.xiaozhi.utils.LogUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -118,7 +118,7 @@ public class MethodTraceAspect {
     private void handleException(ProceedingJoinPoint joinPoint, Throwable e, Duration duration) {
         String methodName = getFullMethodName(joinPoint);
         String paramInfo = getParamInfo(joinPoint);
-        String requestInfo = RequestContextHolder.getFullRequestInfo();
+        String requestInfo = AuthUtils.getFullRequestInfo();
 
         log.error("\n========== 方法调用异常 ==========\n" +
                   "【请求信息】: {}\n" +

@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -53,7 +54,7 @@ public class DatabaseChatMemory  implements ChatMemory {
             List<SysMessage> messages = sysMessageRepository.find(deviceId, roleId, limit);
             messages = new ArrayList<>(messages);
             // 按时间升序排序，时间相同时按sender降序排序，保持user在assistant前面
-            messages.sort(Comparator.<SysMessage, Date>comparing(SysMessage::getCreateTime)
+            messages.sort(Comparator.<SysMessage, LocalDateTime>comparing(SysMessage::getCreateTime)
                                     .thenComparing(SysMessage::getSender, Comparator.reverseOrder()));
             if (messages == null || messages.isEmpty()) {
                 return Collections.emptyList();

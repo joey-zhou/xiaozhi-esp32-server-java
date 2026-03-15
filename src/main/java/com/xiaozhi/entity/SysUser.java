@@ -12,7 +12,7 @@ import org.hibernate.annotations.DynamicUpdate;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serial;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * 用户表
@@ -167,7 +167,7 @@ public class SysUser extends Base<SysUser> {
     @JsonFormat(timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "用户上次登录时间", example = "2024-12-01 10:30:00")
-    private Date loginTime;
+    private LocalDateTime loginTime;
 
     /**
      * 验证码（非数据库字段，用于业务逻辑）

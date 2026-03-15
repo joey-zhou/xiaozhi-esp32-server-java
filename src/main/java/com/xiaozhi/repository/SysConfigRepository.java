@@ -1,6 +1,7 @@
 package com.xiaozhi.repository;
 
 import com.xiaozhi.entity.SysConfig;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -117,9 +118,10 @@ public interface SysConfigRepository extends JpaRepository<SysConfig, Integer>, 
      */
     default List<SysConfig> query(SysConfig sysConfig, Pageable pageable) {
         Specification<SysConfig> spec = (root, query, cb) -> {
+            assert query != null;
             query.distinct(true);
 
-            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            var predicates = new java.util.ArrayList<Predicate>();
 
             // state = '1'
             predicates.add(cb.equal(root.get("state"), "1"));
@@ -156,7 +158,7 @@ public interface SysConfigRepository extends JpaRepository<SysConfig, Integer>, 
                 predicates.add(cb.like(root.get("configName"), "%" + sysConfig.getConfigName() + "%"));
             }
 
-            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+            return cb.and(predicates.toArray(new Predicate[0]));
         };
         if (pageable != null) {
             return findAll(spec, pageable).getContent();

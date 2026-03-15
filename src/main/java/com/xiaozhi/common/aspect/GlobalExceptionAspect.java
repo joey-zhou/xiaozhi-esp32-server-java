@@ -1,6 +1,6 @@
 package com.xiaozhi.common.aspect;
 
-import com.xiaozhi.common.context.RequestContextHolder;
+import com.xiaozhi.utils.AuthUtils;
 import com.xiaozhi.utils.LogUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -71,8 +71,8 @@ public class GlobalExceptionAspect {
         String methodCall = buildMethodCallInfo(className, methodName, joinPoint.getArgs());
 
         // 获取请求信息
-        String requestInfo = RequestContextHolder.getFullRequestInfo();
-        String apiPath = RequestContextHolder.getApiPath();
+        String requestInfo = AuthUtils.getFullRequestInfo();
+        String apiPath = AuthUtils.getApiPath();
 
         // 记录异常日志
         log.error("\n========== 方法调用异常 ==========\n" +

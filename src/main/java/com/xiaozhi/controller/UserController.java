@@ -31,6 +31,7 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -196,7 +197,7 @@ public class UserController extends BaseController {
                 return ResultMessage.error("用户不存在");
             }
             // 记录登录时间和IP
-            user.setLoginTime(new java.util.Date());
+            user.setLoginTime(LocalDateTime.now());
             user.setLoginIp(CmsUtils.getClientIp(request));
             userService.update(user);
 
@@ -257,7 +258,7 @@ public class UserController extends BaseController {
             }
 
             // 记录登录时间和IP
-            user.setLoginTime(new java.util.Date());
+            user.setLoginTime(LocalDateTime.now());
             user.setLoginIp(CmsUtils.getClientIp(request));
             userService.update(user);
 
@@ -373,7 +374,7 @@ public class UserController extends BaseController {
             }
 
             // 更新最后登录时间和IP
-            user.setLoginTime(new java.util.Date());
+            user.setLoginTime(LocalDateTime.now());
             user.setLoginIp(CmsUtils.getClientIp(request));
             userService.update(user);
             // 3. 生成 JWT Token

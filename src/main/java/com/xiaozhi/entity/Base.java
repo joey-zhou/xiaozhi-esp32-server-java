@@ -2,15 +2,12 @@ package com.xiaozhi.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
 import lombok.Getter;
-import lombok.experimental.Accessors;
-
-import java.util.Date;
-
 import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDateTime;
 
 /**
  * 基础实体类，所有实体类的父类
@@ -20,25 +17,26 @@ import org.springframework.format.annotation.DateTimeFormat;
  *
  */
 @Getter
-@Accessors(chain = true)
-@JsonIgnoreProperties({ "start", "limit", "startTime", "endTime" })
+@JsonIgnoreProperties({ "start", "limit" })
 @Schema(description = "基础信息")
 public class Base<T extends Base<T>> implements java.io.Serializable {
     /**
      * 创建日期
      */
+    @Column(name = "create_time", columnDefinition = "TIMESTAMP")
     @JsonFormat(timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "创建时间")
-    protected Date createTime;
+    protected LocalDateTime createTime;
 
     /**
      * 更新日期
      */
+    @Column(name = "update_time", columnDefinition = "TIMESTAMP")
     @JsonFormat(timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "更新时间")
-    protected Date updateTime;
+    protected LocalDateTime updateTime;
 
     /**
      * 用户 ID
@@ -46,21 +44,8 @@ public class Base<T extends Base<T>> implements java.io.Serializable {
     @Schema(description = "用户 ID")
     protected Integer userId;
 
-    /**
-     * 查询开始时间
-     */
-    @JsonFormat(timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Schema(description = "查询开始时间")
-    private Date startTime;
 
-    /**
-     * 查询结束时间
-     */
-    @JsonFormat(timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Schema(description = "查询结束时间")
-    private Date endTime;
+
 
     @SuppressWarnings("unchecked")
     public T setUserId(Integer userId) {
@@ -68,27 +53,12 @@ public class Base<T extends Base<T>> implements java.io.Serializable {
         return (T) this;
     }
 
-    @SuppressWarnings("unchecked")
-    public T setStartTime(Date startTime) {
-        this.startTime = startTime;
-        return (T) this;
-    }
+
 
     @SuppressWarnings("unchecked")
-    public T setEndTime(Date endTime) {
-        this.endTime = endTime;
-        return (T) this;
-    }
-
-    @SuppressWarnings("unchecked")
-    public T setCreateTime(Date createTime) {
+    public T setCreateTime(LocalDateTime createTime) {
         this.createTime = createTime;
         return (T) this;
     }
 
-    @SuppressWarnings("unchecked")
-    public T setUpdateTime(Date updateTime) {
-        this.updateTime = updateTime;
-        return (T) this;
-    }
 }

@@ -9,6 +9,8 @@ import lombok.experimental.Accessors;
 import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
+import java.time.LocalDateTime;
+
 /**
  * LLM\STT\TTS 配置
  *
@@ -154,4 +156,6 @@ public class SysConfig extends Base<SysConfig> {
     @Column(length = 1)
     @Schema(description = "服务提供商状态")
     private String state;
+
+    private LocalDateTime createTime;
 }

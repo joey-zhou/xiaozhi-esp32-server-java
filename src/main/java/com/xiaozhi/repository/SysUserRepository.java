@@ -2,6 +2,7 @@ package com.xiaozhi.repository;
 
 import com.xiaozhi.dto.repository.SysUserWithStats;
 import com.xiaozhi.entity.SysUser;
+import com.xiaozhi.utils.BeanUtil;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -92,7 +93,7 @@ public interface SysUserRepository extends JpaRepository<SysUser, Integer>, JpaS
      */
 
     @Query(value = "SELECT " +
-            "u.user_id, u.username, u.name, " +
+            "u.user_id, u.username, u.wx_open_id, u.wx_union_id, u.password, u.role_id, u.name, " +
             "CASE WHEN LENGTH(u.tel) > 7 THEN CONCAT(LEFT(u.tel, 3), '****', RIGHT(u.tel, 4)) ELSE u.tel END AS tel, " +
             "u.email, u.avatar, u.state, u.is_admin, u.login_ip, u.login_time, u.create_time, " +
             "(SELECT COUNT(*) FROM sys_device d WHERE d.user_id = u.user_id) AS totalDevice, " +
@@ -129,7 +130,10 @@ public interface SysUserRepository extends JpaRepository<SysUser, Integer>, JpaS
             @Param("isAdmin") String isAdmin,
             Pageable pageable) {
         Page<SysUserWithStats> projectionPage = findUsersWithStatsDTO(username, email, tel, name, isAdmin, pageable);
-        return projectionPage.map(this::toEntity);
+        Page<SysUser> page = BeanUtil.projectionPageToEntityPage(projectionPage, SysUser.class);
+
+//        return projectionPage.map(this::toEntity);
+        return page;
     }
 
     private SysUser toEntity(SysUserWithStats p) {
