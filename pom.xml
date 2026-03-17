@@ -14,12 +14,14 @@
     <description></description>
 
     <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>21</java.version>
         <kotlin.version>1.9.25</kotlin.version>
         <netty.version>4.2.10.Final</netty.version>
         <okhttp.version>4.12.0</okhttp.version>
         <websdk-java-core.version>2.0.12</websdk-java-core.version>
         <jna.version>5.18.1</jna.version>
+        <lombok.version>1.18.42</lombok.version>
     </properties>
     <!-- Spring AI -->
     <dependencyManagement>
@@ -88,7 +90,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.42</version>
+            <version>${lombok.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -419,7 +421,6 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-
                 </configuration>
             </plugin>
             <plugin>
@@ -429,11 +430,12 @@
                     <source>${java.version}</source>
                     <target>${java.version}</target>
                     <parameters>true</parameters>  <!-- ✅ 关键配置 -->
+                    <encoding>UTF-8</encoding>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.38</version>
+                            <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
