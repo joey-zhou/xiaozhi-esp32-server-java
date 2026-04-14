@@ -155,7 +155,7 @@ public class PersonaFactory {
     private SttService initSttService(RoleBO role){
         Assert.notNull(role, "role cannot be null");
         var sttId = role.getSttId();
-        if (sttId == null) {
+        if (sttId == null || sttId <= 0) {
             logger.warn("角色没有配置STT服务 - Role: {},默认使用vosk", role.getRoleName());
             return sttFactory.getSttService(null);
         }
@@ -178,7 +178,7 @@ public class PersonaFactory {
     public Synthesizer initSynthesizer(ChatSession session, Player player, RoleBO role) {
         // 新增加的设备很有可能没有配置TTS，采用默认Edge需要传递null
         ConfigBO ttsConfig = null;
-        if (role.getTtsId() != null) {
+        if (role.getTtsId() != null && role.getTtsId() > 0) {
             ttsConfig = configService.getBO(role.getTtsId());
         }
         String voiceName = role.getVoiceName();

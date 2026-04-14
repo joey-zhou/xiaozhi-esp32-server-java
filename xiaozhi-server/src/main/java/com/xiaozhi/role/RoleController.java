@@ -76,8 +76,8 @@ public class RoleController extends BaseController {
     @CheckOwner(resource = "role", id = "#roleId")
     @AuditLog(module = "角色管理", operation = "更新角色")
     @CheckOwner(resource = "config", id = "#param.modelId")
-    @CheckOwner(resource = "config", id = "#param.sttId")
-    @CheckOwner(resource = "config", id = "#param.ttsId")
+    @CheckOwner(resource = "config", id = "#param.sttId != null && #param.sttId > 0 ? #param.sttId : null")
+    @CheckOwner(resource = "config", id = "#param.ttsId != null && #param.ttsId > 0 ? #param.ttsId : null")
     @Operation(summary = "更新角色信息", description = "更新语音助手角色配置")
     public ApiResponse<?> update(@PathVariable Integer roleId, @Valid @RequestBody RoleUpdateReq param) {
         return ApiResponse.success(roleAppService.update(roleId, param));
@@ -93,8 +93,8 @@ public class RoleController extends BaseController {
     @SaCheckPermission("system:role:api:create")
     @AuditLog(module = "角色管理", operation = "创建角色")
     @CheckOwner(resource = "config", id = "#param.modelId")
-    @CheckOwner(resource = "config", id = "#param.sttId")
-    @CheckOwner(resource = "config", id = "#param.ttsId")
+    @CheckOwner(resource = "config", id = "#param.sttId != null && #param.sttId > 0 ? #param.sttId : null")
+    @CheckOwner(resource = "config", id = "#param.ttsId != null && #param.ttsId > 0 ? #param.ttsId : null")
     @Operation(summary = "添加角色信息", description = "添加新的语音助手角色")
     public ApiResponse<?> create(@Valid @RequestBody RoleCreateReq param) {
         return ApiResponse.success(roleAppService.create(param, StpUtil.getLoginIdAsInt()));

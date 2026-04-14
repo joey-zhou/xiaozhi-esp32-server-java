@@ -177,6 +177,12 @@ CREATE TABLE `xiaozhi`.`sys_config` (
   KEY `provider` (`provider`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表(模型、语音识别、语音合成等)';
 
+INSERT INTO `xiaozhi`.`sys_config` (`userId`, `configType`, `provider`, `configName`, `configDesc`, `isDefault`, `state`)
+SELECT u.`userId`, 'oss', 'local', '默认本地存储', '未配置云存储时默认使用本地存储', '1', '1'
+FROM `xiaozhi`.`sys_user` u
+WHERE u.`username` = 'admin'
+LIMIT 1;
+
 -- xiaozhi.sys_template definition
 DROP TABLE IF EXISTS `xiaozhi`.`sys_template`;
 CREATE TABLE `xiaozhi`.`sys_template` (

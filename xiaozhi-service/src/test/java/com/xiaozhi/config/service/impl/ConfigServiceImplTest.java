@@ -70,6 +70,12 @@ class ConfigServiceImplTest {
     }
 
     @Test
+    void getBOReturnsNullForNonPositiveId() {
+        assertThat(configService.getBO(-1)).isNull();
+        verifyNoInteractions(configMapper, configConvert, cacheManager, cacheHelper);
+    }
+
+    @Test
     void getDefaultBOLoadsFromDbThroughCacheHelper() {
         ConfigDO configDO = new ConfigDO();
         configDO.setConfigId(10);

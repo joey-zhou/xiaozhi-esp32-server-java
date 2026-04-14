@@ -59,7 +59,7 @@ public class ConfigServiceImpl implements ConfigService {
 
     @Override
     public ConfigBO getBO(Integer configId) {
-        if (configId == null) {
+        if (configId == null || configId <= 0) {
             return null;
         }
         String cacheKey = String.valueOf(configId);
