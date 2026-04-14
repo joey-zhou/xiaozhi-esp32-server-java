@@ -1,0 +1,108 @@
+# ============================================================
+# Dialogue 独立部署配置
+# 仅包含与 server 不同的部分，其余沿用各模块默认值
+# ============================================================
+
+server:
+  port: 8092
+
+spring:
+  # Flyway Migration 只在 server 执行，dialogue 不执行，避免多实例重复迁移
+  flyway:
+    enabled: false
+
+  # 数据源配置（与 server 共享同一数据库）
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      auto-commit: true
+      idle-timeout: 300000
+      pool-name: DialogueHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+      validation-timeout: 5000
+      leak-detection-threshold: 60000
+      keepalive-time: 30000
+
+  cache:
+    type: redis
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 3s
+      redisson:
+        config: classpath:redisson-config.yml
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+  threads:
+    virtual:
+      enabled: true
+
+  # 激活开发环境，覆盖此处配置使用 application-dev.yml
+  profiles:
+    active: dev
+
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml,classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: false
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: false
+
+# ============================================================
+# 日志配置
+# ============================================================
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO
+    io.netty.handler: ERROR
+
+# ============================================================
+# 小智扩展配置
+# ============================================================
+xiaozhi:
+  runtime:
+    native-lib-dir: lib
+    vosk-model-dir: models/vosk-model
+    tts-models-dir: models/tts
+  vad:
+    model:
+      path: models/silero_vad.onnx
+  check:
+    inactive:
+      session: true
+
+# ============================================================
+# Sa-Token（仅用于 @SaIgnore 和无状态接口校验，token 验证依赖 Redis）
+# ============================================================
+sa-token:
+  token-name: Authorization
+  timeout: 2592000
+  active-timeout: -1
+  is-concurrent: true
+  is-share: false
+  token-style: uuid
+  is-log: false
+  is-read-cookie: true
+  is-read-header: true
+  token-prefix: Bearer
+  jwt-secret-key: xiaozhi-esp32-server-java-jwt-secret-key

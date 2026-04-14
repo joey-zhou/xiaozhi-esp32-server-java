@@ -369,7 +369,8 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
           resolve(true)
         } else if (
           connectionStatus.connectionStatus.includes('错误') ||
-          connectionStatus.connectionStatus.includes('超时')
+          connectionStatus.connectionStatus.includes('超时') ||
+          connectionStatus.connectionStatus.includes('失败')
         ) {
           clearTimeout(timeoutId)
           resolve(false)
@@ -584,14 +585,17 @@ function handleTTSMessage(data: WebSocketMessage): void {
   } else if (data.state === 'stop') {
     log('🛑 TTS结束，音频流结束', 'info')
     
-    // 等待打字机完成后再清理
+    // 等待打字机完成后再清理（最多等待10秒）
+    let waitCount = 0
+    const maxWait = 100 // 100 * 100ms = 10s
     const waitForTyping = () => {
-      if (!isTyping && typewriterQueue.length === 0) {
+      if (!isTyping && typewriterQueue.length === 0 || waitCount >= maxWait) {
         if (currentAIMessage) {
           log(`✅ AI回复完成，最终内容: "${currentAIMessage.content}"`, 'info')
           currentAIMessage = null
         }
       } else {
+        waitCount++
         setTimeout(waitForTyping, 100)
       }
     }
@@ -736,8 +740,10 @@ export function disconnectFromServer(): boolean {
   
   // 停止打字机效果
   stopTypewriter()
+  currentAIMessage = null
 
   if (!webSocket) {
+    connectionStatus.sessionId = null
     return true
   }
 
@@ -749,6 +755,7 @@ export function disconnectFromServer(): boolean {
     webSocket = null
     connectionStatus.isConnected = false
     connectionStatus.connectionStatus = '已断开'
+    connectionStatus.sessionId = null
     log('WebSocket连接已断开', 'info')
     notifyStatusChange()
 

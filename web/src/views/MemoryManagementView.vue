@@ -13,7 +13,7 @@ import { deleteMessage } from '@/services/message'
 import {
   querySummaryMemory,
   queryChatMemory,
-  deleteSummaryMemory
+  deleteSummaryMemory,
 } from '@/services/memory'
 import AudioPlayer from '@/components/AudioPlayer.vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
@@ -28,9 +28,8 @@ const route = useRoute()
 const loadingStore = useLoadingStore()
 
 // 从路由路径推导记忆类型
-const memoryType = computed<'chat' | 'summary' | 'long'>(() => {
+const memoryType = computed<'chat' | 'summary'>(() => {
   if (route.path.endsWith('/summary')) return 'summary'
-  if (route.path.endsWith('/long')) return 'long'
   return 'chat'
 })
 
@@ -152,7 +151,7 @@ const columns = computed(() => {
       {
         title: t('table.action'),
         dataIndex: 'operation',
-        width: 110,
+        width: 160,
         fixed: 'right' as const,
         align: 'center' as const,
       },
@@ -205,8 +204,8 @@ async function handleRoleChange(roleIdValue: number) {
  */
 async function fetchMemoryData() {
   const params: any = {
-    start: pagination.current || 1,
-    limit: pagination.pageSize || 10,
+    pageNo: pagination.current || 1,
+    pageSize: pagination.pageSize || 10,
   }
 
   // 只有当选择了角色时才添加 roleId
@@ -461,7 +460,7 @@ onMounted(async () => {
         </a-space>
       </template>
       <template #extra>
-        <a-button type="primary" @click="handleExport" :loading="exporting">
+        <a-button v-permission="'system:role:memory:export'" type="primary" @click="handleExport" :loading="exporting">
           {{ t('common.export') }}
         </a-button>
       </template>
@@ -544,6 +543,7 @@ onMounted(async () => {
             <a-space>
               <TableActionButtons
                 :record="record"
+                :permissions="{ delete: 'system:role:memory:chat:delete' }"
                 :show-delete="record.state !== '0'"
                 :delete-title="t('message.confirmDeleteMessage')"
                 @delete="() => handleDeleteMessage(record)"
@@ -583,6 +583,7 @@ onMounted(async () => {
           <template v-else-if="column.dataIndex === 'operation'">
             <TableActionButtons
               :record="record"
+              :permissions="{ delete: 'system:role:memory:summary:delete' }"
               show-delete
               :delete-title="t('common.confirmDelete')"
               @delete="() => handleDeleteMemory(record)"
@@ -590,6 +591,7 @@ onMounted(async () => {
           </template>
         </template>
       </a-table>
+
     </a-card>
 
     <!-- 回到顶部 -->

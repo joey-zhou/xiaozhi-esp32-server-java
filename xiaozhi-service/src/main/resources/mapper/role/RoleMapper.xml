@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaozhi.role.dal.mysql.mapper.RoleMapper">
+
+    <sql id="Role_Select_Columns">
+        r.roleId,
+        r.avatar,
+        r.roleName,
+        r.roleDesc,
+        r.voiceName,
+        r.ttsPitch,
+        r.ttsSpeed,
+        r.state,
+        r.ttsId,
+        r.modelId,
+        model_config.configName AS modelName,
+        r.sttId,
+        r.temperature,
+        r.topP,
+        r.vadEnergyTh,
+        r.vadSpeechTh,
+        r.vadSilenceTh,
+        r.vadSilenceMs,
+        model_config.provider AS modelProvider,
+        tts_config.provider AS ttsProvider,
+        r.isDefault,
+        (
+            SELECT COUNT(*)
+            FROM sys_device d
+            WHERE d.roleId = r.roleId
+        ) AS totalDevice,
+        r.memoryType,
+        r.createTime,
+        r.updateTime
+    </sql>
+
+    <sql id="Role_From_And_Where">
+        FROM sys_role r
+        LEFT JOIN sys_config tts_config
+            ON r.ttsId = tts_config.configId
+           AND tts_config.configType = 'tts'
+        LEFT JOIN sys_config model_config
+            ON r.modelId = model_config.configId
+           AND model_config.configType = 'llm'
+        WHERE 1 = 1
+        <if test="userId != null">
+            AND r.userId = #{userId}
+        </if>
+        <if test="roleId != null">
+            AND r.roleId = #{roleId}
+        </if>
+        <if test="roleName != null and roleName != ''">
+            AND r.roleName LIKE CONCAT('%', #{roleName}, '%')
+        </if>
+        <if test="isDefault != null and isDefault != ''">
+            AND r.isDefault = #{isDefault}
+        </if>
+        <if test="state != null and state != ''">
+            AND r.state = #{state}
+        </if>
+    </sql>
+
+    <select id="selectPageResp" resultType="com.xiaozhi.common.model.resp.RoleResp">
+        SELECT
+        <include refid="Role_Select_Columns"/>
+        <include refid="Role_From_And_Where"/>
+        ORDER BY r.createTime DESC
+    </select>
+
+    <select id="selectRespById" resultType="com.xiaozhi.common.model.resp.RoleResp">
+        SELECT
+        <include refid="Role_Select_Columns"/>
+        FROM sys_role r
+        LEFT JOIN sys_config tts_config
+            ON r.ttsId = tts_config.configId
+           AND tts_config.configType = 'tts'
+        LEFT JOIN sys_config model_config
+            ON r.modelId = model_config.configId
+           AND model_config.configType = 'llm'
+        WHERE 1 = 1
+        <if test="userId != null">
+            AND r.userId = #{userId}
+        </if>
+        AND r.roleId = #{roleId}
+        LIMIT 1
+    </select>
+
+</mapper>

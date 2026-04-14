@@ -7,10 +7,10 @@ import type { MessageQueryParams } from '@/types/message'
  * 查询摘要记忆
  */
 export function querySummaryMemory(params: MemoryQueryParams) {
-  const { roleId, deviceId, start = 1, limit = 10 } = params
+  const { roleId, deviceId, pageNo = 1, pageSize = 10 } = params
   return http.getPage<SummaryMemory>(
     `${api.memory.summary}/${roleId}/${deviceId}`,
-    { start, limit }
+    { pageNo, pageSize }
   )
 }
 
@@ -20,16 +20,16 @@ export function querySummaryMemory(params: MemoryQueryParams) {
 export function queryChatMemory(params: {
   roleId: number
   deviceId: string
-  start?: number
-  limit?: number
+  pageNo?: number
+  pageSize?: number
   startTime?: string
   endTime?: string
 }) {
-  const { roleId, deviceId, start = 1, limit = 10, startTime, endTime } = params
+  const { roleId, deviceId, pageNo = 1, pageSize = 10, startTime, endTime } = params
 
   const queryParams: Partial<MessageQueryParams> = {
-    start,
-    limit,
+    pageNo,
+    pageSize,
     deviceId,
     roleId,
   }
@@ -48,4 +48,3 @@ export function deleteSummaryMemory(roleId: number, deviceId: string, summaryId?
   const params = summaryId ? { id: summaryId } : {}
   return http.delete(url, params)
 }
-

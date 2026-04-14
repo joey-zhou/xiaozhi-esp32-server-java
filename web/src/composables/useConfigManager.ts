@@ -2,7 +2,7 @@ import { ref, computed, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import type { ConfigType, Config, ConfigField, ModelOption, LLMModel, LLMFactory } from '@/types/config'
-import { queryConfigs, addConfig, updateConfig } from '@/services/config'
+import { queryConfigs, addConfig, updateConfig, deleteConfig as deleteConfigRequest } from '@/services/config'
 import { configTypeMap } from '@/config/providerConfig'
 import llmFactoriesData from '@/config/llm_factories.json'
 import { useTable } from './useTable'
@@ -34,7 +34,7 @@ export function useConfigManager(configType: ConfigType) {
     embedding?: LLMModel[]
   }
   const llmFactoryData = ref<Record<string, LLMFactoryModelInfo>>({})
-  const availableProviders = ref<Array<{ value: string; label: string }>>([])
+  const availableProviders = ref<Array<{ value: string; label: string; configNameOptions?: string[] }>>([])
 
   // 查询表单
   const queryForm = ref({
@@ -176,10 +176,10 @@ export function useConfigManager(configType: ConfigType) {
    * 获取配置列表
    */
   async function fetchData() {
-    await loadData(async ({ start, limit }) => {
+    await loadData(async ({ pageNo, pageSize }) => {
       return queryConfigs({
-        start,
-        limit,
+        pageNo,
+        pageSize,
         configType,
         ...queryForm.value,
       })
@@ -189,14 +189,10 @@ export function useConfigManager(configType: ConfigType) {
   /**
    * 删除配置（快速操作，只用 table loading）
    */
-  async function deleteConfig(configId: string) {
+  async function deleteConfig(configId: number) {
     loading.value = true
     try {
-      const res = await updateConfig({
-        configId: parseInt(configId),
-        configType,
-        state: '0',
-      })
+      const res = await deleteConfigRequest(configId)
 
       if (res.code === 200) {
         message.success(t('common.delete'))
@@ -270,4 +266,3 @@ export function useConfigManager(configType: ConfigType) {
     getModelsByProviderAndType,
   }
 }
-

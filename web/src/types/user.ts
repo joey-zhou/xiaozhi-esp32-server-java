@@ -1,3 +1,5 @@
+import type { PageQueryParams } from './api'
+
 /**
  * 用户信息接口
  */
@@ -15,18 +17,19 @@ export interface User {
   totalMessage?: number // 对话消息数
   loginTime?: string // 最后登录时间
   loginIp?: string // 最后登录IP
+  authRoleId?: number // 后台权限角色ID
+  authRoleName?: string // 后台权限角色名称
   editable?: boolean // 表格编辑状态
 }
 
 /**
  * 用户查询参数
  */
-export interface UserQueryParams {
-  start: number // 页码
-  limit: number // 每页数量
+export interface UserQueryParams extends PageQueryParams {
   name?: string // 姓名
   email?: string // 邮箱
   tel?: string // 电话
+  authRoleId?: number // 后台权限角色ID
 }
 
 /**
@@ -41,4 +44,3 @@ export interface UpdateUserParams {
   password?: string // 密码字段
   avatar?: string // 头像字段
 }
-

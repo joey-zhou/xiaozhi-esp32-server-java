@@ -6,7 +6,6 @@ import {
   UserOutlined,
   LoadingOutlined,
   CameraOutlined,
-  DeleteOutlined,
   SnippetsOutlined,
   SoundOutlined,
   PauseCircleOutlined
@@ -15,18 +14,21 @@ import { useRouter } from 'vue-router'
 import { useTable } from '@/composables/useTable'
 import { useRoleManager } from '@/composables/useRoleManager'
 import { useMemoryView } from '@/composables/useMemoryView'
+import { useClipboard } from '@/composables/useClipboard'
+import { ROUTES } from '@/router/routes'
 import { queryRoles, addRole, updateRole, deleteRole, testVoice, getSystemGlobalTools, getDisabledTools, updateToolsStatus } from '@/services/role'
 import { queryTemplates } from '@/services/template'
 import { getResourceUrl } from '@/utils/resource'
 import { useAvatar } from '@/composables/useAvatar'
 import { uploadFile } from '@/services/upload'
-import type { Role, RoleFormData, PromptTemplate } from '@/types/role'
+import type { PromptTemplate, Role, RoleFormData } from '@/types/role'
 import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
-import type { McpToolItem } from '@/types/mcpServer'
+import type { McpToolItem } from '@/types/mcpTool'
 import TableActionButtons from '@/components/TableActionButtons.vue'
 
 const { t } = useI18n()
 const { getAvatarUrl } = useAvatar()
+const { copy } = useClipboard()
 
 const router = useRouter()
 const { navigateToMemory } = useMemoryView()
@@ -47,7 +49,6 @@ const {
   loadAllVoices,
   loadSttOptions,
   getModelInfo,
-  getAllVoices,
   formatProviderName,
 } = useRoleManager()
 
@@ -114,7 +115,7 @@ const pendingVadValues = ref<Record<string, number> | null>(null)
 const pendingModelValues = ref<Record<string, number> | null>(null)
 const pendingTtsValues = ref<Record<string, number> | null>(null)
 
-// MCP 相关
+// MCP 工具相关
 const mcpToolsLoading = ref(false)
 const allMcpTools = ref<McpToolItem[]>([])
 const selectedToolNames = ref<string[]>([])
@@ -228,8 +229,8 @@ const handleEdit = (record: Role) => {
     // 获取模型信息
     const modelInfo = getModelInfo(record.modelId || undefined)
 
-    // 获取语音信息（从所有可用音色中查找，包括克隆音色）
-    const voiceInfo = allAvailableVoices.value.find(v => v.value === (record.voiceName || ''))
+    // 获取语音信息
+    const voiceInfo = allVoices.value.find(v => v.value === (record.voiceName || ''))
 
     // 清空pending值（编辑时不使用pending机制）
     pendingVadValues.value = null
@@ -312,7 +313,7 @@ const handleSubmit = async () => {
     submitLoading.value = true
 
     // 统一处理：从所有可用音色中查找
-    const voiceInfo = allAvailableVoices.value.find(v => v.value === formData.voiceName)
+    const voiceInfo = allVoices.value.find(v => v.value === formData.voiceName)
     const ttsId = voiceInfo?.ttsId || -1
     
     const submitData = {
@@ -333,18 +334,18 @@ const handleSubmit = async () => {
       : await addRole(submitData)
 
     if (res.code === 200) {
-      // 2. 如果是编辑模式且有工具选择数据，保存工具选择（使用 exclude 方式）
-      if (editingRoleId.value && allMcpTools.value.length > 0) {
+      const savedRoleId = editingRoleId.value ?? res.data?.roleId
+
+      // 2. 保存工具选择（使用 exclude 方式）
+      if (savedRoleId && allMcpTools.value.length > 0) {
         try {
-          // 计算未选中的工具（exclude）
           const excludeTools = allMcpTools.value
             .filter(tool => !selectedToolNames.value.includes(tool.name))
             .map(tool => tool.name)
           
-          await updateToolsStatus(editingRoleId.value, excludeTools)
+          await updateToolsStatus(savedRoleId, excludeTools)
         } catch (error) {
           console.error('保存工具选择失败:', error)
-          // 工具选择保存失败不影响角色保存成功的提示
           message.warning(t('role.mcpSaveFailed'))
         }
       }
@@ -377,7 +378,7 @@ const resetForm = () => {
   formRef.value?.resetFields()
   editingRoleId.value = undefined
   avatarUrl.value = ''
-  
+
   // 清空待设置的折叠面板值
   pendingVadValues.value = null
   pendingModelValues.value = null
@@ -441,14 +442,6 @@ const handleModelChange = (modelId: number | undefined) => {
   }
 }
 
-// 音色类型切换
-const handleVoiceTypeChange = () => {
-  // 清空当前选择的音色
-  formData.voiceName = undefined
-  formData.ttsId = undefined
-  formData.gender = ''
-}
-
 // 播放音色示例
 const handlePlayVoice = async (voiceName?: string) => {
   if (!voiceName) return
@@ -481,7 +474,7 @@ const handlePlayVoice = async (voiceName?: string) => {
     
     if (!audio) {
       // 统一处理：从所有可用音色中查找
-      const voiceInfo = allAvailableVoices.value.find(v => v.value === voiceName)
+      const voiceInfo = allVoices.value.find(v => v.value === voiceName)
       if (!voiceInfo) {
         message.error(t('role.voiceNotFound'))
         loadingVoiceId.value = ''
@@ -582,7 +575,7 @@ const handleTemplateChange = (templateId: number) => {
 
 // 跳转到模板管理
 const goToTemplateManager = () => {
-  router.push('/template')
+  router.push(ROUTES.TEMPLATE)
 }
 
 // 处理VAD折叠面板变化
@@ -623,87 +616,42 @@ const loadAllMcpTools = async () => {
   try {
     mcpToolsLoading.value = true
     
-    // 判断是编辑模式还是创建模式
     const isEditMode = !!editingRoleId.value
     
-    // 根据模式选择不同的加载逻辑
-    if (isEditMode) {
-      // 编辑模式：加载角色的工具和禁用状态
-      const [systemRes, disabledRes] = await Promise.all([
-        getSystemGlobalTools(),
-        getDisabledTools(editingRoleId.value!)
-      ])
+    const [systemRes, disabledRes] = await Promise.all([
+      getSystemGlobalTools(),
+      getDisabledTools(isEditMode ? editingRoleId.value! : 0)
+    ])
 
-      // 合并所有工具
-      const tools: McpToolItem[] = []
+    const tools: McpToolItem[] = []
 
-      // 处理系统全局工具
-      if (systemRes.code === 200 && systemRes.data && Array.isArray(systemRes.data)) {
-        systemRes.data.forEach((toolName: string) => {
-          tools.push({
-            name: toolName,
-            description: getSystemToolDescription(toolName),
-            inputSchema: '',
-            inputSchemaData: [],
-            enabled: true,
-            source: 'system'
-          })
+    // 处理系统全局工具
+    if (systemRes.code === 200 && systemRes.data && Array.isArray(systemRes.data)) {
+      systemRes.data.forEach((tool: { name: string; description: string }) => {
+        tools.push({
+          name: tool.name,
+          description: tool.description || '',
+          inputSchema: '',
+          inputSchemaData: [],
+          enabled: true,
+          source: 'system'
         })
-      }
+      })
+    }
 
-      allMcpTools.value = tools
+    allMcpTools.value = tools
 
-      // 处理禁用状态（编辑模式）
-      if (disabledRes.code === 200 && disabledRes.data) {
-        const data = disabledRes.data as { globalDisabled?: string[]; roleDisabled?: string[] }
-        globalDisabledTools.value = data.globalDisabled || []
-        const roleDisabled = data.roleDisabled || []
-        
-        // 默认全选（未被角色禁用和全局禁用的工具）
-        selectedToolNames.value = tools
-          .filter(tool => !roleDisabled.includes(tool.name) && !globalDisabledTools.value.includes(tool.name))
-          .map(tool => tool.name)
-      } else {
-        // 如果没有禁用数据，默认全选
-        selectedToolNames.value = tools.map(tool => tool.name)
-      }
+    // 处理禁用状态
+    if (disabledRes.code === 200 && disabledRes.data) {
+      const data = disabledRes.data as { globalDisabled?: string[]; roleDisabled?: string[] }
+      globalDisabledTools.value = data.globalDisabled || []
+      const roleDisabled = isEditMode ? (data.roleDisabled || []) : []
       
-    } else {
-      // 创建模式：只加载所有工具和全局禁用状态（不需要角色的禁用状态）
-      const [systemRes, disabledRes] = await Promise.all([
-        getSystemGlobalTools(),
-        getDisabledTools(0) // 传 0 获取全局禁用列表
-      ])
-
-      // 合并所有工具
-      const tools: McpToolItem[] = []
-
-      // 处理系统全局工具
-      if (systemRes.code === 200 && systemRes.data && Array.isArray(systemRes.data)) {
-        systemRes.data.forEach((toolName: string) => {
-          tools.push({
-            name: toolName,
-            description: getSystemToolDescription(toolName),
-            inputSchema: '',
-            inputSchemaData: [],
-            enabled: true,
-            source: 'system'
-          })
-        })
-      }
-
-      allMcpTools.value = tools
-
-      // 处理全局禁用状态（创建模式）
-      if (disabledRes.code === 200 && disabledRes.data) {
-        const data = disabledRes.data as { globalDisabled?: string[]; roleDisabled?: string[] }
-        globalDisabledTools.value = data.globalDisabled || []
-      }
-
-      // 创建模式：默认全选所有非全局禁用的工具
       selectedToolNames.value = tools
-        .filter(tool => !globalDisabledTools.value.includes(tool.name))
+        .filter(tool => !roleDisabled.includes(tool.name) && !globalDisabledTools.value.includes(tool.name))
         .map(tool => tool.name)
+    } else {
+      selectedToolNames.value = tools.map(tool => tool.name)
     }
 
   } catch (error) {
@@ -714,41 +662,9 @@ const loadAllMcpTools = async () => {
   }
 }
 
-// 获取系统工具描述
-const getSystemToolDescription = (toolName: string): string => {
-  const descriptions: Record<string, string> = {
-    'func_playMusic': '播放音乐功能',
-    'func_changeRole': '切换角色功能',
-    'func_playHuiBen': '播放绘本功能',
-    'func_new_chat': '新对话功能',
-    'func_exitSession': '会话退出功能'
-  }
-  return descriptions[toolName] || '系统工具'
-}
-
-// 获取所有可用工具（按 endpoint -> server -> system 顺序）
+// 获取所有可用工具
 const availableTools = computed(() => {
-  const groups: Record<string, McpToolItem[]> = {
-    system: []
-  }
-  
-  // 先按来源分组
-  allMcpTools.value.forEach(tool => {
-    // 跳过全局禁用的工具，不显示在选项中
-    if (globalDisabledTools.value.includes(tool.name)) {
-      return
-    }
-    
-    const source = tool.source || 'system'
-    if (groups[source]) {
-      groups[source].push(tool)
-    }
-  })
-  
-  // 按顺序合并：system
-  return [
-    ...(groups.system || [])
-  ]
+  return allMcpTools.value.filter(tool => !globalDisabledTools.value.includes(tool.name))
 })
 
 // 工具搜索过滤
@@ -807,12 +723,13 @@ const getAvatar = (avatar?: string) => {
   return getAvatarUrl(avatar)
 }
 
+
 // 获取音色显示名称
 const getVoiceDisplayName = (record: any) => {
   if (!record.voiceName) return ''
 
   // 统一处理：从所有可用音色中查找
-  const voiceInfo = allAvailableVoices.value.find(v => v.value === record.voiceName)
+  const voiceInfo = allVoices.value.find(v => v.value === record.voiceName)
   return voiceInfo?.label || record.voiceName
 }
 
@@ -844,15 +761,10 @@ const loadTemplates = async () => {
   }
 }
 
-// 获取所有可用音色
-const allAvailableVoices = computed(() => {
-  return getAllVoices()
-})
-
-// 提供商选项（用于标准音色筛选显示，隐藏于克隆音色）
+// 提供商选项
 const providerOptions = computed(() => {
   const providers = new Set<string>()
-  allAvailableVoices.value.forEach(v => {
+  allVoices.value.forEach(v => {
     if (v.provider) providers.add(v.provider)
   })
   const items = Array.from(providers).map(p => ({ label: formatProviderName(p), value: p }))
@@ -860,9 +772,8 @@ const providerOptions = computed(() => {
   return [{ label: t('common.all'), value: '' }, ...items]
 })
 
-// 根据音色类型和提供商过滤音色选项
+// 根据提供商过滤音色选项
 const filteredVoices = computed(() => {
-  // 标准音色：按提供商过滤
   const list = allVoices.value
   return selectedProvider.value ? list.filter(v => v.provider === selectedProvider.value) : list
 })
@@ -1010,6 +921,7 @@ if (!editingRoleId.value) {
               <template v-else-if="column.dataIndex === 'operation'">
                 <TableActionButtons
                   :record="record"
+                  permission-prefix="system:role"
                   show-edit
                   show-set-default
                   show-delete
@@ -1020,7 +932,10 @@ if (!editingRoleId.value) {
                   @delete="() => handleDelete(record.roleId)"
                 >
                   <template #actions>
-                    <a @click="() => navigateToMemory({ roleId: record.roleId })">
+                    <a
+                      v-permission="'system:role:memory'"
+                      @click="() => navigateToMemory({ roleId: record.roleId })"
+                    >
                       {{ t('role.memory') }}
                     </a>
                   </template>
@@ -1031,7 +946,11 @@ if (!editingRoleId.value) {
         </a-tab-pane>
 
         <!-- 创建/编辑角色 -->
-        <a-tab-pane key="2" :tab="t('role.createRole')">
+        <a-tab-pane
+          key="2"
+          :tab="editingRoleId ? t('role.updateRole') : t('role.createRole')"
+          v-permission="editingRoleId ? 'system:role:update' : 'system:role:create'"
+        >
           <a-form
             ref="formRef"
             :model="formData"
@@ -1105,7 +1024,7 @@ if (!editingRoleId.value) {
               </a-col>
 
               <a-col :span="24">
-                <a-form-item :label="t('role.setAsDefaultRole')">
+                <a-form-item v-permission="'system:role:update'" :label="t('role.setAsDefaultRole')">
                   <a-switch v-model:checked="formData.isDefault" />
                   <span style="margin-left: 8px; color: var(--ant-color-text-tertiary)">
                     {{ t('role.defaultRoleTip') }}
@@ -1372,6 +1291,7 @@ if (!editingRoleId.value) {
                         <a-tag color="blue" v-if="voice.model">{{ voice.model }}</a-tag>
                         <span>{{ voice.label }}</span>
                         <a-button
+                          v-permission="'system:role'"
                           type="text"
                           size="small"
                           :loading="loadingVoiceId === voice.value"
@@ -1447,36 +1367,38 @@ if (!editingRoleId.value) {
               </a-collapse-panel>
             </a-collapse>
 
-            <!-- MCP 工具设置 -->
-            <a-divider orientation="left">{{ t('role.mcpTools') }}</a-divider>
-            <a-row :gutter="20">
-              <a-col :xl="8" :lg="12" :xs="24">
-                <a-form-item :label="t('role.mcpTools')">
-                  <a-select
-                    v-model:value="selectedToolNames"
-                    mode="multiple"
-                    :placeholder="t('role.mcpSelectTools')"
-                    :loading="mcpToolsLoading"
-                    :max-tag-count="10"
-                    :maxTagTextLength="10"
-                    show-search
-                    :filter-option="filterToolOption"
-                    allow-clear
-                  >
-                    <a-select-option
-                      v-for="tool in availableTools"
-                      :key="tool.name"
-                      :value="tool.name"
-                      :label="formatToolName(tool.name)"
+            <div v-permission="'system:role:mcp-tools'">
+              <!-- MCP 工具设置 -->
+              <a-divider orientation="left">{{ t('role.mcpTools') }}</a-divider>
+              <a-row :gutter="20">
+                <a-col :xl="8" :lg="12" :xs="24">
+                  <a-form-item :label="t('role.mcpTools')">
+                    <a-select
+                      v-model:value="selectedToolNames"
+                      mode="multiple"
+                      :placeholder="t('role.mcpSelectTools')"
+                      :loading="mcpToolsLoading"
+                      :max-tag-count="10"
+                      :maxTagTextLength="10"
+                      show-search
+                      :filter-option="filterToolOption"
+                      allow-clear
                     >
-                      <a-tooltip :title="tool.description" placement="right">
-                        <span>{{ formatToolName(tool.name) }}</span>
-                      </a-tooltip>
-                    </a-select-option>
-                  </a-select>
-                </a-form-item>
-              </a-col>
-            </a-row>
+                      <a-select-option
+                        v-for="tool in availableTools"
+                        :key="tool.name"
+                        :value="tool.name"
+                        :label="formatToolName(tool.name)"
+                      >
+                        <a-tooltip :title="tool.description" placement="right">
+                          <span>{{ formatToolName(tool.name) }}</span>
+                        </a-tooltip>
+                      </a-select-option>
+                    </a-select>
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </div>
             <!-- 记忆类型配置 -->
             <a-divider orientation="left">{{ t('role.memoryTypeSettings') }}</a-divider>
 
@@ -1567,7 +1489,12 @@ if (!editingRoleId.value) {
 
             <!-- 表单操作按钮 -->
             <a-form-item>
-              <a-button type="primary" html-type="submit" :loading="submitLoading">
+              <a-button
+                v-permission="editingRoleId ? 'system:role:update' : 'system:role:create'"
+                type="primary"
+                html-type="submit"
+                :loading="submitLoading"
+              >
                 {{ editingRoleId ? t('role.updateRole') : t('role.createRole') }}
               </a-button>
               <a-button style="margin-left: 8px" @click="handleCancel">
@@ -1715,4 +1642,5 @@ if (!editingRoleId.value) {
 :deep(.ant-select-selection-item-content) {
   max-width: 100px; // 设置最大宽度
 }
+
 </style>

@@ -15,6 +15,7 @@ export function getRouteTitle(routeName: string): string {
     'device': 'router.title.device',
     'message': 'router.title.message',
     'role': 'router.title.role',
+    'auth-role': 'router.title.authRole',
     'template': 'router.title.template',
     'config-model': 'router.title.modelConfig',
     'config-agent': 'router.title.agent',

@@ -81,6 +81,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { DownOutlined } from '@ant-design/icons-vue'
+import { useUserStore } from '@/store/user'
 import type { Component } from 'vue'
 
 /**
@@ -100,26 +101,24 @@ export interface MoreAction {
   /** 是否显示 */
   visible?: boolean
   /** 权限标识 */
-  permission?: string
+  permission?: string | string[]
 }
 
-/**
- * 权限配置
- */
 export interface PermissionConfig {
-  edit?: boolean
-  view?: boolean
-  delete?: boolean
-  download?: boolean
-  copy?: boolean
-  setDefault?: boolean
-  [key: string]: boolean | undefined
+  edit?: boolean | string | string[]
+  view?: boolean | string | string[]
+  delete?: boolean | string | string[]
+  download?: boolean | string | string[]
+  copy?: boolean | string | string[]
+  setDefault?: boolean | string | string[]
+  [key: string]: boolean | string | string[] | undefined
 }
 
 export interface Props {
   /** 当前行数据 */
   record?: any
-  
+  /** 标准按钮权限前缀，例如 system:role、system:config:firmware */
+  permissionPrefix?: string
   /** 是否显示编辑按钮 */
   showEdit?: boolean
   /** 是否显示查看按钮 */
@@ -168,8 +167,7 @@ export interface Props {
   
   /** 更多操作 */
   moreActions?: MoreAction[]
-  
-  /** 权限配置 */
+  /** 特殊权限覆盖，优先级高于 permissionPrefix 自动推导 */
   permissions?: PermissionConfig
 }
 
@@ -202,22 +200,57 @@ export interface Emits {
 const emit = defineEmits<Emits>()
 
 const { t } = useI18n()
+const userStore = useUserStore()
 
 /**
- * 检查权限
+ * 标准操作走通用按钮权限，`view` 默认只受页面访问控制；
+ * 只有少数特殊场景才通过 `permissions` 显式覆盖。
  */
+const actionMap: Record<string, string> = {
+  edit: 'update',
+  delete: 'delete',
+  download: 'download',
+  copy: 'copy',
+  setDefault: 'update',
+}
+
+const matchPermission = (permission?: boolean | string | string[]): boolean | null => {
+  if (typeof permission === 'boolean') {
+    return permission
+  }
+  if (typeof permission === 'string') {
+    return userStore.hasPermission(permission)
+  }
+  if (Array.isArray(permission)) {
+    return userStore.hasAnyPermission(permission)
+  }
+  return null
+}
+
 const hasPermission = (action: string): boolean => {
-  // 如果没有配置权限，默认允许
-  if (!props.permissions || Object.keys(props.permissions).length === 0) {
+  const configured = matchPermission(props.permissions?.[action])
+  if (configured !== null) {
+    return configured
+  }
+
+  if (action === 'view') {
     return true
   }
-  
-  // 检查具体权限
-  return props.permissions[action] !== false
+
+  if (props.permissionPrefix) {
+    const mappedAction = actionMap[action]
+    if (!mappedAction) {
+      return true
+    }
+
+    return userStore.hasPermission(`${props.permissionPrefix}:${mappedAction}`)
+  }
+
+  return true
 }
 
 /**
- * 是否有任何可见按钮（用于判断是否显示分隔线）
+ * 删除按钮前是否已经有其他标准操作可见，用于控制分隔线。
  */
 const hasAnyVisibleButton = computed(() => {
   return (
@@ -229,44 +262,32 @@ const hasAnyVisibleButton = computed(() => {
   )
 })
 
-/**
- * 过滤后的更多操作列表
- */
 const visibleMoreActions = computed(() => {
   if (!props.moreActions) return []
-  
+
   return props.moreActions.filter(action => {
     // 检查 visible 属性
     if (action.visible === false) return false
-    
-    // 检查权限
-    if (action.permission && !hasPermission(action.permission)) {
-      return false
-    }
-    
-    return true
+    const allowed = matchPermission(action.permission)
+    return allowed !== false
   })
 })
 
-// 事件处理
 const handleEdit = () => emit('edit', props.record)
 const handleView = () => emit('view', props.record)
 const handleDelete = () => emit('delete', props.record)
 const handleDownload = () => emit('download', props.record)
 const handleCopy = () => emit('copy', props.record)
 const handleSetDefault = () => emit('setDefault', props.record)
-const handleMoreAction = ({ key }: { key: string }) => {
-  emit('more', key, props.record)
-}
+const handleMoreAction = ({ key }: { key: string }) => emit('more', key, props.record)
 </script>
 
 <style scoped lang="scss">
 .delete-link {
   color: var(--ant-color-error);
-  
+
   &:hover {
     color: var(--ant-color-error-hover);
   }
 }
 </style>
-

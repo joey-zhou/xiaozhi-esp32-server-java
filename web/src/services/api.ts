@@ -13,18 +13,20 @@ export default {
     checkCaptcha: '/user/checkCaptcha',
     checkUser: '/user/checkUser',
   },
+  authRole: {
+    query: '/auth-role',
+    permissions: '/auth-role',
+  },
   device: {
     add: '/device',
     query: '/device',
     update: '/device',
     delete: '/device',
     export: '/device/export',
+    generateToken: '/device/generateToken',
   },
   agent: {
-    add: '/agent',
     query: '/agent',
-    update: '/agent',
-    delete: '/agent',
   },
   role: {
     add: '/role',
@@ -50,21 +52,17 @@ export default {
     add: '/config',
     query: '/config',
     update: '/config',
+    delete: '/config',
   },
   mcpTool: {
-    toggleStatus: '/mcpTool/toggleStatus',
-    toggleGlobalStatus: '/mcpTool/toggleGlobalStatus',
-    batchSetExcludeTools: '/mcpTool/batchSetExcludeTools',
-    getDisabledTools: '/mcpTool/getDisabledTools',
-    getSystemGlobalTools: '/mcpTool/getSystemGlobalTools',
-    refreshCache: '/mcpTool/refreshCache',
+    toggleRoleTool: '/mcpTool/role',         // PATCH /mcpTool/role/{roleId}/tools
+    toggleGlobalTool: '/mcpTool/global',     // PATCH /mcpTool/global/tools
+    batchExclude: '/mcpTool/role',           // POST /mcpTool/role/{roleId}/exclude-tools
+    disabledTools: '/mcpTool/role',          // GET /mcpTool/role/{roleId}/disabled-tools
+    systemGlobalTools: '/mcpTool/system-global',
   },
-  upload: '/api/file/upload',
+  upload: '/file/upload',
   memory: {
     summary: '/memory/summary',
   },
 }
-
-
-
-

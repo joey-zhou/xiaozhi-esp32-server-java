@@ -11,6 +11,7 @@ import App from './App.vue'
 import router from './router'
 import { setupRouterGuards } from './router/guards'
 import { setupErrorHandler } from './utils/errorHandler'
+import { setupDirectives } from './directives'
 import { i18n } from './locales'
 
 const app = createApp(App)
@@ -23,6 +24,9 @@ app.use(createPinia())
 app.use(router)
 app.use(Antd)
 app.use(i18n)
+
+// 2.1 注册自定义指令
+setupDirectives(app)
 
 // 3. 设置路由守卫（登录验证、页面标题、进度条）
 setupRouterGuards(router)

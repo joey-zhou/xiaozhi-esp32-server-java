@@ -1,5 +1,7 @@
 import type { Router } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { ROUTES } from '@/router/routes'
+import { cancelPendingRequests } from '@/services/request'
 import { i18n } from '@/locales'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
@@ -8,11 +10,14 @@ import 'nprogress/nprogress.css'
 NProgress.configure({ showSpinner: false, speed: 500 })
 
 // 不需要登录的白名单
-const whiteList = ['/login', '/register', '/forget']
+const whiteList: string[] = [ROUTES.LOGIN, ROUTES.REGISTER, ROUTES.FORGET]
 
 export function setupRouterGuards(router: Router) {
   // 前置守卫 - 页面跳转前执行
   router.beforeEach((to, from, next) => {
+    // 取消上一个页面所有进行中的请求
+    cancelPendingRequests()
+
     // 开始进度条
     NProgress.start()
 
@@ -39,23 +44,23 @@ export function setupRouterGuards(router: Router) {
         next()
       } else {
         // 不在白名单中，跳转到登录页
-        next(`/login?redirect=${to.path}`)
+        next(`${ROUTES.LOGIN}?redirect=${to.path}`)
         NProgress.done()
       }
       return
     }
 
     // 2. 已登录处理
-    if (to.path === '/login') {
+    if (to.path === ROUTES.LOGIN) {
       // 如果已登录，访问登录页则跳转到首页
-      next({ path: '/dashboard' })
+      next({ path: ROUTES.DASHBOARD })
       NProgress.done()
       return
     }
 
     // 2.1 处理根路径重定向（根据用户类型跳转到不同首页）
     if (to.path === '/') {
-      const defaultPath = isAdmin ? '/dashboard' : '/agents'
+      const defaultPath = isAdmin ? ROUTES.DASHBOARD : ROUTES.DEVICE
       next({ path: defaultPath })
       NProgress.done()
       return
@@ -66,7 +71,7 @@ export function setupRouterGuards(router: Router) {
       // 检查是否需要管理员权限
       if (to.meta.isAdmin && !isAdmin) {
         console.warn(`用户无权限访问: ${to.path}`)
-        next('/403')
+        next(ROUTES.ERROR_403)
         NProgress.done()
         return
       }
@@ -76,7 +81,7 @@ export function setupRouterGuards(router: Router) {
         const hasPermission = userStore.hasPermission(to.meta.permission)
         if (!hasPermission) {
           console.warn(`用户无权限访问: ${to.path}, 需要权限: ${to.meta.permission}`)
-          next('/403')
+          next(ROUTES.ERROR_403)
           NProgress.done()
           return
         }
@@ -87,7 +92,7 @@ export function setupRouterGuards(router: Router) {
         const hasAnyPermission = userStore.hasAnyPermission(to.meta.permissions)
         if (!hasAnyPermission) {
           console.warn(`用户无权限访问: ${to.path}, 需要权限之一: ${to.meta.permissions.join(', ')}`)
-          next('/403')
+          next(ROUTES.ERROR_403)
           NProgress.done()
           return
         }

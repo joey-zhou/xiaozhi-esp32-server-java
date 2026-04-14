@@ -2,15 +2,14 @@
  * 智能体相关类型定义
  */
 
-import type { BaseQueryParams } from './api'
+import type { PageQueryParams } from './api'
 
 /**
  * 智能体查询参数
  */
-export interface AgentQueryParams extends BaseQueryParams {
+export interface AgentQueryParams extends PageQueryParams {
   provider: string
   agentName?: string
-  configType: 'agent'
 }
 
 /**
@@ -98,4 +97,3 @@ export interface FormItem {
 export type PlatformFormItems = {
   [key: string]: FormItem[]
 }
-

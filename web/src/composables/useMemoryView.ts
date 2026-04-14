@@ -1,4 +1,5 @@
 import { useRouter } from 'vue-router'
+import { ROUTES } from '@/router/routes'
 
 export interface MemoryViewParams {
   roleId?: number
@@ -29,7 +30,7 @@ export function useMemoryView() {
     }
 
     router.push({
-      path: '/memory/chat',
+      path: ROUTES.MEMORY_CHAT,
       query
     })
   }

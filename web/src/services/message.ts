@@ -20,6 +20,6 @@ export function deleteMessage(messageId: number | string) {
  * 更新消息
  */
 export function updateMessage(data: Partial<Message>) {
-  return http.putJSON(`${api.message.update}/${data.messageId}`, data)
+  return http.put(`${api.message.update}/${data.messageId}`, data)
 }
 

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.xiaozhi</groupId>
+        <artifactId>xiaozhi-parent</artifactId>
+        <version>5.0.0</version>
+    </parent>
+    <artifactId>xiaozhi-ai</artifactId>
+    <name>xiaozhi-ai</name>
+    <description>AI 能力平台：LLM/TTS/STT provider + 记忆管理</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.xiaozhi</groupId>
+            <artifactId>xiaozhi-service</artifactId>
+        </dependency>
+        <!-- xiaozhi-common 通过 xiaozhi-service 传递 -->
+        <!-- Spring AI -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-ollama</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-zhipuai</artifactId>
+        </dependency>
+        <!-- MCP Client -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-client</artifactId>
+        </dependency>
+        <!-- WebSocket (MCP Endpoint) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <!-- JSON (Vosk STT) -->
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+        </dependency>
+        <!-- OkHttp -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp-sse</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okio</groupId>
+            <artifactId>okio</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-reflect</artifactId>
+        </dependency>
+        <!-- 音频处理 -->
+        <dependency>
+            <groupId>io.github.whitemagic2014</groupId>
+            <artifactId>tts-edge-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.alphacephei</groupId>
+            <artifactId>vosk</artifactId>
+        </dependency>
+        <!-- 云服务 SDK -->
+        <dependency>
+            <groupId>com.tencentcloudapi</groupId>
+            <artifactId>tencentcloud-speech-sdk-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba.nls</groupId>
+            <artifactId>nls-sdk-transcriber</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba.nls</groupId>
+            <artifactId>nls-sdk-tts</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>dashscope-sdk-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>aliyun-java-sdk-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.xfyun</groupId>
+            <artifactId>websdk-java-speech</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.coze</groupId>
+            <artifactId>coze-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.imfangs</groupId>
+            <artifactId>dify-java-client</artifactId>
+        </dependency>
+        <!-- Sherpa-ONNX（从项目内仓库 repo/ 解析，版本由父 POM 统一管理） -->
+        <dependency>
+            <groupId>com.k2fsa</groupId>
+            <artifactId>sherpa-onnx</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.litongjava</groupId>
+            <artifactId>sherpa-onnx-java-api</artifactId>
+        </dependency>
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

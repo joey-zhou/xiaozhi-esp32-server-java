@@ -196,12 +196,9 @@ export function usePagination(options: UsePaginationOptions = {}) {
    */
   const getRequestParams = () => {
     return {
-      page: currentPage.value,
+      pageNo: currentPage.value,
       pageSize: pageSize.value,
-      // 有些后端使用 start/limit 格式
-      start: currentPage.value,
-      limit: pageSize.value,
-      // 有些后端使用 offset/limit 格式
+      // 兼容 offset 分页场景
       offset: (currentPage.value - 1) * pageSize.value,
     }
   }
@@ -246,4 +243,3 @@ export function usePagination(options: UsePaginationOptions = {}) {
     handleTableChange
   }
 }
-

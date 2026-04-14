@@ -1,7 +1,7 @@
 /**
  * 配置类型
  */
-export type ConfigType = 'llm' | 'stt' | 'tts' | 'agent'
+export type ConfigType = 'llm' | 'stt' | 'tts' | 'agent' | 'oss'
 export type ModelType = 'chat' | 'vision' | 'intent' | 'embedding'
 
 /**
@@ -39,9 +39,6 @@ export interface ConfigQueryParams extends PageQueryParams {
   configName?: string
   modelType?: string,
   state?: string
-  // 重写 start 和 limit 为可选
-  start?: number
-  limit?: number
 }
 
 /**
@@ -65,7 +62,8 @@ export interface ConfigField {
  */
 export interface ConfigTypeInfo {
   label: string
-  typeOptions?: Array<{ value: string; label: string; key?: string }>
+  permissionPrefix?: string
+  typeOptions?: Array<{ value: string; label: string; key?: string; configNameOptions?: string[] }>
   typeFields?: Record<string, ConfigField[]>
 }
 
@@ -95,4 +93,3 @@ export interface LLMFactory {
   name: string
   llm: LLMModel[]
 }
-

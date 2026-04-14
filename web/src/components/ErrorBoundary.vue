@@ -29,7 +29,7 @@ const isDev = computed(() => import.meta.env.DEV)
  */
 onErrorCaptured((error, instance, info) => {
   hasError.value = true
-  errorMessage.value = error.message || '未知错误'
+  errorMessage.value = error.message || t('component.errorBoundary.title')
   errorStack.value = error.stack || ''
 
   console.error('ErrorBoundary 捕获到错误:', {
@@ -105,7 +105,7 @@ provide('resetError', resetError)
           class="error-details"
         >
           <details>
-            <summary>错误详情</summary>
+            <summary>{{ t('component.errorBoundary.details') }}</summary>
             <pre>{{ errorStack }}</pre>
           </details>
         </div>

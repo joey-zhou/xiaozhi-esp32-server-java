@@ -1,5 +1,87 @@
+<template>
+  <div class="dashboard-view">
+    <!-- 用户信息与基础统计 -->
+    <a-card :bordered="false" class="user-info-card" :loading="loading">
+      <div class="user-info-content">
+        <a-avatar :src="userAvatar" :size="72" class="user-avatar" />
+        <div class="user-greeting">
+          <h2>{{ timeFix }}，{{ userInfo?.name || userInfo?.username || '用户' }}，{{ welcomeText }}</h2>
+          <a-tooltip :title="t('dashboard.clickToTranslate')" placement="bottomLeft">
+            <p class="daily-sentence" @click="sentenceShow = !sentenceShow">
+              {{ sentenceShow ? sentence.content : sentence.note }}
+            </p>
+          </a-tooltip>
+        </div>
+        <div class="user-statistics">
+          <a-statistic
+            :title="t('dashboard.stat.messages')"
+            :value="stats.messages"
+            class="statistic-item"
+          />
+          <a-statistic
+            :title="t('dashboard.stat.devices')"
+            :value="stats.devices"
+            class="statistic-item"
+          />
+          <a-statistic
+            :title="t('dashboard.stat.roles')"
+            :value="stats.roles"
+            class="statistic-item"
+          />
+        </div>
+      </div>
+    </a-card>
+
+    <!-- 内容区域 -->
+    <a-row :gutter="[20, 20]" class="content-row">
+      <!-- 聊天记录 -->
+      <a-col :xl="14" :lg="12" :xs="24">
+        <a-card :title="t('menu.message')" :bordered="false" :loading="loading">
+          <div class="chat-messages">
+            <div v-if="formattedChatMessages.length === 0" class="empty-messages">
+              <a-empty :description="t('dashboard.noData')" />
+            </div>
+            <div v-else class="message-list">
+              <div
+                v-for="msg in formattedChatMessages"
+                :key="msg.id"
+                class="message-item"
+                :class="{ 'user-message': msg.isUser }"
+              >
+                <div class="message-content">
+                  <div class="message-text">{{ msg.content }}</div>
+                  <div class="message-time">
+                    {{ dayjs(msg.timestamp).format('YYYY-MM-DD HH:mm:ss') }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </a-card>
+      </a-col>
+
+      <!-- 设备列表 & 社区指引 -->
+      <a-col :xl="10" :lg="12" :xs="24">
+        <a-card :title="t('menu.device')" :bordered="false" :loading="loading" style="margin-bottom: 20px;">
+          <a-table
+            :columns="columns"
+            :data-source="devices"
+            :pagination="{ pageSize: 5, showSizeChanger: false }"
+            :scroll="{ x: 500 }"
+            size="small"
+            row-key="deviceId"
+          />
+        </a-card>
+      </a-col>
+    </a-row>
+
+    <a-back-top />
+  </div>
+</template>
+
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/store/user'
 import { useAvatar } from '@/composables/useAvatar'
@@ -11,8 +93,19 @@ import dayjs from 'dayjs'
 import jsonp from 'jsonp'
 import type { Device } from '@/types/device'
 import type { Message } from '@/types/message'
+import {
+  RobotOutlined,
+  UserOutlined,
+  MessageOutlined,
+  ApiOutlined
+} from '@ant-design/icons-vue'
+import request from '@/services/request'
+import api from '@/services/api'
 
 const { t } = useI18n()
+const router = useRouter()
+const userStore = useUserStore()
+const { getAvatarUrl } = useAvatar()
 
 // 类型定义
 interface DailySentence {
@@ -28,16 +121,19 @@ interface FormattedMessage {
   timestamp: Date
 }
 
-const userStore = useUserStore()
-const { getAvatarUrl } = useAvatar()
-
 // 状态
 const loading = ref(true)
-const userLoading = ref(true)
 const sentenceShow = ref(true)
 const sentence = ref<DailySentence>({
   content: '每一天都是新的开始',
   note: 'Every day is a new beginning'
+})
+
+const stats = ref({
+  devices: 0,
+  roles: 0,
+  messages: 0,
+  users: 0
 })
 
 // 设备列表
@@ -45,8 +141,6 @@ const devices = ref<Device[]>([])
 
 // 消息列表
 const messages = ref<Message[]>([])
-const page = ref(1)
-const isLastData = ref(false)
 
 // 表格列定义
 const columns = computed(() => [
@@ -120,7 +214,7 @@ const formattedChatMessages = computed<FormattedMessage[]>(() => {
     const content = item.sender === 'user' 
       ? `${item.deviceName || '用户'} 于 ${item.createTime} 发送: ${item.message}`
       : `${item.roleName || 'AI'} 于 ${item.createTime} 回复: ${item.message}`
-
+    
     return {
       id: String(item.messageId),
       content,
@@ -152,11 +246,7 @@ const getSentence = () => {
 // 获取设备列表
 const fetchDevices = async () => {
   try {
-    userLoading.value = true
-    const res = await queryDevices({
-      start: 1,
-      limit: 10
-    })
+    const res = await queryDevices({ start: 1, limit: 10 })
     if (res.code === 200) {
       devices.value = res.data.list || []
     } else {
@@ -164,129 +254,52 @@ const fetchDevices = async () => {
     }
   } catch (error) {
     message.error('获取设备列表失败')
-  } finally {
-    userLoading.value = false
   }
 }
 
 // 获取消息列表
 const fetchMessages = async () => {
-  if (isLastData.value) return
-
   try {
-    const res = await queryMessages({
-      start: page.value,
-      limit: 10
-    })
-
+    const res = await queryMessages({ start: 1, limit: 20 })
     if (res.code === 200) {
-      const messageList = res.data.list || []
-      if (messageList.length === 0) {
-        message.warning('已到最后一条数据')
-        isLastData.value = true
-        return
-      }
-
-      messages.value = [...messages.value, ...messageList]
-      page.value++
+      messages.value = res.data.list || []
     } else {
       message.error(res.message || '获取消息列表失败')
     }
   } catch (error) {
     message.error('获取消息列表失败')
-  } finally {
-    loading.value = false
   }
 }
 
-// 使用 async setup 进行初始化数据加载（配合 Suspense）
-await Promise.all([
-  getSentence(),
-  fetchDevices(),
-  fetchMessages()
-])
+// 统计总数
+async function fetchStats() {
+  try {
+    const params = { pageNum: 1, pageSize: 1 }
+    const [devicesRes, rolesRes, messagesRes] = await Promise.all([
+      request.get(api.device.query, { params }),
+      request.get(api.role.query, { params }),
+      request.get(api.message.query, { params })
+    ])
+    
+    stats.value.devices = devicesRes.data?.total ?? 0
+    stats.value.roles = rolesRes.data?.total ?? 0
+    stats.value.messages = messagesRes.data?.total ?? 0
+  } catch (error) {
+    console.error('Failed to fetch dashboard stats', error)
+  }
+}
+
+onMounted(async () => {
+  loading.value = true
+  await Promise.all([
+    getSentence(),
+    fetchDevices(),
+    fetchMessages(),
+    fetchStats()
+  ])
+  loading.value = false
+})
 </script>
-
-<template>
-  <div class="dashboard-view">
-    <!-- 用户信息卡片 -->
-    <a-card :bordered="false" class="user-info-card" :loading="loading">
-      <div class="user-info-content">
-        <a-avatar :src="userAvatar" :size="72" class="user-avatar" />
-        <div class="user-greeting">
-          <h2>{{ timeFix }}，{{ userInfo?.name || userInfo?.username }}，{{ welcomeText }}</h2>
-          <a-tooltip :title="t('dashboard.clickToTranslate')" placement="bottomLeft">
-            <p class="daily-sentence" @click="sentenceShow = !sentenceShow">
-              {{ sentenceShow ? sentence.content : sentence.note }}
-            </p>
-          </a-tooltip>
-        </div>
-        <div class="user-statistics">
-          <a-statistic
-            :title="t('dashboard.conversationCount')"
-            :value="userInfo?.totalMessage || 0"
-            class="statistic-item"
-          />
-          <a-statistic
-            :title="t('dashboard.activeDevices')"
-            :value="userInfo?.aliveNumber || 0"
-            class="statistic-item"
-          />
-          <a-statistic
-            :title="t('dashboard.totalDevices')"
-            :value="userInfo?.totalDevice || 0"
-            class="statistic-item"
-          />
-        </div>
-      </div>
-    </a-card>
-
-    <!-- 内容区域 -->
-    <a-row :gutter="[20, 20]" class="content-row">
-      <!-- 聊天记录 -->
-      <a-col :xl="14" :lg="12" :xs="24">
-        <a-card :title="t('menu.message')" :bordered="false" :loading="loading">
-          <div class="chat-messages">
-            <div v-if="formattedChatMessages.length === 0" class="empty-messages">
-              <a-empty :description="t('dashboard.noData')" />
-            </div>
-            <div v-else class="message-list">
-              <div
-                v-for="msg in formattedChatMessages"
-                :key="msg.id"
-                class="message-item"
-                :class="{ 'user-message': msg.isUser }"
-              >
-                <div class="message-content">
-                  <div class="message-text">{{ msg.content }}</div>
-                  <div class="message-time">
-                    {{ dayjs(msg.timestamp).format('YYYY-MM-DD HH:mm:ss') }}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </a-card>
-      </a-col>
-
-      <!-- 设备列表 -->
-      <a-col :xl="10" :lg="12" :xs="24">
-        <a-card :title="t('menu.device')" :bordered="false" :loading="userLoading">
-          <a-table
-            :columns="columns"
-            :data-source="devices"
-            :pagination="{ pageSize: 5, showSizeChanger: false }"
-            :scroll="{ x: 500 }"
-            size="small"
-            row-key="deviceId"
-          />
-        </a-card>
-      </a-col>
-    </a-row>
-
-    <a-back-top />
-  </div>
-</template>
 
 <style scoped lang="scss">
 .dashboard-view {
@@ -372,7 +385,7 @@ await Promise.all([
 // 聊天消息
 .chat-messages {
   min-height: 400px;
-  max-height: 600px;
+  max-height: 500px;
   overflow-y: auto;
   overflow-x: hidden;
 

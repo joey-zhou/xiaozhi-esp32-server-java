@@ -6,7 +6,7 @@ import { useTable } from '@/composables/useTable'
 import { useInlineEdit } from '@/composables/useInlineEdit'
 import { useLoadingStore } from '@/store/loading'
 import { useMemoryView } from '@/composables/useMemoryView'
-import { queryDevices, addDevice, updateDevice, deleteDevice, clearDeviceMemory } from '@/services/device'
+import { queryDevices, addDevice, updateDevice, deleteDevice, clearDeviceMemory, generateDeviceToken } from '@/services/device'
 import { queryRoles } from '@/services/role'
 import DeviceEditDialog from '@/components/DeviceEditDialog.vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
@@ -166,7 +166,7 @@ const columns = computed(() => [
   {
     title: t('table.action'),
     dataIndex: 'operation',
-    width: 200,
+    width: 250,
     align: 'center',
     fixed: 'right',
   },
@@ -179,8 +179,8 @@ async function fetchData() {
   
   await loadData((params) => {
     const queryParams: DeviceQueryParams = {
-      start: params.start,
-      limit: params.limit,
+      pageNo: params.pageNo,
+      pageSize: params.pageSize,
     }
 
     if (queryForm.deviceId) queryParams.deviceId = queryForm.deviceId
@@ -354,6 +354,43 @@ function getRoleName(roleId?: number) {
   return role ? role.roleName : `角色ID:${roleId}`
 }
 
+/**
+ * 生成设备消息token并跳转到资源生成器
+ */
+async function handleCustomize(record: Device) {
+  if (!record.deviceId) {
+    message.error(t('device.invalidDeviceId'))
+    return
+  }
+
+  try {
+    const res = await generateDeviceToken(record.deviceId)
+    if (res.code === 200 && res.data) {
+      const token = res.data.token
+      
+      // 构建跳转URL - 跳转到xiaozhi-assets-generator页面
+      const protocol = window.location.protocol
+      const hostname = window.location.hostname
+      
+      // 本地开发环境使用generator项目的端口(3000)，生产环境使用当前端口
+      const isDev = import.meta.env.DEV
+      const port = isDev ? 3000 : window.location.port
+      const baseUrl = `${protocol}//${hostname}${port ? ':' + port : ''}`
+      
+      // 构建带token的URL，跳转到资源生成器
+      const targetUrl = `${baseUrl}/tools/assets-generator/?token=${encodeURIComponent(token)}`
+      
+      // 在新窗口中打开
+      window.open(targetUrl, '_blank', 'noopener,noreferrer')
+    } else {
+      message.error(res.message || t('device.generateTokenFailed'))
+    }
+  } catch (error) {
+    console.error('生成设备消息token失败:', error)
+    message.error(t('common.serverMaintenance'))
+  }
+}
+
 // 处理分页变化
 const onTableChange = (pag: TablePaginationConfig) => {
   handleTableChange(pag)
@@ -419,6 +456,7 @@ fetchData()
       <template #extra>
         <a-input-search
           v-model:value="addDeviceCode"
+          v-permission="'system:device:create'"
           :loading="addDeviceLoading"
           :enter-button="t('device.addDevice')"
           :placeholder="t('device.enterDeviceCode')"
@@ -458,10 +496,8 @@ fetchData()
               />
               <span
                 v-else-if="editingKey === ''"
-                style="cursor: pointer"
-                @click="() => handleEdit(record.deviceId)"
               >
-                <a-tooltip :title="`点击编辑: ${record.deviceName || '未命名'}`" :mouse-enter-delay="0.5">
+                <a-tooltip :title="record.deviceName || '未命名'" :mouse-enter-delay="0.5">
                   <span v-if="record.deviceName" class="ellipsis-text">{{ record.deviceName }}</span>
                   <span v-else>-</span>
                 </a-tooltip>
@@ -488,11 +524,9 @@ fetchData()
             </a-select>
             <span
               v-else-if="editingKey === ''"
-              style="cursor: pointer"
-              @click="() => handleEdit(record.deviceId)"
             >
               <a-tooltip
-                :title="`点击编辑: ${record.roleDesc || getRoleName(record.roleId)}`"
+                :title="record.roleDesc || getRoleName(record.roleId)"
                 :mouse-enter-delay="0.5"
                 placement="top"
               >
@@ -554,6 +588,7 @@ fetchData()
             <TableActionButtons
               v-else
               :record="record"
+              permission-prefix="system:device"
               show-edit
               show-view
               show-delete
@@ -564,7 +599,17 @@ fetchData()
             >
               <!-- 自定义 -->
               <template #actions>
-                <a @click="() => navigateToMemory({ roleId: record.roleId, deviceId: record.deviceId })">
+                <a
+                  v-permission="'system:device:customize'"
+                  @click="() => handleCustomize(record)"
+                  style="color: #52c41a"
+                >
+                  {{ t('common.customize') }}
+                </a>
+                <a
+                  v-permission="'system:device:memory'"
+                  @click="() => navigateToMemory({ roleId: record.roleId, deviceId: record.deviceId })"
+                >
                   {{ t('role.memory') }}
                 </a>
               </template>
@@ -620,5 +665,3 @@ fetchData()
   }
 }
 </style>
-
-

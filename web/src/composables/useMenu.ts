@@ -1,6 +1,5 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/store/user'
 import type { MenuItem, MenuMeta } from '@/types/menu'
 
@@ -12,7 +11,6 @@ export function useMenu() {
   const route = useRoute()
   const router = useRouter()
   const userStore = useUserStore()
-  const { t } = useI18n()
 
   // 展开的菜单keys（根据当前路由的父菜单初始化）
   const initialOpenKey = route.meta?.parent as string | undefined
@@ -115,19 +113,33 @@ export function useMenu() {
    * 根据权限过滤菜单
    */
   function filterMenuByPermission(items: MenuItem[]): MenuItem[] {
-    return items.filter(item => {
-      // 检查是否需要管理员权限
+    return items.reduce<MenuItem[]>((result, item) => {
+      const children = item.children?.length ? filterMenuByPermission(item.children) : []
+
+      if (children.length > 0) {
+        result.push({
+          ...item,
+          children,
+        })
+        return result
+      }
+
       if (item.meta.isAdmin && !isAdmin) {
-        return false
+        return result
       }
-      
-      // 递归过滤子菜单
-      if (item.children) {
-        item.children = filterMenuByPermission(item.children)
+      if (item.meta.permission && !userStore.hasPermission(item.meta.permission)) {
+        return result
       }
-      
-      return true
-    })
+      if (item.meta.permissions?.length && !userStore.hasAnyPermission(item.meta.permissions)) {
+        return result
+      }
+
+      result.push({
+        ...item,
+        children: undefined,
+      })
+      return result
+    }, [])
   }
 
   /**
@@ -160,5 +172,3 @@ export function useMenu() {
     handleMenuClick,
   }
 }
-
-

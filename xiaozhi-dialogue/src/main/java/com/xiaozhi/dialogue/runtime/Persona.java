@@ -1,0 +1,295 @@
+package com.xiaozhi.dialogue.runtime;
+
+import com.xiaozhi.communication.common.ChatSession;
+import com.xiaozhi.communication.common.SessionManager;
+import com.xiaozhi.ai.llm.memory.Conversation;
+import com.xiaozhi.ai.llm.tool.XiaozhiToolMetadata;
+import com.xiaozhi.dialogue.playback.Player;
+import com.xiaozhi.dialogue.playback.Synthesizer;
+import com.xiaozhi.ai.stt.SttService;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.model.MessageAggregator;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import org.springframework.ai.model.tool.ToolExecutionResult;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
+import reactor.core.publisher.Flux;
+
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+import java.util.concurrent.atomic.AtomicReference;
+
+
+/**
+ * 人物角色、虚拟形象，描述角色的属性和行为。Domain Entity: CharacterRole(聊天角色,Persona)，管理对话历史记录，管理对话工具调用等。
+ * 聚合着ChatModel、TTS(Synthersizer)、Player
+ *
+ * Persona 与 ChatSession 主要有两个关联：
+ * 一是收到消息时，需要从 ChatSession 传导给到 Persona，然后 Persona 将消息传递给 ChatModel。
+ * 二是发送消息时，需要从 Persona 将消息传递给 ChatSession。
+ *
+ * 用户音频文件 Path 通过 ChatSession.getUserAudioPath() 关联到 DialogueTurn，
+ * DialogueTurn 作为 chatStream() 方法内局部变量构建（已实现）。
+ *
+ * 生命周期不同时间节点的几个事件：
+ * 1. 接收到 UserSpeech, 获得完整语音时;
+ * 2. ASR 识别出 UserText, 已进行 STT 语音识别后，获得了文本时。
+ * 3. LLM 响应 AssistantText, 已进行 LLM 生成消息后，获得了 PromptTokens 时。
+ * 4. TTS 合成 AssistantSpeech,
+ * 5. Player 播放完语音。
+ *
+ * Persona 和 Conversation 都属于 Domain，不属于 Infrastructure，不考虑持久化存储。
+ * 持久化由 PersonaListener.onDialogueTurn(DialogueTurn) 回调处理。
+ * ConversationIdentifier = deviceId + sessionId + roleId
+ */
+@Builder(toBuilder = true)
+public class Persona {
+
+    private static final Logger logger = LoggerFactory.getLogger(Persona.class);
+
+    /**
+     * ToolContext 中传递 sessionId 而非整个 ChatSession，避免序列化问题。
+     * XiaoZhiToolCallingManager 负责通过 SessionManager 还原为 ChatSession 再传给 Function。
+     */
+    public static final String TOOL_CONTEXT_SESSION_ID_KEY = "sessionId";
+
+    private final SessionManager sessionManager;
+    
+    @Setter
+    private String sessionId;
+
+    private PersonaListener listener;
+
+    @Getter
+    private SttService sttService;
+
+    /**
+     * 与LLM Provider通信的具体实现类
+     */
+    private ChatModel chatModel;
+    private GoodbyeMessageSupplier goodbyeMessages;
+
+    @Getter
+    private Synthesizer synthesizer;
+
+    @Getter
+    private Player player;
+
+    /**
+     * 一个Session在某个时刻，只有一个活跃的Conversation。
+     * 当切换角色时，Conversation应该释放新建。切换角色一般是不频繁的。
+     */
+    @Getter
+    private Conversation conversation;
+
+    /**
+     * 工具回调列表，由 PersonaFactory 构建时从 DialogueContext 传入。
+     * chatStream() 从此字段获取工具列表，使 Persona 不再依赖 session.getToolCallbacks()。
+     */
+    @Builder.Default
+    private List<ToolCallback> toolCallbacks = new ArrayList<>();
+
+
+    // PersonaListener 回调实现了核心与辅助的分离：Persona 只通知"发生了什么"，持久化和监控由外部实现。
+
+    /**
+     * 获取ChatSession
+     */
+    private ChatSession getSession() {
+        return sessionManager.getSession(sessionId);
+    }
+
+    /**
+     * 处理用户查询（流式方式）
+     * @param userMessage         用户消息
+     * @param useFunctionCall 是否使用函数调用
+     */
+    private Flux<ChatResponse> chatStream(Instant now, UserMessage userMessage, boolean useFunctionCall) {
+        // userSpeechPath 从 session 中获取，避免参数层层穿透
+        Path userSpeechPath = getSession().getUserAudioPath();
+
+        // time to first token，同时也应该是实质上的AssistantMessage createdAt 时间戳。
+        // 在ChatModel生成完成时，语音合成器、播放器已经在工作了。但在第一个Token生成前，语音合成器与播放器还没有开始工作。
+        // 播放器生成文件时也需要用到一个关联到AssistantMessage的ID，不能在sendStart时创建磁盘音频文件。
+        AtomicReference<Instant> ttft = new AtomicReference<>(null);
+
+        String deviceId = getSession().getDevice() != null ? getSession().getDevice().getDeviceId() : null;
+        ChatOptions chatOptions = ToolCallingChatOptions.builder()
+                .toolCallbacks(useFunctionCall ? toolCallbacks : new ArrayList<>())
+                .toolContext(TOOL_CONTEXT_SESSION_ID_KEY, sessionId)
+                .toolContext("deviceId", deviceId)
+                .toolContext("conversationTimestamp", now.toEpochMilli())
+                .build();
+
+        conversation.add(userMessage);
+        List<Message> messages = conversation.messages();
+        Prompt prompt = new Prompt(messages, chatOptions);
+
+        Flux<ChatResponse> chatFlux = chatModel.stream(prompt)
+            .doOnError(error -> {
+                listener.onError(error);
+            });
+        chatFlux = chatFlux.doOnNext(chatResponse -> {
+            Instant assistantMessageCreatedAt = Instant.now();
+            boolean isFirst = ttft.compareAndSet(null, assistantMessageCreatedAt);
+            if (isFirst) {
+                if (player.getOpusRecorder() != null) {
+                    player.getOpusRecorder().setAssistantMessageCreatedAt(assistantMessageCreatedAt);
+                }
+            }
+        });
+        return new MessageAggregator().aggregate(chatFlux, chatResponse -> {
+            boolean disturbed = isDisturbed(chatResponse);
+            var toolCallDetails = getSession().drainToolCallDetails();
+            DialogueTurn dialogueTurn = DialogueTurn.builder()
+                    .userMessage(userMessage)
+                    .chatResponse(chatResponse)
+                    .conversation(conversation)
+                    .userMessageCreatedAt(now)
+                    .userSpeechPath(userSpeechPath)
+                    .assistantMessageCreatedAt(ttft.get())
+                    .disturbed(disturbed)
+                    .toolCallDetails(toolCallDetails)
+                    .build();
+            // UserMessage 的时间戳应在 DialogueTurn 中注入，与 Conversation 持有的是同一个 UserMessage。
+            dialogueTurn.injectInstants();
+            listener.onDialogueTurn(dialogueTurn);
+            if(disturbed){
+                conversation.add(Conversation.ROLLBACK_MESSAGE);
+            }else{
+                // 不能再从 ChatResponse 里取 AssistantMessage，因为已注入时间戳
+                conversation.add(dialogueTurn.getAssistantMessage());
+            }
+
+        });
+    }
+
+    /**
+     * 默认情况下，启用工具调用
+     * @param userMessage
+     */
+    public void chat(String userMessage){
+        chat(userMessage,true);
+    }
+
+    /**
+     * @param userMessage
+     * @param useFunctionCall
+     */
+    public void chat(String userMessage, boolean useFunctionCall){
+        Instant now = Instant.now();
+        Flux<ChatResponse> chatResponseFlux = chatStream(now, new UserMessage(userMessage), useFunctionCall);
+        synthesizer.synthesize(convert(chatResponseFlux));
+    }
+
+
+    /**
+     * 检查当前Persona是否处于活跃状态（LLM生成中、TTS合成中、音频播放中等）。
+     * 用于打断判断：只要管道中任何一层仍在工作，就应该被打断。
+     */
+    public boolean isActive() {
+        if (synthesizer != null && synthesizer.isActive()) {
+            return true;
+        }
+        return player != null && player.hasContent();
+    }
+
+    private boolean isDisturbed(ChatResponse chatResponse) {
+        Generation generation = chatResponse.getResult();
+        Assert.notNull(generation, "Generation is null from ChatResponse");
+
+        // 判断用户消息是否属于可能影响后续对话效果的指令
+        ChatGenerationMetadata generationMetadata = generation.getMetadata();
+        return isFuncitonCalling(generationMetadata, toolCallbacks);
+
+    }
+
+    /**
+     * 检查元数据中是否包含工具调用标识。这里的“工具调用”指的是那些会影响对话效果的工具消息，例如“退出”、“切换角色”。
+     * 这些的特殊用户指令会污染后续对话效果。
+     * 有些工具调用的结果直接作为AssistantMessage加入对话历史并不会影响对话效果。它的AssistantMessage为正常消息。
+     * @param generationMetadata
+     * @param toolCallbacks
+     * @return
+     */
+
+    private boolean isFuncitonCalling(ChatGenerationMetadata generationMetadata, List<ToolCallback> toolCallbacks){
+        if(ToolExecutionResult.FINISH_REASON.equals(generationMetadata.getFinishReason())){
+            String toolId = generationMetadata.get(ToolExecutionResult.METADATA_TOOL_ID);
+            String toolName = generationMetadata.get(ToolExecutionResult.METADATA_TOOL_NAME);
+            logger.info("工具调用id: {} , name: {}", toolId,toolName);
+
+            if (StringUtils.hasText(toolName) &&
+                    toolCallbacks.stream()
+                            .filter(toolCallback -> toolCallback.getToolDefinition().name().equals(toolName))
+                            .map(toolCallback -> toolCallback.getToolMetadata())
+                            .filter(toolMetadata -> toolMetadata instanceof XiaozhiToolMetadata)
+                            .map(toolMetadata -> (XiaozhiToolMetadata) toolMetadata)
+                            .anyMatch(xiaozhiToolMetadata -> xiaozhiToolMetadata.disturbed())) {
+                logger.info("当前用户消息属于可能影响后续对话效果的指令`{}`，准备执行回滚。", toolName);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 发送告别语并在播放完成后关闭会话
+     *
+     * @return 是否成功发送告别语
+     */
+    public void sendGoodbyeMessage() {
+        ChatSession session = getSession();
+        if (session == null || !session.isAudioChannelOpen()){
+            return ;
+        }
+        // 告别语不需要保存opus音频文件，重置时间戳防止复用上一轮对话的值
+        if (player.getOpusRecorder() != null) {
+            player.getOpusRecorder().setAssistantMessageCreatedAt(null);
+        }
+        player.setFunctionAfterChat(() -> {
+            session.setPersona(null);
+            session.setPlayer(null);
+            conversation.clear();
+            if (sessionManager != null) {
+                sessionManager.closeSession(session);
+            } else {
+                session.close();
+            }
+        });
+        if(goodbyeMessages!=null){
+            // 随机选择一条告别语
+            String goodbyeMessage = goodbyeMessages.get();
+
+            // 直接处理告别语，不通过LLM
+            synthesizer.synthesize(goodbyeMessage);
+        }else{
+            chat("我有事先忙了，再见！",false);
+        }
+
+    }
+
+    private Flux<String> convert(Flux<ChatResponse> chatResponseFlux) {
+        return chatResponseFlux.mapNotNull(ChatResponse::getResult)
+                .mapNotNull(Generation::getOutput)
+                .mapNotNull(AssistantMessage::getText);
+
+    }
+}

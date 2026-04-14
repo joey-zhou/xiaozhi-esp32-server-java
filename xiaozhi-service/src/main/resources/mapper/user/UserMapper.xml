@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaozhi.user.dal.mysql.mapper.UserMapper">
+
+    <select id="selectPageResp" resultType="com.xiaozhi.common.model.resp.UserResp">
+        SELECT
+            u.userId,
+            u.username,
+            u.`name`,
+            CASE
+                WHEN LENGTH(u.tel) > 7 THEN CONCAT(LEFT(u.tel, 3), '****', RIGHT(u.tel, 4))
+                ELSE u.tel
+            END AS tel,
+            u.email,
+            u.avatar,
+            u.state,
+            u.isAdmin,
+            u.authRoleId,
+            ar.authRoleName,
+            u.loginIp,
+            u.loginTime,
+            u.createTime,
+            u.updateTime,
+            (
+                SELECT COUNT(*)
+                FROM sys_device d
+                WHERE d.userId = u.userId
+            ) AS totalDevice,
+            (
+                SELECT COUNT(*)
+                FROM sys_message m
+                WHERE m.userId = u.userId
+                  AND m.state = '1'
+            ) AS totalMessage,
+            (
+                SELECT COUNT(*)
+                FROM sys_device d
+                WHERE d.userId = u.userId
+                  AND d.state = '1'
+            ) AS aliveNumber
+        FROM sys_user u
+        LEFT JOIN sys_auth_role ar ON ar.authRoleId = u.authRoleId
+        WHERE 1 = 1
+        <if test="email != null and email != ''">
+            AND u.email = #{email}
+        </if>
+        <if test="tel != null and tel != ''">
+            AND u.tel = #{tel}
+        </if>
+        <if test="name != null and name != ''">
+            AND u.name LIKE CONCAT('%', #{name}, '%')
+        </if>
+        <if test="isAdmin != null and isAdmin != ''">
+            AND u.isAdmin = #{isAdmin}
+        </if>
+        <if test="authRoleId != null">
+            AND u.authRoleId = #{authRoleId}
+        </if>
+        ORDER BY u.createTime DESC
+    </select>
+
+</mapper>

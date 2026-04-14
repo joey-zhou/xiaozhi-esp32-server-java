@@ -8,7 +8,7 @@ const PAGE_SIZE = 50
  * 支持初始加载 + 滚动到底部自动加载下一页
  */
 export function useSelectLoadMore<T extends object>(
-  fetchFn: (params: { start: number; limit: number }) => Promise<PageResponse<T>>
+  fetchFn: (params: { pageNo: number; pageSize: number }) => Promise<PageResponse<T>>
 ) {
   const list = ref<T[]>([])
   const loading = ref(false)
@@ -19,7 +19,7 @@ export function useSelectLoadMore<T extends object>(
     if (loading.value) return
     loading.value = true
     try {
-      const res = await fetchFn({ start: page, limit: PAGE_SIZE })
+      const res = await fetchFn({ pageNo: page, pageSize: PAGE_SIZE })
       if (res.code === 200 && res.data) {
         if (page === 1) {
           list.value = res.data.list as T[]

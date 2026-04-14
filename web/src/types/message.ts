@@ -30,7 +30,4 @@ export interface MessageQueryParams extends PageQueryParams {
   sender?: string
   startTime?: string
   endTime?: string
-  // 重写 start 和 limit 为可选
-  start?: number
-  limit?: number
 }

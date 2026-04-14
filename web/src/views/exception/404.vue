@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { ROUTES } from '@/router/routes'
 
 const router = useRouter()
 
@@ -8,7 +9,7 @@ function goBack() {
 }
 
 function goHome() {
-  router.push('/dashboard')
+  router.push(ROUTES.DASHBOARD)
 }
 </script>
 

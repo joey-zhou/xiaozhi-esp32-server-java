@@ -10,9 +10,9 @@ export interface PromptTemplate {
   updateTime?: string
 }
 
-import type { BaseQueryParams } from './api'
+import type { PageQueryParams } from './api'
 
-export interface TemplateQuery extends BaseQueryParams {
+export interface TemplateQuery extends PageQueryParams {
   templateName?: string
   category?: string
 }

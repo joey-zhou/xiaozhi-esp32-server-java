@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
 import AppFooter from './AppFooter.vue'
+import { ROUTES } from '@/router/routes'
 import FloatingChat from '@/components/FloatingChat.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 
@@ -54,7 +55,7 @@ onMounted(() => {
   
   // 检查登录状态
   if (!userInfo.value) {
-    router.push('/login')
+    router.push(ROUTES.LOGIN)
   }
 })
 

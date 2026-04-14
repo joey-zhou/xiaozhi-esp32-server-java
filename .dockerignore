@@ -1,11 +1,30 @@
-# 排除其他不需要的文件/目录
+# 版本控制 / IDE
 .git/
 .github/
 .idea/
 .vscode/
-node_modules/
-target/
+.windsurf/
+.claude/
+
+# 各模块构建产物
+**/target/
+**/node_modules/
+
+# 前端（由 Dockerfile-node 单独构建）
+web/
+
+# 文档引擎（不需要进入 server 构建）
+document_engine/
+
+# 运行时产物
 audio/
 avatar/
+uploads/
+logs/
+data/
+
+# 杂项
 *.md
 *.log
+.DS_Store
+*.iml

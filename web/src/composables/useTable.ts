@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import type { TablePaginationConfig } from 'ant-design-vue'
 import { useDebounceFn } from '@vueuse/core'
 import type { PageResponse } from '@/types/api'
+import { shouldIgnoreRequestError } from '@/services/request'
 
 /**
  * 表格分页管理 Composable（增强版）
@@ -43,7 +44,7 @@ export function useTable<T = any>() {
    * 加载数据（带错误处理）
    */
   const loadData = async (
-    fetchFn: (params: { start: number; limit: number }) => Promise<PageResponse<T>>,
+    fetchFn: (params: { pageNo: number; pageSize: number }) => Promise<PageResponse<T>>,
     options?: {
       showError?: boolean
       onSuccess?: () => void
@@ -55,8 +56,8 @@ export function useTable<T = any>() {
     try {
       loading.value = true
       const res = await fetchFn({
-        start: pagination.current || 1,
-        limit: pagination.pageSize || 10,
+        pageNo: pagination.current || 1,
+        pageSize: pagination.pageSize || 10,
       })
 
       if (res.code === 200) {
@@ -70,6 +71,10 @@ export function useTable<T = any>() {
         onError?.(res)
       }
     } catch (error: unknown) {
+      if (shouldIgnoreRequestError(error)) {
+        onError?.(error)
+        return
+      }
       console.error('Error loading data:', error)
       if (showError) {
         const errorMessage = error instanceof Error 
@@ -103,4 +108,3 @@ export function useTable<T = any>() {
     createDebouncedSearch,
   }
 }
-

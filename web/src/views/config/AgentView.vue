@@ -105,9 +105,8 @@ const fetchData = async () => {
   await loadData((params) => queryAgents({
     provider: searchForm.value.provider,
     agentName: searchForm.value.agentName,
-    configType: 'agent',
-    start: params.start,
-    limit: params.limit
+    pageNo: params.pageNo,
+    pageSize: params.pageSize
   }))
 }
 
@@ -433,7 +432,11 @@ fetchData()
     <!-- 表格数据 -->
     <a-card :title="t('menu.agent')" :bordered="false">
       <template #extra>
-        <a-button type="primary" @click="handleConfigPlatform">
+        <a-button
+          v-permission="['system:config:agent:create', 'system:config:agent:update']"
+          type="primary"
+          @click="handleConfigPlatform"
+        >
           <template #icon>
             <SettingOutlined />
           </template>
@@ -488,6 +491,7 @@ fetchData()
           <template v-else-if="column.key === 'operation'">
             <TableActionButtons
               :record="record"
+              permission-prefix="system:config:agent"
               show-set-default
               :is-default="record.isDefault == 1"
               @set-default="handleSetDefault"

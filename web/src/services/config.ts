@@ -14,14 +14,21 @@ export function queryConfigs(params: Partial<ConfigQueryParams>) {
  * 添加配置
  */
 export function addConfig(data: Partial<Config>) {
-  return http.postJSON(api.config.add, data)
+  return http.post(api.config.add, data)
 }
 
 /**
  * 更新配置
  */
 export function updateConfig(data: Partial<Config>) {
-  return http.putJSON(`${api.config.update}/${data.configId}`, data)
+  return http.put(`${api.config.update}/${data.configId}`, data)
+}
+
+/**
+ * 删除配置
+ */
+export function deleteConfig(configId: number) {
+  return http.delete(`${api.config.delete}/${configId}`)
 }
 
 /**
@@ -38,12 +45,12 @@ export function queryPlatformConfig(configType: string, provider: string) {
  * 添加平台配置
  */
 export function addPlatformConfig(data: Partial<PlatformConfig>) {
-  return http.postJSON(api.config.add, data)
+  return http.post(api.config.add, data)
 }
 
 /**
  * 更新平台配置
  */
 export function updatePlatformConfig(data: Partial<PlatformConfig>) {
-  return http.putJSON(`${api.config.update}/${data.configId}`, data)
+  return http.put(`${api.config.update}/${data.configId}`, data)
 }

@@ -1,3 +1,5 @@
+import type { PageQueryParams } from './api'
+
 /**
  * 记忆类型定义
  */
@@ -6,6 +8,7 @@
  * 摘要记忆
  */
 export interface SummaryMemory {
+  id: number
   deviceId: string
   roleId: number
   lastMessageTimestamp: string
@@ -32,11 +35,9 @@ export interface ChatMemory {
 /**
  * 记忆查询参数
  */
-export interface MemoryQueryParams {
+export interface MemoryQueryParams extends PageQueryParams {
   roleId: number
   deviceId: string
-  start?: number
-  limit?: number
 }
 
 /**

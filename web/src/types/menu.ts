@@ -5,6 +5,9 @@ export interface MenuMeta {
   hideInMenu?: boolean
   breadcrumb?: Array<{ breadcrumbName: string }>
   parent?: string
+  permission?: string
+  permissions?: string[]
+  showInUserHeader?: boolean
 }
 
 export interface MenuItem {
@@ -14,5 +17,4 @@ export interface MenuItem {
   children?: MenuItem[]
   component?: unknown
 }
-
 

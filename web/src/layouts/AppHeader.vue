@@ -7,6 +7,7 @@ import { useAppStore } from '@/store/app'
 import { useAvatar } from '@/composables/useAvatar'
 import { useLocale } from '@/composables/useLocale'
 import { useAntdTheme } from '@/composables/useAntdTheme'
+import { ROUTES } from '@/router/routes'
 
 const { t } = useI18n()
 import { 
@@ -67,21 +68,21 @@ function handleLogout() {
   // 清除token
   userStore.clearToken()
   // 跳转到登录页
-  router.push('/login')
+  router.push(ROUTES.LOGIN)
 }
 
 /**
  * 跳转到个人中心
  */
 function goToAccount() {
-  router.push('/setting/account')
+  router.push(ROUTES.SETTING_ACCOUNT)
 }
 
 /**
  * 跳转到个人设置
  */
 function goToSettings() {
-  router.push('/setting/config')
+  router.push(ROUTES.SETTING_CONFIG)
 }
 
 /**

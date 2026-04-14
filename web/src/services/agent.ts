@@ -3,7 +3,7 @@
  */
 import { http } from './request'
 import api from './api'
-import type { Agent, AgentQueryParams, PlatformConfig } from '@/types/agent'
+import type { Agent, AgentQueryParams } from '@/types/agent'
 
 /**
  * 查询智能体列表
@@ -11,26 +11,3 @@ import type { Agent, AgentQueryParams, PlatformConfig } from '@/types/agent'
 export function queryAgents(params: Partial<AgentQueryParams>) {
   return http.getPage<Agent>(api.agent.query, params)
 }
-
-/**
- * 添加智能体
- */
-export function addAgent(data: Partial<PlatformConfig>) {
-  return http.postJSON(api.agent.add, data)
-}
-
-/**
- * 更新智能体
- */
-export function updateAgent(data: Partial<PlatformConfig>) {
-  return http.putJSON(`${api.agent.update}/${data.agentId}`, data)
-}
-
-/**
- * 删除智能体
- */
-export function deleteAgent(agentId: string | number) {
-  return http.delete(`${api.agent.delete}/${agentId}`)
-}
-
-

@@ -5,10 +5,12 @@
 
 import type { ConfigTypeInfo } from '@/types/config'
 
+
 // 配置类型信息映射
 export const configTypeMap: Record<string, ConfigTypeInfo> = {
   llm: {
     label: 'config.llm',
+    permissionPrefix: 'system:config',
     // 各类别对应的参数字段定义
     typeFields: {
       // OpenAI 系列
@@ -1029,9 +1031,28 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
   },
   stt: {
     label: 'config.stt',
+    permissionPrefix: 'system:config',
     typeOptions: [
       { label: 'Tencent', value: 'tencent', key: '0' },
-      { label: 'Aliyun（DashScope）', value: 'aliyun', key: '1' },
+      {
+        label: 'Aliyun（DashScope）',
+        value: 'aliyun',
+        key: '1',
+        configNameOptions: [
+          'paraformer-realtime-8k-v2',
+          'paraformer-realtime-8k-v1',
+          'paraformer-realtime-v2',
+          'paraformer-realtime-v1',
+          'fun-asr-realtime',
+          'fun-asr-realtime-2025-11-07',
+          'fun-asr-realtime-2025-09-15',
+          'fun-asr-flash-8k-realtime',
+          'fun-asr-flash-8k-realtime-2026-01-28',
+          'gummy-realtime-v1',
+          'gummy-chat-v1',
+          'qwen3-asr-flash-realtime',
+        ]
+      },
       { label: 'Aliyun（NLS标准版）', value: 'aliyun-nls', key: '2' },
       { label: 'Xfyun', value: 'xfyun', key: '3' },
       { label: 'FunASR', value: 'funasr', key: '4' },
@@ -1161,6 +1182,7 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
   },
   tts: {
     label: 'config.tts',
+    permissionPrefix: 'system:config',
     typeOptions: [
       { label: 'Tencent', value: 'tencent', key: '0' },
       { label: 'Aliyun', value: 'aliyun', key: '1' },
@@ -1297,6 +1319,103 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
         }
       ],
       'sherpa-onnx': [],
+    }
+  },
+  oss: {
+    label: 'config.oss',
+    permissionPrefix: 'system:config',
+    typeOptions: [
+      { label: '本地存储', value: 'local', key: '0' },
+      { label: '腾讯云 COS', value: 'tencent', key: '1' },
+      { label: '阿里云 OSS', value: 'aliyun', key: '2' }
+    ],
+    typeFields: {
+      local: [],
+      tencent: [
+        {
+          name: 'apiKey',
+          label: 'SecretId',
+          required: true,
+          inputType: 'password',
+          span: 12,
+          help: '在 https://console.cloud.tencent.com/cam/capi 获取',
+          placeholder: 'your-secret-id'
+        },
+        {
+          name: 'apiSecret',
+          label: 'SecretKey',
+          required: true,
+          inputType: 'password',
+          span: 12,
+          help: '腾讯云 API 密钥 Key',
+          placeholder: 'your-secret-key'
+        },
+        {
+          name: 'appId',
+          label: 'Region',
+          required: true,
+          inputType: 'text',
+          span: 12,
+          help: '存储桶所在地域',
+          placeholder: 'ap-guangzhou'
+        },
+        {
+          name: 'configName',
+          label: 'Bucket',
+          required: true,
+          inputType: 'text',
+          span: 12,
+          help: '存储桶名称',
+          placeholder: 'my-bucket-1250000000'
+        },
+        {
+          name: 'apiUrl',
+          label: '路径前缀',
+          required: false,
+          inputType: 'text',
+          span: 12,
+          help: 'COS 中的路径前缀（可选）',
+          placeholder: 'uploads/'
+        }
+      ],
+      aliyun: [
+        {
+          name: 'ak',
+          label: 'AccessKey ID',
+          required: true,
+          inputType: 'password',
+          span: 12,
+          help: '在 https://ram.console.aliyun.com/profile/access-keys 获取',
+          placeholder: 'your-access-key-id'
+        },
+        {
+          name: 'sk',
+          label: 'AccessKey Secret',
+          required: true,
+          inputType: 'password',
+          span: 12,
+          help: '对应 AccessKey ID 的密钥',
+          placeholder: 'your-access-key-secret'
+        },
+        {
+          name: 'apiUrl',
+          label: 'Endpoint',
+          required: true,
+          inputType: 'text',
+          span: 12,
+          help: 'OSS 访问域名',
+          placeholder: 'oss-cn-hangzhou.aliyuncs.com'
+        },
+        {
+          name: 'configName',
+          label: 'Bucket',
+          required: true,
+          inputType: 'text',
+          span: 12,
+          help: '存储桶名称',
+          placeholder: 'my-bucket'
+        }
+      ]
     }
   }
 };

@@ -6,6 +6,7 @@ import { ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useLoadingStore } from '@/store/loading'
 import { useDebounceFn } from '@vueuse/core'
+import { shouldIgnoreRequestError } from '@/services/request'
 
 interface RequestOptions<T = unknown> {
   showLoading?: boolean // 是否显示全局 loading
@@ -20,10 +21,6 @@ interface RequestOptions<T = unknown> {
 // 错误类型守卫
 function isErrorWithMessage(error: unknown): error is { message: string } {
   return typeof error === 'object' && error !== null && 'message' in error
-}
-
-function isErrorWithCode(error: unknown): error is { code: string } {
-  return typeof error === 'object' && error !== null && 'code' in error
 }
 
 function getErrorMessage(error: unknown): string {
@@ -78,10 +75,8 @@ export function useRequest() {
 
       return result
     } catch (error: unknown) {
-      // 忽略请求取消错误
-      if (isErrorWithCode(error) && (error.code === 'ERR_CANCELED' || 
-          (isErrorWithMessage(error) && (error.message.includes('canceled') || error.message.includes('aborted'))))) {
-        console.debug('请求已取消:', getErrorMessage(error))
+      if (shouldIgnoreRequestError(error)) {
+        console.debug('请求已静默处理:', getErrorMessage(error))
         return undefined
       }
 
@@ -136,10 +131,8 @@ export async function withLoading<T = unknown>(
     loadingStore.showLoading(loadingText)
     return await requestFn()
   } catch (error: unknown) {
-    // 忽略请求取消错误
-    if (isErrorWithCode(error) && (error.code === 'ERR_CANCELED' || 
-        (isErrorWithMessage(error) && (error.message.includes('canceled') || error.message.includes('aborted'))))) {
-      console.debug('请求已取消:', getErrorMessage(error))
+    if (shouldIgnoreRequestError(error)) {
+      console.debug('请求已静默处理:', getErrorMessage(error))
       return undefined
     }
     
@@ -162,10 +155,8 @@ export async function withErrorHandler<T = unknown>(
   try {
     return await requestFn()
   } catch (error: unknown) {
-    // 忽略请求取消错误
-    if (isErrorWithCode(error) && (error.code === 'ERR_CANCELED' || 
-        (isErrorWithMessage(error) && (error.message.includes('canceled') || error.message.includes('aborted'))))) {
-      console.debug('请求已取消:', getErrorMessage(error))
+    if (shouldIgnoreRequestError(error)) {
+      console.debug('请求已静默处理:', getErrorMessage(error))
       return undefined
     }
     
@@ -175,4 +166,3 @@ export async function withErrorHandler<T = unknown>(
     return undefined
   }
 }
-

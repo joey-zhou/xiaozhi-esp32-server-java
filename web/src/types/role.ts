@@ -1,6 +1,4 @@
-/**
- * 角色相关类型定义
- */
+import type { PageQueryParams } from './api'
 
 // 模型类型
 export type ModelType = 'llm' | 'agent'
@@ -46,54 +44,45 @@ export interface Role {
   memoryType?: MemoryType // 记忆类型
 }
 
-import type { BaseQueryParams } from './api'
-
-// 角色查询参数
-export interface RoleQueryParams extends BaseQueryParams {
+export interface RoleQueryParams extends PageQueryParams {
   roleName?: string
   isDefault?: number
 }
 
-// 语音选项
 export interface VoiceOption {
   label?: string
   value?: string
   gender: VoiceGender
   provider: VoiceProvider
-  ttsId?: number // 关联的TTS配置ID
+  ttsId?: number
   model?: string
 }
 
-// 模型选项（统一LLM和Agent）
 export interface ModelOption {
   label: string
-  value: number // configId
+  value: number
   desc?: string
   type: ModelType
   provider: string
-  // 额外信息
   configName?: string
   configDesc?: string
   agentName?: string
   agentDesc?: string
 }
 
-// 语音识别选项
 export interface SttOption {
   label: string
   value: number
   desc?: string
 }
 
-// 提示词模板
 export interface PromptTemplate {
   templateId: number
   templateName: string
   templateContent: string
-  isDefault?: boolean |number
+  isDefault?: boolean | number
 }
 
-// 角色表单数据
 export interface RoleFormData {
   roleId?: number
   roleName: string
@@ -131,3 +120,4 @@ export interface TestVoiceParams {
   ttsPitch?: number
   ttsSpeed?: number
 }
+

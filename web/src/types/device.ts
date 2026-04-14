@@ -49,9 +49,6 @@ export interface DeviceQueryParams extends PageQueryParams {
   deviceName?: string
   roleName?: string
   state?: string | number
-  // 重写 start 和 limit 为可选
-  start?: number
-  limit?: number
 }
 
 // 移除重复的响应类型定义，使用统一的 PageResponse<Device>
@@ -69,3 +66,5 @@ export interface Role {
   createTime?: string
   updateTime?: string
 }
+
+

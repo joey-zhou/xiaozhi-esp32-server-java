@@ -19,7 +19,6 @@ const { getAvatarUrl } = useAvatar()
 
 const userInfo = computed(() => userStore.userInfo || {})
 const avatarUrl = computed(() => getAvatarUrl(userInfo.value.avatar))
-
 // 头像上传相关状态
 const avatarLoading = ref(false)
 
@@ -324,7 +323,12 @@ const getRelativePath = (fullUrl: string): string => {
             </a-form-item>
 
             <a-form-item>
-              <a-button type="primary" html-type="submit" :loading="submitLoading">
+              <a-button
+                v-permission="'system:setting:account:update'"
+                type="primary"
+                html-type="submit"
+                :loading="submitLoading"
+              >
                 {{ t('common.save') }}
               </a-button>
             </a-form-item>
@@ -335,6 +339,7 @@ const getRelativePath = (fullUrl: string): string => {
         <a-col :xs="24" :lg="12">
           <div class="avatar-section">
             <a-upload
+              v-if="userStore.hasPermission('system:setting:account:update')"
               name="file"
               :show-upload-list="false"
               :before-upload="beforeAvatarUpload"
@@ -351,8 +356,13 @@ const getRelativePath = (fullUrl: string): string => {
                 </div>
               </div>
             </a-upload>
+            <div v-else class="avatar-preview avatar-preview--readonly">
+              <a-avatar :src="avatarUrl" :size="180">
+                <template #icon><UserOutlined /></template>
+              </a-avatar>
+            </div>
             <div class="avatar-tips">
-              <p>{{ t('common.clickToChangeAvatar') }}</p>
+              <p>{{ userStore.hasPermission('system:setting:account:update') ? t('common.clickToChangeAvatar') : t('common.avatar') }}</p>
               <p style="color: var(--ant-color-text-tertiary); font-size: 12px">{{ t('common.avatarFormatTip') }}</p>
             </div>
           </div>
@@ -406,6 +416,10 @@ const getRelativePath = (fullUrl: string): string => {
     }
   }
 
+  .avatar-preview--readonly:hover {
+    transform: none;
+  }
+
   .avatar-tips {
     margin-top: 24px;
     text-align: center;
@@ -420,4 +434,3 @@ const getRelativePath = (fullUrl: string): string => {
   margin-bottom: 24px;
 }
 </style>
-

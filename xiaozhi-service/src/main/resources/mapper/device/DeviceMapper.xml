@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaozhi.device.dal.mysql.mapper.DeviceMapper">
+
+    <sql id="Device_Select_Columns">
+        d.deviceId,
+        d.deviceName,
+        d.roleId,
+        r.roleName,
+        d.state,
+        (
+            SELECT COUNT(*)
+            FROM sys_message m
+            WHERE m.deviceId = d.deviceId
+        ) AS totalMessage,
+        d.wifiName,
+        d.ip,
+        d.chipModelName,
+        d.type,
+        d.version,
+        d.location,
+        d.createTime,
+        d.updateTime
+    </sql>
+
+    <sql id="Device_From_And_Where">
+        FROM sys_device d
+        LEFT JOIN sys_role r ON r.roleId = d.roleId
+        WHERE 1 = 1
+        <if test="userId != null">
+            AND d.userId = #{userId}
+        </if>
+        <if test="deviceId != null and deviceId != ''">
+            AND d.deviceId = #{deviceId}
+        </if>
+        <if test="deviceName != null and deviceName != ''">
+            AND d.deviceName LIKE CONCAT('%', #{deviceName}, '%')
+        </if>
+        <if test="roleName != null and roleName != ''">
+            AND r.roleName LIKE CONCAT('%', #{roleName}, '%')
+        </if>
+        <if test="state != null and state != ''">
+            AND d.state = #{state}
+        </if>
+        <if test="roleId != null">
+            AND d.roleId = #{roleId}
+        </if>
+    </sql>
+
+    <sql id="Device_Code_Columns">
+        c.code,
+        c.deviceId,
+        c.sessionId,
+        c.type,
+        c.audioPath,
+        c.createTime
+    </sql>
+
+    <select id="selectPageResp" resultType="com.xiaozhi.common.model.resp.DeviceResp">
+        SELECT
+        <include refid="Device_Select_Columns"/>
+        <include refid="Device_From_And_Where"/>
+        ORDER BY d.createTime DESC
+    </select>
+
+    <select id="selectRespById" resultType="com.xiaozhi.common.model.resp.DeviceResp">
+        SELECT
+        <include refid="Device_Select_Columns"/>
+        FROM sys_device d
+        LEFT JOIN sys_role r ON r.roleId = d.roleId
+        WHERE 1 = 1
+        <if test="userId != null">
+            AND d.userId = #{userId}
+        </if>
+        AND d.deviceId = #{deviceId}
+        LIMIT 1
+    </select>
+
+    <select id="selectValidCode" resultType="com.xiaozhi.common.model.bo.VerifyCodeBO">
+        SELECT
+        <include refid="Device_Code_Columns"/>
+        FROM sys_code c
+        WHERE 1 = 1
+        <if test="deviceId != null and deviceId != ''">
+            AND c.deviceId = #{deviceId}
+        </if>
+        <if test="sessionId != null and sessionId != ''">
+            AND c.sessionId = #{sessionId}
+        </if>
+        <if test="code != null and code != ''">
+            AND c.code = #{code}
+        </if>
+        AND c.createTime &gt;= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+        ORDER BY c.createTime DESC
+        LIMIT 1
+    </select>
+
+    <insert id="insertVerifyCode">
+        INSERT INTO sys_code (deviceId, sessionId, type, code, createTime)
+        VALUES (#{deviceId}, #{sessionId}, #{type}, #{code}, NOW())
+    </insert>
+
+    <update id="updateCodeAudioPath">
+        UPDATE sys_code
+        SET audioPath = #{audioPath}
+        WHERE deviceId = #{deviceId}
+          AND sessionId = #{sessionId}
+          AND code = #{code}
+    </update>
+</mapper>

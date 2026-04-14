@@ -81,9 +81,9 @@ export interface DragUploadOptions {
  *   },
  *   enabled: () => activeTab.value === 'upload',
  *   messages: {
- *     dragText: 'voiceClone.dragDropText',
- *     dragHint: 'voiceClone.dragDropHint',
- *     successMessage: 'voiceClone.fileUploadSuccess'
+ *     dragText: 'firmware.dragDropText',
+ *     dragHint: 'firmware.dragDropHint',
+ *     successMessage: 'firmware.fileUploadSuccess'
  *   }
  * })
  * ```
@@ -308,37 +308,6 @@ export const fileValidators = {
       const isLt2M = file.size / 1024 / 1024 < 2
       if (!isLt2M) {
         return 'common.imageSizeLimit'
-      }
-
-      return true
-    }
-  } as FileValidator,
-
-  /**
-   * 文档文件验证器（用于知识库，20MB限制）
-   */
-  document: {
-    validate: (file: File) => {
-      const allowedTypes = [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain',
-        'text/markdown'
-      ]
-
-      const allowedExtensions = /\.(pdf|doc|docx|txt|md)$/i
-
-      const isDocument = allowedTypes.includes(file.type) ||
-                        allowedExtensions.test(file.name)
-
-      if (!isDocument) {
-        return 'knowledge.invalidFileFormat'
-      }
-
-      const isLt20M = file.size / 1024 / 1024 < 20
-      if (!isLt20M) {
-        return 'knowledge.fileSizeExceeded'
       }
 
       return true

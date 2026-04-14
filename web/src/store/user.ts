@@ -1,6 +1,9 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
+import type { AuthRole } from '@/types/authRole'
+
+export type { AuthRole } from '@/types/authRole'
 
 export interface UserInfo {
   userId?: string
@@ -16,7 +19,7 @@ export interface UserInfo {
   totalMessage?: number
   loginTime?: string
   loginIp?: string
-  roleId?: number
+  authRoleId?: number
 }
 
 // 权限信息
@@ -35,21 +38,10 @@ export interface Permission {
   children?: Permission[]
 }
 
-// 角色信息
-export interface Role {
-  roleId: number
-  roleName: string
-  roleKey: string
-  description?: string
-  status?: string
-  createTime?: string
-  updateTime?: string
-}
-
 // 登录响应数据
 export interface LoginResponse {
   user: UserInfo
-  role: Role
+  authRole: AuthRole
   permissions: Permission[]
   token: string
   refreshToken: string
@@ -91,14 +83,14 @@ export const useUserStore = defineStore('user', () => {
     },
   })
 
-  // 角色信息
-  const role = useStorage<Role | null>('role', null, localStorage, {
+  // 后台权限角色信息
+  const authRole = useStorage<AuthRole | null>('authRole', null, localStorage, {
     serializer: {
       read: (v: any) => {
         try {
           return v ? JSON.parse(v) : null
         } catch (e) {
-          console.error('Failed to parse role:', e)
+          console.error('Failed to parse auth role:', e)
           return null
         }
       },
@@ -144,8 +136,8 @@ export const useUserStore = defineStore('user', () => {
     permissions.value = perms
   }
 
-  const setRole = (roleInfo: Role) => {
-    role.value = roleInfo
+  const setAuthRole = (roleInfo: AuthRole) => {
+    authRole.value = roleInfo
   }
 
   const setMobileType = (mobile: boolean) => {
@@ -159,7 +151,7 @@ export const useUserStore = defineStore('user', () => {
   const clearUserInfo = () => {
     userInfo.value = null
     permissions.value = []
-    role.value = null
+    authRole.value = null
   }
 
   const updateUserInfo = (info: Partial<UserInfo>) => {
@@ -214,7 +206,7 @@ export const useUserStore = defineStore('user', () => {
   return {
     userInfo,
     permissions,
-    role,
+    authRole,
     token,
     refreshToken,
     wsConfig,
@@ -223,7 +215,7 @@ export const useUserStore = defineStore('user', () => {
     isAdmin,
     setUserInfo,
     setPermissions,
-    setRole,
+    setAuthRole,
     setMobileType,
     setNavigationStyle,
     clearUserInfo,

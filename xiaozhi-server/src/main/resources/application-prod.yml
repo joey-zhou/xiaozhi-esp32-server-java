@@ -1,0 +1,29 @@
+# ============================================================
+# 生产环境配置
+# ============================================================
+
+spring:
+  # 数据源配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/xiaozhi?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: xiaozhi
+    password: 123456
+
+# 生产环境邮箱配置
+email:
+  smtp:
+    username: xxxx
+    password: xxxx
+
+# 阿里云短信配置
+sms:
+  aliyun:
+    access-key-id: ''
+    access-key-secret: ''
+    sign-name: ''
+    template-code: ''
+
+xiaozhi:
+  server:
+    domain: connectai.chat

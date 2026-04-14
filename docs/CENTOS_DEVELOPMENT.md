@@ -1,110 +1,41 @@
-# 小智ESP32服务器CentOS部署文档
+# CentOS 部署指南
 
 ## 系统要求
 
-- CentOS 7/8（推荐CentOS 8）
-- 最小化安装 + 开发工具（gcc, make等）
-- 至少2GB内存（推荐4GB）
-- 至少10GB磁盘空间
+| 项目 | 要求 |
+|------|------|
+| 系统 | CentOS 7/8 |
+| 内存 | ≥ 2GB（推荐 4GB） |
+| 磁盘 | ≥ 10GB |
+| 端口 | 8084、8091、8092、3306 |
 
-## 1. 环境准备
-
-### 1.1 安装基础工具
-
-```bash
-sudo yum install -y epel-release
-sudo yum install -y wget curl git vim unzip
-```
-
-### 1.2 配置防火墙
+## 1. 安装依赖
 
 ```bash
-sudo firewall-cmd --permanent --add-port=8084/tcp
-sudo firewall-cmd --permanent --add-port=8091/tcp
-sudo firewall-cmd --permanent --add-port=3306/tcp
-sudo firewall-cmd --reload
-```
-
-## 2. 安装Java JDK 21
-
-```bash
-sudo yum install -y java-21-openjdk java-21-openjdk-devel
-```
-
-验证安装：
-
-```bash
-java -version
-```
-
-## 3. 安装MySQL 8.0
-
-```bash
-# 安装MySQL 8.0存储库
-sudo yum localinstall -y https://dev.mysql.com/get/mysql80-community-release-el7-7.noarch.rpm
-sudo yum install -y mysql-community-server
-```
-
-启动MySQL服务：
-
-```bash
-sudo systemctl start mysqld
-sudo systemctl enable mysqld
-```
-
-获取临时密码：
-
-```bash
-sudo grep 'temporary password' /var/log/mysqld.log
-```
-
-安全设置：
-
-```bash
-sudo mysql_secure_installation
-```
-
-## 4. 安装Maven
-
-```bash
-sudo yum install -y maven
-```
-
-验证安装：
-
-```bash
-mvn -v
-```
-
-## 5. 安装Node.js 16
-
-```bash
-curl -sL https://rpm.nodesource.com/setup_16.x | sudo bash -
+sudo yum install -y epel-release wget curl git vim unzip
+sudo yum install -y java-21-openjdk java-21-openjdk-devel maven
+curl -sL https://rpm.nodesource.com/setup_22.x | sudo bash -
 sudo yum install -y nodejs
 ```
 
-验证安装：
+## 2. 配置防火墙
 
 ```bash
-node -v
-npm -v
+sudo firewall-cmd --permanent --add-port={8084,8091,8092,3306}/tcp
+sudo firewall-cmd --reload
 ```
 
-## 6. 安装FFmpeg
+## 3. 安装 MySQL 8.0
 
 ```bash
-sudo yum install -y ffmpeg ffmpeg-devel
+sudo yum localinstall -y https://dev.mysql.com/get/mysql80-community-release-el7-7.noarch.rpm
+sudo yum install -y mysql-community-server
+sudo systemctl start mysqld && sudo systemctl enable mysqld
+sudo grep 'temporary password' /var/log/mysqld.log   # 获取临时密码
+sudo mysql_secure_installation
 ```
 
-验证安装：
-
-```bash
-ffmpeg -version
-```
-
-## 7. 数据库配置
-
-创建数据库和用户：
+创建数据库：
 
 ```sql
 mysql -u root -p
@@ -112,95 +43,62 @@ CREATE DATABASE xiaozhi CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'xiaozhi'@'localhost' IDENTIFIED BY '123456';
 GRANT ALL PRIVILEGES ON xiaozhi.* TO 'xiaozhi'@'localhost';
 FLUSH PRIVILEGES;
-exit
 ```
 
-导入初始化脚本：
+> 无需手动导入 SQL，项目集成 Flyway，首次启动自动建表。
+
+## 4. 下载模型和原生库
+
+使用第三方 STT/TTS 服务可只下载基础依赖。
 
 ```bash
-mysql -u root -p xiaozhi < db/init.sql
+./scripts/download_models.sh            # 下载全部（模型 + 原生库）
+./scripts/download_models.sh status     # 查看状态
 ```
 
-## 8. 下载Vosk语音识别模型
+也可按需单独下载：
 
 ```bash
-wget https://alphacephei.com/vosk/models/vosk-model-cn-0.22.zip
-unzip vosk-model-cn-0.22.zip
-mkdir -p models
-mv vosk-model-cn-0.22 models/vosk-model
+./scripts/download_base.sh              # 基础依赖（VAD 模型 + 原生库）— 必须
+./scripts/download_stt.sh               # Vosk STT 模型（使用第三方 STT 可跳过）
+./scripts/download_tts.sh               # TTS 模型（使用第三方 TTS 可跳过）
 ```
 
-## 9. 项目部署
+## 5. 部署
 
-### 9.1 克隆项目
+项目采用**双进程架构**：
+
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| xiaozhi-server | 8091 | 管理后台 API、用户/设备管理 |
+| xiaozhi-dialogue | 8092 | 设备对话、AI、WebSocket |
 
 ```bash
 git clone https://github.com/joey-zhou/xiaozhi-esp32-server-java
 cd xiaozhi-esp32-server-java
+
+# 一键编译并启动
+bin/all.sh start
+
+# 查看状态
+bin/all.sh status
+
+# 停止 / 重启
+bin/all.sh stop
+bin/all.sh restart
 ```
 
-### 9.2 后端部署
+也可单独管理：`bin/server.sh start`、`bin/dialogue.sh start`
+
+前端：
 
 ```bash
-mvn clean package -DskipTests
-java -jar target/xiaozhi.server-*.jar &（版本号可能不同）
+cd web && npm install && npm run build
 ```
 
-### 9.3 前端部署
+## 6. Nginx 反向代理（可选）
 
-```bash
-cd web
-npm install
-npm run build
-```
-
-## 10. 配置系统服务（可选）
-
-### 10.1 创建后端服务
-
-编辑服务文件：
-
-```bash
-sudo vim /etc/systemd/system/xiaozhi.service
-```
-
-添加内容：
-
-```
-[Unit]
-Description=Xiaozhi ESP32 Server
-After=syslog.target network.target
-
-[Service]
-User=root
-WorkingDirectory=/path/to/xiaozhi-esp32-server-java
-ExecStart=/usr/bin/java -jar target/xiaozhi.server-*.jar（版本号可能不同）
-SuccessExitStatus=143
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-启动服务：
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl start xiaozhi
-sudo systemctl enable xiaozhi
-```
-
-### 10.2 配置Nginx（可选）
-
-```bash
-sudo yum install -y nginx
-sudo vim /etc/nginx/conf.d/xiaozhi.conf
-```
-
-添加配置：
-
-```
+```nginx
 server {
     listen 80;
     server_name your_domain_or_ip;
@@ -209,102 +107,45 @@ server {
         root /path/to/xiaozhi-esp32-server-java/web/dist;
         try_files $uri $uri/ /index.html;
     }
-
     location /api {
         proxy_pass http://localhost:8091;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
+    location /ws {
+        proxy_pass http://localhost:8092;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
 }
 ```
 
-启动Nginx：
+## 7. 访问
+
+| 服务 | 地址 |
+|------|------|
+| 前端 | http://your_server_ip:8084 |
+| 后台 API | http://your_server_ip:8091 |
+| WebSocket | ws://your_server_ip:8092/ws/xiaozhi/v1/ |
+
+默认管理员：admin / 123456
+
+## 维护
 
 ```bash
-sudo systemctl start nginx
-sudo systemctl enable nginx
+bin/all.sh status                          # 查看状态
+tail -f logs/xiaozhi-server.log            # 查看日志
+tail -f logs/xiaozhi-dialogue.log
+git pull origin main && bin/all.sh restart # 更新并重启
+mysqldump -u root -p xiaozhi > backup.sql  # 数据库备份
 ```
 
-## 11. 访问系统
+## 常见问题
 
-- 直接访问：`http://your_server_ip:8084`
-- 如果配置了Nginx：`http://your_domain_or_ip`
-- 默认管理员账号：admin/123456
-
-## 常见问题解决
-
-1. **MySQL初始化失败**
-
-   ```bash
-   sudo systemctl restart mysqld
-   mysql_upgrade -u root -p
-   ```
-
-2. **端口冲突**
-
-   ```bash
-   netstat -tulnp | grep 8084
-   kill -9 <PID>
-   ```
-
-3. **Node.js版本问题**
-
-   ```bash
-   sudo yum remove -y nodejs npm
-   curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash -
-   sudo yum install -y nodejs
-   ```
-
-4. **内存不足**
-
-   增加swap空间：
-
-   ```bash
-   sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
-   sudo mkswap /swapfile
-   sudo swapon /swapfile
-   echo '/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
-   ```
-
-5. **Vosk模型加载失败**
-
-   ```bash
-   chmod -R 755 models
-   ```
-
-## 维护命令
-
-- 查看后端日志：
-
-  ```bash
-  journalctl -u xiaozhi -f
-  ```
-
-- 更新代码：
-
-  ```bash
-  git pull origin master
-  mvn clean package -DskipTests
-  sudo systemctl restart xiaozhi
-  ```
-
-- 数据库备份：
-
-  ```bash
-  mysqldump -u root -p xiaozhi > xiaozhi_backup_$(date +%Y%m%d).sql
-  ```
-
-## 注意事项
-
-1. **生产环境建议：**
-   - 修改默认密码
-   - 配置HTTPS
-   - 定期备份数据库
-
-2. **性能优化：**
-
-   增加JVM内存：
-
-   ```bash
-   java -Xms512m -Xmx1024m -jar target/xiaozhi.server-*.jar（版本号可能不同）
-   ```
+| 问题 | 解决 |
+|------|------|
+| MySQL 初始化失败 | `sudo systemctl restart mysqld` |
+| 端口冲突 | `netstat -tulnp \| grep <端口>` 找到并 kill 占用进程 |
+| 内存不足 | 添加 swap：`sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 && sudo mkswap /swapfile && sudo swapon /swapfile` |
+| 模型加载失败 | `chmod -R 755 models` |

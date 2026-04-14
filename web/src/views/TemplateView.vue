@@ -34,7 +34,7 @@
     <!-- 表格区域 -->
     <a-card :title="t('template.templateList')" :bordered="false" style="margin-top: 16px">
       <template #extra>
-        <a-button type="primary" @click="handleCreate">
+        <a-button v-permission="'system:prompt-template:create'" type="primary" @click="handleCreate">
           <template #icon><PlusOutlined /></template>
           {{ t('template.createTemplate') }}
         </a-button>
@@ -64,6 +64,7 @@
           <template v-else-if="column.key === 'operation'">
             <TableActionButtons
               :record="record"
+              permission-prefix="system:prompt-template"
               show-edit
               show-view
               show-set-default
@@ -90,9 +91,20 @@
       :confirm-loading="modal.submitLoading.value"
       :mask-closable="false"
       width="800px"
-      @ok="handleSubmit"
       @cancel="modal.close"
     >
+      <template #footer>
+        <a-button @click="modal.close">{{ t('common.cancel') }}</a-button>
+        <a-button
+          v-permission="modal.isEdit.value ? 'system:prompt-template:update' : 'system:prompt-template:create'"
+          type="primary"
+          :loading="modal.submitLoading.value"
+          @click="handleSubmit"
+        >
+          {{ t('common.confirm') }}
+        </a-button>
+      </template>
+
       <a-form
         ref="formRef"
         :model="formData"
@@ -144,7 +156,7 @@
           />
         </a-form-item>
 
-        <a-form-item :label="t('common.isDefault')" name="isDefault">
+        <a-form-item v-permission="'system:prompt-template:update'" :label="t('common.isDefault')" name="isDefault">
           <a-switch v-model:checked="formData.isDefault" />
           <span style="margin-left: 8px; color: var(--ant-color-text-tertiary)">{{ t('template.defaultTip') }}</span>
         </a-form-item>
@@ -220,11 +232,9 @@ import {
 } from '@/services/template'
 import { useTable } from '@/composables/useTable'
 import { useModal } from '@/composables/useModal'
-import { useLoadingStore } from '@/store/loading'
 import TableActionButtons from '@/components/TableActionButtons.vue'
 
 const { t } = useI18n()
-const loadingStore = useLoadingStore()
 
 const columns = computed(() => [
   {
@@ -381,11 +391,11 @@ const handleSearch = () => {
 
 // 加载数据
 const fetchData = async () => {
-  await loadData(async ({ start, limit }) => {
+  await loadData(async ({ pageNo, pageSize }) => {
     const res = await queryTemplates({
       ...searchForm,
-      start,
-      limit
+      pageNo,
+      pageSize
     })
     
     // 更新分类选项
@@ -533,4 +543,3 @@ blockquote.template-preview-content {
   margin: 8px 0;
 }
 </style>
-

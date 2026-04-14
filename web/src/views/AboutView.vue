@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { ROUTES } from '@/router/routes'
 
 const router = useRouter()
 </script>
@@ -38,7 +39,7 @@ const router = useRouter()
       </a-space>
 
       <div style="margin-top: 24px">
-        <a-button type="primary" @click="router.push('/dashboard')">返回仪表板</a-button>
+        <a-button type="primary" @click="router.push(ROUTES.DASHBOARD)">返回仪表板</a-button>
       </div>
     </a-card>
   </div>

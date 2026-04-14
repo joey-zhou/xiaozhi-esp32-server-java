@@ -116,7 +116,7 @@ const routes: RouteRecordRaw[] = [
           title: 'router.title.shortTermMemory',
           parent: 'router.parent.memoryManagement',
           requiresAuth: true,
-          permission: 'system:message',
+          permission: 'system:role',
         },
       },
       {
@@ -127,7 +127,7 @@ const routes: RouteRecordRaw[] = [
           title: 'router.title.summaryMemory',
           parent: 'router.parent.memoryManagement',
           requiresAuth: true,
-          permission: 'system:message',
+          permission: 'system:role',
         },
       },
       // 配置管理
@@ -139,7 +139,7 @@ const routes: RouteRecordRaw[] = [
           title: 'router.title.modelConfig',
           parent: 'router.parent.configManagement',
           requiresAuth: true,
-          permission: 'system:config:model',
+          permission: 'system:config',
         },
       },
       {
@@ -161,7 +161,7 @@ const routes: RouteRecordRaw[] = [
           title: 'router.title.sttConfig',
           parent: 'router.parent.configManagement',
           requiresAuth: true,
-          permission: 'system:config:stt',
+          permission: 'system:config',
         },
       },
       {
@@ -172,7 +172,29 @@ const routes: RouteRecordRaw[] = [
           title: 'router.title.ttsConfig',
           parent: 'router.parent.configManagement',
           requiresAuth: true,
-          permission: 'system:config:tts',
+          permission: 'system:config',
+        },
+      },
+      {
+        path: 'config/oss',
+        name: 'config-oss',
+        component: () => import('../views/config/OssConfigView.vue'),
+        meta: {
+          title: 'router.title.ossConfig',
+          parent: 'router.parent.configManagement',
+          requiresAuth: true,
+          permission: 'system:config',
+        },
+      },
+      {
+        path: 'auth-role',
+        name: 'auth-role',
+        component: () => import('../views/AuthRoleView.vue'),
+        meta: {
+          title: 'router.title.authRole',
+          icon: 'SafetyCertificateOutlined',
+          requiresAuth: true,
+          permission: 'system:auth-role',
         },
       },
       // 个人中心

@@ -42,10 +42,10 @@ export function useRoleManager() {
     try {
       // 并行加载LLM和Agent
       const [llmRes, cozeRes, difyRes, xingchenRes] = await Promise.all([
-        queryConfigs({ configType: 'llm', start: 1, limit: 1000 }),
-        queryAgents({ provider: 'coze', configType: 'agent', start: 1, limit: 1000 }),
-        queryAgents({ provider: 'dify', configType: 'agent', start: 1, limit: 1000 }),
-        queryAgents({ provider: 'xingchen', configType: 'agent', start: 1, limit: 1000 })
+        queryConfigs({ configType: 'llm', pageNo: 1, pageSize: 1000 }),
+        queryAgents({ provider: 'coze', pageNo: 1, pageSize: 1000 }),
+        queryAgents({ provider: 'dify', pageNo: 1, pageSize: 1000 }),
+        queryAgents({ provider: 'xingchen', pageNo: 1, pageSize: 1000 })
       ])
 
       const models: ModelOption[] = []
@@ -133,7 +133,7 @@ export function useRoleManager() {
     voiceLoading.value = true
     try {
       // 1. 加载TTS配置
-      const ttsRes = await queryConfigs({ configType: 'tts', start: 1, limit: 1000 })
+      const ttsRes = await queryConfigs({ configType: 'tts', pageNo: 1, pageSize: 1000 })
       if (ttsRes.code === 200 && ttsRes.data?.list) {
         ttsConfigs.value = ttsRes.data.list
       }
@@ -256,7 +256,7 @@ export function useRoleManager() {
   async function loadSttOptions() {
     sttLoading.value = true
     try {
-      const res = await queryConfigs({ configType: 'stt', start: 1, limit: 1000 })
+      const res = await queryConfigs({ configType: 'stt', pageNo: 1, pageSize: 1000 })
       const options: SttOption[] = [
         {
           label: 'Vosk本地识别',
@@ -298,12 +298,7 @@ export function useRoleManager() {
    */
   function getVoiceInfo(voiceName?: string) {
     if (!voiceName) return null
-
-    // 先在标准音色中查找
-    const voice = allVoices.value.find(v => v.value === voiceName)
-    if (voice) return voice
-
-    return null
+    return allVoices.value.find(v => v.value === voiceName) || null
   }
 
   /**
@@ -342,13 +337,6 @@ export function useRoleManager() {
     return colors[provider || 'edge'] || 'green'
   }
 
-  /**
-   * 获取所有可用音色
-   */
-  function getAllVoices(): VoiceOption[] {
-    return [...allVoices.value]
-  }
-
   return {
     // 状态
     modelLoading,
@@ -371,8 +359,6 @@ export function useRoleManager() {
     getModelInfo,
     getVoiceInfo,
     formatProviderName,
-    getVoiceTagColor,
-    getAllVoices
+    getVoiceTagColor
   }
 }
-

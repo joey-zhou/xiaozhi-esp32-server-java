@@ -7,14 +7,14 @@ import type { LoginResponse } from '@/store/user'
  * 用户登录
  */
 export function login(data: { username: string; password: string }) {
-  return http.postJSON<LoginResponse>(api.user.login, data)
+  return http.post<LoginResponse>(api.user.login, data)
 }
 
 /**
  * 手机号验证码登录
  */
 export function telLogin(data: { tel: string; code: string }) {
-  return http.postJSON<LoginResponse>(api.user.telLogin, data)
+  return http.post<LoginResponse>(api.user.telLogin, data)
 }
 
 /**
@@ -46,7 +46,7 @@ export function register(data: {
 }) {
   // 后端期望的参数名是 code，前端使用 verifyCode 更语义化
   const { verifyCode, ...rest } = data
-  return http.postJSON(api.user.add, { ...rest, code: verifyCode })
+  return http.post(api.user.add, { ...rest, code: verifyCode })
 }
 
 /**
@@ -57,7 +57,7 @@ export function resetPassword(data: {
   code: string
   password: string
 }) {
-  return http.postJSON(api.user.resetPassword, data)
+  return http.post(api.user.resetPassword, data)
 }
 
 /**
@@ -71,14 +71,14 @@ export function checkUser(data: { username?: string; email?: string }) {
  * 发送邮箱验证码
  */
 export function sendEmailCaptcha(data: { email: string; type: string }) {
-  return http.postJSON(api.user.sendEmailCaptcha, data)
+  return http.post(api.user.sendEmailCaptcha, data)
 }
 
 /**
  * 发送短信验证码
  */
 export function sendSmsCaptcha(data: { tel: string; type: string }) {
-  return http.postJSON(api.user.sendSmsCaptcha, data)
+  return http.post(api.user.sendSmsCaptcha, data)
 }
 
 /**
@@ -100,12 +100,12 @@ export function queryUsers(params: Partial<UserQueryParams>) {
  */
 export function updateUser(data: Partial<UpdateUserParams>) {
   const { userId, ...updateData } = data
-  return http.putJSON(`${api.user.update}/${userId}`, updateData)
+  return http.put(`${api.user.update}/${userId}`, updateData)
 }
 
 /**
  * 添加用户
  */
 export function addUser(data: Partial<User>) {
-  return http.postJSON(api.user.add, data)
+  return http.post(api.user.add, data)
 }

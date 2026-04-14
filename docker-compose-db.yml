@@ -1,0 +1,72 @@
+# 仅数据库服务 - MySQL, Redis
+# 适用于“服务本机运行，数据库容器运行”的开发方式
+# 使用方式: docker compose -f docker-compose-db.yml up -d
+
+services:
+  mysql:
+    image: mysql:8.0-debian
+    container_name: xiaozhi-mysql
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=abc123456
+      - MYSQL_DATABASE=xiaozhi
+      - MYSQL_USER=xiaozhi
+      - MYSQL_PASSWORD=123456
+      - LANG=C.UTF-8
+      - MYSQL_CHARSET=utf8mb4
+      - MYSQL_COLLATION=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "xiaozhi", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - db-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  redis:
+    image: redis:7-alpine
+    container_name: xiaozhi-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - db-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+networks:
+  db-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:

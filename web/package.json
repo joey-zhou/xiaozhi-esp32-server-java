@@ -14,6 +14,11 @@
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "lint:oxlint": "oxlint . --fix -D correctness --ignore-path .gitignore",
     "lint:eslint": "eslint . --fix",
     "lint": "run-s lint:*",
@@ -37,6 +42,8 @@
     "wavesurfer.js": "^7.11.0"
   },
   "devDependencies": {
+    "@pinia/testing": "^1.0.3",
+    "@playwright/test": "^1.58.2",
     "@prettier/plugin-oxc": "^0.0.4",
     "@tsconfig/node22": "^22.0.2",
     "@types/jsonp": "^0.2.3",
@@ -46,11 +53,13 @@
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/eslint-config-prettier": "^10.2.0",
     "@vue/eslint-config-typescript": "^14.6.0",
+    "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.8.1",
     "eslint": "^9.33.0",
     "eslint-plugin-oxlint": "~1.11.0",
     "eslint-plugin-vue": "~10.4.0",
     "jiti": "^2.5.1",
+    "jsdom": "^28.1.0",
     "npm-run-all2": "^8.0.4",
     "oxlint": "~1.11.0",
     "prettier": "3.6.2",
@@ -58,6 +67,7 @@
     "typescript": "~5.9.0",
     "vite": "^7.1.7",
     "vite-plugin-vue-devtools": "^8.0.2",
+    "vitest": "^4.0.18",
     "vue-tsc": "^3.1.0"
   }
 }

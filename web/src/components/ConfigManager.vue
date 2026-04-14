@@ -36,6 +36,12 @@ const {
   getModelsByProviderAndType,
 } = useConfigManager(props.configType)
 
+// 当前 provider 的 configName 预设选项（用于 AutoComplete）
+const currentConfigNameOptions = computed(() => {
+  const option = typeOptions.value.find((item) => item.value === currentType.value)
+  return option?.configNameOptions?.map((v) => ({ value: v })) ?? []
+})
+
 // 表单
 const formRef = ref<FormInstance>()
 const formData = ref<Partial<Config>>({
@@ -200,6 +206,14 @@ async function handleSubmit() {
       configType: props.configType,
     }
 
+
+    // 阿里模型向量模型特殊处理：去掉URL中的/v1后缀
+    if (props.configType === 'llm' &&
+        submitData.provider === 'Tongyi-Qianwen' &&
+        submitData.modelType === 'embedding' &&
+        submitData.apiUrl?.endsWith('/v1')) {
+      submitData.apiUrl = submitData.apiUrl.substring(0, submitData.apiUrl.length - 3)
+    }
     // 处理 isDefault：将 boolean 转换为后端需要的 string enum ('0'/'1')
     submitData.isDefault = formData.value.isDefault == '1' ? '1' : '0'
 
@@ -440,6 +454,7 @@ fetchData()
               <template v-else-if="column.dataIndex === 'operation'">
                 <TableActionButtons
                   :record="record"
+                  :permission-prefix="configTypeInfo.permissionPrefix"
                   show-edit
                   :show-set-default="configType !== 'tts'"
                   :show-delete="record.isDefault !== '1'"
@@ -455,7 +470,11 @@ fetchData()
         </a-tab-pane>
 
         <!-- 创建/编辑标签页 -->
-        <a-tab-pane key="2" :tab="`${t('config.create')} ${t(configTypeInfo.label)}`">
+        <a-tab-pane
+          v-permission="editingConfigId ? `${configTypeInfo.permissionPrefix}:update` : `${configTypeInfo.permissionPrefix}:create`"
+          key="2"
+          :tab="editingConfigId ? `${t('config.update', { type: t(configTypeInfo.label) })}` : `${t('config.create')} ${t(configTypeInfo.label)}`"
+        >
           <a-form
             ref="formRef"
             :model="formData"
@@ -526,6 +545,18 @@ fetchData()
                         option.label.toLowerCase().includes(input.toLowerCase())
                     "
                   />
+                  <!-- 有预设模型选项时使用 AutoComplete（可选可填） -->
+                  <a-auto-complete
+                    v-else-if="currentConfigNameOptions.length > 0"
+                    v-model:value="formData.configName"
+                    :options="currentConfigNameOptions"
+                    :placeholder="t('config.enterName', { type: t(configTypeInfo.label) })"
+                    :filter-option="
+                      (input: string, option: any) =>
+                        option.value.toLowerCase().includes(input.toLowerCase())
+                    "
+                    allow-clear
+                  />
                   <!-- 其他使用输入框 -->
                   <a-input
                     v-else
@@ -547,6 +578,7 @@ fetchData()
             <!-- 设为默认 -->
             <a-form-item
               v-if="configType !== 'tts'"
+              v-permission="`${configTypeInfo.permissionPrefix}:update`"
               :label="`${t('common.setAsDefault')}${t(configTypeInfo.label)}`"
               name="isDefault"
             >
@@ -619,7 +651,12 @@ fetchData()
 
             <a-form-item style="margin-top: 24px">
               <a-space>
-                <a-button type="primary" :loading="loading" @click="handleSubmit">
+                <a-button
+                  v-permission="editingConfigId ? `${configTypeInfo.permissionPrefix}:update` : `${configTypeInfo.permissionPrefix}:create`"
+                  type="primary"
+                  :loading="loading"
+                  @click="handleSubmit"
+                >
                   {{ editingConfigId ? t('config.update', { type: t(configTypeInfo.label) }) : t('config.create', { type: t(configTypeInfo.label) }) }}
                 </a-button>
                 <a-button @click="handleCancel">{{ t('common.cancel') }}</a-button>
@@ -655,4 +692,3 @@ fetchData()
   white-space: nowrap;
 }
 </style>
-

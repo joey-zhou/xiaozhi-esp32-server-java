@@ -7,6 +7,7 @@ import { useUserStore } from '@/store/user'
 import { useCountdown } from '@/composables/useCountdown'
 import { login as loginApi, register as registerApi, resetPassword as resetPasswordApi, telLogin as telLoginApi, sendSmsCaptcha } from '@/services/user'
 import { encrypt, decrypt } from '@/utils/jsencrypt'
+import { ROUTES } from '@/router/routes'
 
 interface LoginForm {
   username: string
@@ -71,8 +72,8 @@ export function useAuth() {
         userStore.setUserInfo(res.data.user)
         // 设置权限信息
         userStore.setPermissions(res.data.permissions)
-        // 设置角色信息
-        userStore.setRole(res.data.role)
+        // 设置后台权限角色信息
+        userStore.setAuthRole(res.data.authRole)
         // 设置token
         userStore.setToken(res.data.token)
         userStore.setRefreshToken(res.data.refreshToken)
@@ -93,7 +94,7 @@ export function useAuth() {
         // 根据用户类型跳转到不同页面
         // 管理员跳转到 dashboard，普通用户跳转到 agents
         const isAdmin = res.data.user && res.data.user.isAdmin === '1'
-        const defaultRoute = isAdmin ? '/dashboard' : '/agents'
+        const defaultRoute = isAdmin ? ROUTES.DASHBOARD : ROUTES.DEVICE
         
         // 获取重定向路径
         let redirect = router.currentRoute.value.query.redirect as string || defaultRoute
@@ -154,7 +155,7 @@ export function useAuth() {
       if (res.code === 200) {
         message.success(t('auth.registerSuccess'))
         setTimeout(() => {
-          router.push('/login')
+          router.push(ROUTES.LOGIN)
         }, 500)
         return true
       } else {
@@ -182,7 +183,7 @@ export function useAuth() {
       if (res.code === 200) {
         message.success(t('auth.passwordReset'))
         setTimeout(() => {
-          router.push('/login')
+          router.push(ROUTES.LOGIN)
         }, 500)
         return true
       } else {
@@ -223,8 +224,8 @@ export function useAuth() {
         userStore.setUserInfo(res.data.user)
         // 设置权限信息
         userStore.setPermissions(res.data.permissions)
-        // 设置角色信息
-        userStore.setRole(res.data.role)
+        // 设置后台权限角色信息
+        userStore.setAuthRole(res.data.authRole)
         // 设置token
         userStore.setToken(res.data.token)
         userStore.setRefreshToken(res.data.refreshToken)
@@ -233,7 +234,7 @@ export function useAuth() {
         
         // 根据用户类型跳转到不同页面
         const isAdmin = res.data.user && res.data.user.isAdmin === '1'
-        const defaultRoute = isAdmin ? '/dashboard' : '/agents'
+        const defaultRoute = isAdmin ? ROUTES.DASHBOARD : ROUTES.DEVICE
         
         // 获取重定向路径
         let redirect = router.currentRoute.value.query.redirect as string || defaultRoute
@@ -268,7 +269,7 @@ export function useAuth() {
       } else if (res.code === 201) {
         // 未注册的手机号
         message.warning(res.message)
-        router.push('/register')
+        router.push(ROUTES.REGISTER)
         return false
       } else {
         message.error(res.message || t('auth.loginFailed'))
@@ -277,7 +278,7 @@ export function useAuth() {
     } catch (error: any) {
       if (error && error.code === 201) {
         message.warning(error.message)
-        router.push('/register')
+        router.push(ROUTES.REGISTER)
       } else {
         message.error(error?.message || t('auth.loginFailed'))
       }
@@ -325,7 +326,7 @@ export function useAuth() {
   const logout = () => {
     userStore.clearUserInfo()
     userStore.clearToken()
-    router.push('/login')
+    router.push(ROUTES.LOGIN)
   }
 
   return {

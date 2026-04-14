@@ -1,5 +1,7 @@
 # 忽略编译和构建目录
 target/
+lib/
+/com/
 usr/
 node_modules/
 out/
@@ -7,14 +9,16 @@ gen/
 dist/
 avatar/
 # 忽略特定格式的文件
-uploads/
-audio/
-vosk-model*
+/uploads/
+/audio/
+/data/
+models/
 *.zip
 *.log
 *.tmp
 *.swp
 *.swo
+*.pid
 .vite
 
 # 忽略 IDE 相关文件
@@ -28,10 +32,9 @@ vosk-model*
 .mvn/wrapper/
 .gradle/
 
-# 忽略本地配置文件
-application-local.properties
-
 .vscode/
 datasets/
 .cursorrules
 .cursor/
+.DS_Store
+CLAUDE.md

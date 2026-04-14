@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { reactive, computed } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message, type TablePaginationConfig } from 'ant-design-vue'
 import { useTable } from '@/composables/useTable'
 import { useExport } from '@/composables/useExport'
+import { queryAuthRoles } from '@/services/authRole'
 import { useLoadingStore } from '@/store/loading'
 import { queryUsers } from '@/services/user'
 import { useAvatar } from '@/composables/useAvatar'
+import type { AuthRole } from '@/types/authRole'
 import type { User, UserQueryParams } from '@/types/user'
 import dayjs from 'dayjs'
 
@@ -26,12 +28,14 @@ const {
 
 // 全局 Loading
 const loadingStore = useLoadingStore()
+const authRoleOptions = ref<AuthRole[]>([])
 
 // 查询表单
 const queryForm = reactive({
   name: '',
   email: '',
   tel: '',
+  authRoleId: undefined as number | undefined,
 })
 
 // 查询过滤器配置
@@ -100,6 +104,12 @@ const columns = computed(() => [
     align: 'center',
   },
   {
+    title: t('user.authRole'),
+    dataIndex: 'authRoleName',
+    width: 140,
+    align: 'center',
+  },
+  {
     title: t('user.lastLoginTime'),
     dataIndex: 'loginTime',
     width: 150,
@@ -117,16 +127,26 @@ const columns = computed(() => [
 async function fetchData() {
   await loadData((params) => {
     const queryParams: UserQueryParams = {
-      start: params.start,
-      limit: params.limit,
+      pageNo: params.pageNo,
+      pageSize: params.pageSize,
     }
     
     if (queryForm.name) queryParams.name = queryForm.name
     if (queryForm.email) queryParams.email = queryForm.email
     if (queryForm.tel) queryParams.tel = queryForm.tel
+    if (queryForm.authRoleId !== undefined && queryForm.authRoleId !== null) {
+      queryParams.authRoleId = queryForm.authRoleId
+    }
     
     return queryUsers(queryParams)
   })
+}
+
+async function loadAuthRoleOptions() {
+  const res = await queryAuthRoles({ pageNo: 1, pageSize: 100 })
+  if (res.code === 200 && res.data?.list) {
+    authRoleOptions.value = res.data.list
+  }
 }
 
 // 防抖搜索
@@ -138,13 +158,16 @@ async function handleExport() {
   try {
     // 先获取全部用户数据
     const queryParams: UserQueryParams = {
-      start: 1,
-      limit: 100000, // 获取全部数据
+      pageNo: 1,
+      pageSize: 100000, // 获取全部数据
     }
     
     if (queryForm.name) queryParams.name = queryForm.name
     if (queryForm.email) queryParams.email = queryForm.email
     if (queryForm.tel) queryParams.tel = queryForm.tel
+    if (queryForm.authRoleId !== undefined && queryForm.authRoleId !== null) {
+      queryParams.authRoleId = queryForm.authRoleId
+    }
     
     const res = await queryUsers(queryParams)
     
@@ -176,6 +199,7 @@ async function handleExport() {
           title: t('user.accountType'),
           format: (val) => val == 1 ? t('user.admin') : t('user.normalUser')
         },
+        { key: 'authRoleName', title: t('user.authRole') },
         { key: 'loginTime', title: t('user.lastLoginTime') },
         { key: 'loginIp', title: t('user.lastLoginIp') },
       ]
@@ -200,7 +224,8 @@ const onTableChange = (pag: TablePaginationConfig) => {
   fetchData()
 }
 
-// 初始化（非阻塞式加载）
+
+loadAuthRoleOptions()
 fetchData()
 </script>
 
@@ -213,7 +238,7 @@ fetchData()
           <a-col
             v-for="filter in queryFilters"
             :key="filter.key"
-            :xl="8"
+            :xl="6"
             :lg="12"
             :xs="24"
           >
@@ -226,6 +251,24 @@ fetchData()
               />
             </a-form-item>
           </a-col>
+          <a-col :xl="6" :lg="12" :xs="24">
+            <a-form-item :label="t('user.authRole')">
+              <a-select
+                v-model:value="queryForm.authRoleId"
+                :placeholder="t('user.authRole')"
+                allow-clear
+                @change="fetchData"
+              >
+                <a-select-option
+                  v-for="authRole in authRoleOptions"
+                  :key="authRole.authRoleId"
+                  :value="authRole.authRoleId"
+                >
+                  {{ authRole.authRoleName }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
         </a-row>
       </a-form>
     </a-card>
@@ -233,7 +276,7 @@ fetchData()
     <!-- 数据表格 -->
     <a-card :title="t('menu.user')" :bordered="false">
       <template #extra>
-        <a-button type="primary" @click="handleExport" :loading="exporting">
+        <a-button v-permission="'system:user:export'" type="primary" @click="handleExport" :loading="exporting">
           {{ t('common.export') }}
         </a-button>
       </template>
@@ -294,6 +337,10 @@ fetchData()
             <a-tag v-if="record.isAdmin == 1" color="blue">{{ t('user.admin') }}</a-tag>
             <a-tag v-else>{{ t('user.normalUser') }}</a-tag>
           </template>
+
+          <template v-else-if="column.dataIndex === 'authRoleName'">
+            <span>{{ record.authRoleName || '-' }}</span>
+          </template>
         </template>
       </a-table>
     </a-card>
@@ -328,5 +375,3 @@ fetchData()
   }
 }
 </style>
-
-

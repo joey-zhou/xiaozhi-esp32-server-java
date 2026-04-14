@@ -69,6 +69,9 @@ export function setupErrorHandler(app: App) {
     if (
       reason?.name === 'CanceledError' ||
       reason?.code === 'ERR_CANCELED' ||
+      reason?.code === 'ERR_AUTH_EXPIRED' ||
+      reason?.isSilent === true ||
+      reason?.isAuthExpired === true ||
       reason?.message?.includes('canceled') ||
       reason?.message?.includes('aborted') ||
       reason?.message?.includes('signal is aborted')

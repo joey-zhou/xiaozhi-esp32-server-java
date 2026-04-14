@@ -69,8 +69,6 @@ export interface DataResponse<T = unknown> extends ApiResponse<T> {
  * 查询参数基础接口
  */
 export interface BaseQueryParams {
-  start?: number
-  limit?: number
   [key: string]: unknown
 }
 
@@ -78,13 +76,6 @@ export interface BaseQueryParams {
  * 分页查询参数
  */
 export interface PageQueryParams extends BaseQueryParams {
-  start?: number
-  limit?: number
-}
-
-/**
- * 列表查询参数（不分页）
- */
-export interface ListQueryParams extends BaseQueryParams {
-  // 可以添加其他通用查询参数
+  pageNo?: number
+  pageSize?: number
 }

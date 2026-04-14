@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.xiaozhi</groupId>
+        <artifactId>xiaozhi-parent</artifactId>
+        <version>5.0.0</version>
+    </parent>
+    <artifactId>xiaozhi-server</artifactId>
+    <name>xiaozhi-server</name>
+    <description>启动器 + Controller，聚合所有模块</description>
+
+    <dependencies>
+        <!-- 核心服务层（含业务逻辑、事件、BO） -->
+        <dependency>
+            <groupId>com.xiaozhi</groupId>
+            <artifactId>xiaozhi-service</artifactId>
+        </dependency>
+        <!-- AI 能力（TTS/STT/Vision/LLM factory） -->
+        <dependency>
+            <groupId>com.xiaozhi</groupId>
+            <artifactId>xiaozhi-ai</artifactId>
+        </dependency>
+        <!-- Tomcat -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-tomcat</artifactId>
+        </dependency>
+        <!-- WebSocket (for WebSocketTransferService) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <!-- Flyway 数据库版本管理 -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+        <!-- 阿里云短信 -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>dysmsapi20170525</artifactId>
+        </dependency>
+        <!-- Email -->
+        <dependency>
+            <groupId>io.github.biezhi</groupId>
+            <artifactId>oh-my-email</artifactId>
+        </dependency>
+        <!-- Test -->
+        <dependency>
+            <groupId>com.xiaozhi</groupId>
+            <artifactId>xiaozhi-dialogue</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.3.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.junit.vintage</groupId>
+                    <artifactId>junit-vintage-engine</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- 工作目录设为项目根，保证 models/ lib/ 等相对路径正确 -->
+                    <workingDirectory>${project.parent.basedir}</workingDirectory>
+                    <jvmArguments>-Djava.library.path=${project.parent.basedir}/lib</jvmArguments>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <argLine>-Djava.library.path=${project.parent.basedir}/lib</argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
