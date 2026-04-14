@@ -57,26 +57,20 @@ public class RedisSubscriber {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
 
-        container.addMessageListener(
-                new MessageListenerAdapter(this, "onClearConversation"),
-                new ChannelTopic(RedisBroadcast.CHANNEL_CLEAR_CONVERSATION));
-        container.addMessageListener(
-                new MessageListenerAdapter(this, "onRoleChanged"),
-                new ChannelTopic(RedisBroadcast.CHANNEL_ROLE_CHANGED));
-        container.addMessageListener(
-                new MessageListenerAdapter(this, "onConfigChanged"),
-                new ChannelTopic(RedisBroadcast.CHANNEL_CONFIG_CHANGED));
-        container.addMessageListener(
-                new MessageListenerAdapter(this, "onCloseSession"),
-                new ChannelTopic(RedisBroadcast.CHANNEL_CLOSE_SESSION));
-        container.addMessageListener(
-                new MessageListenerAdapter(this, "onRoleUpdated"),
-                new ChannelTopic(RedisBroadcast.CHANNEL_ROLE_UPDATED));
-        container.addMessageListener(
-                new MessageListenerAdapter(this, "onDeviceUpdated"),
-                new ChannelTopic(RedisBroadcast.CHANNEL_DEVICE_UPDATED));
+        addListener(container, "onClearConversation", RedisBroadcast.CHANNEL_CLEAR_CONVERSATION);
+        addListener(container, "onRoleChanged", RedisBroadcast.CHANNEL_ROLE_CHANGED);
+        addListener(container, "onConfigChanged", RedisBroadcast.CHANNEL_CONFIG_CHANGED);
+        addListener(container, "onCloseSession", RedisBroadcast.CHANNEL_CLOSE_SESSION);
+        addListener(container, "onRoleUpdated", RedisBroadcast.CHANNEL_ROLE_UPDATED);
+        addListener(container, "onDeviceUpdated", RedisBroadcast.CHANNEL_DEVICE_UPDATED);
 
         return container;
+    }
+
+    private void addListener(RedisMessageListenerContainer container, String method, String channel) {
+        MessageListenerAdapter adapter = new MessageListenerAdapter(this, method);
+        adapter.afterPropertiesSet();
+        container.addMessageListener(adapter, new ChannelTopic(channel));
     }
 
     /**

@@ -44,6 +44,7 @@ public class VadService {
 
     private static final int SILENCE_FRAME_THRESHOLD = 2;
     private static final int VAD_SAMPLE_SIZE = AudioUtils.BUFFER_SIZE;
+    private static final int VAD_CONTEXT_SIZE = SileroVadModel.CONTEXT_SIZE;
     // 连续静音帧数阈值，超过时重置GRU状态，防止长时间静音后GRU深度收敛（30帧 ≈ 约2秒）
     private static final int SILENCE_RESET_FRAMES = 30;
 
@@ -80,6 +81,7 @@ public class VadService {
         private float[][][] sileroState = new float[2][1][128];
         // 跨帧样本拼接缓冲
         private float[] sampleCarryOver = new float[0];
+        private float[] vadContext = new float[VAD_CONTEXT_SIZE];
 
         private final LinkedList<byte[]> preBuffer = new LinkedList<>();
         private int preBufferSize = 0;
@@ -177,6 +179,7 @@ public class VadService {
             originalProbs.clear();
             sileroState = new float[2][1][128];
             sampleCarryOver = new float[0];
+            vadContext = new float[VAD_CONTEXT_SIZE];
             preBuffer.clear();
             preBufferSize = 0;
             pcmData.clear();
@@ -269,6 +272,7 @@ public class VadService {
                 if (state.getConsecutiveSilenceFrames() >= SILENCE_RESET_FRAMES) {
                     state.sileroState = new float[2][1][128];
                     state.sampleCarryOver = new float[0];
+                    state.vadContext = new float[VAD_CONTEXT_SIZE];
                     state.originalProbs.clear();
                     state.consecutiveSilenceFrames = 0;
                 }
@@ -362,7 +366,8 @@ public class VadService {
             int offset = 0;
             while (offset + VAD_SAMPLE_SIZE <= all.length) {
                 float[] chunk = Arrays.copyOfRange(all, offset, offset + VAD_SAMPLE_SIZE);
-                InferenceResult r = vadModel.infer(chunk, state.sileroState);
+                InferenceResult r = vadModel.infer(chunk, state.vadContext, state.sileroState);
+                state.vadContext = Arrays.copyOfRange(chunk, chunk.length - VAD_CONTEXT_SIZE, chunk.length);
                 state.sileroState = r.state;
                 maxProb = Math.max(maxProb, r.probability);
                 offset += VAD_SAMPLE_SIZE;
@@ -409,6 +414,7 @@ public class VadService {
             if (state != null) {
                 state.sileroState = new float[2][1][128];
                 state.sampleCarryOver = new float[0];
+                state.vadContext = new float[VAD_CONTEXT_SIZE];
                 state.originalProbs.clear();
             }
         }
@@ -421,7 +427,6 @@ public class VadService {
             if (state != null) state.reset();
             states.remove(sessionId);
             locks.remove(sessionId);
-            logger.info("VAD会话已重置: {}", sessionId);
         }
     }
 

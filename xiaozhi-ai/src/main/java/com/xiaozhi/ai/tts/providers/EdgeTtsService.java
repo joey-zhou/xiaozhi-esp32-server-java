@@ -63,7 +63,7 @@ public class EdgeTtsService implements TtsService {
                 .storage(outputPath)
                 .voicePitch(pitch)
                 .voiceRate(rate)
-                .connectTimeout(30)
+                .connectTimeout(30000)
                 .trans();
 
         if (filename == null || filename.isEmpty()) {

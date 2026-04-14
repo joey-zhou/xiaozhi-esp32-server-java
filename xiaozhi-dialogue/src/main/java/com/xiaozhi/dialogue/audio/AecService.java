@@ -72,7 +72,6 @@ public class AecService {
             synchronized (state.apmLock) {
                 state.dispose();
             }
-            logger.info("AEC会话已重置: {}", sessionId);
         }
     }
 

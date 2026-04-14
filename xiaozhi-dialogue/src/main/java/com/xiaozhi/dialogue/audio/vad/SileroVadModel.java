@@ -23,6 +23,7 @@ import java.util.Map;
 @Component
 public class SileroVadModel implements VadModel {
     private static final Logger logger = LoggerFactory.getLogger(SileroVadModel.class);
+    public static final int CONTEXT_SIZE = 64;
 
     @Value("${xiaozhi.vad.model.path:models/silero_vad.onnx}")
     private String modelPath;
@@ -30,6 +31,7 @@ public class SileroVadModel implements VadModel {
     private OrtEnvironment env;
     private OrtSession session;
     private final int windowSize = AudioUtils.BUFFER_SIZE;
+    private final int effectiveWindowSize = windowSize + CONTEXT_SIZE;
 
     @PostConstruct
     @Override
@@ -45,7 +47,7 @@ public class SileroVadModel implements VadModel {
                 session = env.createSession(modelPath, opts);
             }
 
-            logger.info("Silero VAD模型初始化成功");
+            logger.info("Silero VAD模型初始化成功, windowSize={}, contextSize={}, effectiveWindowSize={}", windowSize, CONTEXT_SIZE, effectiveWindowSize);
         } catch (UnsatisfiedLinkError e) {
             logger.error("ONNX Runtime native libraries加载失败，请安装Visual C++ Redistributable: {}", e.getMessage());
             logger.error("下载地址: https://aka.ms/vs/17/release/vc_redist.x64.exe");
@@ -58,12 +60,16 @@ public class SileroVadModel implements VadModel {
 
     @Override
     public InferenceResult infer(float[] samples, float[][][] prevState) {
+        return infer(samples, new float[CONTEXT_SIZE], prevState);
+    }
+
+    public InferenceResult infer(float[] samples, float[] context, float[][][] prevState) {
         try {
             if (samples.length != windowSize) {
                 throw new IllegalArgumentException("样本数量必须是" + windowSize);
             }
 
-            float[][] x = new float[][] { samples };
+            float[][] x = new float[][] { buildInput(samples, context) };
 
             float[][][] localState = prevState != null ? prevState : new float[2][1][128];
 
@@ -91,6 +97,16 @@ public class SileroVadModel implements VadModel {
             logger.error("VAD模型推理失败", e);
             return new InferenceResult(0.0f, prevState);
         }
+    }
+
+    private float[] buildInput(float[] samples, float[] context) {
+        float[] input = new float[effectiveWindowSize];
+        if (context != null && context.length > 0) {
+            int copyLength = Math.min(CONTEXT_SIZE, context.length);
+            System.arraycopy(context, context.length - copyLength, input, CONTEXT_SIZE - copyLength, copyLength);
+        }
+        System.arraycopy(samples, 0, input, CONTEXT_SIZE, samples.length);
+        return input;
     }
 
     @PreDestroy
