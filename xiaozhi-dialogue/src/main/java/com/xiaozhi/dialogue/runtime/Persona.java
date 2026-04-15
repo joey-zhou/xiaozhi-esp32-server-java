@@ -131,8 +131,15 @@ public class Persona {
         AtomicReference<Instant> ttft = new AtomicReference<>(null);
 
         String deviceId = getSession().getDevice() != null ? getSession().getDevice().getDeviceId() : null;
+
+        // 从 ToolsSessionHolder 获取实时工具列表（包含后注册的设备 MCP 工具）
+        List<ToolCallback> liveTools = getSession().getToolsSessionHolder().getAllFunction();
+
+        // Layer 3: Embedding 预筛选工具子集
+        List<ToolCallback> effectiveTools = useFunctionCall ? liveTools : new ArrayList<>();
+
         ChatOptions chatOptions = ToolCallingChatOptions.builder()
-                .toolCallbacks(useFunctionCall ? toolCallbacks : new ArrayList<>())
+                .toolCallbacks(effectiveTools)
                 .toolContext(TOOL_CONTEXT_SESSION_ID_KEY, sessionId)
                 .toolContext("deviceId", deviceId)
                 .toolContext("conversationTimestamp", now.toEpochMilli())
@@ -217,7 +224,8 @@ public class Persona {
 
         // 判断用户消息是否属于可能影响后续对话效果的指令
         ChatGenerationMetadata generationMetadata = generation.getMetadata();
-        return isFuncitonCalling(generationMetadata, toolCallbacks);
+        return isFuncitonCalling(generationMetadata,
+                getSession().getToolsSessionHolder().getAllFunction());
 
     }
 

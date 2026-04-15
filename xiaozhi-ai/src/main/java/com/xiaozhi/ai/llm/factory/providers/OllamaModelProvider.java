@@ -14,6 +14,7 @@ import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.ai.ollama.api.OllamaEmbeddingOptions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,6 +25,7 @@ public class OllamaModelProvider implements ChatModelProvider {
     
     private static final Logger logger = LoggerFactory.getLogger(OllamaModelProvider.class);
     
+    @Lazy
     @Autowired
     private ToolCallingManager toolCallingManager;
     

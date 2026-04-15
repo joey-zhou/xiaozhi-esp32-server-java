@@ -225,7 +225,6 @@ public class DeviceMcpService {
             collectedNames.addAll(sendToolsList(chatSession, null));
         } else {
             chatSession.getDeviceMcpHolder().setMcpCursor(null);
-            logger.debug("SessionId: {}, mcp tools loaded successfully", chatSession.getSessionId());
         }
         return collectedNames;
     }

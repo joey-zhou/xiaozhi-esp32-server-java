@@ -22,7 +22,7 @@ import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.role.service.RoleService;
-import com.xiaozhi.ai.tool.ToolRegistrationCoordinator;
+import com.xiaozhi.ai.tool.ToolRegistrationService;
 import com.xiaozhi.dialogue.adapter.ChatSessionToolAdapter;
 import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.dialogue.llm.handler.DialogueListener;
@@ -52,7 +52,7 @@ public class PersonaFactory {
     @Resource
     private ChatModelFactory chatModelFactory;
     @Resource
-    private ToolRegistrationCoordinator toolRegistrationCoordinator;
+    private ToolRegistrationService toolRegistrationService;
     @Resource
     private TtsServiceFactory ttsFactory;
     @Resource
@@ -111,7 +111,7 @@ public class PersonaFactory {
         Synthesizer synthesizer = initSynthesizer(session,player,role);
 
         //处理工具注册（系统工具 + 设备MCP）
-        toolRegistrationCoordinator.register(new ChatSessionToolAdapter(session));
+        toolRegistrationService.register(new ChatSessionToolAdapter(session));
 
         // 获取ChatModel
         ChatModel chatModel = chatModelFactory.getChatModel(role);
@@ -173,7 +173,6 @@ public class PersonaFactory {
 
     /**
      * 初始化对话状态
-     * ChatSession chatSession
      */
     public Synthesizer initSynthesizer(ChatSession session, Player player, RoleBO role) {
         // 新增加的设备很有可能没有配置TTS，采用默认Edge需要传递null

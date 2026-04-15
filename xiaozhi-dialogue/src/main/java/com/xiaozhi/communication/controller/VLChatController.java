@@ -2,7 +2,7 @@ package com.xiaozhi.communication.controller;
 
 import cn.dev33.satoken.annotation.SaIgnore;
 import com.xiaozhi.communication.common.SessionManager;
-import com.xiaozhi.ai.llm.factory.VisionService;
+import com.xiaozhi.ai.llm.service.VisionService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

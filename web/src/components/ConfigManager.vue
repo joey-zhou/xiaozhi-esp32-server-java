@@ -206,14 +206,6 @@ async function handleSubmit() {
       configType: props.configType,
     }
 
-
-    // 阿里模型向量模型特殊处理：去掉URL中的/v1后缀
-    if (props.configType === 'llm' &&
-        submitData.provider === 'Tongyi-Qianwen' &&
-        submitData.modelType === 'embedding' &&
-        submitData.apiUrl?.endsWith('/v1')) {
-      submitData.apiUrl = submitData.apiUrl.substring(0, submitData.apiUrl.length - 3)
-    }
     // 处理 isDefault：将 boolean 转换为后端需要的 string enum ('0'/'1')
     submitData.isDefault = formData.value.isDefault == '1' ? '1' : '0'
 
@@ -532,11 +524,10 @@ fetchData()
                   name="configName"
                   :rules="[{ required: true, message: t('config.enterName', { type: t(configTypeInfo.label) }) }]"
                 >
-                  <!-- LLM 使用下拉框 -->
-                  <a-select
+                  <!-- LLM 使用 AutoComplete（可选可填） -->
+                  <a-auto-complete
                     v-if="configType === 'llm' && currentType"
                     v-model:value="formData.configName"
-                    show-search
                     allow-clear
                     :placeholder="t('config.enterName', { type: t(configTypeInfo.label) })"
                     :options="modelOptions"

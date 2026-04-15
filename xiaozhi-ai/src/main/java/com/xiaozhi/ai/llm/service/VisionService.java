@@ -1,4 +1,4 @@
-package com.xiaozhi.ai.llm.factory;
+package com.xiaozhi.ai.llm.service;
 
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
@@ -9,6 +9,8 @@ import org.springframework.ai.content.Media;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
+
+import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 
 /**
  * 视觉识别服务。

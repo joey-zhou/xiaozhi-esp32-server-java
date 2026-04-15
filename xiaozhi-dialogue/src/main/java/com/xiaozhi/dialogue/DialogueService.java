@@ -6,8 +6,7 @@ import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.dialogue.audio.VadService;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
-import com.xiaozhi.ai.llm.intent.IntentDetector;
-import com.xiaozhi.ai.llm.intent.IntentDetector.UserIntent;
+import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.dialogue.audio.VadService.VadStatus;
 import com.xiaozhi.dialogue.playback.Player;
@@ -61,7 +60,7 @@ public class DialogueService{
     private SessionManager sessionManager;
 
     @Resource
-    private IntentDetector intentDetector;
+    private IntentService intentService;
 
     @Resource
     private ApplicationEventPublisher eventPublisher;
@@ -244,15 +243,14 @@ public class DialogueService{
             }
 
             // 意图检测
-            UserIntent intent = intentDetector.detectIntent(text);
-            if (intent != null) {
-                handleIntent(session, intent, text);
+            if (intentService.detect(text) == IntentService.Intent.EXIT) {
+                sendGoodbyeMessage(session);
                 return;
             }
 
             // LLM+TTS
             try {
-                persona.chat(llmText);
+                persona.chat(llmText, true);
             } catch (Exception e) {
                 logger.error("LLM对话处理失败: {}", e.getMessage(), e);
             }
@@ -262,28 +260,6 @@ public class DialogueService{
         }
     }
 
-    /**
-     * 处理检测到的用户意图
-     *
-     * @param session 聊天会话
-     * @param intent 检测到的意图
-     * @param userInput 用户输入文本
-     */
-    private void handleIntent(ChatSession session, IntentDetector.UserIntent intent, String userInput) {
-
-        logger.info("处理用户意图: type={}, input=\"{}\"", intent.getType(), userInput);
-
-        switch (intent.getType()) {
-            case "EXIT":
-                // 处理退出意图
-                sendGoodbyeMessage(session);
-                break;
-
-            default:
-                logger.warn("未知的意图类型: {}", intent.getType());
-                break;
-        }
-    }
 
     /**
      * 发送告别语并在播放完成后关闭会话

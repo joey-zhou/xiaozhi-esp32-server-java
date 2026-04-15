@@ -18,9 +18,9 @@ import java.util.Set;
  * 2. 依次调用所有注入的 {@link ToolRegistrar} 实现
  */
 @Service
-public class ToolRegistrationCoordinator {
+public class ToolRegistrationService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ToolRegistrationCoordinator.class);
+    private static final Logger logger = LoggerFactory.getLogger(ToolRegistrationService.class);
 
     @Resource
     private McpToolExcludeService mcpToolExcludeService;
@@ -32,7 +32,7 @@ public class ToolRegistrationCoordinator {
     private List<ToolRegistrar> registrars;
 
     /**
-     * 向会话注册所有可用工具。
+     * 向会话注册所有可用工具
      *
      * @param toolSession 当前设备会话
      */
@@ -47,5 +47,7 @@ public class ToolRegistrationCoordinator {
                 logger.warn("ToolRegistrar {} 注册失败", registrar.getClass().getSimpleName(), e);
             }
         }
+
     }
+
 }

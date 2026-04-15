@@ -80,7 +80,7 @@ public class SttServiceFactory {
             return voskService;
         } catch (Throwable e) {
             voskInitialized = false;
-            logger.warn("Vosk STT服务初始化失败 ({}): {}", e.getClass().getSimpleName(), e.getMessage());
+            logger.warn("Vosk STT服务初始化失败: {}", e.getMessage());
         }
         return null;
     }

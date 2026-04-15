@@ -17,6 +17,7 @@ import org.springframework.ai.zhipuai.ZhiPuAiEmbeddingModel;
 import org.springframework.ai.zhipuai.ZhiPuAiEmbeddingOptions;
 import org.springframework.ai.zhipuai.api.ZhiPuAiApi;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
@@ -27,6 +28,7 @@ public class ZhiPuModelProvider implements ChatModelProvider {
 
     private static final Logger logger = LoggerFactory.getLogger(ZhiPuModelProvider.class);
 
+    @Lazy
     @Autowired
     private ToolCallingManager toolCallingManager;
 

@@ -18,6 +18,7 @@ import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.client.reactive.JdkClientHttpConnector;
 import org.springframework.stereotype.Component;
@@ -39,6 +40,7 @@ public class OpenAiModelProvider implements ChatModelProvider {
     
     private static final Logger logger = LoggerFactory.getLogger(OpenAiModelProvider.class);
 
+    @Lazy
     @Autowired
     private ToolCallingManager toolCallingManager;
 
@@ -74,11 +76,7 @@ public class OpenAiModelProvider implements ChatModelProvider {
                                 .connectTimeout(Duration.ofSeconds(30))
                                 .build())))
                 .restClientBuilder(RestClient.builder()
-                        // Force HTTP/1.1 for non-streaming
-                        .requestFactory(new JdkClientHttpRequestFactory(HttpClient.newBuilder()
-                                .version(HttpClient.Version.HTTP_1_1)
-                                .connectTimeout(Duration.ofSeconds(30))
-                                .build())))
+                        .requestFactory(createRequestFactory()))
                 .build();
         
         var openAiChatOptions = OpenAiChatOptions.builder()
@@ -108,6 +106,7 @@ public class OpenAiModelProvider implements ChatModelProvider {
         var openAiApi = OpenAiApi.builder()
                 .apiKey(StringUtils.hasText(config.getApiKey()) ? new SimpleApiKey(config.getApiKey()) : new NoopApiKey())
                 .baseUrl(config.getApiUrl())
+                .embeddingsPath("/embeddings")
                 .headers(headers)
                 .webClientBuilder(WebClient.builder()
                         .clientConnector(new JdkClientHttpConnector(HttpClient.newBuilder()
@@ -115,14 +114,20 @@ public class OpenAiModelProvider implements ChatModelProvider {
                                 .connectTimeout(Duration.ofSeconds(30))
                                 .build())))
                 .restClientBuilder(RestClient.builder()
-                        .requestFactory(new JdkClientHttpRequestFactory(HttpClient.newBuilder()
-                                .version(HttpClient.Version.HTTP_1_1)
-                                .connectTimeout(Duration.ofSeconds(30))
-                                .build())))
+                        .requestFactory(createRequestFactory()))
                 .build();
         var options = OpenAiEmbeddingOptions.builder().model(config.getConfigName()).build();
-        logger.info("Created OpenAI EmbeddingModel: model={}, endpoint={}", config.getConfigName(), config.getApiUrl());
+        logger.debug("创建 OpenAI EmbeddingModel: model={}, endpoint={}", config.getConfigName(), config.getApiUrl());
         return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED, options);
+    }
+
+    private JdkClientHttpRequestFactory createRequestFactory() {
+        var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build());
+        factory.setReadTimeout(Duration.ofSeconds(30));
+        return factory;
     }
 }
 

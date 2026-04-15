@@ -4,6 +4,7 @@
 export interface Device {
   createTime?: string
   updateTime?: string
+  lastLogin?: string
   roleId?: number
   avatar?: string
   roleName?: string

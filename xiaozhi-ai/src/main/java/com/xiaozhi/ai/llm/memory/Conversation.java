@@ -115,6 +115,15 @@ public class Conversation extends ConversationIdentifier {
     }
 
     /**
+     * 返回原始消息列表（不触发 RAG 检索等副作用）。
+     * 用于工具路由的 FC 上下文检测等只需读取历史的场景。
+     * 子类（如 RetrievalConversation）可覆写以返回底层 conversation 的原始消息。
+     */
+    public synchronized List<Message> rawMessages() {
+        return messages;
+    }
+
+    /**
      * 清理当前Conversation涉及的相关资源，包括缓存的消息列表。
      * 对于某些具体的子类实现，清理也可能是指删除当前Covnersation的消息。
      */

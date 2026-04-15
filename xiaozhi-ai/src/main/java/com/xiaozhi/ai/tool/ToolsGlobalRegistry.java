@@ -1,8 +1,8 @@
 package com.xiaozhi.ai.tool;
 
 import com.xiaozhi.ai.tool.session.ToolSession;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
@@ -24,7 +24,7 @@ public class ToolsGlobalRegistry implements ToolCallbackResolver {
             = new ConcurrentHashMap<>();
 
     @Autowired(required = false)
-    protected List<GlobalFunction> globalFunctions = java.util.Collections.emptyList();
+    protected List<GlobalFunction> globalFunctions = List.of();
 
     @Override
     public ToolCallback resolve(@NotNull String toolName) {
@@ -64,7 +64,7 @@ public class ToolsGlobalRegistry implements ToolCallbackResolver {
      */
     public Map<String, ToolCallback> getAllFunctions(ToolSession toolSession) {
         // 注意：这里不再自动注册所有全局函数到allFunction中
-        // 而是返回一个临时的Map，由 ToolRegistrationCoordinator 统一管理工具注册
+        // 而是返回一个临时的Map，由 ToolRegistrationService 统一管理工具注册
         Map<String, ToolCallback> tempFunctions = new HashMap<>();
         globalFunctions.forEach(
                 globalFunction -> {

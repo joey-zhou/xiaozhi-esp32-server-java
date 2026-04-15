@@ -105,7 +105,7 @@ public class ToolsSessionHolder {
      * 注册全局函数到FunctionHolder
      */
     public void registerGlobalFunctionTools() {
-        // 全局函数由 ToolRegistrationCoordinator 统一管理
-        logger.debug("[{}] - SessionId:{} 跳过自动注册全局函数，由 ToolRegistrationCoordinator 统一管理", TAG, sessionId);
+        // 全局函数由 ToolRegistrationService 统一管理
+        logger.debug("[{}] - SessionId:{} 跳过自动注册全局函数，由 ToolRegistrationService 统一管理", TAG, sessionId);
     }
 }

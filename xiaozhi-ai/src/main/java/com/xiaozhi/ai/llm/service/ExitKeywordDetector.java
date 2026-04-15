@@ -1,4 +1,4 @@
-package com.xiaozhi.ai.llm.intent;
+package com.xiaozhi.ai.llm.service;
 
 import java.util.Arrays;
 import java.util.List;
@@ -7,9 +7,9 @@ import java.util.regex.Pattern;
 /**
  * 退出关键词检测器
  * 用于检测用户输入中是否包含明确的退出意图关键词
- * 注意：这个类不再是 Spring 组件，而是作为工具类被 IntentDetector 使用
+ * 作为工具类被 IntentService 使用
  */
-public class ExitKeywordDetector {
+class ExitKeywordDetector {
 
     /**
      * 退出关键词列表
