@@ -2,7 +2,7 @@ package com.xiaozhi.communication.common;
 
 import com.xiaozhi.communication.domain.iot.IotDescriptor;
 import com.xiaozhi.common.model.bo.DeviceBO;
-import com.xiaozhi.ai.llm.memory.Conversation;
+import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.ai.tool.ToolsSessionHolder;
 import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpHolder;
 import com.xiaozhi.dialogue.runtime.DialogueContext;
@@ -185,7 +185,7 @@ public abstract class ChatSession {
         // 判断设备ID是否有不适合路径的特殊字符，它很可能是mac地址需要转换。
         String deviceId = device.getDeviceId().replace(":", "-");
         String roleId = device.getRoleId().toString();
-        String extension = Conversation.MESSAGE_TYPE_USER.equals(who) ? "wav" : "ogg";
+        String extension = MessageBO.SENDER_USER.equals(who) ? "wav" : "ogg";
         String filename = "%s-%s.%s".formatted(datetime, who, extension);
         return Path.of(AudioUtils.AUDIO_PATH, date, deviceId, roleId, filename);
     }

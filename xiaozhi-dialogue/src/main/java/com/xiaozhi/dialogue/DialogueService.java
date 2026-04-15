@@ -4,6 +4,7 @@ import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.common.model.bo.DeviceBO;
+import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.dialogue.audio.VadService;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.ai.llm.service.IntentService;
@@ -19,7 +20,6 @@ import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -190,7 +190,7 @@ public class DialogueService{
 
                 // 音频保存
                 Instant userInstant = Instant.now();
-                Path userAudioPath = session.getAudioPath(MessageType.USER.getValue(), userInstant);
+                Path userAudioPath = session.getAudioPath(MessageBO.SENDER_USER, userInstant);
                 session.setUserAudioPath(userAudioPath);
                 saveUserAudio(session, userAudioPath);
 

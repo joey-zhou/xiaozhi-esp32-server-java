@@ -10,6 +10,11 @@ public class MessageBO {
 
     public static final String STATE_ENABLED = "1";
     public static final String STATE_DELETED = "0";
+
+    public static final String SENDER_USER = "user";
+    public static final String SENDER_ASSISTANT = "assistant";
+    public static final String SENDER_TOOL = "tool";
+
     public static final String MESSAGE_TYPE_NORMAL = "NORMAL";
     public static final String MESSAGE_TYPE_TOOL_CALL = "TOOL_CALL";
     public static final String MESSAGE_TYPE_TOOL_RESPONSE = "TOOL_RESPONSE";

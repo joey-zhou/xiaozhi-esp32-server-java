@@ -196,7 +196,7 @@ public class MessageServiceImpl implements MessageService {
         LambdaQueryWrapper<MessageDO> query = new LambdaQueryWrapper<MessageDO>()
             .eq(MessageDO::getDeviceId, deviceId)
             .eq(MessageDO::getRoleId, roleId)
-            .eq(MessageDO::getSender, "assistant")
+            .eq(MessageDO::getSender, MessageBO.SENDER_ASSISTANT)
             .eq(MessageDO::getCreateTime, createTime)
             .select(MessageDO::getMessageId);
         MessageDO messageDO = messageMapper.selectOne(query);

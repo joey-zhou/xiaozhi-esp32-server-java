@@ -147,7 +147,7 @@ public class DialogueTurn {
         messageBO.setUserId(conversation.device().getUserId());
         messageBO.setDeviceId(conversation.getDeviceId());
         messageBO.setSessionId(conversation.getSessionId());
-        messageBO.setSender(Conversation.MESSAGE_TYPE_ASSISTANT);
+        messageBO.setSender(MessageBO.SENDER_ASSISTANT);
         messageBO.setMessage(toolCallAssistantMessage.getText());
         messageBO.setRoleId(conversation.getRoleId());
         messageBO.setMessageType(MessageBO.MESSAGE_TYPE_TOOL_CALL);
@@ -172,7 +172,7 @@ public class DialogueTurn {
         messageBO.setUserId(conversation.device().getUserId());
         messageBO.setDeviceId(conversation.getDeviceId());
         messageBO.setSessionId(conversation.getSessionId());
-        messageBO.setSender(Conversation.MESSAGE_TYPE_TOOL);
+        messageBO.setSender(MessageBO.SENDER_TOOL);
         // 合并所有 ToolResponse 的文本
         String responseText = toolResponseMessage.getResponses().stream()
                 .map(ToolResponseMessage.ToolResponse::responseData)

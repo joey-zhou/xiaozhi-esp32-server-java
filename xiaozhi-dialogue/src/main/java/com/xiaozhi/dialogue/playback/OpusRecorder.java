@@ -15,7 +15,7 @@ import org.gagravarr.opus.OpusAudioData;
 import org.gagravarr.opus.OpusFile;
 import org.gagravarr.opus.OpusInfo;
 import org.gagravarr.opus.OpusTags;
-import org.springframework.ai.chat.messages.MessageType;
+import com.xiaozhi.common.model.bo.MessageBO;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -82,7 +82,7 @@ public class OpusRecorder {
 
     private void openOpusFile() {
         opusFileCreatedAt = assistantMessageCreatedAt;
-        audioPath = session.getAudioPath(MessageType.ASSISTANT.getValue(), opusFileCreatedAt);
+        audioPath = session.getAudioPath(MessageBO.SENDER_ASSISTANT, opusFileCreatedAt);
         try {
             Files.createDirectories(audioPath.getParent());
             try {

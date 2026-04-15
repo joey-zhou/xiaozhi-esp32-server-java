@@ -77,17 +77,17 @@ public class DatabaseChatMemory implements ChatMemory {
         metadata.put("messageId", message.getMessageId());
 
         Message springMessage;
-        if (Conversation.MESSAGE_TYPE_TOOL.equals(role)) {
+        if (MessageBO.SENDER_TOOL.equals(role)) {
             // ToolResponseMessage: 从 toolCalls 字段恢复 toolCallId 和 toolName
             springMessage = buildToolResponseMessage(message);
-        } else if (MessageType.ASSISTANT.getValue().equals(role)) {
+        } else if (MessageBO.SENDER_ASSISTANT.equals(role)) {
             // TOOL_CALL 类型的 AssistantMessage 需要恢复 toolCalls
             if (MessageBO.MESSAGE_TYPE_TOOL_CALL.equals(message.getMessageType())) {
                 springMessage = buildToolCallAssistantMessage(message, metadata);
             } else {
                 springMessage = AssistantMessage.builder().content(message.getMessage()).properties(metadata).build();
             }
-        } else if (MessageType.USER.getValue().equals(role)) {
+        } else if (MessageBO.SENDER_USER.equals(role)) {
             springMessage = UserMessage.builder().text(message.getMessage()).metadata(metadata).build();
         } else {
             throw new IllegalArgumentException("Invalid role: " + role);
@@ -159,9 +159,9 @@ public class DatabaseChatMemory implements ChatMemory {
             return Collections.emptyList();
         }
         return messages.stream()
-            .filter(message -> MessageType.ASSISTANT.getValue().equals(message.getSender())
-                || MessageType.USER.getValue().equals(message.getSender())
-                || Conversation.MESSAGE_TYPE_TOOL.equals(message.getSender()))
+            .filter(message -> MessageBO.SENDER_ASSISTANT.equals(message.getSender())
+                || MessageBO.SENDER_USER.equals(message.getSender())
+                || MessageBO.SENDER_TOOL.equals(message.getSender()))
             .map(DatabaseChatMemory::toSpringMessage)
             .collect(Collectors.toList());
     }

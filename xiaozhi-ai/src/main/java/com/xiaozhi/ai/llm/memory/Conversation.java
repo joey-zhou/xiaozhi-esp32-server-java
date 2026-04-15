@@ -27,9 +27,6 @@ import static java.time.temporal.ChronoField.*;
  */
 public class Conversation extends ConversationIdentifier {
 
-    public static final String MESSAGE_TYPE_USER = "user";
-    public static final String MESSAGE_TYPE_ASSISTANT = "assistant";
-    public static final String MESSAGE_TYPE_TOOL = "tool";
     // device, role, sessionId 唯一确定一个Conversation,as key,通过final保持全程的不变性(immutable)
     private final DeviceBO device;
     @Getter
