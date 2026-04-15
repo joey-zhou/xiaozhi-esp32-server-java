@@ -12,6 +12,7 @@ export interface Message {
   audioPath?: string
   state: string
   messageType: string
+  toolCalls?: string
   sessionId?: string
   createTime?: string
   updateTime?: string

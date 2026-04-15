@@ -26,21 +26,6 @@ public class MessageResp {
     @Schema(description = "消息内容")
     private String message;
 
-    @Schema(description = "Token 数")
-    private Integer tokens;
-
-    @Schema(description = "用户语音时长")
-    private BigDecimal sttDuration;
-
-    @Schema(description = "TTS 语音时长")
-    private BigDecimal ttsDuration;
-
-    @Schema(description = "首包响应时间")
-    private Long ttfsTime;
-
-    @Schema(description = "响应时间")
-    private Integer responseTime;
-
     @Schema(description = "语音文件路径")
     private String audioPath;
 

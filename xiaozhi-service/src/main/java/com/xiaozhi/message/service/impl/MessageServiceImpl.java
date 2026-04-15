@@ -28,6 +28,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 @Service
@@ -45,7 +46,7 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public PageResp<MessageResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
                                       String sender, String messageType, Integer roleId,
-                                      java.util.Date startTime, java.util.Date endTime, Integer userId) {
+                                      Date startTime, Date endTime, Integer userId) {
         Page<MessageResp> page = new Page<>(pageNo, pageSize);
         IPage<MessageResp> result = messageMapper.selectPageResp(page, deviceId, deviceName, sender, messageType, roleId, startTime, endTime, userId);
         return new PageResp<>(
@@ -184,27 +185,33 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     @Transactional
-    public void updateAudioInfo(String deviceId, Integer roleId, String sender, LocalDateTime createTime,
-                                String audioPath, BigDecimal sttDuration, BigDecimal ttsDuration) {
-        if (!StringUtils.hasText(deviceId) || roleId == null || !StringUtils.hasText(sender) || createTime == null) {
+    public void updateAssistantAudio(String deviceId, Integer roleId,
+                                     LocalDateTime createTime, String audioPath,
+                                     BigDecimal ttsDuration) {
+        if (!StringUtils.hasText(deviceId) || roleId == null || createTime == null) {
             return;
         }
 
-        LambdaUpdateWrapper<MessageDO> updateWrapper = new LambdaUpdateWrapper<MessageDO>()
+        // 1. 找到 assistant 消息的 messageId
+        LambdaQueryWrapper<MessageDO> query = new LambdaQueryWrapper<MessageDO>()
             .eq(MessageDO::getDeviceId, deviceId)
             .eq(MessageDO::getRoleId, roleId)
-            .eq(MessageDO::getSender, sender)
+            .eq(MessageDO::getSender, "assistant")
             .eq(MessageDO::getCreateTime, createTime)
-            .set(MessageDO::getUpdateTime, LocalDateTime.now());
+            .select(MessageDO::getMessageId);
+        MessageDO messageDO = messageMapper.selectOne(query);
+        if (messageDO == null) {
+            return;
+        }
+
+        // 2. 更新 audioPath
         if (StringUtils.hasText(audioPath)) {
-            updateWrapper.set(MessageDO::getAudioPath, audioPath);
+            LambdaUpdateWrapper<MessageDO> msgUpdate = new LambdaUpdateWrapper<MessageDO>()
+                .eq(MessageDO::getMessageId, messageDO.getMessageId())
+                .set(MessageDO::getAudioPath, audioPath)
+                .set(MessageDO::getUpdateTime, LocalDateTime.now());
+            messageMapper.update(null, msgUpdate);
         }
-        if (sttDuration != null) {
-            updateWrapper.set(MessageDO::getSttDuration, sttDuration);
-        }
-        if (ttsDuration != null) {
-            updateWrapper.set(MessageDO::getTtsDuration, ttsDuration);
-        }
-        messageMapper.update(null, updateWrapper);
     }
+
 }

@@ -137,13 +137,11 @@ public class OpusRecorder {
             log.warn("上传AI回复音频失败，保留本地路径: {}", audioPath, e);
         }
 
-        messageService.updateAudioInfo(
+        messageService.updateAssistantAudio(
             conversation.device().getDeviceId(),
             conversation.role().getRoleId(),
-            MessageType.ASSISTANT.getValue(),
             LocalDateTime.ofInstant(opusFileCreatedAt.truncatedTo(ChronoUnit.SECONDS), ZoneId.systemDefault()),
             storedPath,
-            null,
             duration
         );
     }

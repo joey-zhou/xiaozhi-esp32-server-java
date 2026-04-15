@@ -6,21 +6,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.ai.llm.memory.Conversation;
-import com.xiaozhi.utils.AudioUtils;
 import lombok.Builder;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.util.Assert;
 
-import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -91,7 +87,6 @@ public class DialogueTurn {
 
         AssistantMessage finalAssistantMessage = generation.getOutput();
         Usage llmUsage = chatResponse.getMetadata().getUsage();
-        logTokenDetails(llmUsage);
 
         List<MessageBO> messages = new ArrayList<>();
 
@@ -100,7 +95,7 @@ public class DialogueTurn {
 
         // 2+3. 如果有工具调用，插入中间消息：Assistant(toolCall) + Tool(response)
         if (toolCallAssistantMessage != null && toolResponseMessage != null) {
-            messages.add(toToolCallAssistantMessageBO(llmUsage));
+            messages.add(toToolCallAssistantMessageBO());
             messages.add(toToolResponseMessageBO());
         }
 
@@ -123,16 +118,12 @@ public class DialogueTurn {
         switch (message.getMessageType()) {
             case USER:
                 if (userSpeechPath != null) {
-                    messageBO.setSttDuration(BigDecimal.valueOf(AudioUtils.getAudioDuration(userSpeechPath)));
                     messageBO.setAudioPath(userSpeechPath.toString());
                 }
                 messageBO.setCreateTime(LocalDateTime.ofInstant(userMessageCreatedAt, ZoneId.systemDefault()));
-                messageBO.setTokens(usage == null ? 0 : usage.getPromptTokens());
                 break;
             case ASSISTANT:
-                messageBO.setTtfsTime(timeToFirstToken.toMillis());
                 messageBO.setCreateTime(LocalDateTime.ofInstant(assistantMessageCreatedAt, ZoneId.systemDefault()));
-                messageBO.setTokens(usage == null ? 0 : usage.getCompletionTokens());
                 if (!toolCallDetails.isEmpty()) {
                     try {
                         messageBO.setToolCalls(OBJECT_MAPPER.writeValueAsString(toolCallDetails));
@@ -142,17 +133,16 @@ public class DialogueTurn {
                 }
                 break;
             default:
-                messageBO.setTokens(0);
+                break;
         }
 
-        messageBO.setResponseTime(0);
         return messageBO;
     }
 
     /**
      * 构建工具调用请求的 MessageBO（sender=assistant, messageType=TOOL_CALL）
      */
-    private MessageBO toToolCallAssistantMessageBO(Usage usage) {
+    private MessageBO toToolCallAssistantMessageBO() {
         MessageBO messageBO = new MessageBO();
         messageBO.setUserId(conversation.device().getUserId());
         messageBO.setDeviceId(conversation.getDeviceId());
@@ -162,8 +152,6 @@ public class DialogueTurn {
         messageBO.setRoleId(conversation.getRoleId());
         messageBO.setMessageType(MessageBO.MESSAGE_TYPE_TOOL_CALL);
         messageBO.setCreateTime(LocalDateTime.ofInstant(assistantMessageCreatedAt, ZoneId.systemDefault()));
-        messageBO.setTokens(0);
-        messageBO.setResponseTime(0);
         // 存储 toolCalls JSON: [{id, name, arguments}]
         try {
             var toolCallsJson = toolCallAssistantMessage.getToolCalls().stream()
@@ -193,8 +181,6 @@ public class DialogueTurn {
         messageBO.setRoleId(conversation.getRoleId());
         messageBO.setMessageType(MessageBO.MESSAGE_TYPE_TOOL_RESPONSE);
         messageBO.setCreateTime(LocalDateTime.ofInstant(assistantMessageCreatedAt, ZoneId.systemDefault()));
-        messageBO.setTokens(0);
-        messageBO.setResponseTime(0);
         // 存储 toolCallId 和 toolName 信息
         try {
             var responseInfo = toolResponseMessage.getResponses().stream()
@@ -205,22 +191,6 @@ public class DialogueTurn {
             log.warn("序列化 tool response 信息失败", e);
         }
         return messageBO;
-    }
-
-    private void logTokenDetails(Usage usage) {
-        if (!log.isDebugEnabled() || usage == null) {
-            return;
-        }
-        if (usage instanceof DefaultUsage defaultUsage && defaultUsage.getNativeUsage() instanceof OpenAiApi.Usage openAiUsage) {
-            var promptDetails = openAiUsage.promptTokensDetails();
-            var completionDetails = openAiUsage.completionTokenDetails();
-            log.debug("Token详情 — prompt: {} (cached: {}), completion: {} (reasoning: {}), total: {}",
-                openAiUsage.promptTokens(),
-                promptDetails != null ? promptDetails.cachedTokens() : "N/A",
-                openAiUsage.completionTokens(),
-                completionDetails != null ? completionDetails.reasoningTokens() : "N/A",
-                openAiUsage.totalTokens());
-        }
     }
 
     public void injectInstants() {

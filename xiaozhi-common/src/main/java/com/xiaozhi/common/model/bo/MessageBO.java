@@ -2,7 +2,6 @@ package com.xiaozhi.common.model.bo;
 
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -15,16 +14,11 @@ public class MessageBO {
     public static final String MESSAGE_TYPE_TOOL_CALL = "TOOL_CALL";
     public static final String MESSAGE_TYPE_TOOL_RESPONSE = "TOOL_RESPONSE";
 
-    private Integer messageId;
+    private Long messageId;
     private Integer userId;
     private String deviceId;
     private String sender;
     private String message;
-    private Integer tokens;
-    private BigDecimal sttDuration;
-    private BigDecimal ttsDuration;
-    private Long ttfsTime;
-    private Integer responseTime;
     private LocalDate statDate;
     private String audioPath;
     private String state;

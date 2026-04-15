@@ -4,7 +4,6 @@ import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.resp.MessageResp;
 import com.xiaozhi.common.model.resp.PageResp;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Date;
@@ -28,11 +27,10 @@ public interface MessageService {
 
     List<MessageBO> listHistoryAfter(String deviceId, Integer roleId, Instant time);
 
-    void updateAudioInfo(String deviceId,
-                         Integer roleId,
-                         String sender,
-                         LocalDateTime createTime,
-                         String audioPath,
-                         BigDecimal sttDuration,
-                         BigDecimal ttsDuration);
+    /**
+     * 更新 assistant 消息的音频路径，并更新关联的 metrics 记录中的 ttsDuration。
+     */
+    void updateAssistantAudio(String deviceId, Integer roleId,
+                              LocalDateTime createTime, String audioPath,
+                              java.math.BigDecimal ttsDuration);
 }
