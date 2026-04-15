@@ -4,6 +4,8 @@ import com.xiaozhi.ai.tool.ToolsSessionHolder;
 import com.xiaozhi.ai.tool.session.ToolSession;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.dialogue.playback.Player;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 
 /**
  * ChatSession 到 ToolSession 的适配器。
@@ -46,6 +48,12 @@ public class ChatSessionToolAdapter implements ToolSession {
     @Override
     public void addToolCallDetail(String name, String args, String result) {
         chatSession.addToolCallDetail(name, args, result);
+    }
+
+    @Override
+    public void addToolCallMessages(AssistantMessage toolCallAssistantMessage,
+                                    ToolResponseMessage toolResponseMessage) {
+        chatSession.getDialogueContext().setToolCallMessages(toolCallAssistantMessage, toolResponseMessage);
     }
 
     @Override

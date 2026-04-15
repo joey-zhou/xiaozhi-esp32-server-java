@@ -182,6 +182,18 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         XiaoZhiToolCallingManager.InternalToolExecutionResult internalToolExecutionResult = executeToolCall(prompt, assistantMessage,
                 toolContext);
 
+        // 将中间消息（模型的 tool_call 请求 + 工具执行结果）存入 ToolSession，供 Persona 注入 Conversation
+        String sessionId = toolContext.getContext().get("sessionId") instanceof String s ? s : null;
+        if (sessionId != null) {
+            ToolSessionProvider provider = getToolSessionProvider();
+            if (provider != null) {
+                ToolSession toolSession = provider.getSession(sessionId);
+                if (toolSession != null) {
+                    toolSession.addToolCallMessages(assistantMessage, internalToolExecutionResult.toolResponseMessage());
+                }
+            }
+        }
+
         List<Message> conversationHistory = buildConversationHistoryAfterToolExecution(prompt.getInstructions(),
                 assistantMessage, internalToolExecutionResult.toolResponseMessage());
 
@@ -279,12 +291,6 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
                 .anyMatch(tc -> !hasText(tc.name()));
         if (!hasFragment) {
             return toolCalls;
-        }
-
-        logger.info("检测到工具调用分片，原始条目数: {}，开始合并", toolCalls.size());
-        for (int i = 0; i < toolCalls.size(); i++) {
-            var tc = toolCalls.get(i);
-            logger.debug("  分片[{}]: id='{}', name='{}', arguments='{}'", i, tc.id(), tc.name(), tc.arguments());
         }
 
         List<AssistantMessage.ToolCall> merged = new ArrayList<>();

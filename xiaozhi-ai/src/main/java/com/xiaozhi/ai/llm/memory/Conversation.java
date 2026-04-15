@@ -29,7 +29,7 @@ public class Conversation extends ConversationIdentifier {
 
     public static final String MESSAGE_TYPE_USER = "user";
     public static final String MESSAGE_TYPE_ASSISTANT = "assistant";
-    public static final AssistantMessage ROLLBACK_MESSAGE = new AssistantMessage("rollback");
+    public static final String MESSAGE_TYPE_TOOL = "tool";
     // device, role, sessionId 唯一确定一个Conversation,as key,通过final保持全程的不变性(immutable)
     private final DeviceBO device;
     @Getter
@@ -139,17 +139,21 @@ public class Conversation extends ConversationIdentifier {
         }
 
         if(message instanceof AssistantMessage assistantMessage){
-
-            if (assistantMessage == Conversation.ROLLBACK_MESSAGE) {
-                if (!messages.isEmpty()) {
-                    messages.removeLast();
-                }
-                return;
-            }
-
-            // 2. 更新缓存
             messages.add(assistantMessage);
+            return;
         }
+
+        if(message instanceof ToolResponseMessage toolResponseMessage){
+            messages.add(toolResponseMessage);
+        }
+    }
+
+    /**
+     * 将工具调用链（模型的 tool_call 请求 + 工具执行结果）作为原子操作添加到消息列表
+     */
+    public synchronized void addToolCallChain(AssistantMessage toolCallMsg, ToolResponseMessage toolResponse) {
+        messages.add(toolCallMsg);
+        messages.add(toolResponse);
     }
 
 }

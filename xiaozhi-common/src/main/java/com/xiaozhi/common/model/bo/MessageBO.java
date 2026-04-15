@@ -12,7 +12,8 @@ public class MessageBO {
     public static final String STATE_ENABLED = "1";
     public static final String STATE_DELETED = "0";
     public static final String MESSAGE_TYPE_NORMAL = "NORMAL";
-    public static final String MESSAGE_TYPE_FUNCTION_CALL = "FUNCTION_CALL";
+    public static final String MESSAGE_TYPE_TOOL_CALL = "TOOL_CALL";
+    public static final String MESSAGE_TYPE_TOOL_RESPONSE = "TOOL_RESPONSE";
 
     private Integer messageId;
     private Integer userId;

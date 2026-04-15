@@ -28,6 +28,7 @@ export interface MessageQueryParams extends PageQueryParams {
   deviceName?: string
   roleId?: number
   sender?: string
+  messageType?: string
   startTime?: string
   endTime?: string
 }

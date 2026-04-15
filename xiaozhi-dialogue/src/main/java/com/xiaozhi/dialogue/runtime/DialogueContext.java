@@ -4,6 +4,8 @@ import com.xiaozhi.ai.tool.ToolsSessionHolder;
 import com.xiaozhi.dialogue.playback.Player;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.tool.ToolCallback;
 
 import java.nio.file.Path;
@@ -38,6 +40,16 @@ public class DialogueContext {
     private final List<ToolCallInfo> toolCallDetails = new CopyOnWriteArrayList<>();
 
     /**
+     * 工具调用的中间消息：模型请求调用工具的 AssistantMessage（包含 toolCalls）
+     */
+    private volatile AssistantMessage toolCallAssistantMessage;
+
+    /**
+     * 工具调用的中间消息：工具执行结果
+     */
+    private volatile ToolResponseMessage toolResponseMessage;
+
+    /**
      * 工具调用详情
      */
     public record ToolCallInfo(String name, String arguments, String result) {}
@@ -58,6 +70,23 @@ public class DialogueContext {
         List<ToolCallInfo> details = new ArrayList<>(toolCallDetails);
         toolCallDetails.clear();
         return details;
+    }
+
+    public void setToolCallMessages(AssistantMessage assistantMessage, ToolResponseMessage responseMessage) {
+        this.toolCallAssistantMessage = assistantMessage;
+        this.toolResponseMessage = responseMessage;
+    }
+
+    public synchronized AssistantMessage drainToolCallAssistantMessage() {
+        AssistantMessage msg = this.toolCallAssistantMessage;
+        this.toolCallAssistantMessage = null;
+        return msg;
+    }
+
+    public synchronized ToolResponseMessage drainToolResponseMessage() {
+        ToolResponseMessage msg = this.toolResponseMessage;
+        this.toolResponseMessage = null;
+        return msg;
     }
 
     public boolean isFunctionCalled() {

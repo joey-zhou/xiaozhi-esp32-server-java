@@ -87,7 +87,7 @@ public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
                             return "角色切换异常";
                         }
                     })
-                    .toolMetadata(new XiaozhiToolMetadata(true, true))
+                    .toolMetadata(new XiaozhiToolMetadata(true))
                     .description("当用户想切换角色/助手名字时调用,可选的角色名称列表：" + getRoleList(roleList)
                             + ". 调用前需要先把所有角色名称告知用户,用户告诉你角色名称进行切换.")
                     .inputSchema("""

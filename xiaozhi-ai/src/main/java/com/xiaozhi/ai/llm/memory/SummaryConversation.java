@@ -103,7 +103,7 @@ public class SummaryConversation extends Conversation {
             }
         }else {
             List<Message> history = chatMemory.find(device().getDeviceId(), role().getRoleId(), lastSummary.getLastMessageTimestamp());
-            logger.info("加载设备{}的{}条未被摘要的普通消息(MessageBO.MESSAGE_TYPE_NORMAL)作为对话历史", device().getDeviceId(), history.size());
+            logger.info("加载设备{}的{}条未被摘要的消息作为对话历史", device().getDeviceId(), history.size());
             synchronized (summaryLock) {
                 super.messages.addAll(history);
             }
@@ -126,8 +126,8 @@ public class SummaryConversation extends Conversation {
         synchronized (summaryLock) {
             super.add(message);
         }
-        // 达到阈值则触发大模型进行摘要。如果只是添加了UserMesassage，则暂时不需要急着摘要。
-        if (message instanceof AssistantMessage && message != Conversation.ROLLBACK_MESSAGE) {
+        // 达到阈值则触发大模型进行摘要。只在添加 AssistantMessage 时触发（避免重复触发）
+        if (message instanceof AssistantMessage) {
             summarize();
         }
     }
@@ -162,8 +162,19 @@ public class SummaryConversation extends Conversation {
     protected void summaryMessages(List<Message> needSummaryMessages) {
         // 1. Process memory messages as a string.
         String memory = needSummaryMessages.stream()
-                .filter(m -> m.getMessageType() == MessageType.USER || m.getMessageType() == MessageType.ASSISTANT)
-                .map(m -> m.getMessageType() + ":" + m.getText())
+                .map(m -> {
+                    if (m.getMessageType() == MessageType.TOOL) {
+                        return "TOOL:" + m.getText();
+                    }
+                    if (m.getMessageType() == MessageType.ASSISTANT && m instanceof AssistantMessage am
+                            && am.getToolCalls() != null && !am.getToolCalls().isEmpty()) {
+                        String toolNames = am.getToolCalls().stream()
+                                .map(tc -> tc.name())
+                                .collect(Collectors.joining(","));
+                        return "ASSISTANT:[tool_call:" + toolNames + "]";
+                    }
+                    return m.getMessageType() + ":" + m.getText();
+                })
                 .collect(Collectors.joining(System.lineSeparator()));
 
         // 2. 拼接提示词

@@ -20,7 +20,7 @@ public class MessageWindowConversation extends Conversation {
         super(device, role, sessionId);
         this.maxMessages = maxMessages;
 
-        logger.info("加载设备{}的普通消息(MessageBO.MESSAGE_TYPE_NORMAL)作为对话历史", device.getDeviceId());
+        logger.info("加载设备{}的对话历史", device.getDeviceId());
         List<Message> history = chatMemory.find(device.getDeviceId(), role.getRoleId(), maxMessages);
         super.messages.addAll(history) ;
     }
@@ -66,25 +66,10 @@ public class MessageWindowConversation extends Conversation {
     }
 
 
-    /**
-     * 添加消息
-     * 后续考虑：继承封装UserMessage和AssistantMessage,UserMessageWithTime,AssistantMessageWithTime
-     * 后续考虑：将function 或者 mcp 的相关信息封装在AssistantMessageWithTime，来精细处理。或者根据元数据判断是function_call还是mcp调用
-     * @param message
-     */
     @Override
     public synchronized void add(Message message) {
-
-        if(message instanceof UserMessage  || message instanceof AssistantMessage ){
-
-            if(message == Conversation.ROLLBACK_MESSAGE){
-                // 避免特殊指令影响后续对话效果。将此前已添加的UserMessage移除。
-                if(messages.size() > 0){
-                    messages.removeLast();
-                }
-            }else{
-                messages.add(message);
-            }
+        if(message instanceof UserMessage || message instanceof AssistantMessage || message instanceof ToolResponseMessage){
+            messages.add(message);
         }else{
             logger.warn("不支持的消息类型：{}",message.getClass().getName());
         }
@@ -92,10 +77,22 @@ public class MessageWindowConversation extends Conversation {
 
     @Override
     public synchronized List<Message> messages() {
-        // maxMessages一般设置为偶数，而实际调用此方法时一般是已添加了UserMessage。缩减缓存的历史消息size时，一般是移除一轮（User+Assistant）
-        while (messages.size() > maxMessages+1) {
-            messages.remove(0);
-            messages.remove(0);
+        // 按对话组裁剪：简单组=[User,Assistant](2条)，工具组=[User,Assistant(toolCall),Tool,Assistant(final)](4条)
+        while (messages.size() > maxMessages + 1) {
+            if (messages.size() >= 2 && messages.get(1) instanceof AssistantMessage am
+                    && am.getToolCalls() != null && !am.getToolCalls().isEmpty()
+                    && messages.size() >= 4) {
+                // 工具对话组：移除 4 条 [User, Assistant(toolCall), Tool, Assistant(final)]
+                for (int i = 0; i < 4 && !messages.isEmpty(); i++) {
+                    messages.remove(0);
+                }
+            } else {
+                // 简单对话组：移除 2 条 [User, Assistant]
+                messages.remove(0);
+                if (!messages.isEmpty()) {
+                    messages.remove(0);
+                }
+            }
         }
         // 新消息列表对象，避免使用过程中污染原始列表对象
         List<Message> historyMessages = new ArrayList<>();

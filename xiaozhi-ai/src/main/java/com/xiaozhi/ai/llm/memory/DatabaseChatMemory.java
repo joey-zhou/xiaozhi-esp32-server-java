@@ -8,9 +8,12 @@ import com.xiaozhi.summary.service.SummaryService;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,6 +37,7 @@ import java.util.stream.Collectors;
 public class DatabaseChatMemory implements ChatMemory {
 
     private static final Logger logger = LoggerFactory.getLogger(DatabaseChatMemory.class);
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final SummaryService summaryService;
     private final MessageService messageService;
@@ -71,11 +75,18 @@ public class DatabaseChatMemory implements ChatMemory {
         String role = message.getSender();
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("messageId", message.getMessageId());
-        metadata.put(ChatMemory.MESSAGE_TYPE_KEY, message.getMessageType());
 
         Message springMessage;
-        if (MessageType.ASSISTANT.getValue().equals(role)) {
-            springMessage = AssistantMessage.builder().content(message.getMessage()).properties(metadata).build();
+        if (Conversation.MESSAGE_TYPE_TOOL.equals(role)) {
+            // ToolResponseMessage: 从 toolCalls 字段恢复 toolCallId 和 toolName
+            springMessage = buildToolResponseMessage(message);
+        } else if (MessageType.ASSISTANT.getValue().equals(role)) {
+            // TOOL_CALL 类型的 AssistantMessage 需要恢复 toolCalls
+            if (MessageBO.MESSAGE_TYPE_TOOL_CALL.equals(message.getMessageType())) {
+                springMessage = buildToolCallAssistantMessage(message, metadata);
+            } else {
+                springMessage = AssistantMessage.builder().content(message.getMessage()).properties(metadata).build();
+            }
         } else if (MessageType.USER.getValue().equals(role)) {
             springMessage = UserMessage.builder().text(message.getMessage()).metadata(metadata).build();
         } else {
@@ -91,13 +102,66 @@ public class DatabaseChatMemory implements ChatMemory {
         return springMessage;
     }
 
+    /**
+     * 从 DB 记录重建带 toolCalls 的 AssistantMessage
+     */
+    private static AssistantMessage buildToolCallAssistantMessage(MessageBO message, Map<String, Object> metadata) {
+        List<AssistantMessage.ToolCall> toolCalls = List.of();
+        if (message.getToolCalls() != null) {
+            try {
+                List<Map<String, String>> rawList = OBJECT_MAPPER.readValue(
+                        message.getToolCalls(), new TypeReference<>() {});
+                toolCalls = rawList.stream()
+                        .map(m -> new AssistantMessage.ToolCall(
+                                m.getOrDefault("id", ""),
+                                "function",
+                                m.getOrDefault("name", ""),
+                                m.getOrDefault("arguments", "")))
+                        .toList();
+            } catch (Exception e) {
+                logger.warn("反序列化 toolCalls 失败: {}", e.getMessage());
+            }
+        }
+        return AssistantMessage.builder()
+                .content(message.getMessage())
+                .properties(metadata)
+                .toolCalls(toolCalls)
+                .build();
+    }
+
+    /**
+     * 从 DB 记录重建 ToolResponseMessage
+     */
+    private static ToolResponseMessage buildToolResponseMessage(MessageBO message) {
+        List<ToolResponseMessage.ToolResponse> responses = new ArrayList<>();
+        if (message.getToolCalls() != null) {
+            try {
+                List<Map<String, String>> rawList = OBJECT_MAPPER.readValue(
+                        message.getToolCalls(), new TypeReference<>() {});
+                for (Map<String, String> m : rawList) {
+                    responses.add(new ToolResponseMessage.ToolResponse(
+                            m.getOrDefault("toolCallId", ""),
+                            m.getOrDefault("toolName", ""),
+                            message.getMessage()));
+                }
+            } catch (Exception e) {
+                logger.warn("反序列化 tool response 信息失败: {}", e.getMessage());
+            }
+        }
+        if (responses.isEmpty()) {
+            responses.add(new ToolResponseMessage.ToolResponse("", "", message.getMessage()));
+        }
+        return ToolResponseMessage.builder().responses(responses).build();
+    }
+
     public static List<Message> toSpringMessages(List<MessageBO> messages) {
         if (messages == null || messages.isEmpty()) {
             return Collections.emptyList();
         }
         return messages.stream()
             .filter(message -> MessageType.ASSISTANT.getValue().equals(message.getSender())
-                || MessageType.USER.getValue().equals(message.getSender()))
+                || MessageType.USER.getValue().equals(message.getSender())
+                || Conversation.MESSAGE_TYPE_TOOL.equals(message.getSender()))
             .map(DatabaseChatMemory::toSpringMessage)
             .collect(Collectors.toList());
     }

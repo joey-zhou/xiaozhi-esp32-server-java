@@ -476,7 +476,7 @@ onMounted(async () => {
         :scroll="{ x: 800 }"
         size="middle"
         :expandable="{
-          rowExpandable: (record: any) => record.messageType === 'FUNCTION_CALL' && !!record.toolCalls,
+          rowExpandable: (record: any) => !!record.toolCalls,
         }"
         @change="onTableChange"
       >
@@ -511,7 +511,7 @@ onMounted(async () => {
 
           <!-- 消息类型列 -->
           <template v-else-if="column.dataIndex === 'messageType'">
-            <template v-if="record.messageType === 'FUNCTION_CALL' && record.sender === 'assistant'">
+            <template v-if="!!record.toolCalls">
               <a-tooltip placement="topLeft" :mouse-enter-delay="0.5" :overlay-style="{ maxWidth: '400px' }">
                 <template #title>
                   <div v-for="(tool, index) in parseToolCalls(record.toolCalls)" :key="index">{{ tool.name }}</div>

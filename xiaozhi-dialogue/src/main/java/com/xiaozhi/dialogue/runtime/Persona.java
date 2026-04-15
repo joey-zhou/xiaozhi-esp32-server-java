@@ -3,7 +3,6 @@ package com.xiaozhi.dialogue.runtime;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.ai.llm.memory.Conversation;
-import com.xiaozhi.ai.llm.tool.XiaozhiToolMetadata;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.ai.stt.SttService;
@@ -14,8 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -23,10 +22,7 @@ import org.springframework.ai.chat.model.MessageAggregator;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
-import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.ai.tool.ToolCallback;
-import org.springframework.util.Assert;
-import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
 import java.nio.file.Path;
@@ -163,8 +159,11 @@ public class Persona {
             }
         });
         return new MessageAggregator().aggregate(chatFlux, chatResponse -> {
-            boolean disturbed = isDisturbed(chatResponse);
             var toolCallDetails = getSession().drainToolCallDetails();
+            // 从 DialogueContext 中获取工具调用的中间消息
+            AssistantMessage toolCallAssistantMsg = getSession().getDialogueContext().drainToolCallAssistantMessage();
+            ToolResponseMessage toolResponseMsg = getSession().getDialogueContext().drainToolResponseMessage();
+
             DialogueTurn dialogueTurn = DialogueTurn.builder()
                     .userMessage(userMessage)
                     .chatResponse(chatResponse)
@@ -172,19 +171,20 @@ public class Persona {
                     .userMessageCreatedAt(now)
                     .userSpeechPath(userSpeechPath)
                     .assistantMessageCreatedAt(ttft.get())
-                    .disturbed(disturbed)
                     .toolCallDetails(toolCallDetails)
+                    .toolCallAssistantMessage(toolCallAssistantMsg)
+                    .toolResponseMessage(toolResponseMsg)
                     .build();
             // UserMessage 的时间戳应在 DialogueTurn 中注入，与 Conversation 持有的是同一个 UserMessage。
             dialogueTurn.injectInstants();
             listener.onDialogueTurn(dialogueTurn);
-            if(disturbed){
-                conversation.add(Conversation.ROLLBACK_MESSAGE);
-            }else{
-                // 不能再从 ChatResponse 里取 AssistantMessage，因为已注入时间戳
-                conversation.add(dialogueTurn.getAssistantMessage());
-            }
 
+            // 将工具调用链注入 Conversation 历史
+            if (toolCallAssistantMsg != null && toolResponseMsg != null) {
+                conversation.addToolCallChain(toolCallAssistantMsg, toolResponseMsg);
+            }
+            // 不能再从 ChatResponse 里取 AssistantMessage，因为已注入时间戳
+            conversation.add(dialogueTurn.getAssistantMessage());
         });
     }
 
@@ -216,46 +216,6 @@ public class Persona {
             return true;
         }
         return player != null && player.hasContent();
-    }
-
-    private boolean isDisturbed(ChatResponse chatResponse) {
-        Generation generation = chatResponse.getResult();
-        Assert.notNull(generation, "Generation is null from ChatResponse");
-
-        // 判断用户消息是否属于可能影响后续对话效果的指令
-        ChatGenerationMetadata generationMetadata = generation.getMetadata();
-        return isFuncitonCalling(generationMetadata,
-                getSession().getToolsSessionHolder().getAllFunction());
-
-    }
-
-    /**
-     * 检查元数据中是否包含工具调用标识。这里的“工具调用”指的是那些会影响对话效果的工具消息，例如“退出”、“切换角色”。
-     * 这些的特殊用户指令会污染后续对话效果。
-     * 有些工具调用的结果直接作为AssistantMessage加入对话历史并不会影响对话效果。它的AssistantMessage为正常消息。
-     * @param generationMetadata
-     * @param toolCallbacks
-     * @return
-     */
-
-    private boolean isFuncitonCalling(ChatGenerationMetadata generationMetadata, List<ToolCallback> toolCallbacks){
-        if(ToolExecutionResult.FINISH_REASON.equals(generationMetadata.getFinishReason())){
-            String toolId = generationMetadata.get(ToolExecutionResult.METADATA_TOOL_ID);
-            String toolName = generationMetadata.get(ToolExecutionResult.METADATA_TOOL_NAME);
-            logger.info("工具调用id: {} , name: {}", toolId,toolName);
-
-            if (StringUtils.hasText(toolName) &&
-                    toolCallbacks.stream()
-                            .filter(toolCallback -> toolCallback.getToolDefinition().name().equals(toolName))
-                            .map(toolCallback -> toolCallback.getToolMetadata())
-                            .filter(toolMetadata -> toolMetadata instanceof XiaozhiToolMetadata)
-                            .map(toolMetadata -> (XiaozhiToolMetadata) toolMetadata)
-                            .anyMatch(xiaozhiToolMetadata -> xiaozhiToolMetadata.disturbed())) {
-                logger.info("当前用户消息属于可能影响后续对话效果的指令`{}`，准备执行回滚。", toolName);
-                return true;
-            }
-        }
-        return false;
     }
 
     /**

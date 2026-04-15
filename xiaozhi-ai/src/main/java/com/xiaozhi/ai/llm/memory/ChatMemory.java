@@ -17,7 +17,6 @@ import java.util.List;
  *
  */
 public interface ChatMemory {
-    String MESSAGE_TYPE_KEY = "SYS_MESSAGE_TYPE";
     String TIME_MILLIS_KEY = "TIME_MILLIS";
     String AUDIO_PATH = "AUDIO_PATH";
     String USAGE_KEY = "llm_usage";  // 用于存储LLM使用情况的键
@@ -58,7 +57,7 @@ public interface ChatMemory {
     List<Message> find(String deviceId, int roleId, Instant timeMillis);
     /**
      * 清除设备的历史记录
-     * 不是提供给Conversation使用，而是用于FUNCTION_CALL 场景使用。或者其它强制使其失忆的场景。
+     * 不是提供给Conversation使用，而是用于强制使其失忆的场景。
      *
      * @param deviceId 设备ID
      */

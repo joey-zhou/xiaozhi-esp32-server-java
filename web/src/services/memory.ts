@@ -32,6 +32,7 @@ export function queryChatMemory(params: {
     pageSize,
     deviceId,
     roleId,
+    messageType: 'NORMAL',
   }
 
   if (startTime) queryParams.startTime = startTime

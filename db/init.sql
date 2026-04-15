@@ -84,7 +84,7 @@ CREATE TABLE `xiaozhi`.`sys_message` (
   `userId` int unsigned DEFAULT NULL COMMENT '用户ID',
   `deviceId` varchar(30) NOT NULL COMMENT '设备ID',
   `sessionId` varchar(100) NOT NULL COMMENT '会话ID',
-  `sender` enum('user','assistant') NOT NULL COMMENT '消息发送方：user-用户，assistant-人工智能',
+  `sender` enum('user','assistant','tool') NOT NULL COMMENT '消息发送方：user-用户，assistant-人工智能，tool-工具响应',
   `roleId` int unsigned DEFAULT NULL COMMENT 'AI扮演的角色ID',
   `message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '消息内容',
   `tokens` int unsigned DEFAULT 0 COMMENT 'tokens数量',

@@ -1,6 +1,8 @@
 package com.xiaozhi.ai.tool.session;
 
 import com.xiaozhi.ai.tool.ToolsSessionHolder;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 
 /**
  * 工具会话抽象 — 替代直接依赖 ChatSession。
@@ -20,6 +22,10 @@ public interface ToolSession {
     boolean isDeviceMcpInitialized();
 
     void addToolCallDetail(String name, String args, String result);
+
+    /** 存储工具调用的中间消息（模型的 tool_call 请求 + 工具执行结果），用于注入 Conversation 历史 */
+    void addToolCallMessages(AssistantMessage toolCallAssistantMessage,
+                             ToolResponseMessage toolResponseMessage);
 
     void sendTextMessage(String message);
 

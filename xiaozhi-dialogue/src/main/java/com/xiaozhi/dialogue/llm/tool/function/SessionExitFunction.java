@@ -33,7 +33,7 @@ public class SessionExitFunction implements ToolsGlobalRegistry.GlobalFunction {
                 }
                 return sayGoodbye;
             })
-            .toolMetadata(new XiaozhiToolMetadata(true, true))
+            .toolMetadata(new XiaozhiToolMetadata(true))
             .description("当用户明确表达要离开/结束对话时调用此函数。触发词汇：'拜拜'、'再见'、'退下'、'走了'、'结束对话'、'退出'、'我要走了'、'goodbye'、'bye'。重要：检测到这些词汇时必须调用此函数来正确结束会话，不要只是普通回复。")
             .inputSchema("""
                         {

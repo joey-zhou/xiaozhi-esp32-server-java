@@ -11,6 +11,7 @@ import lombok.Builder;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.metadata.Usage;
@@ -25,7 +26,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
 
 /**
  * 表示一次 Conversation 中已完成的一轮交互：
@@ -43,9 +48,10 @@ public class DialogueTurn {
     private Conversation conversation;
     private Instant userMessageCreatedAt;
     private Instant assistantMessageCreatedAt;
-    private boolean disturbed;
     private List<DialogueContext.ToolCallInfo> toolCallDetails;
     private Path userSpeechPath;
+    private AssistantMessage toolCallAssistantMessage;
+    private ToolResponseMessage toolResponseMessage;
 
     private final AssistantMessage assistantMessage;
     private final Duration timeToFirstToken;
@@ -58,8 +64,9 @@ public class DialogueTurn {
             Path userSpeechPath,
             Instant userMessageCreatedAt,
             Instant assistantMessageCreatedAt,
-            boolean disturbed,
-            List<DialogueContext.ToolCallInfo> toolCallDetails) {
+            List<DialogueContext.ToolCallInfo> toolCallDetails,
+            AssistantMessage toolCallAssistantMessage,
+            ToolResponseMessage toolResponseMessage) {
         Assert.notNull(userMessage, "用户消息对象不应该为NULL！");
         Assert.notNull(chatResponse, "大语言模型的响应对象不应该为NULL！");
         Assert.notNull(conversation, "会话对象不应该为NULL！");
@@ -69,25 +76,38 @@ public class DialogueTurn {
         this.chatResponse = chatResponse;
         this.conversation = conversation;
         this.userSpeechPath = userSpeechPath;
-        this.userMessageCreatedAt = userMessageCreatedAt;
-        this.assistantMessageCreatedAt = assistantMessageCreatedAt;
-        this.disturbed = disturbed;
-        this.toolCallDetails = toolCallDetails != null ? toolCallDetails : List.of();
-        this.assistantMessage = chatResponse.getResult().getOutput();
         this.timeToFirstToken = Duration.between(userMessageCreatedAt, assistantMessageCreatedAt);
+        this.userMessageCreatedAt = userMessageCreatedAt.truncatedTo(ChronoUnit.SECONDS);
+        this.assistantMessageCreatedAt = assistantMessageCreatedAt.truncatedTo(ChronoUnit.SECONDS);
+        this.toolCallDetails = toolCallDetails != null ? toolCallDetails : List.of();
+        this.toolCallAssistantMessage = toolCallAssistantMessage;
+        this.toolResponseMessage = toolResponseMessage;
+        this.assistantMessage = chatResponse.getResult().getOutput();
     }
 
     public List<MessageBO> toMessages() {
         Generation generation = chatResponse.getResult();
         Assert.notNull(generation, "Generation is null from ChatResponse");
 
-        AssistantMessage assistantMessage = generation.getOutput();
+        AssistantMessage finalAssistantMessage = generation.getOutput();
         Usage llmUsage = chatResponse.getMetadata().getUsage();
         logTokenDetails(llmUsage);
 
-        return List.of(userMessage, assistantMessage).stream()
-            .map(message -> toMessageBO(message, llmUsage))
-            .toList();
+        List<MessageBO> messages = new ArrayList<>();
+
+        // 1. UserMessage
+        messages.add(toMessageBO(userMessage, llmUsage));
+
+        // 2+3. 如果有工具调用，插入中间消息：Assistant(toolCall) + Tool(response)
+        if (toolCallAssistantMessage != null && toolResponseMessage != null) {
+            messages.add(toToolCallAssistantMessageBO(llmUsage));
+            messages.add(toToolResponseMessageBO());
+        }
+
+        // 4. 最终 AssistantMessage
+        messages.add(toMessageBO(finalAssistantMessage, llmUsage));
+
+        return messages;
     }
 
     private MessageBO toMessageBO(org.springframework.ai.chat.messages.AbstractMessage message, Usage usage) {
@@ -98,9 +118,7 @@ public class DialogueTurn {
         messageBO.setSender(message.getMessageType().getValue());
         messageBO.setMessage(message.getText());
         messageBO.setRoleId(conversation.getRoleId());
-        messageBO.setMessageType(toolCallDetails.isEmpty()
-            ? MessageBO.MESSAGE_TYPE_NORMAL
-            : MessageBO.MESSAGE_TYPE_FUNCTION_CALL);
+        messageBO.setMessageType(MessageBO.MESSAGE_TYPE_NORMAL);
 
         switch (message.getMessageType()) {
             case USER:
@@ -128,6 +146,64 @@ public class DialogueTurn {
         }
 
         messageBO.setResponseTime(0);
+        return messageBO;
+    }
+
+    /**
+     * 构建工具调用请求的 MessageBO（sender=assistant, messageType=TOOL_CALL）
+     */
+    private MessageBO toToolCallAssistantMessageBO(Usage usage) {
+        MessageBO messageBO = new MessageBO();
+        messageBO.setUserId(conversation.device().getUserId());
+        messageBO.setDeviceId(conversation.getDeviceId());
+        messageBO.setSessionId(conversation.getSessionId());
+        messageBO.setSender(Conversation.MESSAGE_TYPE_ASSISTANT);
+        messageBO.setMessage(toolCallAssistantMessage.getText());
+        messageBO.setRoleId(conversation.getRoleId());
+        messageBO.setMessageType(MessageBO.MESSAGE_TYPE_TOOL_CALL);
+        messageBO.setCreateTime(LocalDateTime.ofInstant(assistantMessageCreatedAt, ZoneId.systemDefault()));
+        messageBO.setTokens(0);
+        messageBO.setResponseTime(0);
+        // 存储 toolCalls JSON: [{id, name, arguments}]
+        try {
+            var toolCallsJson = toolCallAssistantMessage.getToolCalls().stream()
+                    .map(tc -> Map.of("id", tc.id(), "name", tc.name(), "arguments", tc.arguments()))
+                    .toList();
+            messageBO.setToolCalls(OBJECT_MAPPER.writeValueAsString(toolCallsJson));
+        } catch (JsonProcessingException e) {
+            log.warn("序列化 tool call 请求失败", e);
+        }
+        return messageBO;
+    }
+
+    /**
+     * 构建工具执行结果的 MessageBO（sender=tool, messageType=TOOL_RESPONSE）
+     */
+    private MessageBO toToolResponseMessageBO() {
+        MessageBO messageBO = new MessageBO();
+        messageBO.setUserId(conversation.device().getUserId());
+        messageBO.setDeviceId(conversation.getDeviceId());
+        messageBO.setSessionId(conversation.getSessionId());
+        messageBO.setSender(Conversation.MESSAGE_TYPE_TOOL);
+        // 合并所有 ToolResponse 的文本
+        String responseText = toolResponseMessage.getResponses().stream()
+                .map(ToolResponseMessage.ToolResponse::responseData)
+                .collect(Collectors.joining("\n"));
+        messageBO.setMessage(responseText);
+        messageBO.setRoleId(conversation.getRoleId());
+        messageBO.setMessageType(MessageBO.MESSAGE_TYPE_TOOL_RESPONSE);
+        messageBO.setCreateTime(LocalDateTime.ofInstant(assistantMessageCreatedAt, ZoneId.systemDefault()));
+        messageBO.setTokens(0);
+        messageBO.setResponseTime(0);
+        // 存储 toolCallId 和 toolName 信息
+        try {
+            var responseInfo = toolResponseMessage.getResponses().stream()
+                    .map(r -> Map.of("toolCallId", r.id(), "toolName", r.name()))
+                    .toList();
+            messageBO.setToolCalls(OBJECT_MAPPER.writeValueAsString(responseInfo));
+        } catch (JsonProcessingException e) {
+            log.warn("序列化 tool response 信息失败", e);
+        }
         return messageBO;
     }
 

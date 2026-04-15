@@ -155,7 +155,6 @@ public class MessageServiceImpl implements MessageService {
         }
         return messageMapper.selectList(new LambdaQueryWrapper<MessageDO>()
                 .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
-                .eq(MessageDO::getMessageType, MessageBO.MESSAGE_TYPE_NORMAL)
                 .eq(MessageDO::getDeviceId, deviceId)
                 .eq(MessageDO::getRoleId, roleId)
                 .orderByDesc(MessageDO::getCreateTime)
@@ -173,7 +172,6 @@ public class MessageServiceImpl implements MessageService {
         LocalDateTime createTime = LocalDateTime.ofInstant(time, ZoneId.systemDefault());
         return messageMapper.selectList(new LambdaQueryWrapper<MessageDO>()
                 .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
-                .eq(MessageDO::getMessageType, MessageBO.MESSAGE_TYPE_NORMAL)
                 .eq(MessageDO::getDeviceId, deviceId)
                 .eq(MessageDO::getRoleId, roleId)
                 .ge(MessageDO::getCreateTime, createTime)
