@@ -21,5 +21,7 @@ public interface MessageMapper extends BaseMapper<MessageDO> {
                                       @Param("roleId") Integer roleId,
                                       @Param("startTime") Date startTime,
                                       @Param("endTime") Date endTime,
-                                      @Param("userId") Integer userId);
+                                      @Param("userId") Integer userId,
+                                      @Param("sessionId") String sessionId,
+                                      @Param("source") String source);
 }

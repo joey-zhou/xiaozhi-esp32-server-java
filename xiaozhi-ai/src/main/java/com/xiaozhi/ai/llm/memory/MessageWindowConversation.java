@@ -1,5 +1,6 @@
 package com.xiaozhi.ai.llm.memory;
 
+import lombok.Builder;
 import org.springframework.ai.chat.messages.*;
 
 
@@ -14,75 +15,32 @@ public class MessageWindowConversation extends Conversation {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MessageWindowConversation.class);
 
 
+    /**
+     * 可切换加载维度的构造器。由 Lombok {@link Builder} 生成静态工厂 {@code builder()} 与链式 setter。
+     * <ul>
+     *   <li>{@code sessionScoped=false}（默认）：按 ownerId + roleId 查 {@link ChatMemory#find(String, int, int)}，设备场景跨 session 聚合</li>
+     *   <li>{@code sessionScoped=true}：按 sessionId 查 {@link ChatMemory#find(String, int)}，Web 场景按会话隔离</li>
+     * </ul>
+     */
+    @Builder
     public MessageWindowConversation(String ownerId, Integer roleId, String sessionId, String roleDesc, Integer userId,
-                                      int maxMessages, ChatMemory chatMemory){
+                                      int maxMessages, ChatMemory chatMemory, boolean sessionScoped){
         super(ownerId, roleId, sessionId, roleDesc, userId);
         this.maxMessages = maxMessages;
 
-        logger.info("加载{}的对话历史", ownerId);
-        List<Message> history = chatMemory.find(ownerId, roleId, maxMessages);
-        super.messages.addAll(history) ;
+        List<Message> history = sessionScoped
+                ? chatMemory.find(sessionId, maxMessages)
+                : chatMemory.find(ownerId, roleId, maxMessages);
+        logger.info("加载对话历史: sessionScoped={}, ownerId={}, sessionId={}, size={}",
+                sessionScoped, ownerId, sessionId, history.size());
+        super.messages.addAll(history);
     }
-
-    public static class Builder {
-        private String ownerId;
-        private Integer roleId;
-        private String roleDesc;
-        private Integer userId;
-        private String sessionId;
-        private int maxMessages;
-        private ChatMemory chatMemory;
-
-        public Builder ownerId(String ownerId) {
-            this.ownerId = ownerId;
-            return this;
-        }
-
-        public Builder roleId(Integer roleId) {
-            this.roleId = roleId;
-            return this;
-        }
-
-        public Builder roleDesc(String roleDesc) {
-            this.roleDesc = roleDesc;
-            return this;
-        }
-
-        public Builder userId(Integer userId) {
-            this.userId = userId;
-            return this;
-        }
-
-        public Builder sessionId(String sessionId) {
-            this.sessionId = sessionId;
-            return this;
-        }
-
-        public Builder chatMemory(ChatMemory chatMemory) {
-            this.chatMemory = chatMemory;
-            return this;
-        }
-
-        public Builder maxMessages(int maxMessages) {
-            this.maxMessages = maxMessages;
-            return this;
-        }
-
-        public MessageWindowConversation build(){
-            return new MessageWindowConversation(ownerId, roleId, sessionId, roleDesc, userId, maxMessages, chatMemory);
-        }
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
 
     @Override
     public synchronized void add(Message message) {
-        if(message instanceof UserMessage || message instanceof AssistantMessage || message instanceof ToolResponseMessage){
+        if (message instanceof UserMessage || message instanceof AssistantMessage || message instanceof ToolResponseMessage) {
             messages.add(message);
-        }else{
+        } else {
             logger.warn("不支持的消息类型：{}",message.getClass().getName());
         }
     }

@@ -64,9 +64,9 @@ class MessageServiceImplTest {
     @Test
     void deleteMarksMessageAsDeletedWhenMessageExists() {
         MessageDO messageDO = new MessageDO();
-        messageDO.setMessageId(1);
+        messageDO.setMessageId(1L);
         var messageBO = new com.xiaozhi.common.model.bo.MessageBO();
-        messageBO.setMessageId(1);
+        messageBO.setMessageId(1L);
         messageBO.setAudioPath("");
 
         when(messageMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(messageDO);

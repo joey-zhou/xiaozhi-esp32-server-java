@@ -27,5 +27,6 @@ public class MessageDO extends BaseDO {
     private String messageType;
     private String toolCalls;
     private String sessionId;
+    private String source;
     private Integer roleId;
 }

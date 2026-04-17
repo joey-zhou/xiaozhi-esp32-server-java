@@ -1,6 +1,7 @@
 package com.xiaozhi.event;
 
 import com.xiaozhi.common.domain.AbstractDomainEvent;
+import lombok.Getter;
 
 /**
  * STT 语音识别完成事件。
@@ -14,10 +15,14 @@ import com.xiaozhi.common.domain.AbstractDomainEvent;
  *   <li>敏感词过滤：在 LLM 调用前对用户文本进行安全过滤</li>
  * </ul>
  */
+@Getter
 public class SpeechRecognizedEvent extends AbstractDomainEvent {
 
     private final String sessionId;
     private final String text;
+    /**
+     * 用户语音中检测到的情感标签，可能为 null。
+     */
     private final String emotion;
 
     public SpeechRecognizedEvent(Object source, String sessionId, String text, String emotion) {
@@ -25,20 +30,5 @@ public class SpeechRecognizedEvent extends AbstractDomainEvent {
         this.sessionId = sessionId;
         this.text = text;
         this.emotion = emotion;
-    }
-
-    public String getSessionId() {
-        return sessionId;
-    }
-
-    public String getText() {
-        return text;
-    }
-
-    /**
-     * 用户语音中检测到的情感标签，可能为 null。
-     */
-    public String getEmotion() {
-        return emotion;
     }
 }

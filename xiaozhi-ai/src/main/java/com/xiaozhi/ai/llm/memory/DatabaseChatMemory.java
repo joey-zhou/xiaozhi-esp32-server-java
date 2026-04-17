@@ -2,7 +2,6 @@ package com.xiaozhi.ai.llm.memory;
 
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.SummaryBO;
-import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.summary.service.SummaryService;
 import org.jetbrains.annotations.NotNull;
@@ -12,18 +11,15 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,12 +57,19 @@ public class DatabaseChatMemory implements ChatMemory {
     @Override
     public List<Message> find(String ownerId, int roleId, int limit) {
         try {
-            List<MessageBO> messages = new ArrayList<>(messageService.listHistory(ownerId, roleId, limit));
-            messages.sort(Comparator.comparing(MessageBO::getCreateTime, Comparator.nullsLast(LocalDateTime::compareTo))
-                .thenComparing(MessageBO::getSender, Comparator.reverseOrder()));
-            return toSpringMessages(messages);
+            return toSpringMessages(messageService.listHistory(ownerId, roleId, limit));
         } catch (Exception e) {
-            logger.error("获取历史消息时出错: {}", e.getMessage(), e);
+            logger.error("获取历史消息时出错(按 ownerId+roleId): {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+
+    @Override
+    public List<Message> find(String sessionId, int limit) {
+        try {
+            return toSpringMessages(messageService.listHistory(sessionId, limit));
+        } catch (Exception e) {
+            logger.error("获取历史消息时出错(按 sessionId): {}", e.getMessage(), e);
             return new ArrayList<>();
         }
     }

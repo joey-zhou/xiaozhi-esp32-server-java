@@ -1,6 +1,7 @@
 package com.xiaozhi.event;
 
 import com.xiaozhi.common.domain.AbstractDomainEvent;
+import lombok.Getter;
 
 /**
  * 音频通道已连接事件。
@@ -13,6 +14,7 @@ import com.xiaozhi.common.domain.AbstractDomainEvent;
  *   <li>VAD/AEC 预热：提前初始化音频处理组件，减少首次对话延迟</li>
  * </ul>
  */
+@Getter
 public class ChatAudioOpenedEvent extends AbstractDomainEvent {
 
     private final String sessionId;
@@ -22,13 +24,5 @@ public class ChatAudioOpenedEvent extends AbstractDomainEvent {
         super(source);
         this.sessionId = sessionId;
         this.deviceId = deviceId;
-    }
-
-    public String getSessionId() {
-        return sessionId;
-    }
-
-    public String getDeviceId() {
-        return deviceId;
     }
 }

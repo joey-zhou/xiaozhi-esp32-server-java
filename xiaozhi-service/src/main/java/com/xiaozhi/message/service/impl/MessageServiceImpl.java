@@ -6,11 +6,13 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.MessageBO;
+import com.xiaozhi.common.model.resp.ConversationResp;
 import com.xiaozhi.common.model.resp.MessageResp;
 import com.xiaozhi.common.model.resp.PageResp;
 import com.xiaozhi.event.ConversationHistoryClearedEvent;
 import com.xiaozhi.message.convert.MessageConvert;
 import com.xiaozhi.message.dal.mysql.dataobject.MessageDO;
+import com.xiaozhi.message.dal.mysql.mapper.ConversationMapper;
 import com.xiaozhi.message.dal.mysql.mapper.MessageMapper;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.utils.AudioUtils;
@@ -27,9 +29,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class MessageServiceImpl implements MessageService {
@@ -43,18 +47,24 @@ public class MessageServiceImpl implements MessageService {
     @Resource
     private ApplicationEventPublisher eventPublisher;
 
+    @Resource
+    private ConversationMapper conversationMapper;
+
     @Override
     public PageResp<MessageResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
                                       String sender, String messageType, Integer roleId,
-                                      Date startTime, Date endTime, Integer userId) {
+                                      Date startTime, Date endTime, Integer userId, String sessionId,
+                                      String source) {
         Page<MessageResp> page = new Page<>(pageNo, pageSize);
-        IPage<MessageResp> result = messageMapper.selectPageResp(page, deviceId, deviceName, sender, messageType, roleId, startTime, endTime, userId);
-        return new PageResp<>(
-            result.getRecords(),
-            result.getTotal(),
-            Math.toIntExact(result.getCurrent()),
-            Math.toIntExact(result.getSize())
-        );
+        IPage<MessageResp> iPage = messageMapper.selectPageResp(page, deviceId, deviceName, sender, messageType, roleId, startTime, endTime, userId, sessionId, source);
+        return new PageResp<>(iPage.getRecords(), iPage.getTotal(), pageNo, pageSize);
+    }
+
+    @Override
+    public PageResp<ConversationResp> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source) {
+        Page<ConversationResp> page = new Page<>(pageNo, pageSize);
+        IPage<ConversationResp> iPage = conversationMapper.selectConversationPage(page, userId, roleId, source);
+        return new PageResp<>(iPage.getRecords(), iPage.getTotal(), pageNo, pageSize);
     }
 
     @Override
@@ -154,15 +164,36 @@ public class MessageServiceImpl implements MessageService {
         if (!StringUtils.hasText(deviceId) || roleId == null || limit <= 0) {
             return Collections.emptyList();
         }
-        return messageMapper.selectList(new LambdaQueryWrapper<MessageDO>()
+        List<MessageBO> desc = messageMapper.selectList(new LambdaQueryWrapper<MessageDO>()
                 .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
                 .eq(MessageDO::getDeviceId, deviceId)
                 .eq(MessageDO::getRoleId, roleId)
                 .orderByDesc(MessageDO::getCreateTime)
+                .orderByDesc(MessageDO::getMessageId)
                 .last("LIMIT " + limit))
             .stream()
             .map(messageConvert::toBO)
-            .toList();
+            .collect(Collectors.toCollection(ArrayList::new));
+        Collections.reverse(desc);
+        return desc;
+    }
+
+    @Override
+    public List<MessageBO> listHistory(String sessionId, int limit) {
+        if (!StringUtils.hasText(sessionId) || limit <= 0) {
+            return Collections.emptyList();
+        }
+        List<MessageBO> desc = messageMapper.selectList(new LambdaQueryWrapper<MessageDO>()
+                .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
+                .eq(MessageDO::getSessionId, sessionId)
+                .orderByDesc(MessageDO::getCreateTime)
+                .orderByDesc(MessageDO::getMessageId)
+                .last("LIMIT " + limit))
+            .stream()
+            .map(messageConvert::toBO)
+            .collect(Collectors.toCollection(ArrayList::new));
+        Collections.reverse(desc);
+        return desc;
     }
 
     @Override

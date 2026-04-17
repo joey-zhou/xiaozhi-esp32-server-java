@@ -37,4 +37,10 @@ public class MessagePageReq extends BasePageReq {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date endTime;
+
+    @Schema(description = "会话ID")
+    private String sessionId;
+
+    @Schema(description = "消息来源: web|device")
+    private String source;
 }

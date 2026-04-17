@@ -47,6 +47,7 @@ export default {
     update: '/message',
     delete: '/message',
     export: '/message/export',
+    conversations: '/message/conversations',
   },
   config: {
     add: '/config',
@@ -64,5 +65,11 @@ export default {
   upload: '/file/upload',
   memory: {
     summary: '/memory/summary',
+  },
+  // Web 聊天 API
+  chat: {
+    open: '/chat/open',
+    stream: '/chat/stream',
+    close: '/chat/close',
   },
 }

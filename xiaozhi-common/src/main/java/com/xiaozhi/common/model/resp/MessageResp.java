@@ -41,6 +41,9 @@ public class MessageResp {
     @Schema(description = "会话ID")
     private String sessionId;
 
+    @Schema(description = "消息来源: web|device")
+    private String source;
+
     @Schema(description = "角色ID")
     private Integer roleId;
 

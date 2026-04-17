@@ -316,9 +316,9 @@ const handleSubmit = async () => {
     const voiceInfo = allVoices.value.find(v => v.value === formData.voiceName)
     const ttsId = voiceInfo?.ttsId || -1
     
-    const submitData = {
+    const submitData: Partial<RoleFormData> & { avatar?: string } = {
       ...formData,
-      avatar: avatarUrl.value,
+      avatar: avatarUrl.value || '',
       // 将 isDefault 布尔值转换为字符串 '1' 或 '0'
       isDefault: formData.isDefault ? '1' : '0',
       ttsId: ttsId,

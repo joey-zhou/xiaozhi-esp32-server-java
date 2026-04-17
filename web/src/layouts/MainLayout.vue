@@ -168,6 +168,7 @@ onBeforeUnmount(() => {
 
 .layout-content {
   flex: 1;
+  position: relative;
 }
 
 

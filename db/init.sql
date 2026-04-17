@@ -366,8 +366,9 @@ INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `pe
 (NULL, '角色配置', 'system:role', 'menu', '/role', 'page/Role', 'user-add', 5, '1', '1'),
 (NULL, '提示词模板管理', 'system:prompt-template', 'menu', '/prompt-template', 'page/PromptTemplate', 'snippets', 6, '0', '1'),
 (NULL, '配置管理', 'system:config', 'menu', '/config', 'common/PageView', 'setting', 7, '1', '1'),
-(NULL, '设置', 'system:setting', 'menu', '/setting', 'common/PageView', 'setting', 8, '1', '1'),
-(NULL, '权限角色', 'system:auth-role', 'menu', '/auth-role', 'page/AuthRole', 'safety-certificate', 9, '1', '1');
+(NULL, 'Web 聊天', 'system:chat', 'menu', '/chat', 'page/Chat', 'message', 8, '1', '1'),
+(NULL, '设置', 'system:setting', 'menu', '/setting', 'common/PageView', 'setting', 9, '1', '1'),
+(NULL, '权限角色', 'system:auth-role', 'menu', '/auth-role', 'page/AuthRole', 'safety-certificate', 10, '1', '1');
 
 -- 配置管理子菜单 (parentId=7 即配置管理)
 INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
@@ -386,6 +387,19 @@ INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `pe
 SELECT `permissionId`, '保存授权', 'system:auth-role:assign', 'button', NULL, NULL, NULL, 1, '0', '1'
 FROM `xiaozhi`.`sys_permission`
 WHERE `permissionKey` = 'system:auth-role';
+
+-- Web 聊天 API 子权限
+INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`)
+SELECT permissionId, '开启会话', 'system:chat:api:open', 'api', NULL, NULL, NULL, 1, '0', '1'
+FROM `xiaozhi`.`sys_permission` WHERE `permissionKey` = 'system:chat';
+
+INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`)
+SELECT permissionId, '流式聊天', 'system:chat:api:stream', 'api', NULL, NULL, NULL, 2, '0', '1'
+FROM `xiaozhi`.`sys_permission` WHERE `permissionKey` = 'system:chat';
+
+INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`)
+SELECT permissionId, '关闭会话', 'system:chat:api:close', 'api', NULL, NULL, NULL, 3, '0', '1'
+FROM `xiaozhi`.`sys_permission` WHERE `permissionKey` = 'system:chat';
 
 -- 隐藏菜单: 文件能力
 INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
@@ -494,7 +508,11 @@ permissionKey IN (
     'system:setting',
     'system:setting:account',
     'system:setting:config',
-    'system:config'
+    'system:config',
+    'system:chat',
+    'system:chat:api:open',
+    'system:chat:api:stream',
+    'system:chat:api:close'
 );
 
 -- 将admin用户设为管理员角色

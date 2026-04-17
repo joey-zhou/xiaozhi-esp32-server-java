@@ -197,11 +197,13 @@ public class ScheduledPlayer extends Player {
      * 订阅队列中的下一个Flux
      */
     private void subscribeNext() {
-        Flux<Speech> nextFlux = fluxQueue.poll();
-        if (nextFlux != null) {
-            subscribe(nextFlux);
-        } else {
-            fluxDisposable.set(null);
+        synchronized (fluxDisposable) {
+            Flux<Speech> nextFlux = fluxQueue.poll();
+            if (nextFlux != null) {
+                subscribe(nextFlux);
+            } else {
+                fluxDisposable.set(null);
+            }
         }
     }
 

@@ -1,10 +1,12 @@
 package com.xiaozhi.event;
 
 import com.xiaozhi.common.domain.AbstractDomainEvent;
+import lombok.Getter;
 
 /**
  * Session 关闭事件
  */
+@Getter
 public class ChatSessionClosedEvent extends AbstractDomainEvent {
 
     private final String sessionId;
@@ -14,13 +16,5 @@ public class ChatSessionClosedEvent extends AbstractDomainEvent {
         super(source);
         this.sessionId = sessionId;
         this.deviceId = deviceId;
-    }
-
-    public String getSessionId() {
-        return sessionId;
-    }
-
-    public String getDeviceId() {
-        return deviceId;
     }
 }

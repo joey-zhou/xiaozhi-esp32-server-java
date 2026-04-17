@@ -38,14 +38,24 @@ public interface ChatMemory {
     SummaryBO findLastSummary(String ownerId, int roleId);
 
     /**
-     * 获取历史对话消息列表
+     * 按 ownerId + roleId 获取历史对话消息列表（设备场景：跨 session 聚合）。
      *
-     * @param ownerId 聊天参与者标识（设备场景: deviceId, Web 场景: userId）
+     * @param ownerId 聊天参与者标识（设备场景: deviceId）
      * @param roleId 角色ID
      * @param limit 限制数量，此参数对于性能是必要的。
-     * @return 消息列表
+     * @return 消息列表，按 createTime 升序
      */
     List<Message> find(String ownerId, int roleId, int limit);
+
+    /**
+     * 按 sessionId 获取历史对话消息列表（Web 场景：按会话隔离）。
+     * 与 {@link #find(String, int, int)} 参数数量不同构成方法重载。
+     *
+     * @param sessionId 会话 ID
+     * @param limit 限制数量
+     * @return 消息列表，按 createTime 升序
+     */
+    List<Message> find(String sessionId, int limit);
 
     /**
      * 获取历史对话消息列表

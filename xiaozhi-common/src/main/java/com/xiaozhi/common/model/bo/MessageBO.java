@@ -19,6 +19,9 @@ public class MessageBO {
     public static final String MESSAGE_TYPE_TOOL_CALL = "TOOL_CALL";
     public static final String MESSAGE_TYPE_TOOL_RESPONSE = "TOOL_RESPONSE";
 
+    public static final String SOURCE_WEB = "web";
+    public static final String SOURCE_DEVICE = "device";
+
     private Long messageId;
     private Integer userId;
     private String deviceId;
@@ -30,6 +33,7 @@ public class MessageBO {
     private String messageType;
     private String toolCalls;
     private String sessionId;
+    private String source;
     private Integer roleId;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

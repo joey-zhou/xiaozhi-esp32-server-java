@@ -186,6 +186,18 @@ const routes: RouteRecordRaw[] = [
           permission: 'system:config',
         },
       },
+      // Web 聊天
+      {
+        path: 'chat',
+        name: 'chat',
+        component: () => import('../views/ChatView.vue'),
+        meta: {
+          title: 'router.title.chat',
+          icon: 'MessageOutlined',
+          requiresAuth: true,
+          permission: 'system:chat',
+        },
+      },
       {
         path: 'auth-role',
         name: 'auth-role',

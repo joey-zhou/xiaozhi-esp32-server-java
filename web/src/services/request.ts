@@ -247,7 +247,7 @@ export const http = {
     return request.post(url, data, {
       ...config,
       headers: {
-        ...(config?.headers || {}),
+        ...config?.headers,
         'Content-Type': 'multipart/form-data',
       },
     })
@@ -274,7 +274,7 @@ export const http = {
   /**
    * PATCH 请求（JSON 格式）
    */
-  patch<T = unknown>(url: string, data?: Record<string, unknown>): Promise<DataResponse<T>> {
+  patch<T = unknown>(url: string, data?: unknown): Promise<DataResponse<T>> {
     return request.patch(url, data)
   },
 

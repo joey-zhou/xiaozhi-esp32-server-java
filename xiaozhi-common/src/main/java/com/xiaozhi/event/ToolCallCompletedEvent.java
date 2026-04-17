@@ -1,11 +1,13 @@
 package com.xiaozhi.event;
 
 import com.xiaozhi.common.domain.AbstractDomainEvent;
+import lombok.Getter;
 
 /**
  * 工具调用完成事件。
  * 在 XiaoZhiToolCallingManager 执行工具后发布，供日志记录和审计使用。
  */
+@Getter
 public class ToolCallCompletedEvent extends AbstractDomainEvent {
 
     private final String sessionId;
@@ -24,29 +26,5 @@ public class ToolCallCompletedEvent extends AbstractDomainEvent {
         this.result = result;
         this.success = success;
         this.durationMs = durationMs;
-    }
-
-    public String getSessionId() {
-        return sessionId;
-    }
-
-    public String getToolName() {
-        return toolName;
-    }
-
-    public String getArguments() {
-        return arguments;
-    }
-
-    public String getResult() {
-        return result;
-    }
-
-    public boolean isSuccess() {
-        return success;
-    }
-
-    public long getDurationMs() {
-        return durationMs;
     }
 }

@@ -3,9 +3,11 @@ package com.xiaozhi.message;
 import com.xiaozhi.server.web.BaseController;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaMode;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
+import com.xiaozhi.common.model.req.ConversationPageReq;
 import com.xiaozhi.common.model.req.MessagePageReq;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.message.MessageAppService;
@@ -31,10 +33,18 @@ public class MessageController extends BaseController {
 
     @GetMapping("")
     @ResponseBody
-    @SaCheckPermission("system:role:memory:chat:api:list")
+    @SaCheckPermission(value = {"system:role:memory:chat:api:list", "system:chat"}, mode = SaMode.OR)
     @Operation(summary = "根据条件查询对话消息", description = "返回对话消息列表")
     public ApiResponse<?> list(@Valid MessagePageReq req) {
         return ApiResponse.success(messageAppService.page(req, StpUtil.getLoginIdAsInt()));
+    }
+
+    @GetMapping("/conversations")
+    @ResponseBody
+    @SaCheckPermission("system:chat")
+    @Operation(summary = "查询用户的会话列表", description = "返回当前用户的历史会话列表，基于sessionId聚合")
+    public ApiResponse<?> conversations(@Valid ConversationPageReq req) {
+        return ApiResponse.success(messageAppService.conversationPage(req, StpUtil.getLoginIdAsInt()));
     }
 
     @DeleteMapping("/{messageId}")

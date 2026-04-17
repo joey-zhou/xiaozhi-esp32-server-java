@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaozhi.message.dal.mysql.mapper.ConversationMapper">
+    <select id="selectConversationPage" resultType="com.xiaozhi.common.model.resp.ConversationResp">
+        SELECT
+            m.sessionId,
+            m.roleId,
+            r.roleName,
+            MAX(m.createTime) AS updateTime,
+            (SELECT message FROM sys_message sm WHERE sm.sessionId = m.sessionId AND sm.sender = 'user' AND sm.state = '1' ORDER BY sm.createTime ASC LIMIT 1) AS title
+        FROM sys_message m
+        LEFT JOIN sys_role r ON m.roleId = r.roleId
+        WHERE m.state = '1'
+        AND m.sessionId IS NOT NULL AND m.sessionId != ''
+        <if test="userId != null">
+            AND m.userId = #{userId}
+        </if>
+        <if test="roleId != null">
+            AND m.roleId = #{roleId}
+        </if>
+        <if test="source != null and source != ''">
+            AND m.source = #{source}
+        </if>
+        GROUP BY m.sessionId, m.roleId, r.roleName
+        ORDER BY updateTime DESC
+    </select>
+</mapper>

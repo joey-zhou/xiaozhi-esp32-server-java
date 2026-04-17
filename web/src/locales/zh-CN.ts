@@ -861,6 +861,26 @@ export default {
     },
   },
 
+  chat: {
+    selectRole: '选择角色',
+    noRole: '无角色',
+    startChat: '开始聊天',
+    endChat: '结束聊天',
+    newChat: '新建对话',
+    history: '历史记录',
+    greeting: '你好！我是 {name}',
+    defaultAssistant: 'AI助手',
+    me: '我',
+    send: '发送',
+    disclaimer: '内容由 AI 生成，请自行鉴别。',
+    batchDelete: '批量删除',
+    newConversation: '新对话',
+    noHistory: '暂无历史会话',
+    emptyHint: '我们聊点什么？',
+    inputPlaceholder: '输入消息，开始探索...',
+    connectFirst: '请先选择角色并开始聊天',
+  },
+
   memory: {
     chat: '聊天记录',
     summary: '摘要',

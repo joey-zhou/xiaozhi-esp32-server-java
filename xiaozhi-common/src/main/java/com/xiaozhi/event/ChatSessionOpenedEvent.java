@@ -1,6 +1,7 @@
 package com.xiaozhi.event;
 
 import com.xiaozhi.common.domain.AbstractDomainEvent;
+import lombok.Getter;
 
 /**
  * 会话连接打开（注册）事件。
@@ -13,6 +14,7 @@ import com.xiaozhi.common.domain.AbstractDomainEvent;
  *   <li>资源预分配：提前为该设备加载角色配置、TTS 资源等</li>
  * </ul>
  */
+@Getter
 public class ChatSessionOpenedEvent extends AbstractDomainEvent {
 
     private final String sessionId;
@@ -22,13 +24,5 @@ public class ChatSessionOpenedEvent extends AbstractDomainEvent {
         super(source);
         this.sessionId = sessionId;
         this.deviceId = deviceId;
-    }
-
-    public String getSessionId() {
-        return sessionId;
-    }
-
-    public String getDeviceId() {
-        return deviceId;
     }
 }

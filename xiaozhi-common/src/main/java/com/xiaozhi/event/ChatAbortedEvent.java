@@ -1,11 +1,13 @@
 package com.xiaozhi.event;
 
 import com.xiaozhi.common.domain.AbstractDomainEvent;
+import lombok.Getter;
 import org.springframework.util.StringUtils;
 
 /**
  * 设备端（客户端）发起打断的事件
  */
+@Getter
 public class ChatAbortedEvent extends AbstractDomainEvent {
 
     private final String sessionId;
@@ -17,17 +19,5 @@ public class ChatAbortedEvent extends AbstractDomainEvent {
         this.sessionId = sessionId;
         this.deviceId = deviceId;
         this.reason = StringUtils.hasText(reason) ? reason : "设备端打断";
-    }
-
-    public String getSessionId() {
-        return sessionId;
-    }
-
-    public String getDeviceId() {
-        return deviceId;
-    }
-
-    public String getReason() {
-        return reason;
     }
 }

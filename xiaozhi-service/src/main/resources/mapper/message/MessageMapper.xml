@@ -13,6 +13,7 @@
         m.messageType,
         m.toolCalls,
         m.sessionId,
+        m.source,
         m.roleId,
         r.roleName,
         m.createTime,
@@ -44,6 +45,12 @@
         </if>
         <if test="roleId != null">
             AND m.roleId = #{roleId}
+        </if>
+        <if test="sessionId != null and sessionId != ''">
+            AND m.sessionId = #{sessionId}
+        </if>
+        <if test="source != null and source != ''">
+            AND m.source = #{source}
         </if>
     </sql>
 
