@@ -31,37 +31,37 @@ public interface ChatMemory {
 
     /**
      * 查询最近的Conversation Summary
-     * @param deviceId
+     * @param ownerId 聊天参与者标识（设备场景: deviceId, Web 场景: userId）
      * @param roleId
      * @return
      */
-    SummaryBO findLastSummary(String deviceId, int roleId);
+    SummaryBO findLastSummary(String ownerId, int roleId);
 
     /**
      * 获取历史对话消息列表
      *
-     * @param deviceId 设备ID
+     * @param ownerId 聊天参与者标识（设备场景: deviceId, Web 场景: userId）
      * @param roleId 角色ID
      * @param limit 限制数量，此参数对于性能是必要的。
      * @return 消息列表
      */
-    List<Message> find(String deviceId, int roleId, int limit);
+    List<Message> find(String ownerId, int roleId, int limit);
 
     /**
      * 获取历史对话消息列表
-     * @param deviceId 指定设备ID
+     * @param ownerId 聊天参与者标识（设备场景: deviceId, Web 场景: userId）
      * @param roleId 角色ID
      * @param timeMillis 在这个时间戳后的消息
      * @return
      */
-    List<Message> find(String deviceId, int roleId, Instant timeMillis);
+    List<Message> find(String ownerId, int roleId, Instant timeMillis);
     /**
-     * 清除设备的历史记录
+     * 清除历史记录
      * 不是提供给Conversation使用，而是用于强制使其失忆的场景。
      *
-     * @param deviceId 设备ID
+     * @param ownerId 聊天参与者标识（设备场景: deviceId, Web 场景: userId）
      */
-    void delete(String deviceId, int roleId);
+    void delete(String ownerId, int roleId);
 
 
 }

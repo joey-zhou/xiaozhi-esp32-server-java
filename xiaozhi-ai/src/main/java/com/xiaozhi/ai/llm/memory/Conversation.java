@@ -1,7 +1,5 @@
 package com.xiaozhi.ai.llm.memory;
 
-import com.xiaozhi.common.model.bo.DeviceBO;
-import com.xiaozhi.common.model.bo.RoleBO;
 import lombok.Getter;
 import org.springframework.ai.chat.messages.*;
 import org.springframework.util.Assert;
@@ -27,10 +25,10 @@ import static java.time.temporal.ChronoField.*;
  */
 public class Conversation extends ConversationIdentifier {
 
-    // device, role, sessionId 唯一确定一个Conversation,as key,通过final保持全程的不变性(immutable)
-    private final DeviceBO device;
     @Getter
-    private final RoleBO role;
+    private final String roleDesc;
+    @Getter
+    private final Integer userId;
     private final String sessionId;
 
     protected List<Message> messages = new ArrayList<>();
@@ -47,47 +45,34 @@ public class Conversation extends ConversationIdentifier {
             .toFormatter();
 
     /**
-     *
-     * @param device
-     * @param role
-     * @param sessionId
+     * @param ownerId   聊天参与者标识（设备场景: deviceId, Web 场景: userId）
+     * @param roleId    角色ID
+     * @param sessionId 会话ID
+     * @param roleDesc  角色描述（静态，构造时确定）
+     * @param userId    用户ID（消息持久化需要）
      */
-    public Conversation(DeviceBO device, RoleBO role, String sessionId) {
-        super(device.getDeviceId(), role.getRoleId(), sessionId);
-        // final 属性的规范要求
-        Assert.notNull(device, "device must not be null");
-        Assert.notNull(role, "role must not be null");
-        Assert.notNull(device.getDeviceId(), "deviceId must not be null");
-        Assert.notNull(role.getRoleId(), "roleId must not be null");
+    public Conversation(String ownerId, Integer roleId, String sessionId, String roleDesc, Integer userId) {
+        super(ownerId, roleId, sessionId);
+        Assert.notNull(ownerId, "ownerId must not be null");
+        Assert.notNull(roleId, "roleId must not be null");
         Assert.notNull(sessionId, "sessionId must not be null");
-        this.device = device;
-        this.role = role;
         this.sessionId = sessionId;
-    }
-
-    public DeviceBO device() {
-        return device;
-    }
-    public RoleBO role() {
-        return role;
+        this.roleDesc = roleDesc;
+        this.userId = userId;
     }
 
     public String sessionId() {
         return sessionId;
     }
 
-    public Optional<SystemMessage> roleSystemMessage() {
-        // 角色描述是在运行过程中不变的，作为第一条系统消息。
-        String roleDesc = role().getRoleDesc();
-        // 添加设备地址信息到系统提示词中
-        String deviceLocation = device().getLocation();
-
+    public Optional<SystemMessage> roleSystemMessage(ConversationContext context) {
         StringBuilder msgBuilder = new StringBuilder();
         if(StringUtils.hasText(roleDesc)) {
             msgBuilder.append( "角色描述：" ).append(roleDesc).append(System.lineSeparator());
         }
-        if (StringUtils.hasText(deviceLocation)) {
-            msgBuilder.append("当前位置：").append(deviceLocation)
+        String location = context != null ? context.location() : null;
+        if (StringUtils.hasText(location)) {
+            msgBuilder.append("当前位置：").append(location)
                     .append("。如果用户提及现在在哪里，则以新地方为准。")
                     .append(System.lineSeparator());
         }
@@ -105,10 +90,17 @@ public class Conversation extends ConversationIdentifier {
     }
 
     /**
+     * 带运行时上下文的消息列表（子类覆写此方法以注入系统提示词）。
+     */
+    public synchronized List<Message> messages(ConversationContext context) {
+        return messages;
+    }
+
+    /**
      * 当前Conversation的多轮消息列表。
      */
     public synchronized List<Message> messages() {
-        return messages;
+        return messages(ConversationContext.EMPTY);
     }
 
     /**

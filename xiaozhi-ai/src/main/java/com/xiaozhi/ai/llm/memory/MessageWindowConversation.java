@@ -1,7 +1,5 @@
 package com.xiaozhi.ai.llm.memory;
 
-import com.xiaozhi.common.model.bo.DeviceBO;
-import com.xiaozhi.common.model.bo.RoleBO;
 import org.springframework.ai.chat.messages.*;
 
 
@@ -16,31 +14,45 @@ public class MessageWindowConversation extends Conversation {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MessageWindowConversation.class);
 
 
-    public MessageWindowConversation(DeviceBO device, RoleBO role, String sessionId, int maxMessages, ChatMemory chatMemory){
-        super(device, role, sessionId);
+    public MessageWindowConversation(String ownerId, Integer roleId, String sessionId, String roleDesc, Integer userId,
+                                      int maxMessages, ChatMemory chatMemory){
+        super(ownerId, roleId, sessionId, roleDesc, userId);
         this.maxMessages = maxMessages;
 
-        logger.info("加载设备{}的对话历史", device.getDeviceId());
-        List<Message> history = chatMemory.find(device.getDeviceId(), role.getRoleId(), maxMessages);
+        logger.info("加载{}的对话历史", ownerId);
+        List<Message> history = chatMemory.find(ownerId, roleId, maxMessages);
         super.messages.addAll(history) ;
     }
 
     public static class Builder {
-        private DeviceBO device;
-        private RoleBO role;
+        private String ownerId;
+        private Integer roleId;
+        private String roleDesc;
+        private Integer userId;
         private String sessionId;
         private int maxMessages;
         private ChatMemory chatMemory;
 
-        public Builder device(DeviceBO device) {
-            this.device = device;
+        public Builder ownerId(String ownerId) {
+            this.ownerId = ownerId;
             return this;
         }
 
-        public Builder role(RoleBO role) {
-            this.role = role;
+        public Builder roleId(Integer roleId) {
+            this.roleId = roleId;
             return this;
         }
+
+        public Builder roleDesc(String roleDesc) {
+            this.roleDesc = roleDesc;
+            return this;
+        }
+
+        public Builder userId(Integer userId) {
+            this.userId = userId;
+            return this;
+        }
+
         public Builder sessionId(String sessionId) {
             this.sessionId = sessionId;
             return this;
@@ -57,7 +69,7 @@ public class MessageWindowConversation extends Conversation {
         }
 
         public MessageWindowConversation build(){
-            return new MessageWindowConversation(device,role,sessionId,maxMessages,chatMemory);
+            return new MessageWindowConversation(ownerId, roleId, sessionId, roleDesc, userId, maxMessages, chatMemory);
         }
     }
 
@@ -75,8 +87,10 @@ public class MessageWindowConversation extends Conversation {
         }
     }
 
-    @Override
-    public synchronized List<Message> messages() {
+    /**
+     * 返回带系统提示词的消息列表，接受运行时上下文（位置、声纹等）
+     */
+    public synchronized List<Message> messages(ConversationContext context) {
         // 按对话组裁剪：简单组=[User,Assistant](2条)，工具组=[User,Assistant(toolCall),Tool,Assistant(final)](4条)
         while (messages.size() > maxMessages + 1) {
             if (messages.size() >= 2 && messages.get(1) instanceof AssistantMessage am
@@ -96,12 +110,17 @@ public class MessageWindowConversation extends Conversation {
         }
         // 新消息列表对象，避免使用过程中污染原始列表对象
         List<Message> historyMessages = new ArrayList<>();
-        var roleSystemMessage = roleSystemMessage();
+        var roleSystemMessage = roleSystemMessage(context);
         if(roleSystemMessage.isPresent()){
             historyMessages.add(roleSystemMessage.get());
         }
         historyMessages.addAll(messages);
         return historyMessages;
+    }
+
+    @Override
+    public synchronized List<Message> messages() {
+        return messages(ConversationContext.EMPTY);
     }
 
 }

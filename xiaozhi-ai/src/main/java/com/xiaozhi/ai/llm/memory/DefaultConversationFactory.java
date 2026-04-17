@@ -1,6 +1,5 @@
 package com.xiaozhi.ai.llm.memory;
 
-import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,21 +21,25 @@ public class DefaultConversationFactory implements ConversationFactory {
     private SummaryConversationFactory summaryConversationFactory;
 
     @Override
-    public Conversation initConversation(DeviceBO device, RoleBO role, String sessionId) {
+    public Conversation initConversation(String ownerId, Integer userId, RoleBO role, String sessionId) {
         Conversation conversation = switch (role.getMemoryType()) {
             case "summary" -> summaryConversationFactory.initConversation(device, role, sessionId);
             case "window" -> MessageWindowConversation.builder().chatMemory(chatMemory)
                     .maxMessages(maxMessages)
-                    .role(role)
-                    .device(device)
+                    .ownerId(ownerId)
+                    .roleId(role.getRoleId())
+                    .roleDesc(role.getRoleDesc())
+                    .userId(userId)
                     .sessionId(sessionId)
                     .build();
             default -> {
                 log.warn("系统目前不支持这类未知的记忆类型：{} ，将启用默认的MessageWindowConversation", role.getMemoryType());
                 yield MessageWindowConversation.builder().chatMemory(chatMemory)
                     .maxMessages(maxMessages)
-                    .role(role)
-                    .device(device)
+                    .ownerId(ownerId)
+                    .roleId(role.getRoleId())
+                    .roleDesc(role.getRoleDesc())
+                    .userId(userId)
                     .sessionId(sessionId)
                     .build();
             }

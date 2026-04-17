@@ -2,8 +2,6 @@ package com.xiaozhi.ai.llm.memory;
 
 import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
-import com.xiaozhi.common.model.bo.DeviceBO;
-import com.xiaozhi.common.model.bo.RoleBO;
 
 import lombok.Builder;
 import org.slf4j.Logger;
@@ -65,8 +63,10 @@ public class SummaryConversation extends Conversation {
     private boolean summarizing = false;
 
     @Builder
-    public SummaryConversation(DeviceBO device, RoleBO role, String sessionId, PromptTemplate initSummarizerPromptTemplate,PromptTemplate againSummarizerPromptTemplate, ChatMemory chatMemory, ChatModel chatModel, int maxMessages, int batchSize){
-        super(device, role, sessionId);
+    public SummaryConversation(String ownerId, Integer roleId, String sessionId, String roleDesc, Integer userId,
+                               PromptTemplate initSummarizerPromptTemplate, PromptTemplate againSummarizerPromptTemplate,
+                               ChatMemory chatMemory, ChatModel chatModel, int maxMessages, int batchSize){
+        super(ownerId, roleId, sessionId, roleDesc, userId);
         Assert.notNull(initSummarizerPromptTemplate, "initSummarizerPromptTemplate must not be null");
         this.initSummarizerPromptTemplate = initSummarizerPromptTemplate;
 
@@ -86,10 +86,10 @@ public class SummaryConversation extends Conversation {
         this.chatModel = chatModel;
 
         // 在新建Conversation时，可以加载以前的已有的Summary。
-        this.lastSummary = chatMemory.findLastSummary(device().getDeviceId(), role().getRoleId());
+        this.lastSummary = chatMemory.findLastSummary(getOwnerId(), getRoleId());
         if(lastSummary == null){
-            List<Message> history = chatMemory.find(device().getDeviceId(), role().getRoleId(), maxMessages);
-            logger.info("当前设备{}还没有历史summary,加载{}条普通消息进入对话上下文", device().getDeviceId(), history.size());
+            List<Message> history = chatMemory.find(getOwnerId(), getRoleId(), maxMessages);
+            logger.info("当前{}还没有历史summary,加载{}条普通消息进入对话上下文", getOwnerId(), history.size());
             synchronized (summaryLock) {
                 super.messages.addAll(history);
             }
@@ -97,19 +97,19 @@ public class SummaryConversation extends Conversation {
             if (history.size() >= 2) {
                 Instant lastMessageTime = MessageTimeMetadata.getTimeMillis(history.getLast());
                 if (Duration.between(lastMessageTime, Instant.now()).toHours() >= CONVERSATION_INTERVAL_HOURS) {
-                    logger.info("设备{}的最后一条消息已超过{}小时，生成summary压缩上下文", device().getDeviceId(), CONVERSATION_INTERVAL_HOURS);
+                    logger.info("{}的最后一条消息已超过{}小时，生成summary压缩上下文", getOwnerId(), CONVERSATION_INTERVAL_HOURS);
                     summarize(true);
                 }
             }
         }else {
-            List<Message> history = chatMemory.find(device().getDeviceId(), role().getRoleId(), lastSummary.getLastMessageTimestamp());
-            logger.info("加载设备{}的{}条未被摘要的消息作为对话历史", device().getDeviceId(), history.size());
+            List<Message> history = chatMemory.find(getOwnerId(), getRoleId(), lastSummary.getLastMessageTimestamp());
+            logger.info("加载{}的{}条未被摘要的消息作为对话历史", getOwnerId(), history.size());
             synchronized (summaryLock) {
                 super.messages.addAll(history);
             }
             if (Duration.between(lastSummary.getLastMessageTimestamp(), Instant.now()).toHours() >= CONVERSATION_INTERVAL_HOURS
                     && history.size() >= 2) {
-                logger.info("设备{}的last summary已超过1小时，但还有一些剩余消息没有summarize,重新生成summary", device().getDeviceId());
+                logger.info("{}的last summary已超过1小时，但还有一些剩余消息没有summarize,重新生成summary", getOwnerId());
                 summarize(true);
             }
         }
@@ -204,8 +204,8 @@ public class SummaryConversation extends Conversation {
 
             // 4. 入库存储。
             SummaryBO newSummary = new SummaryBO()
-                    .setDeviceId(device().getDeviceId())
-                    .setRoleId(role().getRoleId())
+                    .setDeviceId(getOwnerId())
+                    .setRoleId(getRoleId())
                     .setLastMessageTimestamp(MessageTimeMetadata.getTimeMillis(needSummaryMessages.getLast()).truncatedTo(ChronoUnit.SECONDS))
                     .setSummary(factExtract)
                     .setCreateTime(Instant.now());
@@ -219,15 +219,14 @@ public class SummaryConversation extends Conversation {
             }
             summarize();
         } catch (Exception e) {
-            logger.error("设备{}对话摘要失败", device().getDeviceId(), e);
+            logger.error("{}对话摘要失败", getOwnerId(), e);
             synchronized (summaryLock) {
                 summarizing = false;
             }
         }
     }
 
-    @Override
-    public List<Message> messages() {
+    public List<Message> messages(ConversationContext context) {
         List<Message> messageSnapshot;
         SummaryBO summarySnapshot;
         synchronized (summaryLock) {
@@ -236,7 +235,7 @@ public class SummaryConversation extends Conversation {
         }
         // 新消息列表对象，避免使用过程中污染原始列表对象
         List<Message> historyMessages = new ArrayList<>();
-        var roleSystemMessage = roleSystemMessage();
+        var roleSystemMessage = roleSystemMessage(context);
         if(roleSystemMessage.isPresent()){
             historyMessages.add(roleSystemMessage.get());
         }
@@ -246,5 +245,10 @@ public class SummaryConversation extends Conversation {
         }
         historyMessages.addAll(messageSnapshot);
         return historyMessages;
+    }
+
+    @Override
+    public List<Message> messages() {
+        return messages(ConversationContext.EMPTY);
     }
 }

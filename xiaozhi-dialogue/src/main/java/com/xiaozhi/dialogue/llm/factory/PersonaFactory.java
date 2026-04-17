@@ -102,7 +102,9 @@ public class PersonaFactory {
             session.setPlayer(player);
         }
         // 初始化Conversation(相当于角色的记忆）
-        Conversation conversation = conversationFactory.initConversation(device, role, session.getSessionId());
+        String ownerId = device.getDeviceId();
+        Integer userId = device.getUserId();
+        Conversation conversation = conversationFactory.initConversation(ownerId, userId, role, session.getSessionId());
 
         // 获取STT服务
         SttService sttService = initSttService(role);

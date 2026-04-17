@@ -107,8 +107,8 @@ public class DialogueTurn {
 
     private MessageBO toMessageBO(org.springframework.ai.chat.messages.AbstractMessage message, Usage usage) {
         MessageBO messageBO = new MessageBO();
-        messageBO.setUserId(conversation.device().getUserId());
-        messageBO.setDeviceId(conversation.getDeviceId());
+        messageBO.setUserId(conversation.getUserId());
+        messageBO.setDeviceId(conversation.getOwnerId());
         messageBO.setSessionId(conversation.getSessionId());
         messageBO.setSender(message.getMessageType().getValue());
         messageBO.setMessage(message.getText());
@@ -144,8 +144,8 @@ public class DialogueTurn {
      */
     private MessageBO toToolCallAssistantMessageBO() {
         MessageBO messageBO = new MessageBO();
-        messageBO.setUserId(conversation.device().getUserId());
-        messageBO.setDeviceId(conversation.getDeviceId());
+        messageBO.setUserId(conversation.getUserId());
+        messageBO.setDeviceId(conversation.getOwnerId());
         messageBO.setSessionId(conversation.getSessionId());
         messageBO.setSender(MessageBO.SENDER_ASSISTANT);
         messageBO.setMessage(toolCallAssistantMessage.getText());
@@ -169,8 +169,8 @@ public class DialogueTurn {
      */
     private MessageBO toToolResponseMessageBO() {
         MessageBO messageBO = new MessageBO();
-        messageBO.setUserId(conversation.device().getUserId());
-        messageBO.setDeviceId(conversation.getDeviceId());
+        messageBO.setUserId(conversation.getUserId());
+        messageBO.setDeviceId(conversation.getOwnerId());
         messageBO.setSessionId(conversation.getSessionId());
         messageBO.setSender(MessageBO.SENDER_TOOL);
         // 合并所有 ToolResponse 的文本

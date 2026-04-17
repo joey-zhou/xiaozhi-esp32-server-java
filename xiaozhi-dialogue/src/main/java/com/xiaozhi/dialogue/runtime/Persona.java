@@ -3,6 +3,7 @@ package com.xiaozhi.dialogue.runtime;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.ai.llm.memory.Conversation;
+import com.xiaozhi.ai.llm.memory.ConversationContext;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.ai.stt.SttService;
@@ -126,7 +127,7 @@ public class Persona {
         // 播放器生成文件时也需要用到一个关联到AssistantMessage的ID，不能在sendStart时创建磁盘音频文件。
         AtomicReference<Instant> ttft = new AtomicReference<>(null);
 
-        String deviceId = getSession().getDevice() != null ? getSession().getDevice().getDeviceId() : null;
+        String ownerId = conversation.getOwnerId();
 
         // 从 ToolsSessionHolder 获取实时工具列表（包含后注册的设备 MCP 工具）
         List<ToolCallback> liveTools = getSession().getToolsSessionHolder().getAllFunction();
@@ -137,12 +138,16 @@ public class Persona {
         ChatOptions chatOptions = ToolCallingChatOptions.builder()
                 .toolCallbacks(effectiveTools)
                 .toolContext(TOOL_CONTEXT_SESSION_ID_KEY, sessionId)
-                .toolContext("deviceId", deviceId)
+                .toolContext("deviceId", ownerId)
                 .toolContext("conversationTimestamp", now.toEpochMilli())
                 .build();
 
         conversation.add(userMessage);
-        List<Message> messages = conversation.messages();
+        // 构建运行时上下文（位置等）传入 messages
+        ChatSession currentSession = getSession();
+        String location = currentSession.getDevice() != null ? currentSession.getDevice().getLocation() : null;
+        ConversationContext ctx = new ConversationContext(location);
+        List<Message> messages = conversation.messages(ctx);
         Prompt prompt = new Prompt(messages, chatOptions);
 
         Flux<ChatResponse> chatFlux = chatModel.stream(prompt)

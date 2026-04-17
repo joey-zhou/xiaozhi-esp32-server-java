@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
-import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 
 /**
@@ -63,15 +62,17 @@ public class SummaryConversationFactory implements ConversationFactory{
     }
 
     @Override
-    public Conversation initConversation(DeviceBO device, RoleBO role, String sessionId) {
+    public Conversation initConversation(String ownerId, Integer userId, RoleBO role, String sessionId) {
         logger.debug("初始化SummaryConversation基础配置参数，maxMessages：{}，batchSize：{}",maxMessages,batchSize);
 
 
         ChatModel chatModel = chatModelFactory.getChatModel(role);
         // 测试时，可将batchSeconds调小。实际生产的默认值可以先考虑：20,16,60。
         return SummaryConversation.builder()
-                .device(device)
-                .role(role)
+                .ownerId(ownerId)
+                .roleId(role.getRoleId())
+                .roleDesc(role.getRoleDesc())
+                .userId(userId)
                 .sessionId(sessionId)
                 .maxMessages(maxMessages)
                 .batchSize(batchSize)

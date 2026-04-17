@@ -54,14 +54,14 @@ public class DatabaseChatMemory implements ChatMemory {
     }
 
     @Override
-    public SummaryBO findLastSummary(String deviceId, int roleId) {
-        return summaryService.findLast(deviceId, roleId);
+    public SummaryBO findLastSummary(String ownerId, int roleId) {
+        return summaryService.findLast(ownerId, roleId);
     }
 
     @Override
-    public List<Message> find(String deviceId, int roleId, int limit) {
+    public List<Message> find(String ownerId, int roleId, int limit) {
         try {
-            List<MessageBO> messages = new ArrayList<>(messageService.listHistory(deviceId, roleId, limit));
+            List<MessageBO> messages = new ArrayList<>(messageService.listHistory(ownerId, roleId, limit));
             messages.sort(Comparator.comparing(MessageBO::getCreateTime, Comparator.nullsLast(LocalDateTime::compareTo))
                 .thenComparing(MessageBO::getSender, Comparator.reverseOrder()));
             return toSpringMessages(messages);
@@ -167,16 +167,16 @@ public class DatabaseChatMemory implements ChatMemory {
     }
 
     @Override
-    public List<Message> find(String deviceId, int roleId, Instant timeMillis) {
-        return toSpringMessages(messageService.listHistoryAfter(deviceId, roleId, timeMillis));
+    public List<Message> find(String ownerId, int roleId, Instant timeMillis) {
+        return toSpringMessages(messageService.listHistoryAfter(ownerId, roleId, timeMillis));
     }
 
     @Override
-    public void delete(String deviceId, int roleId) {
+    public void delete(String ownerId, int roleId) {
         try {
-            throw new IllegalAccessException("暂不支持删除设备历史记录");
+            throw new IllegalAccessException("暂不支持删除历史记录");
         } catch (Exception e) {
-            logger.error("清除设备历史记录时出错: {}", e.getMessage(), e);
+            logger.error("清除历史记录时出错: {}", e.getMessage(), e);
         }
     }
 }

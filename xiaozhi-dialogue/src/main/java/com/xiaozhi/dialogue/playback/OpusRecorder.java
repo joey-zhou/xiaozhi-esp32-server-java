@@ -138,8 +138,8 @@ public class OpusRecorder {
         }
 
         messageService.updateAssistantAudio(
-            conversation.device().getDeviceId(),
-            conversation.role().getRoleId(),
+            conversation.getOwnerId(),
+            conversation.getRoleId(),
             LocalDateTime.ofInstant(opusFileCreatedAt.truncatedTo(ChronoUnit.SECONDS), ZoneId.systemDefault()),
             storedPath,
             duration
