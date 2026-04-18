@@ -9,8 +9,6 @@ import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tool.session.ToolSession;
 import com.xiaozhi.dialogue.llm.tool.media.HuiBenPlayer;
 import com.xiaozhi.utils.AudioUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
@@ -22,15 +20,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-@Component
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+// @Component
 public class PlayHuiBenFunction implements ToolsGlobalRegistry.GlobalFunction {
-    private static final Logger logger = LoggerFactory.getLogger(PlayHuiBenFunction.class);
     private static final String TOOL_NAME = "play_huiben";
     // 使用虚拟线程执行器处理定时任务
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(
             Runtime.getRuntime().availableProcessors(),
             Thread.ofVirtual().name("huiBen-scheduler-", 0).factory());
-
 
     ToolCallback toolCallback = FunctionToolCallback
             .builder(TOOL_NAME, (Map<String, String> params, ToolContext toolContext) -> {
@@ -48,7 +47,7 @@ public class PlayHuiBenFunction implements ToolsGlobalRegistry.GlobalFunction {
                     return "尝试播放绘本《" + num + "》";
 
                 } catch (Exception e) {
-                    logger.error("播放绘本异常，绘本编号: {}", num, e);
+                    log.error("播放绘本异常，绘本编号: {}", num, e);
                     return "绘本播放失败";
                 }
             })

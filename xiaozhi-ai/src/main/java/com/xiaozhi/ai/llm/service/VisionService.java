@@ -1,8 +1,6 @@
 package com.xiaozhi.ai.llm.service;
 
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.content.Media;
@@ -12,14 +10,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 视觉识别服务。
  * 封装多模态视觉模型调用，供 MCP 工具或 REST 接口使用。
  */
+@Slf4j
 @Service
 public class VisionService {
-
-    private static final Logger logger = LoggerFactory.getLogger(VisionService.class);
 
     @Resource
     private ChatModelFactory chatModelFactory;
@@ -50,7 +48,7 @@ public class VisionService {
                 .build();
 
         String result = chatModel.call(userMessage);
-        logger.info("视觉识别完成 - 问题: {}, 结果: {}", question, result);
+        log.info("视觉识别完成 - 问题: {}, 结果: {}", question, result);
         return result;
     }
 }

@@ -29,22 +29,17 @@ import com.xiaozhi.dialogue.llm.handler.DialogueListener;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.util.Assert;
 import org.springframework.stereotype.Component;
 
-
-
+import lombok.extern.slf4j.Slf4j;
 /**
  * Persona 工厂类，负责构建完整的 Persona 实例（含 STT/TTS/LLM/Player 等组件）。
  */
+@Slf4j
 @Component
 public class PersonaFactory {
-    private static final Logger logger = LoggerFactory.getLogger(PersonaFactory.class);
-
-
     @Resource
     private MessageService chatMessageService;
     @Resource
@@ -158,17 +153,17 @@ public class PersonaFactory {
         Assert.notNull(role, "role cannot be null");
         var sttId = role.getSttId();
         if (sttId == null || sttId <= 0) {
-            logger.warn("角色没有配置STT服务 - Role: {},默认使用vosk", role.getRoleName());
+            log.warn("角色没有配置STT服务 - Role: {},默认使用vosk", role.getRoleName());
             return sttFactory.getSttService(null);
         }
         var sttConfig = configService.getBO(sttId);
         if(sttConfig == null){
-            logger.error("无法获取STT服务配置 - Id: {}", sttId);
+            log.error("无法获取STT服务配置 - Id: {}", sttId);
             return null;
         }
         SttService sttService = sttFactory.getSttService(sttConfig);
         if (sttService == null) {
-            logger.error("无法获取STT服务 - Provider: {}", sttConfig != null ? sttConfig.getProvider() : "null");
+            log.error("无法获取STT服务 - Provider: {}", sttConfig != null ? sttConfig.getProvider() : "null");
         }
         return sttService;
     }

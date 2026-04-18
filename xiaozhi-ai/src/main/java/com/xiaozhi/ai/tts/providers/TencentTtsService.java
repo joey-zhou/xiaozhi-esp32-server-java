@@ -8,8 +8,6 @@ import com.xiaozhi.ai.tts.XiaozhiTtsOptions;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.utils.AudioUtils;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import reactor.util.retry.Retry;
@@ -20,9 +18,10 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.*;
 
-public class TencentTtsService implements TtsService {
-    private static final Logger logger = LoggerFactory.getLogger(TencentTtsService.class);
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
+public class TencentTtsService implements TtsService {
     private static final String PROVIDER_NAME = "tencent";
     // 默认的腾讯云TTS WebSocket地址
     private static final String DEFAULT_TTS_REQ_URL = "wss://tts.cloud.tencent.com/stream_ws";
@@ -68,7 +67,7 @@ public class TencentTtsService implements TtsService {
 
     private Flux<byte[]> stream(String text) throws Exception {
         if (text == null || text.isEmpty()) {
-            logger.warn("文本内容为空！");
+            log.warn("文本内容为空！");
             return Flux.empty();
         }
 
@@ -116,7 +115,7 @@ public class TencentTtsService implements TtsService {
                 @Override
                 public void onSynthesisFail(SpeechSynthesizerResponse response) {
                     String message = response.getMessage() != null ? response.getMessage() : "未知错误";
-                    logger.error("腾讯云TTS合成失败 - SessionId: {}, 错误: {}",
+                    log.error("腾讯云TTS合成失败 - SessionId: {}, 错误: {}",
                             response.getSessionId(), message);
                     dataSink.tryEmitError(new Exception(message));
                 }
@@ -129,7 +128,7 @@ public class TencentTtsService implements TtsService {
                 synthRef[0] = synthesizer;
                 synthesizer.start();
             } catch (Exception e) {
-                logger.error("腾讯云TTS合成过程中发生错误", e);
+                log.error("腾讯云TTS合成过程中发生错误", e);
                 return Flux.error(e);
             }
 
@@ -138,18 +137,18 @@ public class TencentTtsService implements TtsService {
                     .doFinally(signal -> {
                         SpeechSynthesizer synth = synthRef[0];
                         if (synth != null) {
-                            try { synth.stop(); } catch (Exception e) { logger.warn("停止腾讯云TTS时发生错误", e); }
-                            try { synth.close(); } catch (Exception e) { logger.error("关闭腾讯云TTS合成器时发生错误", e); }
+                            try { synth.stop(); } catch (Exception e) { log.warn("停止腾讯云TTS时发生错误", e); }
+                            try { synth.close(); } catch (Exception e) { log.error("关闭腾讯云TTS合成器时发生错误", e); }
                         }
                     });
         }).retryWhen(Retry.fixedDelay(MAX_RETRY_ATTEMPTS - 1, Duration.ofMillis(RETRY_DELAY_MS)))
-          .doOnError(e -> logger.error("腾讯云流式语音合成失败，已达到最大重试次数", e));
+          .doOnError(e -> log.error("腾讯云流式语音合成失败，已达到最大重试次数", e));
     }
 
     @Override
     public Path textToSpeech(String text) throws Exception {
         if (text == null || text.isEmpty()) {
-            logger.warn("文本内容为空！");
+            log.warn("文本内容为空！");
             return null;
         }
 
@@ -165,7 +164,7 @@ public class TencentTtsService implements TtsService {
                         try {
                             audioBuffer.write(audioData);
                         } catch (Exception e) {
-                            logger.error("写入音频数据失败", e);
+                            log.error("写入音频数据失败", e);
                             error[0] = e;
                         }
                     }
@@ -179,7 +178,7 @@ public class TencentTtsService implements TtsService {
                 // 将合并后的PCM音频数据转换为WAV格式并保存
                 byte[] pcmData = audioBuffer.toByteArray();
                 if (pcmData.length == 0) {
-                    logger.warn("合成的音频数据为空");
+                    log.warn("合成的音频数据为空");
                     return null;
                 }
 
@@ -191,16 +190,16 @@ public class TencentTtsService implements TtsService {
             } catch (Exception e) {
                 attempts++;
                 if (attempts < MAX_RETRY_ATTEMPTS) {
-                    logger.warn("腾讯云语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
+                    log.warn("腾讯云语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
                     try {
                         Thread.sleep(RETRY_DELAY_MS);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        logger.error("重试等待被中断", ie);
+                        log.error("重试等待被中断", ie);
                         throw e;
                     }
                 } else {
-                    logger.error("腾讯云语音合成失败，已达到最大重试次数", e);
+                    log.error("腾讯云语音合成失败，已达到最大重试次数", e);
                     throw new Exception("非流式语音合成失败", e);
                 }
             }

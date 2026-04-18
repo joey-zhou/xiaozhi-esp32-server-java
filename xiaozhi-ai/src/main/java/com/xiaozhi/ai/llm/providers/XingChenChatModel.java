@@ -2,8 +2,6 @@ package com.xiaozhi.ai.llm.providers;
 
 import com.xiaozhi.ai.llm.providers.xingchen.*;
 import com.xiaozhi.utils.JsonUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -17,11 +15,12 @@ import reactor.core.publisher.Flux;
 import java.io.IOException;
 import java.util.*;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class XingChenChatModel implements ChatModel {
 
     private XingChenClient chatClient;
-
-    private static final Logger logger = LoggerFactory.getLogger(XingChenChatModel.class);
 
     /**
      * 构造函数
@@ -43,7 +42,7 @@ public class XingChenChatModel implements ChatModel {
                     "AGENT_USER_INPUT", prompt.getUserMessage().getText(),
                     "func_call", chatOptions.getToolCallbacks()
             );
-            logger.info("工具支持如下：{}", JsonUtil.toJson(chatOptions.getToolCallbacks()));
+            log.info("工具支持如下：{}", JsonUtil.toJson(chatOptions.getToolCallbacks()));
         } else {
             input = Map.of(
                     "AGENT_USER_INPUT", prompt.getUserMessage().getText(),
@@ -73,7 +72,7 @@ public class XingChenChatModel implements ChatModel {
             )));
 
         } catch (IOException e) {
-            logger.error("错误: ", e);
+            log.error("错误: ", e);
             return ChatResponse.builder().generations(Collections.emptyList()).build();
         }
 
@@ -110,13 +109,13 @@ public class XingChenChatModel implements ChatModel {
                     public void onMessage(XingChenResponse event) {
                         // 安全检查: 确保 choices 不为空
                         if (event.getChoices() == null || event.getChoices().isEmpty()) {
-                            logger.warn("收到空的 choices,跳过此消息");
+                            log.warn("收到空的 choices,跳过此消息");
                             return;
                         }
                         
                         XingChenResponse.Choices choice = event.getChoices().get(0);
                         if (choice.getDelta() == null) {
-                            logger.warn("收到空的 delta,跳过此消息");
+                            log.warn("收到空的 delta,跳过此消息");
                             return;
                         }
                         
@@ -136,10 +135,10 @@ public class XingChenChatModel implements ChatModel {
                     public void onMessageEnd(XingChenResponse event) {
                         // 如果没有触发工具调用,这里就是真正的结束点
                         if (!hasToolCall[0]) {
-                            logger.debug("初始流结束且无工具调用,完成流程");
+                            log.debug("初始流结束且无工具调用,完成流程");
                             sink.complete();
                         } else {
-                            logger.debug("初始流结束但有工具调用,等待 resume 完成");
+                            log.debug("初始流结束但有工具调用,等待 resume 完成");
                         }
                     }
 
@@ -147,11 +146,11 @@ public class XingChenChatModel implements ChatModel {
                     public void onFunctionCall(XingChenResponse event) {
                         // 标记有工具调用
                         hasToolCall[0] = true;
-                        logger.debug("触发工具调用");
+                        log.debug("触发工具调用");
                         
                         // 安全检查
                         if (event.getEventData() == null || event.getEventData().getValue() == null) {
-                            logger.error("EventData 或 Value 为空,无法执行工具调用");
+                            log.error("EventData 或 Value 为空,无法执行工具调用");
                             sink.error(new IllegalStateException("无效的工具调用数据"));
                             return;
                         }
@@ -159,7 +158,7 @@ public class XingChenChatModel implements ChatModel {
                         XingChenResponse.EventData eventData = event.getEventData();
                         String content = eventData.getValue().getContent();
                         if (content == null || content.isEmpty()) {
-                            logger.error("工具调用内容为空");
+                            log.error("工具调用内容为空");
                             sink.error(new IllegalStateException("工具调用内容为空"));
                             return;
                         }
@@ -169,7 +168,7 @@ public class XingChenChatModel implements ChatModel {
                         Map<String, Object> map = JsonUtil.fromJson(content, Map.class);
                         
                         if (map == null || !map.containsKey("name")) {
-                            logger.error("工具调用解析失败,无法获取工具名称: {}", content);
+                            log.error("工具调用解析失败,无法获取工具名称: {}", content);
                             sink.error(new IllegalStateException("工具调用格式错误"));
                             return;
                         }
@@ -232,7 +231,7 @@ public class XingChenChatModel implements ChatModel {
 
                     @Override
                     public void onException(Throwable throwable) {
-                        logger.error("异常: {}", throwable.getMessage());
+                        log.error("异常: {}", throwable.getMessage());
                         sink.error(throwable);
                     }
                 });
@@ -245,21 +244,21 @@ public class XingChenChatModel implements ChatModel {
 
     public void resume(XingChenResume resume, reactor.core.publisher.FluxSink<ChatResponse> sink) {
         try {
-            logger.debug("XingChen resume消息: {}", JsonUtil.toJson(resume));
+            log.debug("XingChen resume消息: {}", JsonUtil.toJson(resume));
             chatClient.resume(resume, new XingChenChatStreamCallback() {
                 @Override
                 public void onMessage(XingChenResponse event) {
-                    logger.info("Resume onMessage: {}", JsonUtil.toJson(event));
+                    log.info("Resume onMessage: {}", JsonUtil.toJson(event));
                     
                     // 安全检查: 确保 choices 不为空
                     if (event.getChoices() == null || event.getChoices().isEmpty()) {
-                        logger.warn("Resume 收到空的 choices,跳过此消息");
+                        log.warn("Resume 收到空的 choices,跳过此消息");
                         return;
                     }
                     
                     XingChenResponse.Choices choice = event.getChoices().get(0);
                     if (choice.getDelta() == null) {
-                        logger.warn("Resume 收到空的 delta,跳过此消息");
+                        log.warn("Resume 收到空的 delta,跳过此消息");
                         return;
                     }
                     
@@ -277,35 +276,35 @@ public class XingChenChatModel implements ChatModel {
 
                 @Override
                 public void onMessageEnd(XingChenResponse event) {
-                    logger.info("Resume onMessageEnd,流程完成: {}", JsonUtil.toJson(event));
+                    log.info("Resume onMessageEnd,流程完成: {}", JsonUtil.toJson(event));
                     // Resume流程结束,通知完成
                     sink.complete();
                 }
 
                 @Override
                 public void onFunctionCall(XingChenResponse event) {
-                    logger.warn("Resume过程中又触发了FunctionCall,这可能不是预期行为: {}", JsonUtil.toJson(event));
+                    log.warn("Resume过程中又触发了FunctionCall,这可能不是预期行为: {}", JsonUtil.toJson(event));
                     // 如果 resume 后又触发了工具调用,需要递归处理
                     // 但这种情况比较特殊,暂时只记录警告
                 }
 
                 @Override
                 public void onError(XingChenResponse event) {
-                    logger.error("Resume错误: code={}, message={}", event.getCode(), event.getMessage());
+                    log.error("Resume错误: code={}, message={}", event.getCode(), event.getMessage());
                     sink.error(new IOException("Resume错误: " + event.getMessage()));
                 }
 
                 @Override
                 public void onException(Throwable throwable) {
-                    logger.error("Resume异常: {}", throwable.getMessage());
+                    log.error("Resume异常: {}", throwable.getMessage());
                     sink.error(throwable);
                 }
             });
         } catch (IOException e) {
-            logger.error("发送resume请求失败", e);
+            log.error("发送resume请求失败", e);
             sink.error(e);
         } catch (Exception e) {
-            logger.error("Resume过程发生未预期异常", e);
+            log.error("Resume过程发生未预期异常", e);
             sink.error(e);
         }
     }

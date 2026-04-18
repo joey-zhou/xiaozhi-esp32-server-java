@@ -8,8 +8,6 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import java.net.URI;
@@ -20,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * FunASR STT服务实现
  * <br/>
@@ -29,9 +28,9 @@ import java.util.concurrent.atomic.AtomicReference;
  *  <br/>
  * <a href="https://www.funasr.com/static/offline/index.html">体验地址</a>
  */
+@Slf4j
 public class FunASRSttService implements SttService {
 
-    private static final Logger logger = LoggerFactory.getLogger(FunASRSttService.class);
     private static final String PROVIDER_NAME = "funasr";
 
     private static final String SPEAKING_START = "{\"mode\":\"2pass\",\"wav_name\":\"voice.wav\",\"is_speaking\":true,\"wav_format\":\"pcm\",\"chunk_size\":[5,10,5],\"itn\":true}";
@@ -64,7 +63,7 @@ public class FunASRSttService implements SttService {
         audioSink.subscribe(
             data -> audioQueue.offer(data),
             error -> {
-                logger.error("音频流处理错误", error);
+                log.error("音频流处理错误", error);
                 isCompleted.set(true);
             },
             () -> isCompleted.set(true)
@@ -74,7 +73,7 @@ public class FunASRSttService implements SttService {
         WebSocketClient webSocketClient = new WebSocketClient(URI.create(apiUrl)) {
             @Override
             public void onOpen(ServerHandshake handshake) {
-                logger.debug("FunASR WebSocket连接已打开");
+                log.debug("FunASR WebSocket连接已打开");
                 send(SPEAKING_START);
                 
                 // 启动虚拟线程发送音频数据
@@ -85,7 +84,7 @@ public class FunASRSttService implements SttService {
                             try {
                                 audioChunk = audioQueue.poll(QUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
                             } catch (InterruptedException e) {
-                                logger.warn("音频数据队列等待被中断", e);
+                                log.warn("音频数据队列等待被中断", e);
                                 Thread.currentThread().interrupt(); // 重新设置中断标志
                                 break;
                             }
@@ -100,7 +99,7 @@ public class FunASRSttService implements SttService {
                             send(SPEAKING_END);
                         }
                     } catch (Exception e) {
-                        logger.error("发送音频数据时发生错误", e);
+                        log.error("发送音频数据时发生错误", e);
                     }
                 });
             }
@@ -117,16 +116,16 @@ public class FunASRSttService implements SttService {
                         if (text != null && !text.isEmpty()) {
                             offlineResult.append(text);
                         }
-                        logger.debug("FunASR 离线修正片段: {}", text);
+                        log.debug("FunASR 离线修正片段: {}", text);
                     }
                 } catch (Exception e) {
-                    logger.error("解析FunASR响应失败", e);
+                    log.error("解析FunASR响应失败", e);
                 }
             }
 
             @Override
             public void onClose(int code, String reason, boolean remote) {
-                logger.info("FunASR WS关闭，原因：{}", reason);
+                log.info("FunASR WS关闭，原因：{}", reason);
                 // 连接关闭时，离线修正结果已全部收到，设置最终结果
                 finalResult.set(offlineResult.toString());
                 recognitionLatch.countDown();
@@ -134,7 +133,7 @@ public class FunASRSttService implements SttService {
 
             @Override
             public void onError(Exception ex) {
-                logger.error("FunASR WS错误", ex);
+                log.error("FunASR WS错误", ex);
                 // 先设置已有的结果，再释放锁，避免主线程读到空结果
                 finalResult.set(offlineResult.toString());
                 recognitionLatch.countDown();
@@ -149,10 +148,10 @@ public class FunASRSttService implements SttService {
             boolean recognized = recognitionLatch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             
             if (!recognized) {
-                logger.warn("FunASR识别超时");
+                log.warn("FunASR识别超时");
             }
         } catch (Exception e) {
-            logger.error("FunASR识别过程中发生错误", e);
+            log.error("FunASR识别过程中发生错误", e);
         } finally {
             // 关闭WebSocket连接
             if (webSocketClient.isOpen()) {

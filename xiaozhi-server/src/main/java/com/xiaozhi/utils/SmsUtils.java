@@ -5,20 +5,18 @@ import com.aliyun.dysmsapi20170525.models.SendSmsRequest;
 import com.aliyun.dysmsapi20170525.models.SendSmsResponse;
 import com.aliyun.teaopenapi.models.Config;
 import com.aliyun.teautil.models.RuntimeOptions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 短信工具类
  *
  * @author Joey
  */
+@Slf4j
 @Component
 public class SmsUtils {
-    private static final Logger logger = LoggerFactory.getLogger(SmsUtils.class);
-
     @Value("${sms.aliyun.access-key-id:}")
     private String accessKeyId;
 
@@ -55,19 +53,19 @@ public class SmsUtils {
             SendSmsResponse sendSmsResponse = client.sendSmsWithOptions(sendSmsRequest, runtime);
             
             // 记录请求ID
-            logger.info("发送短信响应的requestID: {}", sendSmsResponse.getBody().getRequestId());
+            log.info("发送短信响应的requestID: {}", sendSmsResponse.getBody().getRequestId());
             
             // 检查发送结果
             String code = sendSmsResponse.getBody().getCode();
             if ("OK".equals(code)) {
-                logger.info("短信发送成功，手机号: {}", phoneNumber);
+                log.info("短信发送成功，手机号: {}", phoneNumber);
                 return true;
             } else {
-                logger.error("短信发送失败，错误码: {}, 错误信息: {}", code, sendSmsResponse.getBody().getMessage());
+                log.error("短信发送失败，错误码: {}, 错误信息: {}", code, sendSmsResponse.getBody().getMessage());
                 return false;
             }
         } catch (Exception e) {
-            logger.error("发送短信异常: {}", e.getMessage(), e);
+            log.error("发送短信异常: {}", e.getMessage(), e);
             return false;
         }
     }

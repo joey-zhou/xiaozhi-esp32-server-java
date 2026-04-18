@@ -4,8 +4,6 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.port.ConfigLookup;
 import io.micrometer.observation.ObservationRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +15,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * ChatModel
  * 
@@ -25,10 +24,9 @@ import java.util.stream.Collectors;
  * - 每个LLM提供商实现独立的Provider
  * - 工厂类通过Spring自动注入所有Provider,自动路由到对应实现
  */
+@Slf4j
 @Component
 public class ChatModelFactory {
-    
-    private static final Logger logger = LoggerFactory.getLogger(ChatModelFactory.class);
     
     @Autowired
     private ConfigLookup configLookup;

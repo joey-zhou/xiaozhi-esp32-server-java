@@ -6,23 +6,21 @@ import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.ai.tts.SentenceHelper;
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.utils.AudioUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 
 import java.nio.file.Path;
 import java.util.List;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 语音合成器，用于非流式TTS（先生成完整音频文件再播放）。
  * 适用于不支持流式输出的TTS Provider（如 SherpaOnnx）。
  *
  * 数据流：LLM token流 → SentenceHelper分句 → 逐句调用TTS生成完整音频文件 → 读取PCM → 交给播放器播放
  */
+@Slf4j
 public class FileSynthesizer extends Synthesizer {
-
-    private static final Logger logger = LoggerFactory.getLogger(FileSynthesizer.class);
 
     // 保存LLM输出流的订阅引用，以便在cancel时取消上游订阅
     private volatile Disposable llmDisposable;
@@ -63,10 +61,10 @@ public class FileSynthesizer extends Synthesizer {
                             first = false;
                         }
                     } else {
-                        logger.error("TTS服务返回空音频文件 - SessionId: {}", chatSession.getSessionId());
+                        log.error("TTS服务返回空音频文件 - SessionId: {}", chatSession.getSessionId());
                     }
                 } catch (Exception e) {
-                    logger.error("TTS合成出错: {} - SessionId: {}", e.getMessage(), chatSession.getSessionId());
+                    log.error("TTS合成出错: {} - SessionId: {}", e.getMessage(), chatSession.getSessionId());
                 }
                 sink.complete();
             });

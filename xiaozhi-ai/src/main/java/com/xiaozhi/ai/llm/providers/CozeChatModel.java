@@ -10,8 +10,7 @@ import com.coze.openapi.service.service.CozeAPI;
 
 import io.reactivex.Flowable;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
 import org.springframework.ai.chat.model.ChatModel;
@@ -29,12 +28,12 @@ import java.util.stream.Collectors;
 /**
  * Coze LLM服务实现
  */
+@Slf4j
 public class CozeChatModel implements ChatModel {
 
     private final CozeAPI coze;
     private final String botId;
 
-    private final Logger logger = LoggerFactory.getLogger(getClass());
     public static final String PROVIDER_NAME = "coze";
 
 
@@ -61,7 +60,7 @@ public class CozeChatModel implements ChatModel {
         // 数据库coze相关的配置行，其字段里的appId已用作token的作用，configName字段实际作为coze 的botId。也相当于入参的model。
         this.botId = model;
 
-        logger.info("初始化Coze服务，botId: {}, baseUrl: {}", botId, baseUrl);
+        log.info("初始化Coze服务，botId: {}, baseUrl: {}", botId, baseUrl);
     }
 
     @Override
@@ -103,7 +102,7 @@ public class CozeChatModel implements ChatModel {
         // the developer can also set the timeout.
         try {
             ChatPoll chatPoll = coze.chat().createAndPoll(req, timeout);
-            logger.debug(chatPoll.toString());
+            log.debug(chatPoll.toString());
             var message = chatPoll.getMessages().getLast();
             Map<String, Object> messageMetadata = Optional.ofNullable(message.getMetaData())
                     .map(metaData -> new HashMap<String, Object>(metaData))
@@ -111,7 +110,7 @@ public class CozeChatModel implements ChatModel {
             var assistantMessage = AssistantMessage.builder().content(message.getContent()).properties(messageMetadata).build();
             var generation = new Generation(assistantMessage,
                     ChatGenerationMetadata.builder().metadata(BeanUtil.beanToMap(chatPoll.getChat())).build());
-            logger.info("耗时：{}ms", System.currentTimeMillis() - start);
+            log.info("耗时：{}ms", System.currentTimeMillis() - start);
             return ChatResponse.builder().generations(List.of(generation)).build();
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -173,9 +172,9 @@ public class CozeChatModel implements ChatModel {
                         if (ChatEventType.CONVERSATION_CHAT_COMPLETED.equals(event.getEvent())) {
                             Message message = event.getMessage();
                             if (message != null && MessageType.FOLLOW_UP.equals(message.getType())) {
-                                logger.debug(message.getContent());
+                                log.debug(message.getContent());
                             } else if (event.getChat() != null && event.getChat().getUsage() != null) {
-                                logger.debug("Token usage:{}", event.getChat().getUsage().getTokenCount());
+                                log.debug("Token usage:{}", event.getChat().getUsage().getTokenCount());
                             }
                         }
 
@@ -225,7 +224,7 @@ public class CozeChatModel implements ChatModel {
 
             return new MessageAggregator().aggregate(chatResponse, observationContext::setResponse);
         } catch (Exception e) {
-            logger.error("创建流式请求时出错: {}", e.getMessage(), e);
+            log.error("创建流式请求时出错: {}", e.getMessage(), e);
             return Flux.error(e);
         }
     }

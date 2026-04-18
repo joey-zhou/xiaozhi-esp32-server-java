@@ -9,17 +9,16 @@ import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.ai.utils.HttpUtil;
 
 import okhttp3.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.file.Path;
 import java.util.*;
 
-public class VolcengineTtsService implements TtsService {
-    private static final Logger logger = LoggerFactory.getLogger(VolcengineTtsService.class);
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
+public class VolcengineTtsService implements TtsService {
     private static final String PROVIDER_NAME = "volcengine";
     private static final String API_URL = "https://openspeech.bytedance.com/api/v1/tts";
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
@@ -60,7 +59,7 @@ public class VolcengineTtsService implements TtsService {
     @Override
     public Path textToSpeech(String text) throws Exception {
         if (text == null || text.isEmpty()) {
-            logger.warn("文本内容为空！");
+            log.warn("文本内容为空！");
             return null;
         }
 
@@ -82,16 +81,16 @@ public class VolcengineTtsService implements TtsService {
             } catch (Exception e) {
                 attempts++;
                 if (attempts < MAX_RETRY_ATTEMPTS) {
-                    logger.warn("火山语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
+                    log.warn("火山语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
                     try {
                         Thread.sleep(RETRY_DELAY_MS);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        logger.error("重试等待被中断", ie);
+                        log.error("重试等待被中断", ie);
                         throw e;
                     }
                 } else {
-                    logger.error("火山语音合成失败，已达到最大重试次数", e);
+                    log.error("火山语音合成失败，已达到最大重试次数", e);
                     throw e;
                 }
             }
@@ -157,7 +156,7 @@ public class VolcengineTtsService implements TtsService {
             try (Response response = client.newCall(request).execute()) {
                 if (!response.isSuccessful()) {
                     String errorBody = response.body() != null ? response.body().string() : "无响应体";
-                    logger.error("TTS请求失败: {} {}, 错误信息: {}, 原始内容: {}", response.code(), response.message(), errorBody, text);
+                    log.error("TTS请求失败: {} {}, 错误信息: {}, 原始内容: {}", response.code(), response.message(), errorBody, text);
                     return false;
                 }
 
@@ -168,7 +167,7 @@ public class VolcengineTtsService implements TtsService {
 
                     // 检查响应是否包含错误
                     if (jsonResponse.has("code") && jsonResponse.get("code").getAsInt() != 3000) {
-                        logger.error("TTS请求返回错误: code={}, message={}",
+                        log.error("TTS请求返回错误: code={}, message={}",
                                 jsonResponse.get("code").getAsInt(),
                                 jsonResponse.get("message").getAsString());
                         return false;
@@ -187,16 +186,16 @@ public class VolcengineTtsService implements TtsService {
 
                         return true;
                     } else {
-                        logger.error("TTS响应中未找到音频数据: {}", responseBody);
+                        log.error("TTS响应中未找到音频数据: {}", responseBody);
                         return false;
                     }
                 } else {
-                    logger.error("TTS响应体为空");
+                    log.error("TTS响应体为空");
                     return false;
                 }
             }
         } catch (Exception e) {
-            logger.error("发送TTS请求时发生错误", e);
+            log.error("发送TTS请求时发生错误", e);
             throw new Exception("发送TTS请求失败", e);
         }
     }

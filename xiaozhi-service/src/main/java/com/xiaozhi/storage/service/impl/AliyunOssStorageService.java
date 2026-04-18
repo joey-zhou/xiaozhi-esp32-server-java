@@ -6,8 +6,6 @@ import com.aliyun.oss.model.OSSObject;
 import com.aliyun.oss.model.ObjectMetadata;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.storage.service.StorageService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -15,6 +13,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 阿里云 OSS 存储实现。
  * <p>
@@ -26,9 +25,8 @@ import java.nio.file.Path;
  *   <li>configName → Bucket 名称</li>
  * </ul>
  */
+@Slf4j
 public class AliyunOssStorageService implements StorageService {
-
-    private static final Logger logger = LoggerFactory.getLogger(AliyunOssStorageService.class);
 
     private final OSS ossClient;
     private final String bucketName;
@@ -85,7 +83,7 @@ public class AliyunOssStorageService implements StorageService {
                 return is.readAllBytes();
             }
         } catch (Exception e) {
-            logger.warn("从 OSS 下载失败: {}", storedPath, e);
+            log.warn("从 OSS 下载失败: {}", storedPath, e);
             return null;
         }
     }
@@ -97,7 +95,7 @@ public class AliyunOssStorageService implements StorageService {
         try {
             ossClient.deleteObject(bucketName, key);
         } catch (Exception e) {
-            logger.warn("从 OSS 删除失败: {}", storedPath, e);
+            log.warn("从 OSS 删除失败: {}", storedPath, e);
         }
     }
 

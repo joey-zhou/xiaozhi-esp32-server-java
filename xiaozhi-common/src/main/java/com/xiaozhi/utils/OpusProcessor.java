@@ -1,9 +1,6 @@
 package com.xiaozhi.utils;
 
 import io.github.jaredmdobson.concentus.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
@@ -11,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Opus音频处理器
  * 编码、解码，通常是两个过程，只是可能会共享基本设置，例如采样率，频道数，帧大小。
@@ -18,9 +16,8 @@ import java.util.List;
  * 没必要放在Spring Context管理，没有必要作为 @Component 。作为一个过程工具，用完即扔。
  * 一般工具类（或工具类实例对象），没有必要作为长生命周期的对象。
  */
+@Slf4j
 public class OpusProcessor {
-    private static final Logger logger = LoggerFactory.getLogger(OpusProcessor.class);
-
     // 缓存
     private OpusDecoder decoders = initDecoder();
     private final OpusEncoder encoders = initEncoder();
@@ -85,7 +82,7 @@ public class OpusProcessor {
                 frames.add(frame);
             }
         } catch (OpusException e) {
-            logger.warn("残留数据编码失败: {}", e.getMessage());
+            log.warn("残留数据编码失败: {}", e.getMessage());
         }
 
         // 清空缓存
@@ -114,7 +111,7 @@ public class OpusProcessor {
 
             return pcm;
         } catch (OpusException e) {
-            logger.warn("解码失败: {}", e.getMessage());
+            log.warn("解码失败: {}", e.getMessage());
             // 重置解码器
             decoders = initDecoder();
             throw e;
@@ -195,7 +192,7 @@ public class OpusProcessor {
                     frames.add(Arrays.copyOf(opusBuf, opusLen));
                 }
             } catch (Exception | AssertionError e) {
-                logger.warn("淡入帧编码失败: {}", e.getMessage());
+                log.warn("淡入帧编码失败: {}", e.getMessage());
             }
 
             // 处理剩余的完整帧
@@ -208,7 +205,7 @@ public class OpusProcessor {
                         frames.add(Arrays.copyOf(opusBuf, opusLen));
                     }
                 } catch (Exception | AssertionError e) {
-                    logger.warn("帧 #{} 编码失败: {}", i, e.getMessage());
+                    log.warn("帧 #{} 编码失败: {}", i, e.getMessage());
                 }
             }
         } else {
@@ -222,7 +219,7 @@ public class OpusProcessor {
                         frames.add(Arrays.copyOf(opusBuf, opusLen));
                     }
                 } catch (Exception | AssertionError e) {
-                    logger.warn("帧 #{} 编码失败: {}", i, e.getMessage());
+                    log.warn("帧 #{} 编码失败: {}", i, e.getMessage());
                 }
             }
         }
@@ -251,7 +248,7 @@ public class OpusProcessor {
             decoder.setGain(0);
             return decoder;
         } catch (OpusException e) {
-            logger.error("创建解码器失败", e);
+            log.error("创建解码器失败", e);
             throw new RuntimeException("创建解码器失败", e);
         }
     }
@@ -281,7 +278,7 @@ public class OpusProcessor {
 
             return encoder;
         } catch (OpusException e) {
-            logger.error("创建编码器失败: 采样率={}, 通道={}", SAMPLE_RATE, CHANNELS, e);
+            log.error("创建编码器失败: 采样率={}, 通道={}", SAMPLE_RATE, CHANNELS, e);
             throw new RuntimeException("创建编码器失败", e);
         }
     }

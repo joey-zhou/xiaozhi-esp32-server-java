@@ -9,8 +9,6 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.ai.utils.HttpUtil;
 
 import okhttp3.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import java.io.ByteArrayOutputStream;
@@ -24,14 +22,15 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.GZIPInputStream;
 import java.io.ByteArrayInputStream;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 火山引擎大模型流式语音识别服务
  * 基于 WebSocket 二进制协议实现
  * 
  * @see <a href="https://www.volcengine.com/docs/6561/1354869">大模型流式语音识别API</a>
  */
+@Slf4j
 public class VolcengineSttService implements SttService {
-    private static final Logger logger = LoggerFactory.getLogger(VolcengineSttService.class);
     private static final String PROVIDER_NAME = "volcengine";
 
     // WebSocket API地址
@@ -76,7 +75,7 @@ public class VolcengineSttService implements SttService {
     public SttResult stream(Flux<byte[]> audioFlux) {
         // 检查配置是否已设置
         if (appId == null || accessToken == null) {
-            logger.error("火山引擎语音识别配置未设置，无法进行识别");
+            log.error("火山引擎语音识别配置未设置，无法进行识别");
             return null;
         }
 
@@ -92,7 +91,7 @@ public class VolcengineSttService implements SttService {
         audioFlux.subscribe(
                 data -> audioQueue.offer(data),
                 error -> {
-                    logger.error("音频流处理错误", error);
+                    log.error("音频流处理错误", error);
                     isCompleted.set(true);
                 },
                 () -> isCompleted.set(true)
@@ -119,7 +118,7 @@ public class VolcengineSttService implements SttService {
                     byte[] fullRequest = buildFullClientRequest();
                     webSocket.send(okio.ByteString.of(fullRequest));
                 } catch (Exception e) {
-                    logger.error("发送 full client request 失败", e);
+                    log.error("发送 full client request 失败", e);
                     webSocket.close(1000, "发送请求失败");
                 }
 
@@ -133,7 +132,7 @@ public class VolcengineSttService implements SttService {
                                     byte[] audioRequest = buildAudioRequest(audioChunk, false);
                                     webSocket.send(okio.ByteString.of(audioRequest));
                                 } catch (Exception e) {
-                                    logger.error("发送音频数据时发生错误", e);
+                                    log.error("发送音频数据时发生错误", e);
                                     break;
                                 }
                             }
@@ -144,10 +143,10 @@ public class VolcengineSttService implements SttService {
                             byte[] lastRequest = buildAudioRequest(new byte[0], true);
                             webSocket.send(okio.ByteString.of(lastRequest));
                         } catch (Exception e) {
-                            logger.error("发送最后一包时发生错误", e);
+                            log.error("发送最后一包时发生错误", e);
                         }
                     } catch (Exception e) {
-                        logger.error("处理音频流时发生错误", e);
+                        log.error("处理音频流时发生错误", e);
                     }
                 });
             }
@@ -157,13 +156,13 @@ public class VolcengineSttService implements SttService {
                 try {
                     parseServerResponse(bytes.toByteArray(), textBuilder, finalResult, recognitionLatch, latchReleased, connectId);
                 } catch (Exception e) {
-                    logger.error("解析服务器响应失败", e);
+                    log.error("解析服务器响应失败", e);
                 }
             }
 
             @Override
             public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-                logger.error("火山引擎识别失败", t);
+                log.error("火山引擎识别失败", t);
                 if (latchReleased.compareAndSet(false, true)) {
                     recognitionLatch.countDown();
                 }
@@ -181,10 +180,10 @@ public class VolcengineSttService implements SttService {
             // 等待识别完成或超时
             boolean recognized = recognitionLatch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             if (!recognized) {
-                logger.warn("火山引擎识别超时 - ConnectId: {}", connectId);
+                log.warn("火山引擎识别超时 - ConnectId: {}", connectId);
             }
         } catch (InterruptedException e) {
-            logger.error("等待识别结果时被中断", e);
+            log.error("等待识别结果时被中断", e);
             Thread.currentThread().interrupt();
         } finally {
             // 确保关闭 WebSocket 连接
@@ -286,7 +285,7 @@ public class VolcengineSttService implements SttService {
             AtomicReference<SttResult> finalResult, CountDownLatch latch, AtomicBoolean latchReleased,
             String connectId) throws Exception {
         if (data.length < 4) {
-            logger.warn("响应数据过短");
+            log.warn("响应数据过短");
             return;
         }
 
@@ -320,7 +319,7 @@ public class VolcengineSttService implements SttService {
                     byte[] errorMsgBytes = new byte[errorMsgSize];
                     buffer.get(errorMsgBytes);
                     String errorMsg = new String(errorMsgBytes, "UTF-8");
-                    logger.error("火山引擎识别错误 - Code: {}, Message: {}", errorCode, errorMsg);
+                    log.error("火山引擎识别错误 - Code: {}, Message: {}", errorCode, errorMsg);
                 }
             }
             if (latchReleased.compareAndSet(false, true)) {
@@ -340,7 +339,7 @@ public class VolcengineSttService implements SttService {
 
         int payloadSize = buffer.getInt();
         if (buffer.remaining() < payloadSize) {
-            logger.warn("Payload 数据不完整");
+            log.warn("Payload 数据不完整");
             return;
         }
 
@@ -401,7 +400,7 @@ public class VolcengineSttService implements SttService {
         boolean isLast = (flags & 0b0010) != 0;
         if (isLast) {
             SttResult current = finalResult.get();
-            logger.info("语音识别完成(volcengine): {} [情感: {}, 置信度: {}, 强度: {}, 强度置信度: {}]",
+            log.info("语音识别完成(volcengine): {} [情感: {}, 置信度: {}, 强度: {}, 强度置信度: {}]",
                     current.text(), current.emotion(), current.emotionScore(),
                     current.emotionDegree(), current.emotionDegreeScore());
             if (latchReleased.compareAndSet(false, true)) {

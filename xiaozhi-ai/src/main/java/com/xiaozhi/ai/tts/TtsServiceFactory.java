@@ -7,8 +7,6 @@ import com.xiaozhi.ai.tts.providers.*;
 import com.xiaozhi.common.model.bo.ConfigBO;
 
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 
@@ -16,10 +14,11 @@ import java.io.File;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Component
 public class TtsServiceFactory {
-
-    private static final Logger logger = LoggerFactory.getLogger(TtsServiceFactory.class);
 
     // 缓存已初始化的服务：键为"provider:configId:voiceName"格式，确保音色变化时创建新实例
     private final Map<String, TtsService> serviceCache = new ConcurrentHashMap<>();
@@ -93,7 +92,6 @@ public class TtsServiceFactory {
             default -> new EdgeTtsService(voiceName, pitch, speed, outputPath);
         };
     }
-
 
     private void ensureOutputPath(String outputPath) {
         File dir = new File(outputPath);

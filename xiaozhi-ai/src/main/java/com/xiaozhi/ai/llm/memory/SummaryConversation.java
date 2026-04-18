@@ -4,8 +4,6 @@ import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 
 import lombok.Builder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.*;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.PromptTemplate;
@@ -21,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 实现对话摘要
  * @see org.springframework.ai.chat.memory.MessageWindowChatMemory
@@ -42,11 +41,11 @@ import java.util.stream.Collectors;
  * @author Able
  */
 
+@Slf4j
 public class SummaryConversation extends Conversation {
     private static final int CONVERSATION_INTERVAL_HOURS = 1;
     private static final int DEFAULT_MAX_MESSAGES = 24;
     private static final int DEFAULT_BATCH_SIZE = 20;
-    private final Logger logger = LoggerFactory.getLogger(SummaryConversation.class);
     private final PromptTemplate initSummarizerPromptTemplate ;
     private final PromptTemplate againSummarizerPromptTemplate ;
     private final ChatMemory chatMemory;
@@ -89,7 +88,7 @@ public class SummaryConversation extends Conversation {
         this.lastSummary = chatMemory.findLastSummary(getOwnerId(), getRoleId());
         if(lastSummary == null){
             List<Message> history = chatMemory.find(getOwnerId(), getRoleId(), maxMessages);
-            logger.info("当前{}还没有历史summary,加载{}条普通消息进入对话上下文", getOwnerId(), history.size());
+            log.info("当前{}还没有历史summary,加载{}条普通消息进入对话上下文", getOwnerId(), history.size());
             synchronized (summaryLock) {
                 super.messages.addAll(history);
             }
@@ -97,24 +96,23 @@ public class SummaryConversation extends Conversation {
             if (history.size() >= 2) {
                 Instant lastMessageTime = MessageTimeMetadata.getTimeMillis(history.getLast());
                 if (Duration.between(lastMessageTime, Instant.now()).toHours() >= CONVERSATION_INTERVAL_HOURS) {
-                    logger.info("{}的最后一条消息已超过{}小时，生成summary压缩上下文", getOwnerId(), CONVERSATION_INTERVAL_HOURS);
+                    log.info("{}的最后一条消息已超过{}小时，生成summary压缩上下文", getOwnerId(), CONVERSATION_INTERVAL_HOURS);
                     summarize(true);
                 }
             }
         }else {
             List<Message> history = chatMemory.find(getOwnerId(), getRoleId(), lastSummary.getLastMessageTimestamp());
-            logger.info("加载{}的{}条未被摘要的消息作为对话历史", getOwnerId(), history.size());
+            log.info("加载{}的{}条未被摘要的消息作为对话历史", getOwnerId(), history.size());
             synchronized (summaryLock) {
                 super.messages.addAll(history);
             }
             if (Duration.between(lastSummary.getLastMessageTimestamp(), Instant.now()).toHours() >= CONVERSATION_INTERVAL_HOURS
                     && history.size() >= 2) {
-                logger.info("{}的last summary已超过1小时，但还有一些剩余消息没有summarize,重新生成summary", getOwnerId());
+                log.info("{}的last summary已超过1小时，但还有一些剩余消息没有summarize,重新生成summary", getOwnerId());
                 summarize(true);
             }
         }
     }
-
 
     /**
      * 添加消息
@@ -155,7 +153,7 @@ public class SummaryConversation extends Conversation {
             needSummaryMessages = new ArrayList<>(messages.subList(0, actualBatchSize));
             summarizing = true;
         }
-        logger.info("current conversation message size:{}, batch size to summary:{}", size, actualBatchSize);
+        log.info("current conversation message size:{}, batch size to summary:{}", size, actualBatchSize);
         Thread.startVirtualThread(() -> summaryMessages(needSummaryMessages));
     }
 
@@ -197,10 +195,10 @@ public class SummaryConversation extends Conversation {
 
         try {
             // 3. Call the model.
-            logger.info("调用大模型进行摘要：{}", factExtractPrompt);
+            log.info("调用大模型进行摘要：{}", factExtractPrompt);
 
             String factExtract = chatModel.call(factExtractPrompt);
-            logger.info("大模型从对话里提取用户重要备忘: {}", factExtract);
+            log.info("大模型从对话里提取用户重要备忘: {}", factExtract);
 
             // 4. 入库存储。
             SummaryBO newSummary = new SummaryBO()
@@ -219,7 +217,7 @@ public class SummaryConversation extends Conversation {
             }
             summarize();
         } catch (Exception e) {
-            logger.error("{}对话摘要失败", getOwnerId(), e);
+            log.error("{}对话摘要失败", getOwnerId(), e);
             synchronized (summaryLock) {
                 summarizing = false;
             }

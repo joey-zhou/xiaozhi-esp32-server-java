@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/message")
 @Tag(name = "消息管理", description = "消息相关操作")
@@ -66,7 +68,7 @@ public class MessageController extends BaseController {
     @Operation(summary = "批量删除设备消息", description = "清除指定设备的所有聊天记录")
     public ApiResponse<?> batchDelete(@RequestParam String deviceId) {
         int rows = messageAppService.deleteByDeviceId(deviceId);
-        logger.info("清除设备记忆，删除聊天记录：{}行。", rows);
+        log.info("清除设备记忆，删除聊天记录：{}行。", rows);
         return ApiResponse.success("删除成功，共删除" + rows + "条消息");
     }
 }

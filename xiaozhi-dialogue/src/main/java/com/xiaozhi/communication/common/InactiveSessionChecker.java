@@ -4,8 +4,6 @@ import com.xiaozhi.communication.server.websocket.WebSocketSession;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,14 +15,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 不活跃会话检查器，定期检查并关闭超时未活动的会话。
  * 从 SessionManager 拆分出来，职责单一化。
  */
+@Slf4j
 @Component
 public class InactiveSessionChecker {
-
-    private static final Logger logger = LoggerFactory.getLogger(InactiveSessionChecker.class);
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
@@ -44,7 +42,7 @@ public class InactiveSessionChecker {
     public void init() {
         if (checkInactiveSession) {
             scheduler.scheduleAtFixedRate(this::checkInactiveSessions, 10, 10, TimeUnit.SECONDS);
-            logger.info("不活跃会话检查任务已启动，超时时间: {}秒", inactiveTimeOutSeconds);
+            log.info("不活跃会话检查任务已启动，超时时间: {}秒", inactiveTimeOutSeconds);
         }
     }
 
@@ -59,7 +57,7 @@ public class InactiveSessionChecker {
             scheduler.shutdownNow();
             Thread.currentThread().interrupt();
         }
-        logger.info("不活跃会话检查任务已关闭");
+        log.info("不活跃会话检查任务已关闭");
     }
 
     private void checkInactiveSessions() {
@@ -78,7 +76,7 @@ public class InactiveSessionChecker {
                         // IDLE 和 LISTENING 均可触发（设备连接中但用户长时间没说话）
                         if (session.getDeviceState() != DeviceState.SPEAKING
                                 && session.getDeviceState() != DeviceState.THINKING) {
-                            logger.info("会话 {} 已经 {} 秒没有有效活动，发送超时提示并自动关闭",
+                            log.info("会话 {} 已经 {} 秒没有有效活动，发送超时提示并自动关闭",
                                     session.getSessionId(), inactiveDuration.getSeconds());
                             session.clearAudioSinks();
                             if (session.getPersona() != null) {

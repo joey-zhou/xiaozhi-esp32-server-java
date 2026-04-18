@@ -10,8 +10,6 @@ import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.utils.OpusProcessor;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
@@ -26,13 +24,13 @@ import java.nio.ByteOrder;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 语音活动检测服务
  */
+@Slf4j
 @Service
 public class VadService {
-    private static final Logger logger = LoggerFactory.getLogger(VadService.class);
-
     private final ConcurrentHashMap<String, VadState> states = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Object> locks = new ConcurrentHashMap<>();
 
@@ -62,7 +60,7 @@ public class VadService {
 
     @PreDestroy
     public void cleanup() {
-        logger.info("VAD服务资源已释放");
+        log.info("VAD服务资源已释放");
         states.clear();
         locks.clear();
     }
@@ -195,7 +193,7 @@ public class VadService {
             } else {
                 state.reset();
             }
-            logger.info("VAD会话已初始化: {}", sessionId);
+            log.info("VAD会话已初始化: {}", sessionId);
         }
     }
 
@@ -243,7 +241,7 @@ public class VadService {
                         return new VadResult(VadStatus.NO_SPEECH, null);
                     }
                 } catch (Exception e) {
-                    logger.error("Opus解码失败: {}", e.getMessage());
+                    log.error("Opus解码失败: {}", e.getMessage());
                     return new VadResult(VadStatus.ERROR, null);
                 }
 
@@ -279,7 +277,7 @@ public class VadService {
 
                 boolean speechStartAllowed = state.getConsecutiveSpeechFrames() >= 2;
 
-                // logger.debug("VAD[{}] prob:{} nrg:{} sil:{}ms({}) {}{}",
+                // log.debug("VAD[{}] prob:{} nrg:{} sil:{}ms({}) {}{}",
                 //         sessionId,
                 //         String.format("%.3f", speechProb),
                 //         String.format("%.4f", energy),
@@ -292,7 +290,7 @@ public class VadService {
                     state.setSpeaking(true);
                     state.resetSilenceFrameCount();
 
-                    logger.debug("检测到语音开始 - SessionId: {}, 概率: {}, 能量: {}, 阈值: {}",
+                    log.debug("检测到语音开始 - SessionId: {}, 概率: {}, 能量: {}, 阈值: {}",
                             sessionId, String.format("%.4f", speechProb),
                             String.format("%.6f", energy), String.format("%.4f", speechThreshold));
 
@@ -319,7 +317,7 @@ public class VadService {
                                 }
                             }
                         }
-                        logger.debug("语音结束: {}, 静音: {}ms", sessionId, silenceDuration);
+                        log.debug("语音结束: {}, 静音: {}ms", sessionId, silenceDuration);
 
                         state.resetSilenceFrameCount();
 
@@ -337,7 +335,7 @@ public class VadService {
                     return new VadResult(VadStatus.NO_SPEECH, null);
                 }
             } catch (Exception e) {
-                logger.error("处理音频失败: {}, 错误: {}", sessionId, e.getMessage(), e);
+                log.error("处理音频失败: {}, 错误: {}", sessionId, e.getMessage(), e);
                 return new VadResult(VadStatus.ERROR, null);
             }
         }
@@ -349,7 +347,7 @@ public class VadService {
      */
     private float detectSpeech(VadState state, float[] samples) {
         if (vadModel == null || samples == null || samples.length == 0) {
-            logger.warn("VAD模型为空或样本为空");
+            log.warn("VAD模型为空或样本为空");
             return 0.0f;
         }
         try {
@@ -378,7 +376,7 @@ public class VadService {
 
             return maxProb;
         } catch (Exception e) {
-            logger.error("VAD推断失败: {}", e.getMessage());
+            log.error("VAD推断失败: {}", e.getMessage());
             return 0.0f;
         }
     }

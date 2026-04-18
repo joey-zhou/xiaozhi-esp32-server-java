@@ -2,14 +2,11 @@ package com.xiaozhi.dialogue.llm.tool.media;
 
 import com.xiaozhi.common.Speech;
 
-
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.utils.AudioUtils;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import java.nio.file.Files;
@@ -21,9 +18,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class HuiBenPlayer  {
 
-    private static final Logger logger = LoggerFactory.getLogger(HuiBenPlayer.class);
     private static final String API_BASE_URL = "https://www.limaogushi.com/huiben/";
 
     // 使用OkHttp3替代JDK HttpClient
@@ -40,7 +39,6 @@ public class HuiBenPlayer  {
         this.session = session;
         this.bookId = bookId;
     }
-
 
     /**
      * 播放绘本
@@ -61,7 +59,7 @@ public class HuiBenPlayer  {
         Path audioFilePath = downloadFile(audioUrl, randomName);
 
         if (audioFilePath == null || !Files.exists(audioFilePath)) {
-            logger.warn("音频文件不存在: {}", audioFilePath);
+            log.warn("音频文件不存在: {}", audioFilePath);
             return;
         }
 
@@ -72,7 +70,7 @@ public class HuiBenPlayer  {
             // 将音频文件转换为PCM格式
             byte[] audioData = AudioUtils.readAsPcm(audioFilePath.toAbsolutePath().toString());
             if (audioData == null || audioData.length == 0) {
-                logger.warn("音频数据为空");
+                log.warn("音频数据为空");
                 return;
             }
             Flux<Speech> speechFlux = Flux.just(new Speech(audioData))
@@ -80,7 +78,7 @@ public class HuiBenPlayer  {
             session.getPlayer().play(speechFlux);
 
         } catch (Exception e) {
-            logger.error("处理音频时发生错误 ", e);
+            log.error("处理音频时发生错误 ", e);
         }
     }
 
@@ -100,14 +98,14 @@ public class HuiBenPlayer  {
 
             try (Response response = okHttpClient.newCall(request).execute()) {
                 if (!response.isSuccessful()) {
-                    logger.error("获取绘本信息失败，响应码: {}", response.code());
+                    log.error("获取绘本信息失败，响应码: {}", response.code());
                     return null;
                 }
 
                 // 解析响应
                 String responseBody = response.body() != null ? response.body().string() : null;
                 if (responseBody == null) {
-                    logger.error("获取绘本信息失败，响应体为空");
+                    log.error("获取绘本信息失败，响应体为空");
                     return null;
                 }
 
@@ -117,7 +115,7 @@ public class HuiBenPlayer  {
                 return result;
             }
         } catch (Exception e) {
-            logger.error("获取绘本信息时发生错误", e);
+            log.error("获取绘本信息时发生错误", e);
             return null;
         }
     }
@@ -157,7 +155,7 @@ public class HuiBenPlayer  {
 
             try (Response response = okHttpClient.newCall(request).execute()) {
                 if (!response.isSuccessful() || response.body() == null) {
-                    logger.error("下载文件失败，响应码: {}", response.code());
+                    log.error("下载文件失败，响应码: {}", response.code());
                     return null;
                 }
 
@@ -168,7 +166,7 @@ public class HuiBenPlayer  {
                 return outputPath;
             }
         } catch (Exception e) {
-            logger.error("下载文件时发生错误", e);
+            log.error("下载文件时发生错误", e);
             return null;
         }
     }

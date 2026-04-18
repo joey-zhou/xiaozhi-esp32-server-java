@@ -11,8 +11,6 @@ import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.XiaozhiTtsOptions;
 import com.xiaozhi.common.model.bo.ConfigBO;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -23,13 +21,15 @@ import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentHashMap;
 
+import java.util.concurrent.atomic.AtomicReference;
+
+import lombok.extern.slf4j.Slf4j;
 /**
  * 阿里云NLS标准语音合成服务
  * 使用阿里云智能语音交互SDK实现TTS功能
  */
+@Slf4j
 public class AliyunNlsTtsService implements TtsService {
-    private static final Logger logger = LoggerFactory.getLogger(AliyunNlsTtsService.class);
-
     private static final String PROVIDER_NAME = "aliyun-nls";
 
     // 阿里云NLS服务的默认URL
@@ -110,7 +110,7 @@ public class AliyunNlsTtsService implements TtsService {
                     try {
                         existing.client.shutdown();
                     } catch (Exception e) {
-                        logger.warn("关闭旧NlsClient失败", e);
+                        log.warn("关闭旧NlsClient失败", e);
                     }
                 }
             }
@@ -131,11 +131,10 @@ public class AliyunNlsTtsService implements TtsService {
         return options;
     }
 
-
     @Override
     public Path textToSpeech(String text) throws Exception {
         if (text == null || text.isEmpty()) {
-            logger.warn("文本内容为空！");
+            log.warn("文本内容为空！");
             return null;
         }
 
@@ -158,7 +157,7 @@ public class AliyunNlsTtsService implements TtsService {
 
                     @Override
                     public void onFail(SpeechSynthesizerResponse response) {
-                        logger.error("NLS语音合成失败 - TaskId: {}, Status: {}, StatusText: {}",
+                        log.error("NLS语音合成失败 - TaskId: {}, Status: {}, StatusText: {}",
                                 response.getTaskId(), response.getStatus(), response.getStatusText());
                         latch.countDown();
                     }
@@ -170,7 +169,7 @@ public class AliyunNlsTtsService implements TtsService {
                         try {
                             outputStream.write(buffer);
                         } catch (IOException e) {
-                            logger.error("写入音频数据失败", e);
+                            log.error("写入音频数据失败", e);
                         }
                     }
                 });
@@ -200,7 +199,7 @@ public class AliyunNlsTtsService implements TtsService {
 
                 // 设置超时时间，避免无限等待
                 if (!latch.await(30, java.util.concurrent.TimeUnit.SECONDS)) {
-                    logger.error("NLS语音合成超时");
+                    log.error("NLS语音合成超时");
                     throw new RuntimeException("语音合成超时");
                 }
 
@@ -235,23 +234,23 @@ public class AliyunNlsTtsService implements TtsService {
                     try {
                         synthesizer.close();
                     } catch (Exception ex) {
-                        logger.warn("关闭SpeechSynthesizer失败", ex);
+                        log.warn("关闭SpeechSynthesizer失败", ex);
                     }
                 }
 
                 if (attempts < MAX_RETRY_ATTEMPTS) {
-                    logger.warn("阿里云NLS语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
+                    log.warn("阿里云NLS语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
                     try {
                         Thread.sleep(RETRY_DELAY_MS);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        logger.error("重试等待被中断", ie);
+                        log.error("重试等待被中断", ie);
                         // NLS 连接异常时清除缓存，下次调用时重建 client
                         globalClientCache.remove(config.getConfigId());
                         throw e;
                     }
                 } else {
-                    logger.error("阿里云NLS语音合成失败，已达到最大重试次数: {}", e.getMessage(), e);
+                    log.error("阿里云NLS语音合成失败，已达到最大重试次数: {}", e.getMessage(), e);
                     // NLS 连接异常时清除缓存，下次调用时重建 client
                     globalClientCache.remove(config.getConfigId());
                     throw e;

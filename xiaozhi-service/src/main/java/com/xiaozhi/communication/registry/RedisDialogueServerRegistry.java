@@ -1,8 +1,6 @@
 package com.xiaozhi.communication.registry;
 
 import com.xiaozhi.utils.JsonUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -13,16 +11,16 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 基于 Redis 的 Dialogue 服务器注册中心实现
  * <p>
  * 使用 Redis Hash 存储所有实例信息，每个实例有独立的 TTL key 做健康检测。
  * </p>
  */
+@Slf4j
 @Service
 public class RedisDialogueServerRegistry implements DialogueServerRegistry {
-
-    private static final Logger logger = LoggerFactory.getLogger(RedisDialogueServerRegistry.class);
 
     private static final String REGISTRY_HASH_KEY = "xiaozhi:dialogue:servers";
     private static final String HEARTBEAT_KEY_PREFIX = "xiaozhi:dialogue:heartbeat:";
@@ -39,14 +37,14 @@ public class RedisDialogueServerRegistry implements DialogueServerRegistry {
         stringRedisTemplate.opsForValue().set(
                 HEARTBEAT_KEY_PREFIX + serverInfo.getInstanceId(), "1",
                 HEARTBEAT_TTL_SECONDS, TimeUnit.SECONDS);
-        logger.info("Dialogue服务器已注册: {}", serverInfo.getInstanceId());
+        log.info("Dialogue服务器已注册: {}", serverInfo.getInstanceId());
     }
 
     @Override
     public void unregister(String instanceId) {
         stringRedisTemplate.opsForHash().delete(REGISTRY_HASH_KEY, instanceId);
         stringRedisTemplate.delete(HEARTBEAT_KEY_PREFIX + instanceId);
-        logger.info("Dialogue服务器已注销: {}", instanceId);
+        log.info("Dialogue服务器已注销: {}", instanceId);
     }
 
     @Override
@@ -89,10 +87,10 @@ public class RedisDialogueServerRegistry implements DialogueServerRegistry {
 
                 // 心跳过期，清理僵尸注册
                 stringRedisTemplate.opsForHash().delete(REGISTRY_HASH_KEY, instanceId);
-                logger.info("清理过期的Dialogue服务器: {}", instanceId);
+                log.info("清理过期的Dialogue服务器: {}", instanceId);
             }
         } catch (Exception e) {
-            logger.error("获取可用Dialogue服务器列表失败", e);
+            log.error("获取可用Dialogue服务器列表失败", e);
         }
         return result;
     }

@@ -3,18 +3,16 @@ package com.xiaozhi.ai.llm.memory;
 import lombok.Builder;
 import org.springframework.ai.chat.messages.*;
 
-
 import java.util.*;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 限定消息条数（消息窗口）的Conversation实现。根据不同的策略，可实现聊天会话的持久化、加载、清除等功能。
  * 短期记忆，只能记住当前对话有限的消息条数（多轮）。
  */
+@Slf4j
 public class MessageWindowConversation extends Conversation {
     private final int maxMessages;
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MessageWindowConversation.class);
-
-
     /**
      * 可切换加载维度的构造器。由 Lombok {@link Builder} 生成静态工厂 {@code builder()} 与链式 setter。
      * <ul>
@@ -31,7 +29,7 @@ public class MessageWindowConversation extends Conversation {
         List<Message> history = sessionScoped
                 ? chatMemory.find(sessionId, maxMessages)
                 : chatMemory.find(ownerId, roleId, maxMessages);
-        logger.info("加载对话历史: sessionScoped={}, ownerId={}, sessionId={}, size={}",
+        log.info("加载对话历史: sessionScoped={}, ownerId={}, sessionId={}, size={}",
                 sessionScoped, ownerId, sessionId, history.size());
         super.messages.addAll(history);
     }
@@ -41,7 +39,7 @@ public class MessageWindowConversation extends Conversation {
         if (message instanceof UserMessage || message instanceof AssistantMessage || message instanceof ToolResponseMessage) {
             messages.add(message);
         } else {
-            logger.warn("不支持的消息类型：{}",message.getClass().getName());
+            log.warn("不支持的消息类型：{}",message.getClass().getName());
         }
     }
 

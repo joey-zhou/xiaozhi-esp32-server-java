@@ -10,8 +10,6 @@ import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -29,14 +27,14 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Web 聊天服务：为纯文本 Web 客户端提供流式 AI 对话能力。
  * 轻量级实现，不涉及 STT/TTS/Player 等音频组件
  */
+@Slf4j
 @Service
 public class WebChatService {
-    private static final Logger logger = LoggerFactory.getLogger(WebChatService.class);
-
     @Resource
     private ChatModelFactory chatModelFactory;
     @Resource
@@ -98,7 +96,7 @@ public class WebChatService {
         ChatModel chatModel = chatModelFactory.getChatModel(role);
         chatModels.put(sessionId, chatModel);
 
-        logger.info("Web 聊天会话已创建: sessionId={}, userId={}, roleId={}, resume={}",
+        log.info("Web 聊天会话已创建: sessionId={}, userId={}, roleId={}, resume={}",
                 sessionId, userId, roleId, StringUtils.hasText(resumeSessionId));
         return sessionId;
     }
@@ -166,7 +164,7 @@ public class WebChatService {
                     conversation.add(new AssistantMessage(reply));
                     persistTurn(conversation, text, userCreatedAt, reply, LocalDateTime.now());
                 })
-                .doOnError(e -> logger.error("Web 聊天流式响应失败: sessionId={}", sessionId, e));
+                .doOnError(e -> log.error("Web 聊天流式响应失败: sessionId={}", sessionId, e));
     }
 
     /**
@@ -180,7 +178,7 @@ public class WebChatService {
             MessageBO assistantBO = buildMessageBO(conversation, MessageBO.SENDER_ASSISTANT, assistantText, assistantCreatedAt);
             messageService.saveAll(List.of(userBO, assistantBO));
         } catch (Exception e) {
-            logger.error("Web 聊天消息持久化失败: sessionId={}", conversation.sessionId(), e);
+            log.error("Web 聊天消息持久化失败: sessionId={}", conversation.sessionId(), e);
         }
     }
 
@@ -204,7 +202,7 @@ public class WebChatService {
     public void closeSession(String sessionId) {
         conversations.remove(sessionId);
         chatModels.remove(sessionId);
-        logger.info("Web 聊天会话已关闭: sessionId={}", sessionId);
+        log.info("Web 聊天会话已关闭: sessionId={}", sessionId);
     }
 
     /**

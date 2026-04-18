@@ -2,7 +2,6 @@ package com.xiaozhi.dialogue.llm.tool.media;
 
 import com.xiaozhi.common.Speech;
 
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.utils.AudioUtils;
@@ -11,8 +10,6 @@ import lombok.Getter;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 
@@ -25,7 +22,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class MusicPlayer {
     private static final String API_BASE_URL = "";//"https://api.xiaozhi.com/api/v1/music/search";
     // 使用OkHttp3替代JDK HttpClient
@@ -34,8 +33,6 @@ public class MusicPlayer {
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .build();
-
-    private static final Logger logger = LoggerFactory.getLogger(MusicPlayer.class);
 
     private final ChatSession session;
 
@@ -59,7 +56,6 @@ public class MusicPlayer {
         this.artist = artist;
 
     }
-
 
     /**
      * 搜索并播放音乐
@@ -95,12 +91,11 @@ public class MusicPlayer {
             sendAudioWithLyrics(audioFile);
 
         } catch (Exception e) {
-            logger.error("播放音乐时发生错误", e);
+            log.error("播放音乐时发生错误", e);
             session.getPersona().getSynthesizer().synthesize("播放音乐时发生错误");
         }
 
     }
-
 
     /**
      * 发送音频和同步歌词
@@ -108,7 +103,7 @@ public class MusicPlayer {
     private void sendAudioWithLyrics(Path audioPath) {
 
         if (!Files.exists(audioPath)) {
-            logger.error("音频文件不存在: {}", audioPath);
+            log.error("音频文件不存在: {}", audioPath);
             return;
         }
         if (CollectionUtils.isEmpty(lyrics) || lyrics.size() < 2) {
@@ -120,10 +115,9 @@ public class MusicPlayer {
             // 将音频文件转换为PCM格式
             byte[] audioData = AudioUtils.readAsPcm(audioPath.toAbsolutePath().toString());
             if (audioData == null || audioData.length == 0) {
-                logger.warn("音频数据为空");
+                log.warn("音频数据为空");
                 return;
             }
-
 
             // 预处理歌词时间点，将毫秒时间转换为帧索引
             // 1个Opus帧大约为几百字节，60ms，而pcm字节数也是与时间长度正相关的。 可以按毫秒数大约估算对应的字节长度。
@@ -143,7 +137,7 @@ public class MusicPlayer {
                 endIndex = ms * avg;
                 if(endIndex>audioData.length){
 
-                    logger.warn("歌词超出音频长度，已截断");
+                    log.warn("歌词超出音频长度，已截断");
                     break;
                 }
                 byte[] frameData = Arrays.copyOfRange(audioData, startIndex, endIndex);
@@ -161,7 +155,7 @@ public class MusicPlayer {
 
         } catch (Exception e) {
             String sessionId = session.getSessionId();
-            logger.error("处理音频时发生错误 - SessionId: {}", sessionId, e);
+            log.error("处理音频时发生错误 - SessionId: {}", sessionId, e);
 
         }
     }
@@ -187,14 +181,14 @@ public class MusicPlayer {
 
             try (Response response = okHttpClient.newCall(request).execute()) {
                 if (!response.isSuccessful()) {
-                    logger.error("获取音乐信息失败，响应码: {}", response.code());
+                    log.error("获取音乐信息失败，响应码: {}", response.code());
                     return null;
                 }
 
                 // 解析JSON响应
                 String responseBody = response.body() != null ? response.body().string() : null;
                 if (responseBody == null) {
-                    logger.error("获取音乐信息失败，响应体为空");
+                    log.error("获取音乐信息失败，响应体为空");
                     return null;
                 }
 
@@ -220,7 +214,7 @@ public class MusicPlayer {
                             URLEncoder.encode(audioPath, StandardCharsets.UTF_8) +
                             "&name=" + URLEncoder.encode(song + ".mp3", StandardCharsets.UTF_8));
                 } else {
-                    logger.error("API响应中缺少音频URL信息");
+                    log.error("API响应中缺少音频URL信息");
                     return null;
                 }
 
@@ -235,13 +229,13 @@ public class MusicPlayer {
                             "&name=" + URLEncoder.encode(song + ".lrc", StandardCharsets.UTF_8));
                 } else {
                     // 歌词可选，没有歌词也可以播放
-                    logger.warn("API响应中缺少歌词URL信息");
+                    log.warn("API响应中缺少歌词URL信息");
                 }
 
                 return result;
             }
         } catch (Exception e) {
-            logger.error("获取音乐信息时发生错误", e);
+            log.error("获取音乐信息时发生错误", e);
             return null;
         }
     }
@@ -266,18 +260,18 @@ public class MusicPlayer {
 
             try (Response response = okHttpClient.newCall(request).execute()) {
                 if (!response.isSuccessful() || response.body() == null) {
-                    logger.error("下载文件失败，响应码: {}", response.code());
+                    log.error("下载文件失败，响应码: {}", response.code());
                     return null;
                 }
 
                 // 将响应体写入文件
                 Files.write(outputPath, response.body().bytes());
-                logger.info("文件已保存到: {}", outputPath);
+                log.info("文件已保存到: {}", outputPath);
 
                 return outputPath;
             }
         } catch (Exception e) {
-            logger.error("下载文件时发生错误", e);
+            log.error("下载文件时发生错误", e);
             return null;
         }
     }
@@ -289,7 +283,7 @@ public class MusicPlayer {
         List<LyricLine> result = new ArrayList<>();
 
         if (lyricUrl == null || lyricUrl.isEmpty()) {
-            logger.warn("歌词URL为空，无法解析歌词");
+            log.warn("歌词URL为空，无法解析歌词");
             return result;
         }
 
@@ -303,7 +297,7 @@ public class MusicPlayer {
 
             try (Response response = okHttpClient.newCall(request).execute()) {
                 if (!response.isSuccessful() || response.body() == null) {
-                    logger.error("获取歌词失败，响应码: {}", response.code());
+                    log.error("获取歌词失败，响应码: {}", response.code());
                     return result;
                 }
 
@@ -332,7 +326,7 @@ public class MusicPlayer {
             }
 
         } catch (Exception e) {
-            logger.error("解析歌词时发生错误", e);
+            log.error("解析歌词时发生错误", e);
         }
 
         return result;

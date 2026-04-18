@@ -12,8 +12,6 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.ai.utils.HttpUtil;
 
 import okhttp3.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import java.util.UUID;
@@ -25,8 +23,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class TencentSttService implements SttService {
-    private static final Logger logger = LoggerFactory.getLogger(TencentSttService.class);
     private static final String PROVIDER_NAME = "tencent";
     private static final String API_URL = "https://asr.tencentcloudapi.com";
     private static final int QUEUE_TIMEOUT_MS = 100; // 队列等待超时时间
@@ -54,7 +54,7 @@ public class TencentSttService implements SttService {
                 Response response = client.newCall(request).execute();
                 response.close(); // 不读取内容，仅建立连接，用以提速后续的请求
             } catch (Exception e) {
-                logger.error("初始化TencentSttService STT服务时发生错误", e);
+                log.error("初始化TencentSttService STT服务时发生错误", e);
             }
         });
     }
@@ -76,7 +76,7 @@ public class TencentSttService implements SttService {
     public SttResult stream(Flux<byte[]> audioSink) {
         // 检查配置是否已设置
         if (secretId == null || secretKey == null || appId == null) {
-            logger.error("腾讯云语音识别配置未设置，无法进行识别");
+            log.error("腾讯云语音识别配置未设置，无法进行识别");
             return null;
         }
 
@@ -90,7 +90,7 @@ public class TencentSttService implements SttService {
         audioSink.subscribe(
             data -> audioQueue.offer(data),
             error -> {
-                logger.error("音频流处理错误", error);
+                log.error("音频流处理错误", error);
                 isCompleted.set(true);
             },
             () -> isCompleted.set(true)
@@ -115,7 +115,7 @@ public class TencentSttService implements SttService {
                 
                 @Override
                 public void onRecognitionStart(SpeechRecognizerResponse response) {
-                    logger.debug("腾讯云识别开始 - VoiceId: {}", voiceId);
+                    log.debug("腾讯云识别开始 - VoiceId: {}", voiceId);
                 }
 
                 @Override
@@ -180,7 +180,7 @@ public class TencentSttService implements SttService {
 
                 @Override
                 public void onFail(SpeechRecognizerResponse response) {
-                    logger.error("识别失败 - VoiceId: {}, 错误: {}", voiceId,
+                    log.error("识别失败 - VoiceId: {}, 错误: {}", voiceId,
                             response.getMessage() != null ? response.getMessage() : "未知错误");
                     
                     // 释放锁，表示识别失败
@@ -216,7 +216,7 @@ public class TencentSttService implements SttService {
                         try {
                             audioChunk = audioQueue.poll(QUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
                         } catch (InterruptedException e) {
-                            logger.warn("音频数据队列等待被中断", e);
+                            log.warn("音频数据队列等待被中断", e);
                             Thread.currentThread().interrupt(); // 重新设置中断标志
                             break;
                         }
@@ -225,7 +225,7 @@ public class TencentSttService implements SttService {
                             try {
                                 recognizer.write(audioChunk);
                             } catch (Exception e) {
-                                logger.error("发送音频数据时发生错误 - VoiceId: {}", voiceId, e);
+                                log.error("发送音频数据时发生错误 - VoiceId: {}", voiceId, e);
                                 break;
                             }
                         }
@@ -236,11 +236,11 @@ public class TencentSttService implements SttService {
                         try {
                             recognizer.stop();
                         } catch (Exception e) {
-                            logger.error("停止识别器时发生错误 - VoiceId: {}", voiceId, e);
+                            log.error("停止识别器时发生错误 - VoiceId: {}", voiceId, e);
                         }
                     }
                 } catch (Exception e) {
-                    logger.error("处理音频流时发生错误 - VoiceId: {}", voiceId, e);
+                    log.error("处理音频流时发生错误 - VoiceId: {}", voiceId, e);
                 }
             });
 
@@ -255,7 +255,7 @@ public class TencentSttService implements SttService {
                         recognizer.close();
                         activeRecognizers.remove(voiceId);
                     } catch (Exception e) {
-                        logger.error("清理超时识别器资源时发生错误 - VoiceId: {}", voiceId, e);
+                        log.error("清理超时识别器资源时发生错误 - VoiceId: {}", voiceId, e);
                     }
                 }
             } else {
@@ -263,12 +263,12 @@ public class TencentSttService implements SttService {
                 try {
                     recognizer.close();
                 } catch (Exception e) {
-                    logger.error("关闭识别器时发生错误 - VoiceId: {}", voiceId, e);
+                    log.error("关闭识别器时发生错误 - VoiceId: {}", voiceId, e);
                 }
             }
 
         } catch (Exception e) {
-            logger.error("创建语音识别会话时发生错误", e);
+            log.error("创建语音识别会话时发生错误", e);
         }
         
         return SttResult.textOnly(finalResult.get());
@@ -282,7 +282,7 @@ public class TencentSttService implements SttService {
                 recognizer.stop();
                 recognizer.close();
             } catch (Exception e) {
-                logger.error("关闭识别器时发生错误 - VoiceId: {}", id, e);
+                log.error("关闭识别器时发生错误 - VoiceId: {}", id, e);
             }
         });
         activeRecognizers.clear();

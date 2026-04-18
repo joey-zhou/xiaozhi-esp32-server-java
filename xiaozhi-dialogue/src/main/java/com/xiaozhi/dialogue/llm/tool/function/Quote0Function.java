@@ -4,8 +4,6 @@ import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tool.session.ToolSession;
 import okhttp3.OkHttpClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
@@ -16,12 +14,13 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Quote0更新
  */
-@Component
+@Slf4j
+// @Component
 public class Quote0Function implements ToolsGlobalRegistry.GlobalFunction {
-    private static final Logger logger = LoggerFactory.getLogger(Quote0Function.class);
     private static final String TOOL_NAME = "update_eink";
     private static final String API_BASE_URL = "https://dot.mindreset.tech/api/open/text";
 
@@ -66,12 +65,12 @@ public class Quote0Function implements ToolsGlobalRegistry.GlobalFunction {
                             if (response.isSuccessful()) {
                                 return "墨水屏信息更新成功";
                             } else {
-                                logger.error("墨水屏更新失败，HTTP状态码: {}", response.code());
+                                log.error("墨水屏更新失败，HTTP状态码: {}", response.code());
                                 return "墨水屏更新失败，状态码: " + response.code();
                             }
                         }
                     } catch (Exception e) {
-                        logger.error("墨水屏更新异常", e);
+                        log.error("墨水屏更新异常", e);
                         return "墨水屏更新异常: " + e.getMessage();
                     }
                 })

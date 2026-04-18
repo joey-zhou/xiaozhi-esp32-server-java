@@ -1,15 +1,15 @@
 package com.xiaozhi.communication.server.websocket;
 
 import com.xiaozhi.communication.common.ChatSession;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.TextMessage;
 
 import java.io.IOException;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class WebSocketSession extends ChatSession {
-    private static final Logger logger = LoggerFactory.getLogger(WebSocketSession.class);
     /**
      * 当前会话的链接 session
      */
@@ -39,7 +39,7 @@ public class WebSocketSession extends ChatSession {
             try {
                 session.close();
             } catch (IOException e) {
-                logger.error("关闭WebSocket会话时发生错误 - SessionId: {}", getSessionId(), e);
+                log.error("关闭WebSocket会话时发生错误 - SessionId: {}", getSessionId(), e);
             }
         }
     }
@@ -59,7 +59,7 @@ public class WebSocketSession extends ChatSession {
         try {
             session.sendMessage(new TextMessage(message));
         } catch (IOException e) {
-            logger.error("发送Text消息失败, message: {}", message, e);
+            log.error("发送Text消息失败, message: {}", message, e);
         }
     }
 
@@ -68,7 +68,7 @@ public class WebSocketSession extends ChatSession {
         try {
             session.sendMessage(new BinaryMessage(message));
         } catch (IOException e) {
-            logger.error("发送Binary消息失败", e);
+            log.error("发送Binary消息失败", e);
         }
     }
 }

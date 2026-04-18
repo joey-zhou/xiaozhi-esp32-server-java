@@ -6,14 +6,13 @@ import com.xiaozhi.utils.OpusProcessor;
 import dev.onvoid.webrtc.media.audio.AudioProcessing;
 import dev.onvoid.webrtc.media.audio.AudioProcessingConfig;
 import dev.onvoid.webrtc.media.audio.AudioProcessingStreamConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 服务端 AEC（回声消除）服务。
  * 使用 WebRTC AEC3 在服务端消除麦克风中的扬声器回声，
@@ -27,10 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *   自动找到参考信号与回声之间的延迟，无需手动对齐。
  * - setStreamDelayMs 仅作为初始提示加速收敛。
  */
+@Slf4j
 @Service
 public class AecService {
-    private static final Logger logger = LoggerFactory.getLogger(AecService.class);
-
     @Value("${aec.enabled:true}")
     private boolean enabled;
 
@@ -58,7 +56,7 @@ public class AecService {
             if (existing == null) {
             }
         } catch (Exception e) {
-            logger.error("AEC会话初始化失败: {}", sessionId, e);
+            log.error("AEC会话初始化失败: {}", sessionId, e);
         }
     }
 
@@ -101,7 +99,7 @@ public class AecService {
                 }
             }
         } catch (Exception e) {
-            logger.warn("AEC重建失败: {}: {}", sessionId, e.getMessage());
+            log.warn("AEC重建失败: {}: {}", sessionId, e.getMessage());
         }
     }
 
@@ -134,7 +132,7 @@ public class AecService {
             }
 
         } catch (Exception e) {
-            logger.warn("AEC feedReference 失败 - SessionId: {}: {}", sessionId, e.getMessage());
+            log.warn("AEC feedReference 失败 - SessionId: {}: {}", sessionId, e.getMessage());
         }
     }
 
@@ -174,7 +172,7 @@ public class AecService {
 
             return aecOutput;
         } catch (Exception e) {
-            logger.warn("AEC process 失败 - SessionId: {}: {}", sessionId, e.getMessage());
+            log.warn("AEC process 失败 - SessionId: {}: {}", sessionId, e.getMessage());
             return micPcm;
         }
     }
@@ -231,7 +229,7 @@ public class AecService {
             try {
                 apm.dispose();
             } catch (Exception e) {
-                logger.warn("AEC dispose 失败: {}", e.getMessage());
+                log.warn("AEC dispose 失败: {}", e.getMessage());
             }
         }
     }

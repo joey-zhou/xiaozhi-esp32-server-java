@@ -12,8 +12,6 @@ import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.dialogue.runtime.Persona;
 import lombok.Data;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Sinks;
 
@@ -27,9 +25,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Data
 public abstract class ChatSession {
-    private static final Logger logger = LoggerFactory.getLogger(ChatSession.class);
     /**
      * 当前会话的sessionId
      */
@@ -70,7 +70,7 @@ public abstract class ChatSession {
             return;
         }
         this.deviceState = newState;
-        logger.debug("状态转换: {} -> {} (SessionId: {})", oldState, newState, sessionId);
+        log.debug("状态转换: {} -> {} (SessionId: {})", oldState, newState, sessionId);
     }
 
     /**
@@ -190,7 +190,6 @@ public abstract class ChatSession {
         return Path.of(AudioUtils.AUDIO_PATH, date, deviceId, roleId, filename);
     }
 
-
     /**
      * 会话连接是否打开中
      *
@@ -210,7 +209,6 @@ public abstract class ChatSession {
     public abstract void sendTextMessage(String message);
 
     public abstract void sendBinaryMessage(byte[] message);
-
 
     public boolean isTimeoutDisconnect()            { return timeoutDisconnect; }
     public void setTimeoutDisconnect(boolean flag)  { this.timeoutDisconnect = flag; }

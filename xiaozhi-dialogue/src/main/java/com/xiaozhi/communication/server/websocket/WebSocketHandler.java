@@ -6,8 +6,6 @@ import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpService;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
@@ -20,10 +18,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Component
 public class WebSocketHandler extends AbstractWebSocketHandler {
-    private static final Logger logger = LoggerFactory.getLogger(WebSocketHandler.class);
-
     @Resource
     private SessionManager sessionManager;
 
@@ -39,11 +38,11 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
         String deviceIdAuth = headers.get("device-id");
         String token = headers.get("Authorization");
         if (deviceIdAuth == null || deviceIdAuth.isEmpty()) {
-            logger.error("设备ID为空");
+            log.error("设备ID为空");
             try {
                 session.close(CloseStatus.BAD_DATA.withReason("设备ID为空"));
             } catch (IOException e) {
-                logger.error("关闭WebSocket连接失败", e);
+                log.error("关闭WebSocket连接失败", e);
             }
             return;
         }
@@ -53,7 +52,7 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
         messageHandler.afterConnection(xiaoZhiSession, deviceIdAuth);
         sessionManager.openAudioChannel(xiaoZhiSession.getSessionId(), deviceIdAuth);
 
-        logger.info("WebSocket连接建立成功 - SessionId: {}, DeviceId: {}", session.getId(), deviceIdAuth);
+        log.info("WebSocket连接建立成功 - SessionId: {}, DeviceId: {}", session.getId(), deviceIdAuth);
     }
 
     @Override
@@ -78,15 +77,15 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
                     // 自动绑定成功，重新获取设备信息
                     device = chatSession != null ? chatSession.getDevice() : null;
                     if (device == null || device.getRoleId() == null) {
-                        logger.warn("自动绑定后设备信息异常 - SessionId: {}", sessionId);
+                        log.warn("自动绑定后设备信息异常 - SessionId: {}", sessionId);
                         return;
                     }
-                    logger.info("自动绑定成功，继续处理消息 - SessionId: {}, DeviceId: {}", sessionId, device.getDeviceId());
+                    log.info("自动绑定成功，继续处理消息 - SessionId: {}, DeviceId: {}", sessionId, device.getDeviceId());
                 }
                 messageHandler.handleMessage(msg, sessionId);
             }
         } catch (Exception e) {
-            logger.error("handleTextMessage处理失败", e);
+            log.error("handleTextMessage处理失败", e);
         }
     }
 
@@ -105,7 +104,7 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
         String sessionId = session.getId();
         messageHandler.afterConnectionClosed(sessionId);
 
-        logger.info("WebSocket连接关闭 - SessionId: {}, 状态: {}", sessionId, status);
+        log.info("WebSocket连接关闭 - SessionId: {}, 状态: {}", sessionId, status);
     }
 
     @Override
@@ -114,11 +113,11 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
         // 检查是否是客户端正常关闭连接导致的异常
         if (isClientCloseRequest(exception)) {
             // 客户端主动关闭，记录为信息级别日志而非错误
-            logger.info("WebSocket连接被客户端主动关闭 - SessionId: {}", sessionId);
+            log.info("WebSocket连接被客户端主动关闭 - SessionId: {}", sessionId);
             messageHandler.afterConnectionClosed(sessionId);
         } else {
             // 真正的传输错误
-            logger.error("WebSocket传输错误 - SessionId: {}", sessionId, exception);
+            log.error("WebSocket传输错误 - SessionId: {}", sessionId, exception);
         }
     }
 
@@ -143,10 +142,10 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
 
     private void handleHelloMessage(WebSocketSession session, HelloMessage message) {
         var sessionId = session.getId();
-        logger.info("收到hello消息 - SessionId: {}, JsonNode: {}", sessionId, message);
+        log.info("收到hello消息 - SessionId: {}, JsonNode: {}", sessionId, message);
 
         if (message.getAudioParams() != null) {
-            logger.info("客户端音频参数 - 格式: {}, 采样率: {}, 声道: {}, 帧时长: {}ms",
+            log.info("客户端音频参数 - 格式: {}, 采样率: {}, 声道: {}, 帧时长: {}ms",
                     message.getAudioParams().getFormat(),
                     message.getAudioParams().getSampleRate(),
                     message.getAudioParams().getChannels(),
@@ -172,7 +171,7 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
                 });
             }
         } catch (Exception e) {
-            logger.error("发送hello响应失败", e);
+            log.error("发送hello响应失败", e);
         }
     }
 

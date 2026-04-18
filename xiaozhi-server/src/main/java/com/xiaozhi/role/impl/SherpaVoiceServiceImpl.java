@@ -3,8 +3,6 @@ package com.xiaozhi.role.impl;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.role.SherpaVoiceService;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -13,13 +11,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Sherpa-ONNX 本地音色扫描服务实现。
  */
+@Slf4j
 @Service
 public class SherpaVoiceServiceImpl implements SherpaVoiceService {
-
-    private static final Logger logger = LoggerFactory.getLogger(SherpaVoiceServiceImpl.class);
 
     @Resource
     private RuntimePathConfig runtimePathConfig;
@@ -124,7 +122,7 @@ public class SherpaVoiceServiceImpl implements SherpaVoiceService {
                 if (!name.isEmpty()) names.add(name);
             }
         } catch (IOException e) {
-            logger.warn("读取 voices.bin 失败: {}", voicesBin.getAbsolutePath());
+            log.warn("读取 voices.bin 失败: {}", voicesBin.getAbsolutePath());
         }
         return names;
     }

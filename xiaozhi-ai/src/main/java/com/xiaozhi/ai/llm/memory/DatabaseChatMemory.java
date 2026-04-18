@@ -5,10 +5,6 @@ import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.summary.service.SummaryService;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
@@ -25,15 +21,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+
+import lombok.extern.slf4j.Slf4j;
 /**
  * 基于数据库的聊天记忆实现。
  * 全局单例类，负责 Conversation 里消息的获取、保存、清理。
  */
+@Slf4j
 @Service
 public class DatabaseChatMemory implements ChatMemory {
-
-    private static final Logger logger = LoggerFactory.getLogger(DatabaseChatMemory.class);
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final SummaryService summaryService;
     private final MessageService messageService;
@@ -59,7 +55,7 @@ public class DatabaseChatMemory implements ChatMemory {
         try {
             return toSpringMessages(messageService.listHistory(ownerId, roleId, limit));
         } catch (Exception e) {
-            logger.error("获取历史消息时出错(按 ownerId+roleId): {}", e.getMessage(), e);
+            log.error("获取历史消息时出错(按 ownerId+roleId): {}", e.getMessage(), e);
             return new ArrayList<>();
         }
     }
@@ -69,7 +65,7 @@ public class DatabaseChatMemory implements ChatMemory {
         try {
             return toSpringMessages(messageService.listHistory(sessionId, limit));
         } catch (Exception e) {
-            logger.error("获取历史消息时出错(按 sessionId): {}", e.getMessage(), e);
+            log.error("获取历史消息时出错(按 sessionId): {}", e.getMessage(), e);
             return new ArrayList<>();
         }
     }
@@ -110,20 +106,10 @@ public class DatabaseChatMemory implements ChatMemory {
      */
     private static AssistantMessage buildToolCallAssistantMessage(MessageBO message, Map<String, Object> metadata) {
         List<AssistantMessage.ToolCall> toolCalls = List.of();
-        if (message.getToolCalls() != null) {
-            try {
-                List<Map<String, String>> rawList = OBJECT_MAPPER.readValue(
-                        message.getToolCalls(), new TypeReference<>() {});
-                toolCalls = rawList.stream()
-                        .map(m -> new AssistantMessage.ToolCall(
-                                m.getOrDefault("id", ""),
-                                "function",
-                                m.getOrDefault("name", ""),
-                                m.getOrDefault("arguments", "")))
-                        .toList();
-            } catch (Exception e) {
-                logger.warn("反序列化 toolCalls 失败: {}", e.getMessage());
-            }
+        try {
+            toolCalls = ToolCallMessageCodec.decodeToolCalls(message.getToolCalls());
+        } catch (Exception e) {
+            log.warn("反序列化 toolCalls 失败: {}", e.getMessage());
         }
         return AssistantMessage.builder()
                 .content(message.getMessage())
@@ -136,22 +122,12 @@ public class DatabaseChatMemory implements ChatMemory {
      * 从 DB 记录重建 ToolResponseMessage
      */
     private static ToolResponseMessage buildToolResponseMessage(MessageBO message) {
-        List<ToolResponseMessage.ToolResponse> responses = new ArrayList<>();
-        if (message.getToolCalls() != null) {
-            try {
-                List<Map<String, String>> rawList = OBJECT_MAPPER.readValue(
-                        message.getToolCalls(), new TypeReference<>() {});
-                for (Map<String, String> m : rawList) {
-                    responses.add(new ToolResponseMessage.ToolResponse(
-                            m.getOrDefault("toolCallId", ""),
-                            m.getOrDefault("toolName", ""),
-                            message.getMessage()));
-                }
-            } catch (Exception e) {
-                logger.warn("反序列化 tool response 信息失败: {}", e.getMessage());
-            }
-        }
-        if (responses.isEmpty()) {
+        List<ToolResponseMessage.ToolResponse> responses;
+        try {
+            responses = ToolCallMessageCodec.decodeToolResponses(message.getToolCalls(), message.getMessage());
+        } catch (Exception e) {
+            log.warn("反序列化 tool response 信息失败: {}", e.getMessage());
+            responses = new ArrayList<>();
             responses.add(new ToolResponseMessage.ToolResponse("", "", message.getMessage()));
         }
         return ToolResponseMessage.builder().responses(responses).build();
@@ -179,7 +155,7 @@ public class DatabaseChatMemory implements ChatMemory {
         try {
             throw new IllegalAccessException("暂不支持删除历史记录");
         } catch (Exception e) {
-            logger.error("清除历史记录时出错: {}", e.getMessage(), e);
+            log.error("清除历史记录时出错: {}", e.getMessage(), e);
         }
     }
 }

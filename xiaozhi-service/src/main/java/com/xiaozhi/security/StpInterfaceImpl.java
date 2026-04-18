@@ -8,23 +8,21 @@ import com.xiaozhi.common.model.resp.PermissionResp;
 import com.xiaozhi.permission.service.PermissionService;
 import com.xiaozhi.user.service.UserService;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Sa-Token权限接口实现
  * 用于Sa-Token框架获取用户的权限和角色信息
  *
  * @author Joey
  */
+@Slf4j
 @Component
 public class StpInterfaceImpl implements StpInterface {
-
-    private static final Logger logger = LoggerFactory.getLogger(StpInterfaceImpl.class);
 
     @Resource
     private PermissionService permissionService;
@@ -60,7 +58,7 @@ public class StpInterfaceImpl implements StpInterface {
             }
         } catch (Exception e) {
             // 记录日志但不抛出异常,返回空列表
-            logger.error("获取用户权限失败: {}", e.getMessage());
+            log.error("获取用户权限失败: {}", e.getMessage());
         }
 
         return permissionList;
@@ -98,7 +96,7 @@ public class StpInterfaceImpl implements StpInterface {
             }
         } catch (Exception e) {
             // 记录日志但不抛出异常,返回空列表
-            logger.error("获取用户角色失败: {}", e.getMessage());
+            log.error("获取用户角色失败: {}", e.getMessage());
         }
 
         return authRoleKeys;

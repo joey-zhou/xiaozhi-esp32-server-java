@@ -1,8 +1,6 @@
 package com.xiaozhi.storage.service.impl;
 
 import com.xiaozhi.storage.service.StorageService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,13 +13,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 本地文件存储实现
  */
+@Slf4j
 @Component
 public class LocalStorageService implements StorageService {
-
-    private static final Logger logger = LoggerFactory.getLogger(LocalStorageService.class);
 
     @Value("${xiaozhi.upload-path:uploads}")
     private String baseDir;
@@ -70,7 +68,7 @@ public class LocalStorageService implements StorageService {
             Path path = Path.of(storedPath);
             return Files.exists(path) ? Files.readAllBytes(path) : null;
         } catch (Exception e) {
-            logger.warn("读取本地文件失败: {}", storedPath, e);
+            log.warn("读取本地文件失败: {}", storedPath, e);
             return null;
         }
     }
@@ -81,7 +79,7 @@ public class LocalStorageService implements StorageService {
         try {
             Files.deleteIfExists(Path.of(storedPath));
         } catch (Exception e) {
-            logger.warn("删除本地文件失败: {}", storedPath, e);
+            log.warn("删除本地文件失败: {}", storedPath, e);
         }
     }
 

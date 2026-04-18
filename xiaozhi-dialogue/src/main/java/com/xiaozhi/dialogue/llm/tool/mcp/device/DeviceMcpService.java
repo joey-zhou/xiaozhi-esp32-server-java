@@ -13,8 +13,6 @@ import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
@@ -31,10 +29,11 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class DeviceMcpService {
-    private static final Logger logger = LoggerFactory.getLogger(DeviceMcpService.class);
-
     @Resource
     private Environment environment;
 
@@ -127,7 +126,7 @@ public class DeviceMcpService {
 
         DeviceMcpMessage result = sendMcpRequest(chatSession, message);
         if (result != null) {
-            logger.debug("SessionId: {}, MCP initialized successfully", chatSession.getSessionId());
+            log.debug("SessionId: {}, MCP initialized successfully", chatSession.getSessionId());
             return result;
         }
         return null;
@@ -199,7 +198,7 @@ public class DeviceMcpService {
                         if (resp == null) {
                             return "操作失败";
                         }
-                        logger.info("SessionId: {}, MCP function call response: {}", chatSession.getSessionId(), resp);
+                        log.info("SessionId: {}, MCP function call response: {}", chatSession.getSessionId(), resp);
                         if (resp.getPayload().getResult() == null) {
                             return resp.getPayload().getError().get("message");
                         }
@@ -248,9 +247,9 @@ public class DeviceMcpService {
                 deviceRepository.save(device);
             });
             chatSession.getDevice().setMcpList(mcpList);
-            logger.info("DeviceId: {}, mcp_list updated: {}", deviceId, mcpList);
+            log.info("DeviceId: {}, mcp_list updated: {}", deviceId, mcpList);
         } catch (Exception e) {
-            logger.warn("DeviceId: {}, failed to persist mcp_list", deviceId, e);
+            log.warn("DeviceId: {}, failed to persist mcp_list", deviceId, e);
         }
     }
 
@@ -264,7 +263,7 @@ public class DeviceMcpService {
         try {
             response = future.get(30, TimeUnit.SECONDS);
         } catch (Exception e) {
-            logger.error("SessionId: {}, Error sending MCP request：{}", chatSession.getSessionId(), e);
+            log.error("SessionId: {}, Error sending MCP request：{}", chatSession.getSessionId(), e);
             chatSession.getDeviceMcpHolder().getMcpPendingRequests().remove(id);
         }
         return response;

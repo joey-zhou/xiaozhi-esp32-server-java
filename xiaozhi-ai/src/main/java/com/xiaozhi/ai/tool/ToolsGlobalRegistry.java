@@ -3,8 +3,6 @@ package com.xiaozhi.ai.tool;
 import com.xiaozhi.ai.tool.session.ToolSession;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.resolution.ToolCallbackResolver;
 import org.springframework.stereotype.Service;
@@ -14,9 +12,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class ToolsGlobalRegistry implements ToolCallbackResolver {
-    private final Logger logger = LoggerFactory.getLogger(ToolsGlobalRegistry.class);
     private static final String TAG = "FUNCTION_GLOBAL";
 
     // 用于存储所有function列表

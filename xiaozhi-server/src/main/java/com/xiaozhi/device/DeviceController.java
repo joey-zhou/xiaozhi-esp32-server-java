@@ -33,6 +33,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
@@ -43,6 +44,7 @@ import jakarta.validation.Valid;
  * 
  */
 
+@Slf4j
 @RestController
 @RequestMapping("/api/device")
 @Tag(name = "设备管理", description = "设备相关操作")
@@ -132,7 +134,7 @@ public class DeviceController extends BaseController {
         } catch (IllegalArgumentException e) {
             return buildJsonResponse(HttpStatus.BAD_REQUEST, Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
-            logger.error("处理OTA请求失败", e);
+            log.error("处理OTA请求失败", e);
             return buildJsonResponse(HttpStatus.INTERNAL_SERVER_ERROR, Map.of("error", "处理请求失败"));
         }
     }
@@ -149,7 +151,7 @@ public class DeviceController extends BaseController {
                     ? ResponseEntity.ok("success")
                     : ResponseEntity.status(202).build();
         } catch (RuntimeException e) {
-            logger.error("OTA激活失败", e);
+            log.error("OTA激活失败", e);
             return ResponseEntity.status(202).build();
         }
     }
@@ -164,7 +166,7 @@ public class DeviceController extends BaseController {
             try {
                 jsonData = JsonUtil.OBJECT_MAPPER.readValue(requestBody, new TypeReference<>() {});
             } catch (IOException e) {
-                logger.debug("JSON解析失败: {}", e.getMessage());
+                log.debug("JSON解析失败: {}", e.getMessage());
             }
         }
 
@@ -209,7 +211,7 @@ public class DeviceController extends BaseController {
             headers.setContentLength(responseBytes.length);
             return new ResponseEntity<>(responseBytes, headers, status);
         } catch (JsonProcessingException e) {
-            logger.error("序列化OTA响应失败", e);
+            log.error("序列化OTA响应失败", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

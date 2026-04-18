@@ -26,8 +26,6 @@ import com.xiaozhi.enums.ListenState;
 import com.xiaozhi.event.ChatAbortedEvent;
 import com.xiaozhi.role.service.RoleService;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
@@ -39,10 +37,11 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Component
 public class MessageHandler {
-    private static final Logger logger = LoggerFactory.getLogger(MessageHandler.class);
-
     @Resource
     private DeviceService deviceService;
 
@@ -114,11 +113,11 @@ public class MessageHandler {
         // 所以广播到达本实例时 getSessionByDeviceId 返回 null，不会误关自己
         String previousInstance = deviceRegistry.getInstance(deviceId);
         if (previousInstance != null && !previousInstance.equals(instanceIdHolder.getInstanceId())) {
-            logger.info("设备 {} 之前在实例 {} 上，通知旧实例清理幽灵会话", deviceId, previousInstance);
+            log.info("设备 {} 之前在实例 {} 上，通知旧实例清理幽灵会话", deviceId, previousInstance);
             redisBroadcast.closeDeviceSession(deviceId);
         }
 
-        logger.info("开始查询设备信息 - DeviceId: {}", deviceId);
+        log.info("开始查询设备信息 - DeviceId: {}", deviceId);
         DeviceBO device = Optional.ofNullable(deviceService.getBO(deviceId)).orElse(new DeviceBO());
         device.setDeviceId(deviceId);
         device.setSessionId(sessionId);
@@ -161,7 +160,7 @@ public class MessageHandler {
                 deviceRepository.updateState(deviceId, newState);
             } catch (Exception e) {
                 // 仅记录告警，不关闭会话：状态写库失败不影响设备正常通信
-                logger.warn("更新设备在线状态失败 - DeviceId: {}, State: {}", deviceId, newState, e);
+                log.warn("更新设备在线状态失败 - DeviceId: {}, State: {}", deviceId, newState, e);
             }
         });
 
@@ -195,10 +194,10 @@ public class MessageHandler {
                         }
 
                         deviceRepository.updateState(deviceId, newState);
-                        logger.info("连接已关闭 - SessionId: {}, DeviceId: {}, 新状态: {}",
+                        log.info("连接已关闭 - SessionId: {}, DeviceId: {}, 新状态: {}",
                                 sessionId, deviceId, newState);
                     } catch (Exception e) {
-                        logger.error("更新设备状态失败", e);
+                        log.error("更新设备状态失败", e);
                     }
                 });
             }
@@ -242,7 +241,7 @@ public class MessageHandler {
         // 检查是否是 user_chat_ 开头的虚拟设备，如果是则自动绑定
         if (deviceId.startsWith("user_chat_")) {
             try {
-                logger.info("检测到虚拟设备 {}，尝试自动绑定", deviceId);
+                log.info("检测到虚拟设备 {}，尝试自动绑定", deviceId);
                 
                 // 提取用户ID
                 String userIdStr = deviceId.substring("user_chat_".length());
@@ -257,7 +256,7 @@ public class MessageHandler {
                             deviceId, "小助手", "web", userId, defaultRoleId);
                     deviceRepository.save(createdDevice);
                     if (createdDevice.getDeviceId() != null) {
-                        logger.info("虚拟设备 {} 自动绑定成功，角色ID: {}", deviceId, defaultRoleId);
+                        log.info("虚拟设备 {} 自动绑定成功，角色ID: {}", deviceId, defaultRoleId);
                         
                         // 重新查询设备信息
                         DeviceBO boundDevice = deviceService.getBO(deviceId);
@@ -271,22 +270,22 @@ public class MessageHandler {
                             if (chatSession != null && chatSession.isOpen()) {
                                 // 初始化设备会话（与afterConnection中的逻辑一致）
                                 initializeBoundDevice(chatSession, boundDevice);
-                                logger.info("虚拟设备 {} 初始化完成，可以开始对话", deviceId);
+                                log.info("虚拟设备 {} 初始化完成，可以开始对话", deviceId);
                             }
                             
                             // 设备已绑定并初始化完成，返回true表示可以继续处理消息
                             return true;
                         }
                     } else {
-                        logger.warn("虚拟设备 {} 自动绑定失败", deviceId);
+                        log.warn("虚拟设备 {} 自动绑定失败", deviceId);
                     }
                 } else {
-                    logger.warn("用户 {} 没有可用的角色，无法自动绑定虚拟设备", userId);
+                    log.warn("用户 {} 没有可用的角色，无法自动绑定虚拟设备", userId);
                 }
             } catch (NumberFormatException e) {
-                logger.error("解析虚拟设备ID失败: {}", deviceId, e);
+                log.error("解析虚拟设备ID失败: {}", deviceId, e);
             } catch (Exception e) {
-                logger.error("自动绑定虚拟设备失败: {}", deviceId, e);
+                log.error("自动绑定虚拟设备失败: {}", deviceId, e);
             }
         }
         
@@ -344,7 +343,7 @@ public class MessageHandler {
                 captchaGenerationInProgress.remove(deviceId);
 
             } catch (Exception e) {
-                logger.error("处理未绑定设备失败", e);
+                log.error("处理未绑定设备失败", e);
                 captchaGenerationInProgress.remove(deviceId);
             }
         });
@@ -355,7 +354,7 @@ public class MessageHandler {
 
     private void handleListenMessage(ChatSession chatSession, ListenMessage message) {
         String sessionId = chatSession.getSessionId();
-        logger.info("收到listen消息 - SessionId: {}, State: {}, Mode: {}", sessionId, message.getState(), message.getMode());
+        log.info("收到listen消息 - SessionId: {}, State: {}, Mode: {}", sessionId, message.getState(), message.getMode());
 
         // 如果会话标记为即将关闭，忽略listen消息
         if (chatSession.getPlayer().getFunctionAfterChat()!= null) {
@@ -368,7 +367,7 @@ public class MessageHandler {
         switch (message.getState()) {
             case ListenState.Start:
                 // 设备开始录音，进入聆听状态
-                logger.info("开始监听 - Mode: {}", message.getMode());
+                log.info("开始监听 - Mode: {}", message.getMode());
 
                 chatSession.transitionTo(DeviceState.LISTENING);
 
@@ -380,7 +379,7 @@ public class MessageHandler {
 
             case ListenState.Stop:
                 // 停止监听
-                logger.info("停止监听");
+                log.info("停止监听");
 
                 // 关闭音频流，恢复到 IDLE
                 chatSession.completeAudioStream();
@@ -404,7 +403,7 @@ public class MessageHandler {
                 sessionManager.updateLastActivity(sessionId);
                 personaFactory.buildPersona(chatSession);
                 messageService.sendSttMessage(chatSession, message.getText());
-                logger.info("处理聊天文字输入: \"{}\"", message.getText());
+                log.info("处理聊天文字输入: \"{}\"", message.getText());
                 dialogueService.handleText(chatSession, SttResult.textOnly(message.getText()));
                 break;
 
@@ -415,7 +414,7 @@ public class MessageHandler {
                 break;
 
             default:
-                logger.warn("未知的listen状态: {}", message.getState());
+                log.warn("未知的listen状态: {}", message.getState());
         }
     }
 
@@ -428,14 +427,14 @@ public class MessageHandler {
         String sessionId = chatSession.getSessionId();
         // 处理设备描述信息
         if (message.getDescriptors() != null) {
-            logger.info("收到IoT设备描述信息 - SessionId: {}: {}", sessionId, message.getDescriptors());
+            log.info("收到IoT设备描述信息 - SessionId: {}: {}", sessionId, message.getDescriptors());
             // 处理设备描述信息的逻辑
             iotService.handleDeviceDescriptors(sessionId, message.getDescriptors());
         }
 
         // 处理设备状态更新
         if (message.getStates() != null) {
-            logger.info("收到IoT设备状态更新 - SessionId: {}: {}", sessionId, message.getStates());
+            log.info("收到IoT设备状态更新 - SessionId: {}: {}", sessionId, message.getStates());
             // 处理设备状态更新的逻辑
             iotService.handleDeviceStates(sessionId, message.getStates());
         }

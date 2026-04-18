@@ -9,8 +9,6 @@ import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.utils.OpusProcessor;
 import io.jsonwebtoken.lang.Assert;
 import lombok.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
@@ -19,7 +17,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-
+import lombok.extern.slf4j.Slf4j;
 /**
  *
  * 播放器，负责处理音频播放（下发至终端设备）。
@@ -44,10 +42,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 答：不是所有的Player实现类都需要实现Runnable，也可以通过ExecutorService / ScheduledExecutorService实现，可者聚合多个Player（Composite模式）。
  *
  */
+@Slf4j
 @Data
 public abstract class Player {
-    private static final Logger logger = LoggerFactory.getLogger(Player.class);
-
     // 默认情况下，应当是false的。 随着向设备发送的消息而改变状态。
     private volatile boolean isPlaying = false;
     /**
@@ -111,7 +108,7 @@ public abstract class Player {
      */
     protected void sendOpusFrame( byte[] opusFrame)  {
         messageService.sendBinaryMessage(session, opusFrame);
-        // logger.info("发送Opus帧数据: {}", opusFrame.length);
+        // log.info("发送Opus帧数据: {}", opusFrame.length);
         if (opusRecorder != null) {
             opusRecorder.onSendOpusFrame(opusFrame);
         }
@@ -143,12 +140,11 @@ public abstract class Player {
             }
         } catch (Exception e) {
             // sendStop 有可能是由于连接断掉而触发的，所以只打印异常，不再往外抛。
-            logger.error("发送停止消息失败", e);
+            log.error("发送停止消息失败", e);
         }
     }
 
     abstract public void play(Flux<Speech> speechFlux);
-
 
     public void play(Path audioPath) {
         play("",audioPath);
@@ -158,7 +154,7 @@ public abstract class Player {
 
         File audioFile = audioPath.toFile();
         if (!audioFile.exists()) {
-            logger.error("音频文件不存在: {}", audioPath);
+            log.error("音频文件不存在: {}", audioPath);
             return;
         }
         // 分块读取PCM，避免全量加载进内存
@@ -188,7 +184,7 @@ public abstract class Player {
      */
     public void stop() {
         // 子类（如ScheduledPlayer）会覆盖此方法进行更详细的清理
-        logger.info("已取消音频发送任务 - SessionId: {}", session.getSessionId());
+        log.info("已取消音频发送任务 - SessionId: {}", session.getSessionId());
     }
 
 }

@@ -13,8 +13,6 @@ import com.xiaozhi.ai.llm.tool.XiaozhiToolMetadata;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.role.service.RoleService;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
@@ -26,12 +24,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 通过语音切换角色函数
  */
-@Component
+@Slf4j
+// @Component
 public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
-    private static final Logger logger = LoggerFactory.getLogger(ChangeRoleFunction.class);
     private static final String TOOL_NAME = "change_role";
     @Resource
     private RoleService roleService;
@@ -62,7 +61,6 @@ public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
                                     .filter(role -> role.getRoleName().equals(roleName))
                                     .findFirst();
 
-
                             if(changedRole.isPresent()){
                                 RoleBO role = changedRole.get();
                                 deviceRepository.findById(device.getDeviceId()).ifPresent(d -> {
@@ -83,7 +81,7 @@ public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
                                 return "角色切换失败, 没有对应角色哦";
                             }
                         }catch (Exception e){
-                            logger.error("角色切换异常，role name: {}", roleName, e);
+                            log.error("角色切换异常，role name: {}", roleName, e);
                             return "角色切换异常";
                         }
                     })

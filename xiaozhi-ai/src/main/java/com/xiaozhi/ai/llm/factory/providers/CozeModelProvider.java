@@ -8,19 +8,17 @@ import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.port.ConfigLookup;
 
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Coze模型提供者
  */
+@Slf4j
 @Component
 public class CozeModelProvider implements ChatModelProvider {
-    
-    private static final Logger logger = LoggerFactory.getLogger(CozeModelProvider.class);
     
     @Autowired
     private ConfigLookup configLookup;
@@ -53,7 +51,7 @@ public class CozeModelProvider implements ChatModelProvider {
         
         var chatModel = new CozeChatModel(token, model);
         
-        logger.info("Created Coze ChatModel: model={}", model);
+        log.info("Created Coze ChatModel: model={}", model);
         return chatModel;
     }
 }

@@ -2,8 +2,6 @@ package com.xiaozhi.utils;
 
 import org.gagravarr.ogg.*;
 import org.gagravarr.opus.*;
-import org.slf4j.Logger;
-
 import javazoom.jl.decoder.*;
 
 import java.io.*;
@@ -18,12 +16,14 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class AudioUtils {
     /** 由 {@link com.xiaozhi.common.config.RuntimePathConfig} 在启动时初始化 */
     public static String AUDIO_PATH;
 
     public static final int AUDIO_RETENTION_DAYS = 30;
-    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(AudioUtils.class);
     public static final int FRAME_SIZE = 960;
     public static final int SAMPLE_RATE = 16000; // 采样率
     public static final int CHANNELS = 1; // 单声道
@@ -31,7 +31,6 @@ public class AudioUtils {
     public static final int SAMPLE_FORMAT = 1; // AV_SAMPLE_FMT_S16, 16位PCM
     public static final int BUFFER_SIZE = 512; // 窗口大小
     public static final int OPUS_FRAME_DURATION_MS = 60; // OPUS帧持续时间（毫秒）
-
 
     /**
      * 删除文件（静默处理异常）
@@ -43,7 +42,7 @@ public class AudioUtils {
         try {
             Files.deleteIfExists(Path.of(path));
         } catch (IOException e) {
-            logger.warn("删除文件失败: {}", path, e);
+            log.warn("删除文件失败: {}", path, e);
         }
     }
 
@@ -56,11 +55,11 @@ public class AudioUtils {
                 try {
                     Files.delete(path);
                 } catch (IOException e) {
-                    logger.warn("删除失败: {}", path, e);
+                    log.warn("删除失败: {}", path, e);
                 }
             });
         } catch (IOException e) {
-            logger.warn("删除目录失败: {}", dir, e);
+            log.warn("删除目录失败: {}", dir, e);
         }
     }
 
@@ -113,7 +112,7 @@ public class AudioUtils {
                 dos.write(audioData);
             }
         } catch (IOException e) {
-            logger.error("写入WAV文件时发生错误", e);
+            log.error("写入WAV文件时发生错误", e);
         }
     }
 
@@ -136,7 +135,7 @@ public class AudioUtils {
                 Files.move(sourcePath, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 return;
             } catch (Exception e) {
-                logger.warn("文件移动失败，回退到合并逻辑: {}", e.getMessage());
+                log.warn("文件移动失败，回退到合并逻辑: {}", e.getMessage());
             }
         }
 //        var uuid = UUID.randomUUID().toString().replace("-", "");
@@ -197,7 +196,7 @@ public class AudioUtils {
             // }
 
         } catch (Exception e) {
-            logger.error("合并音频文件时发生错误", e);
+            log.error("合并音频文件时发生错误", e);
         }
     }
 
@@ -564,7 +563,7 @@ public class AudioUtils {
                 return (double) fileSize / (SAMPLE_RATE * CHANNELS * 2);
             }
         } catch (Exception e) {
-            logger.debug("获取音频时长失败: {}", path, e);
+            log.debug("获取音频时长失败: {}", path, e);
         }
         return -1;
     }
@@ -634,7 +633,7 @@ public class AudioUtils {
                 }
             }
         } catch (Exception e) {
-            logger.error("读取Ogg Opus文件失败: {}", file.getAbsolutePath(), e);
+            log.error("读取Ogg Opus文件失败: {}", file.getAbsolutePath(), e);
             return frames;
         }
 
@@ -661,7 +660,7 @@ public class AudioUtils {
                 }
             }
         } catch (Exception e) {
-            logger.error("从输入流读取Ogg Opus失败", e);
+            log.error("从输入流读取Ogg Opus失败", e);
         }
         return frames;
     }

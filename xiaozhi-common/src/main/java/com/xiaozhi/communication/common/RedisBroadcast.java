@@ -8,14 +8,13 @@ import com.xiaozhi.event.DeviceUpdatedEvent;
 import com.xiaozhi.event.RoleUpdatedEvent;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 跨实例消息广播。
  * 通过 Redis Pub/Sub 通知所有实例执行对应操作，支持：
@@ -25,10 +24,9 @@ import java.util.Map;
  *   <li>configChanged：配置变更，清除对应工厂缓存</li>
  * </ul>
  */
+@Slf4j
 @Component
 public class RedisBroadcast {
-
-    private static final Logger logger = LoggerFactory.getLogger(RedisBroadcast.class);
 
     public static final String CHANNEL_CLEAR_CONVERSATION = "xiaozhi:clear-conversation";
     public static final String CHANNEL_ROLE_CHANGED = "xiaozhi:role-changed";
@@ -103,9 +101,9 @@ public class RedisBroadcast {
     private void publish(String channel, String message) {
         try {
             stringRedisTemplate.convertAndSend(channel, message);
-            logger.debug("已广播消息 - channel: {}, message: {}", channel, message);
+            log.debug("已广播消息 - channel: {}, message: {}", channel, message);
         } catch (Exception e) {
-            logger.error("广播消息失败 - channel: {}, message: {}", channel, message, e);
+            log.error("广播消息失败 - channel: {}, message: {}", channel, message, e);
         }
     }
 }

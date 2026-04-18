@@ -3,8 +3,6 @@ package com.xiaozhi.ai.llm.factory.providers;
 import com.xiaozhi.ai.llm.factory.ChatModelProvider;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.model.tool.ToolCallingManager;
@@ -17,13 +15,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Ollama模型提供者
  */
+@Slf4j
 @Component
 public class OllamaModelProvider implements ChatModelProvider {
-    
-    private static final Logger logger = LoggerFactory.getLogger(OllamaModelProvider.class);
     
     @Lazy
     @Autowired
@@ -57,7 +55,7 @@ public class OllamaModelProvider implements ChatModelProvider {
                 .toolCallingManager(toolCallingManager)
                 .build();
         
-        logger.info("Created Ollama ChatModel: model={}, endpoint={}", model, endpoint);
+        log.info("Created Ollama ChatModel: model={}, endpoint={}", model, endpoint);
         return chatModel;
     }
 
@@ -65,7 +63,7 @@ public class OllamaModelProvider implements ChatModelProvider {
     public EmbeddingModel createEmbeddingModel(ConfigBO config) {
         var ollamaApi = OllamaApi.builder().baseUrl(config.getApiUrl()).build();
         var options = OllamaEmbeddingOptions.builder().model(config.getConfigName()).build();
-        logger.info("Created Ollama EmbeddingModel: model={}, endpoint={}", config.getConfigName(), config.getApiUrl());
+        log.info("Created Ollama EmbeddingModel: model={}, endpoint={}", config.getConfigName(), config.getApiUrl());
         return OllamaEmbeddingModel.builder().ollamaApi(ollamaApi).defaultOptions(options).build();
     }
 }

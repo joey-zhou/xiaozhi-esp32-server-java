@@ -7,19 +7,17 @@ import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.port.ConfigLookup;
 
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 星辰(讯飞)模型提供者
  */
+@Slf4j
 @Component
 public class XingChenModelProvider implements ChatModelProvider {
-    
-    private static final Logger logger = LoggerFactory.getLogger(XingChenModelProvider.class);
     
     @Autowired
     private ConfigLookup configLookup;
@@ -50,7 +48,7 @@ public class XingChenModelProvider implements ChatModelProvider {
         
         var chatModel = new XingChenChatModel(endpoint, apiKey, apiSecret);
         
-        logger.info("Created XingChen ChatModel: endpoint={}", endpoint);
+        log.info("Created XingChen ChatModel: endpoint={}", endpoint);
         return chatModel;
     }
 }

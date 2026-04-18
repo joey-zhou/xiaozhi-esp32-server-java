@@ -2,24 +2,22 @@ package com.xiaozhi.common;
 
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.Resource;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 缓存助手类
  * 提供带分布式锁的缓存查询,防止缓存击穿
  *
  * @author Joey
  */
+@Slf4j
 @Component
 public class CacheHelper {
-
-    private static final Logger logger = LoggerFactory.getLogger(CacheHelper.class);
 
     @Resource
     private RedissonClient redissonClient;
@@ -51,12 +49,12 @@ public class CacheHelper {
                     // 3. 双重检查,避免重复查询数据库
                     cached = cacheGetter.get();
                     if (cached != null) {
-                        logger.debug("获取锁后从缓存命中: {}", lockKey);
+                        log.debug("获取锁后从缓存命中: {}", lockKey);
                         return cached;
                     }
 
                     // 4. 查询数据库
-                    logger.debug("从数据库查询: {}", lockKey);
+                    log.debug("从数据库查询: {}", lockKey);
                     T result = dbGetter.get();
 
                     // 5. 结果会通过@Cacheable自动写入缓存
@@ -67,17 +65,17 @@ public class CacheHelper {
                 }
             } else {
                 // 获取锁失败,直接查询数据库(降级策略)
-                logger.warn("获取锁超时,直接查询数据库: {}", lockKey);
+                log.warn("获取锁超时,直接查询数据库: {}", lockKey);
                 return dbGetter.get();
             }
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            logger.error("获取锁被中断: {}", lockKey, e);
+            log.error("获取锁被中断: {}", lockKey, e);
             // 降级: 直接查询数据库
             return dbGetter.get();
         } catch (Exception e) {
-            logger.error("分布式锁异常: {}", lockKey, e);
+            log.error("分布式锁异常: {}", lockKey, e);
             // 降级: 直接查询数据库
             return dbGetter.get();
         }
@@ -102,15 +100,15 @@ public class CacheHelper {
                     lock.unlock();
                 }
             } else {
-                logger.warn("获取锁超时: {}", lockKey);
+                log.warn("获取锁超时: {}", lockKey);
                 return null;
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            logger.error("获取锁被中断: {}", lockKey, e);
+            log.error("获取锁被中断: {}", lockKey, e);
             return null;
         } catch (Exception e) {
-            logger.error("执行带锁操作异常: {}", lockKey, e);
+            log.error("执行带锁操作异常: {}", lockKey, e);
             return null;
         }
     }

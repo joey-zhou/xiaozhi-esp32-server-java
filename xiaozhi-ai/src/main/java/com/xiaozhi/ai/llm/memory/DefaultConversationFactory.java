@@ -23,7 +23,7 @@ public class DefaultConversationFactory implements ConversationFactory {
     @Override
     public Conversation initConversation(String ownerId, Integer userId, RoleBO role, String sessionId) {
         Conversation conversation = switch (role.getMemoryType()) {
-            case "summary" -> summaryConversationFactory.initConversation(device, role, sessionId);
+            case "summary" -> summaryConversationFactory.initConversation(ownerId, userId, role, sessionId);
             case "window" -> MessageWindowConversation.builder().chatMemory(chatMemory)
                     .maxMessages(maxMessages)
                     .ownerId(ownerId)
@@ -44,7 +44,7 @@ public class DefaultConversationFactory implements ConversationFactory {
                     .build();
             }
         };
-
+        
         return conversation;
     }
 }

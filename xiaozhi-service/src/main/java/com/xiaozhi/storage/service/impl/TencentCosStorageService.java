@@ -10,8 +10,6 @@ import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.region.Region;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.storage.service.StorageService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -19,6 +17,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 腾讯云 COS 存储实现。
  * <p>
@@ -31,9 +30,8 @@ import java.nio.file.Path;
  *   <li>apiUrl → 路径前缀（可选，默认 "uploads/"）</li>
  * </ul>
  */
+@Slf4j
 public class TencentCosStorageService implements StorageService {
-
-    private static final Logger logger = LoggerFactory.getLogger(TencentCosStorageService.class);
 
     private final COSClient cosClient;
     private final String bucketName;
@@ -99,7 +97,7 @@ public class TencentCosStorageService implements StorageService {
                 return is.readAllBytes();
             }
         } catch (Exception e) {
-            logger.warn("从 COS 下载失败: {}", storedPath, e);
+            log.warn("从 COS 下载失败: {}", storedPath, e);
             return null;
         }
     }
@@ -111,7 +109,7 @@ public class TencentCosStorageService implements StorageService {
         try {
             cosClient.deleteObject(bucketName, key);
         } catch (Exception e) {
-            logger.warn("从 COS 删除失败: {}", storedPath, e);
+            log.warn("从 COS 删除失败: {}", storedPath, e);
         }
     }
 

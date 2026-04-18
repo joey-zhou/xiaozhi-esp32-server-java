@@ -8,8 +8,6 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
@@ -17,11 +15,12 @@ import jakarta.annotation.PostConstruct;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Component
 public class SttServiceFactory {
 
-    private static final Logger logger = LoggerFactory.getLogger(SttServiceFactory.class);
-    
     @Resource
     private TokenResolver tokenResolver;
 
@@ -45,12 +44,12 @@ public class SttServiceFactory {
      */
     @PostConstruct
     public void initializeDefaultSttService() {
-        logger.info("正在初始化默认语音识别服务(Vosk)...");
+        log.info("正在初始化默认语音识别服务(Vosk)...");
         initializeVosk();
         if (voskInitialized) {
-            logger.info("默认语音识别服务(Vosk)初始化成功，可直接使用");
+            log.info("默认语音识别服务(Vosk)初始化成功，可直接使用");
         } else {
-            logger.warn("默认语音识别服务(Vosk)初始化失败，将在需要时尝试使用备选服务");
+            log.warn("默认语音识别服务(Vosk)初始化失败，将在需要时尝试使用备选服务");
         }
     }
 
@@ -76,11 +75,11 @@ public class SttServiceFactory {
             
             serviceCache.put(DEFAULT_PROVIDER, voskService);
             voskInitialized = true;
-            logger.info("Vosk STT服务初始化成功");
+            log.info("Vosk STT服务初始化成功");
             return voskService;
         } catch (Throwable e) {
             voskInitialized = false;
-            logger.warn("Vosk STT服务初始化失败: {}", e.getMessage());
+            log.warn("Vosk STT服务初始化失败: {}", e.getMessage());
         }
         return null;
     }

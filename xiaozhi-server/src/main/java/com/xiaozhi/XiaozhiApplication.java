@@ -2,8 +2,6 @@ package com.xiaozhi;
 
 import com.xiaozhi.communication.ServerAddressProvider;
 import org.mybatis.spring.annotation.MapperScan;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -13,6 +11,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import lombok.extern.slf4j.Slf4j;
 @SpringBootApplication
 @EnableCaching
 @EnableScheduling
@@ -65,9 +64,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.xiaozhi.user.dal.mysql.mapper",
     "com.xiaozhi.operationlog.dal.mysql.mapper",
 })
+@Slf4j
 public class XiaozhiApplication {
-
-    Logger logger = LoggerFactory.getLogger(XiaozhiApplication.class);
 
     @Autowired
     private ServerAddressProvider serverAddressProvider;
@@ -78,8 +76,8 @@ public class XiaozhiApplication {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onReady() {
-        logger.info("==========================================================");
-        logger.info("OTA服务地址: {}", serverAddressProvider.getOtaAddress());
-        logger.info("==========================================================");
+        log.info("==========================================================");
+        log.info("OTA服务地址: {}", serverAddressProvider.getOtaAddress());
+        log.info("==========================================================");
     }
 }

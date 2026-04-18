@@ -1,21 +1,19 @@
 package com.xiaozhi.utils;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.Resource;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 验证码发送工具类
  * 统一管理邮件和短信验证码发送
  * 
  * @author Joey
  */
+@Slf4j
 @Component
 public class CaptchaUtils {
-    
-    private static final Logger logger = LoggerFactory.getLogger(CaptchaUtils.class);
     
     @Resource
     private EmailUtils emailUtils;
@@ -81,13 +79,13 @@ public class CaptchaUtils {
         try {
             // 验证邮箱格式
             if (!isValidEmail(email)) {
-                logger.warn("邮箱格式不正确: {}", email);
+                log.warn("邮箱格式不正确: {}", email);
                 return CaptchaResult.error("邮箱格式不正确");
             }
             
             // 验证验证码
             if (!isValidCode(code)) {
-                logger.warn("验证码格式不正确: {}", code);
+                log.warn("验证码格式不正确: {}", code);
                 return CaptchaResult.error("验证码格式不正确");
             }
             
@@ -95,15 +93,15 @@ public class CaptchaUtils {
             boolean success = emailUtils.sendCaptchaEmail(email, code);
             
             if (success) {
-                logger.info("邮箱验证码发送成功: {}", email);
+                log.info("邮箱验证码发送成功: {}", email);
                 return CaptchaResult.success();
             } else {
-                logger.error("邮箱验证码发送失败: {}", email);
+                log.error("邮箱验证码发送失败: {}", email);
                 return CaptchaResult.error("邮件发送失败，请检查邮箱配置");
             }
             
         } catch (Exception e) {
-            logger.error("发送邮箱验证码异常: {}", e.getMessage(), e);
+            log.error("发送邮箱验证码异常: {}", e.getMessage(), e);
             return CaptchaResult.error("发送失败，请稍后重试");
         }
     }
@@ -119,13 +117,13 @@ public class CaptchaUtils {
         try {
             // 验证手机号格式
             if (!isValidPhoneNumber(phoneNumber)) {
-                logger.warn("手机号格式不正确: {}", phoneNumber);
+                log.warn("手机号格式不正确: {}", phoneNumber);
                 return CaptchaResult.error("手机号格式不正确");
             }
             
             // 验证验证码
             if (!isValidCode(code)) {
-                logger.warn("验证码格式不正确: {}", code);
+                log.warn("验证码格式不正确: {}", code);
                 return CaptchaResult.error("验证码格式不正确");
             }
             
@@ -133,15 +131,15 @@ public class CaptchaUtils {
             boolean success = smsUtils.sendVerificationCodeSms(phoneNumber, code);
             
             if (success) {
-                logger.info("短信验证码发送成功: {}", phoneNumber);
+                log.info("短信验证码发送成功: {}", phoneNumber);
                 return CaptchaResult.success();
             } else {
-                logger.error("短信验证码发送失败: {}", phoneNumber);
+                log.error("短信验证码发送失败: {}", phoneNumber);
                 return CaptchaResult.error("短信发送失败，请稍后重试");
             }
             
         } catch (Exception e) {
-            logger.error("发送短信验证码异常: {}", e.getMessage(), e);
+            log.error("发送短信验证码异常: {}", e.getMessage(), e);
             return CaptchaResult.error("短信发送失败，请联系管理员");
         }
     }

@@ -4,8 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
 import okio.BufferedSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 
 import java.io.IOException;
@@ -15,8 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 public class OpenAiLlmService {
-    protected final Logger logger = LoggerFactory.getLogger(getClass());
     protected static final ObjectMapper objectMapper = new ObjectMapper();
     protected static final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -44,7 +43,7 @@ public class OpenAiLlmService {
 
     public String chat(String sysMessage, String userMessage, boolean enableThinking) {
         long startTime = System.currentTimeMillis();
-        logger.debug("LLM开始调用，使用的模型是：{}，深度思考参数：{}", getModel(), enableThinking);
+        log.debug("LLM开始调用，使用的模型是：{}，深度思考参数：{}", getModel(), enableThinking);
 
         List<Map<String, Object>> formattedMessages = new ArrayList<>();
         Map<String, Object> systemMsg = new HashMap<>();
@@ -89,7 +88,7 @@ public class OpenAiLlmService {
                     try (ResponseBody responseBody = response.body()) {
                         if (responseBody == null) {
                             String errorMsg = "响应体为空";
-                            logger.error(errorMsg);
+                            log.error(errorMsg);
                             throw new IOException(errorMsg);
                         }
 
@@ -122,7 +121,7 @@ public class OpenAiLlmService {
                                         }
                                     }
                                 } catch (Exception e) {
-                                    logger.error("解析流式响应失败: {}", e.getMessage(), e);
+                                    log.error("解析流式响应失败: {}", e.getMessage(), e);
                                 }
                             }
                         }
@@ -140,9 +139,9 @@ public class OpenAiLlmService {
                 }
             }
         }catch (Exception e){
-            logger.error("调用{}模型发生错误", model, e);
+            log.error("调用{}模型发生错误", model, e);
         }
-        logger.debug("LLM调用耗时: {} ms， 返回内容： {}", System.currentTimeMillis() - startTime, fullResponse);
+        log.debug("LLM调用耗时: {} ms， 返回内容： {}", System.currentTimeMillis() - startTime, fullResponse);
         return !fullResponse.isEmpty() ? fullResponse.toString() : null;
     }
 
@@ -157,7 +156,7 @@ public class OpenAiLlmService {
      */
     public String chatStream(String sysMessage, String userMessage, boolean enableThinking, TokenCallback tokenCallback) {
         long startTime = System.currentTimeMillis();
-        logger.debug("LLM开始流式调用，使用的模型是：{}，深度思考参数：{}", getModel(), enableThinking);
+        log.debug("LLM开始流式调用，使用的模型是：{}，深度思考参数：{}", getModel(), enableThinking);
 
         List<Map<String, Object>> formattedMessages = new ArrayList<>();
         Map<String, Object> systemMsg = new HashMap<>();
@@ -203,7 +202,7 @@ public class OpenAiLlmService {
                 try (ResponseBody responseBody = response.body()) {
                     if (responseBody == null) {
                         String errorMsg = "响应体为空";
-                        logger.error(errorMsg);
+                        log.error(errorMsg);
                         throw new IOException(errorMsg);
                     }
 
@@ -239,7 +238,7 @@ public class OpenAiLlmService {
                                     }
                                 }
                             } catch (Exception e) {
-                                logger.error("解析流式响应失败: {}", e.getMessage(), e);
+                                log.error("解析流式响应失败: {}", e.getMessage(), e);
                                 // 解析失败时不再继续处理后续数据，避免继续调用可能已失效的回调
                                 break;
                             }
@@ -248,10 +247,10 @@ public class OpenAiLlmService {
                 }
             }
         }catch (Exception e){
-            logger.error("调用{}模型发生错误", model, e);
+            log.error("调用{}模型发生错误", model, e);
         }
         
-        logger.debug("LLM流式调用耗时: {} ms， 返回内容： {}", System.currentTimeMillis() - startTime, fullResponse);
+        log.debug("LLM流式调用耗时: {} ms， 返回内容： {}", System.currentTimeMillis() - startTime, fullResponse);
         return !fullResponse.isEmpty() ? fullResponse.toString() : null;
     }
 

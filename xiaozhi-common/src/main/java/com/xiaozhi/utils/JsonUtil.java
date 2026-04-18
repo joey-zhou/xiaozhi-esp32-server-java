@@ -6,13 +6,12 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.text.SimpleDateFormat;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class JsonUtil {
-    private static final Logger logger = LoggerFactory.getLogger(JsonUtil.class);
     public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     public static <T> String toJson(T obj) {
@@ -21,7 +20,7 @@ public class JsonUtil {
         try {
             json = OBJECT_MAPPER.writeValueAsString(obj);
         } catch (Exception e) {
-            logger.error("JsonUtil.toJson error", e);
+            log.error("JsonUtil.toJson error", e);
         }
 
         return json;
@@ -33,7 +32,7 @@ public class JsonUtil {
         try {
             pojo = OBJECT_MAPPER.readValue(json, type);
         } catch (Exception e) {
-            logger.error("JsonUtil.fromJson error", e);
+            log.error("JsonUtil.fromJson error", e);
         }
         return pojo;
     }
@@ -44,7 +43,7 @@ public class JsonUtil {
         try {
             pojo = OBJECT_MAPPER.readValue(json, valueTypeRef);
         } catch (Exception e) {
-            logger.error("JsonUtil.fromJson error", e);
+            log.error("JsonUtil.fromJson error", e);
         }
         return pojo;
     }

@@ -11,8 +11,6 @@ import com.xiaozhi.event.DeviceUpdatedEvent;
 import com.xiaozhi.event.ChatSessionOpenedEvent;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Lazy;
@@ -29,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 会话注册表，负责管理所有连接的会话状态。
  * 核心职责：register / get / remove / close，以及设备注册与验证码状态管理。
@@ -36,10 +35,9 @@ import java.util.concurrent.TimeUnit;
  * 不活跃会话检查已拆分至 {@link InactiveSessionChecker}。
  * 音频流管理已迁移至 {@link ChatSession} 实例方法。
  */
+@Slf4j
 @Service
 public class SessionManager {
-    private static final Logger logger = LoggerFactory.getLogger(SessionManager.class);
-
     private final ConcurrentHashMap<String, ChatSession> sessions = new ConcurrentHashMap<>();
 
     /** deviceId → sessionId 反向索引，O(1) 查找设备所在会话 */
@@ -79,15 +77,15 @@ public class SessionManager {
                     Set<String> ownDeviceIds = deviceRegistry.getOwnDeviceIds();
                     if (!ownDeviceIds.isEmpty()) {
                         int updated = deviceRepository.batchUpdateState(ownDeviceIds, DeviceBO.DEVICE_STATE_OFFLINE);
-                        logger.info("项目启动，重置本实例 {} 个设备状态为离线", updated);
+                        log.info("项目启动，重置本实例 {} 个设备状态为离线", updated);
                         // 清理本实例旧的 Redis 映射
                         for (String deviceId : ownDeviceIds) {
                             deviceRegistry.unbind(deviceId);
                         }
                     }
-                    logger.info("项目启动，instanceId: {}", instanceIdHolder.getInstanceId());
+                    log.info("项目启动，instanceId: {}", instanceIdHolder.getInstanceId());
                 } catch (Exception e) {
-                    logger.error("项目启动时重置设备状态失败", e);
+                    log.error("项目启动时重置设备状态失败", e);
                 }
             }, 1, TimeUnit.SECONDS);
         }
@@ -142,7 +140,7 @@ public class SessionManager {
 
     public void registerSession(String sessionId, ChatSession chatSession) {
         sessions.put(sessionId, chatSession);
-        logger.info("会话已注册 - SessionId: {}  SessionType: {}", sessionId, chatSession.getClass().getSimpleName());
+        log.info("会话已注册 - SessionId: {}  SessionType: {}", sessionId, chatSession.getClass().getSimpleName());
         String deviceId = chatSession.getDevice() != null ? chatSession.getDevice().getDeviceId() : null;
         applicationContext.publishEvent(new ChatSessionOpenedEvent(this, sessionId, deviceId));
     }
@@ -203,11 +201,11 @@ public class SessionManager {
                 chatSession.close();
                 String closeDeviceId = chatSession.getDevice() != null ? chatSession.getDevice().getDeviceId() : null;
                 applicationContext.publishEvent(new ChatSessionClosedEvent(this, chatSession.getSessionId(), closeDeviceId));
-                logger.info("会话已关闭 - SessionId: {} SessionType: {}", chatSession.getSessionId(), chatSession.getClass().getSimpleName());
+                log.info("会话已关闭 - SessionId: {} SessionType: {}", chatSession.getSessionId(), chatSession.getClass().getSimpleName());
             }
             chatSession.clearAudioSinks();
         } catch (Exception e) {
-            logger.error("清理会话资源时发生错误 - SessionId: {}",
+            log.error("清理会话资源时发生错误 - SessionId: {}",
                     chatSession.getSessionId(), e);
         }
     }
@@ -216,7 +214,7 @@ public class SessionManager {
 
     public void registerDevice(String sessionId, DeviceBO device) {
         if (device == null || device.getDeviceId() == null) {
-            logger.warn("注册设备失败: device 或 deviceId 为 null, sessionId={}", sessionId);
+            log.warn("注册设备失败: device 或 deviceId 为 null, sessionId={}", sessionId);
             return;
         }
         ChatSession chatSession = sessions.get(sessionId);
@@ -225,7 +223,7 @@ public class SessionManager {
             deviceIdToSessionId.put(device.getDeviceId(), sessionId);
             updateLastActivity(sessionId);
             deviceRegistry.bind(device.getDeviceId());
-            logger.debug("设备配置已注册 - SessionId: {}, DeviceId: {}", sessionId, device.getDeviceId());
+            log.debug("设备配置已注册 - SessionId: {}, DeviceId: {}", sessionId, device.getDeviceId());
             applicationContext.publishEvent(new DeviceOnlineEvent(this, device.getDeviceId()));
         }
     }

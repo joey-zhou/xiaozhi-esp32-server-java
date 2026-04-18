@@ -23,8 +23,6 @@ import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.utils.CmsUtils;
 import com.xiaozhi.utils.CommonUtils;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +33,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 设备领域应用服务。
  * <p>
@@ -45,10 +44,9 @@ import java.util.Objects;
  *   <li>副作用协调（Redis 广播设备会话变更、角色切换）</li>
  * </ul>
  */
+@Slf4j
 @Service
 public class DeviceAppService {
-
-    private static final Logger logger = LoggerFactory.getLogger(DeviceAppService.class);
 
     @Resource
     private DeviceService deviceService;
@@ -245,7 +243,7 @@ public class DeviceAppService {
             try {
                 selectedServer = dialogueServerRegistry.selectServer();
             } catch (RuntimeException e) {
-                logger.warn("选择对话服务器失败，回退默认地址, deviceId={}", deviceId, e);
+                log.warn("选择对话服务器失败，回退默认地址, deviceId={}", deviceId, e);
             }
             String websocketAddress = selectedServer != null ? selectedServer.getWebsocketAddress() : serverAddressProvider.getWebsocketAddress();
 
@@ -267,7 +265,7 @@ public class DeviceAppService {
             try {
                 sync(syncData);
             } catch (RuntimeException e) {
-                logger.warn("同步设备信息失败，不影响OTA返回, deviceId={}", deviceId, e);
+                log.warn("同步设备信息失败，不影响OTA返回, deviceId={}", deviceId, e);
             }
         }
 
@@ -287,7 +285,7 @@ public class DeviceAppService {
         if (device == null) {
             return false;
         }
-        logger.info("OTA激活结果查询成功, deviceId: {} 激活时间: {}", deviceId, device.getCreateTime());
+        log.info("OTA激活结果查询成功, deviceId: {} 激活时间: {}", deviceId, device.getCreateTime());
         return true;
     }
 }

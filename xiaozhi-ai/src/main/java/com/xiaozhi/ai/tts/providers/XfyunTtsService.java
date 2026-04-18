@@ -4,12 +4,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.XiaozhiTtsOptions;
@@ -20,12 +17,13 @@ import cn.xfyun.model.response.TtsResponse;
 import cn.xfyun.service.tts.AbstractTtsWebSocketListener;
 import okhttp3.Response;
 import okhttp3.WebSocket;
+
+import lombok.extern.slf4j.Slf4j;
 /**
  * 讯飞语音合成服务
  */
+@Slf4j
 public class XfyunTtsService implements TtsService {
-    private static final Logger logger = LoggerFactory.getLogger(XfyunTtsService.class);
-
     private static final String PROVIDER_NAME = "xfyun";
     // 识别超时时间（60秒）
     private static final long RECOGNITION_TIMEOUT_MS = 60000;
@@ -70,7 +68,7 @@ public class XfyunTtsService implements TtsService {
     @Override
     public Path textToSpeech(String text) throws Exception {
         if (text == null || text.isEmpty()) {
-            logger.warn("文本内容为空！");
+            log.warn("文本内容为空！");
             return null;
         }
 
@@ -92,16 +90,16 @@ public class XfyunTtsService implements TtsService {
             } catch (Exception e) {
                 attempts++;
                 if (attempts < MAX_RETRY_ATTEMPTS) {
-                    logger.warn("讯飞语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
+                    log.warn("讯飞语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
                     try {
                         Thread.sleep(RETRY_DELAY_MS);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        logger.error("重试等待被中断", ie);
+                        log.error("重试等待被中断", ie);
                         throw e;
                     }
                 } else {
-                    logger.error("讯飞语音合成失败，已达到最大重试次数", e);
+                    log.error("讯飞语音合成失败，已达到最大重试次数", e);
                     throw e;
                 }
             }
@@ -159,7 +157,7 @@ public class XfyunTtsService implements TtsService {
                                 outputStream.close();
                                 outputStream = null;  // 标记已关闭
                             } catch (IOException e) {
-                                logger.error("关闭 xfyun 语音合成文件流失败", e);
+                                log.error("关闭 xfyun 语音合成文件流失败", e);
                                 throw new RuntimeException("文件关闭失败", e);
                             }
                         }
@@ -170,7 +168,7 @@ public class XfyunTtsService implements TtsService {
                         }
                         
                     } catch (Exception e) {
-                        logger.error("写入音频文件失败", e);
+                        log.error("写入音频文件失败", e);
                         throw new RuntimeException(e);
                     } finally {
                         // 最后确保countDown被调用
@@ -181,26 +179,26 @@ public class XfyunTtsService implements TtsService {
                 //授权失败通过throwable.getMessage()获取对应错误信息
                 @Override
                 public void onFail(WebSocket webSocket, Throwable throwable, Response response) {
-                    logger.error("xfyun tts fail，原因：{}", throwable.getMessage());
+                    log.error("xfyun tts fail，原因：{}", throwable.getMessage());
                     recognitionLatch.countDown();
                 }
 
                 //业务失败通过ttsResponse获取错误码和错误信息
                 @Override
                 public void onBusinessFail(WebSocket webSocket, TtsResponse ttsResponse) {
-                    logger.error(ttsResponse.toString());
+                    log.error(ttsResponse.toString());
                     recognitionLatch.countDown();
                 }
             });
         } catch (Exception e) {
-            logger.error("发送TTS请求时发生错误", e);
+            log.error("发送TTS请求时发生错误", e);
             recognitionLatch.countDown();
             throw new Exception("发送TTS请求失败", e);
         }
         // 等待语音合成完成或超时
         boolean recognized = recognitionLatch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         if (!recognized) {
-            logger.warn("讯飞云语音合成超时");
+            log.warn("讯飞云语音合成超时");
         }
         return true;
     }

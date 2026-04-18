@@ -2,8 +2,6 @@ package com.xiaozhi.server.web;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.utils.RequestContextUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -11,13 +9,14 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 系统日志拦截器
  */
+@Slf4j
 @Component
 public class LogInterceptor implements HandlerInterceptor {
 
-    private static final Logger logger = LoggerFactory.getLogger(LogInterceptor.class);
     private static final String START_TIME_ATTRIBUTE = LogInterceptor.class.getName() + ".startTime";
     private static final String HANDLER_ATTRIBUTE = LogInterceptor.class.getName() + ".handler";
 
@@ -53,7 +52,7 @@ public class LogInterceptor implements HandlerInterceptor {
         String clientIp = RequestContextUtils.getClientIp(request);
 
         if (ex != null || response.getStatus() >= 500) {
-            logger.error(
+            log.error(
                 "HTTP {} {} -> status={} cost={}ms ip={} userId={} handler={}",
                 request.getMethod(),
                 requestPath,
@@ -68,7 +67,7 @@ public class LogInterceptor implements HandlerInterceptor {
         }
 
         if (response.getStatus() >= 400) {
-            logger.warn(
+            log.warn(
                 "HTTP {} {} -> status={} cost={}ms ip={} userId={} handler={}",
                 request.getMethod(),
                 requestPath,
@@ -81,7 +80,7 @@ public class LogInterceptor implements HandlerInterceptor {
             return;
         }
 
-        /* logger.debug(
+        /* log.debug(
             "HTTP {} {} -> status={} cost={}ms ip={} userId={} handler={}",
             request.getMethod(),
             requestPath,

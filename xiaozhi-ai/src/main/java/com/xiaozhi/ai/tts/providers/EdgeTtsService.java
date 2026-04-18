@@ -7,15 +7,13 @@ import io.github.whitemagic2014.tts.bean.Voice;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.XiaozhiTtsOptions;
 
-public class EdgeTtsService implements TtsService {
-    private static final Logger logger = LoggerFactory.getLogger(EdgeTtsService.class);
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
+public class EdgeTtsService implements TtsService {
     private static final String PROVIDER_NAME = "edge";
 
     private final XiaozhiTtsOptions options;

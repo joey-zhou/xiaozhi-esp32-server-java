@@ -4,8 +4,6 @@ import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tool.session.ToolSession;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.annotation.Tool;
@@ -15,9 +13,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 // @Component
 public class PlayListGetter implements ToolsGlobalRegistry.GlobalFunction {
-    private static final Logger logger = LoggerFactory.getLogger(PlayListGetter.class);
     public static final String TOOL_NAME = "get_playlist";
 
     @Resource

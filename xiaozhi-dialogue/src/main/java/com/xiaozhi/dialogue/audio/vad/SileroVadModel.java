@@ -5,8 +5,6 @@ import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import ai.onnxruntime.OrtLoggingLevel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,12 +15,13 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Silero VAD模型实现
  */
+@Slf4j
 @Component
 public class SileroVadModel implements VadModel {
-    private static final Logger logger = LoggerFactory.getLogger(SileroVadModel.class);
     public static final int CONTEXT_SIZE = 64;
 
     @Value("${xiaozhi.vad.model.path:models/silero_vad.onnx}")
@@ -47,13 +46,13 @@ public class SileroVadModel implements VadModel {
                 session = env.createSession(modelPath, opts);
             }
 
-            logger.info("Silero VAD模型初始化成功, windowSize={}, contextSize={}, effectiveWindowSize={}", windowSize, CONTEXT_SIZE, effectiveWindowSize);
+            log.info("Silero VAD模型初始化成功, windowSize={}, contextSize={}, effectiveWindowSize={}", windowSize, CONTEXT_SIZE, effectiveWindowSize);
         } catch (UnsatisfiedLinkError e) {
-            logger.error("ONNX Runtime native libraries加载失败，请安装Visual C++ Redistributable: {}", e.getMessage());
-            logger.error("下载地址: https://aka.ms/vs/17/release/vc_redist.x64.exe");
+            log.error("ONNX Runtime native libraries加载失败，请安装Visual C++ Redistributable: {}", e.getMessage());
+            log.error("下载地址: https://aka.ms/vs/17/release/vc_redist.x64.exe");
             throw new RuntimeException("ONNX Runtime native libraries加载失败，请安装Visual C++ Redistributable", e);
         } catch (OrtException e) {
-            logger.error("Silero VAD模型初始化失败", e);
+            log.error("Silero VAD模型初始化失败", e);
             throw new RuntimeException("VAD模型初始化失败", e);
         }
     }
@@ -94,7 +93,7 @@ public class SileroVadModel implements VadModel {
                 srTensor.close();
             }
         } catch (OrtException e) {
-            logger.error("VAD模型推理失败", e);
+            log.error("VAD模型推理失败", e);
             return new InferenceResult(0.0f, prevState);
         }
     }
@@ -116,9 +115,9 @@ public class SileroVadModel implements VadModel {
             if (session != null) {
                 session.close();
             }
-            logger.info("Silero VAD模型资源已释放");
+            log.info("Silero VAD模型资源已释放");
         } catch (OrtException e) {
-            logger.error("关闭VAD模型失败", e);
+            log.error("关闭VAD模型失败", e);
         }
     }
 }

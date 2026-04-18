@@ -15,8 +15,6 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.utils.AudioUtils;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import java.nio.ByteBuffer;
@@ -27,8 +25,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class AliyunSttService implements SttService {
-    private static final Logger logger = LoggerFactory.getLogger(AliyunSttService.class);
     private static final String PROVIDER_NAME = "aliyun";
 
     private final String apiKey;
@@ -57,12 +57,12 @@ public class AliyunSttService implements SttService {
                 if (!model.toLowerCase().contains("paraformer")
                         && !model.toLowerCase().contains("fun-asr")) {
                     actualModel = "paraformer-realtime-8k-v2";
-                    logger.info("未识别的模型类型: {}，使用默认模型: {}", model, actualModel);
+                    log.info("未识别的模型类型: {}，使用默认模型: {}", model, actualModel);
                 }
                 return streamRecognitionParaformer(audioSink, actualModel);
             }
         } catch (Exception e) {
-            logger.error("使用{}模型语音识别失败：", model, e);
+            log.error("使用{}模型语音识别失败：", model, e);
             return SttResult.textOnly("");
         }
     }
@@ -98,13 +98,13 @@ public class AliyunSttService implements SttService {
                                         String emoTag = result.getSentence().getEmoTag();
                                         Double emoConfidence = result.getSentence().getEmoConfidence();
                                         SttResult sttResult = SttResult.withEmotion(text, emoTag, emoConfidence);
-                                        logger.info("语音识别结果({}): {} [情感: {}, 置信度: {}]",
+                                        log.info("语音识别结果({}): {} [情感: {}, 置信度: {}]",
                                                 modelName, text, emoTag, emoConfidence);
                                         sink.next(sttResult);
                                     }
                                 },
                                 error -> {
-                                    logger.error("流式识别过程中发生错误({})", modelName, error);
+                                    log.error("流式识别过程中发生错误({})", modelName, error);
                                     // 使用complete而非error，保留已识别的部分结果
                                     sink.complete();
                                 },
@@ -112,7 +112,7 @@ public class AliyunSttService implements SttService {
                         );
             } catch (Exception e) {
                 sink.error(e);
-                logger.info("使用{}模型语音识别失败：", modelName, e);
+                log.info("使用{}模型语音识别失败：", modelName, e);
             }
         });
 
@@ -185,14 +185,14 @@ public class AliyunSttService implements SttService {
                             if (recognizerResult.getTranscriptionResult() != null) {
                                 if (recognizerResult.isSentenceEnd()) {
                                     String text = recognizerResult.getTranscriptionResult().getText();
-                                    logger.info("语音识别结果({}): {}", model, text);
+                                    log.info("语音识别结果({}): {}", model, text);
                                     synchronized (result) {
                                         result.append(text);
                                     }
                                 }
                             }
                         } catch (Exception e) {
-                            logger.error("处理识别结果时发生错误", e);
+                            log.error("处理识别结果时发生错误", e);
                         }
                     }
 
@@ -203,7 +203,7 @@ public class AliyunSttService implements SttService {
 
                     @Override
                     public void onError(Exception e) {
-                        logger.error("语音识别错误({}): {}", model, e.getMessage(), e);
+                        log.error("语音识别错误({}): {}", model, e.getMessage(), e);
                         hasError.set(true);
                         latch.countDown();
                     }
@@ -223,11 +223,11 @@ public class AliyunSttService implements SttService {
                             ByteBuffer buffer = ByteBuffer.wrap(audioChunk);
                             translator.sendAudioFrame(buffer);
                         } catch (Exception e) {
-                            logger.error("发送音频数据时发生错误", e);
+                            log.error("发送音频数据时发生错误", e);
                         }
                     },
                     error -> {
-                        logger.error("音频流错误", error);
+                        log.error("音频流错误", error);
                         translator.stop();
                         latch.countDown();
                     },
@@ -240,18 +240,18 @@ public class AliyunSttService implements SttService {
             boolean completed = latch.await(90, TimeUnit.SECONDS);
 
             if (!completed) {
-                logger.warn("语音识别超时({})", model);
+                log.warn("语音识别超时({})", model);
             }
 
         } catch (Exception e) {
-            logger.error("流式识别过程中发生错误({})", model, e);
+            log.error("流式识别过程中发生错误({})", model, e);
             hasError.set(true);
         } finally {
             // 关闭 websocket 连接
             try {
                 translator.getDuplexApi().close(1000, "bye");
             } catch (Exception e) {
-                logger.error("关闭连接时发生错误", e);
+                log.error("关闭连接时发生错误", e);
             }
         }
 
@@ -292,7 +292,7 @@ public class AliyunSttService implements SttService {
                             break;
                         case "conversation.item.input_audio_transcription.completed":
                             String transcript = message.get("transcript").getAsString();
-                            logger.info("语音识别结果({}): {}", model, transcript);
+                            log.info("语音识别结果({}): {}", model, transcript);
                             synchronized (result) {
                                 result.append(transcript);
                             }
@@ -301,7 +301,7 @@ public class AliyunSttService implements SttService {
                                 try {
                                     conversationRef.get().close(1000, "transcription_completed");
                                 } catch (Exception e) {
-                                    logger.error("关闭连接时发生错误", e);
+                                    log.error("关闭连接时发生错误", e);
                                     // 如果关闭失败，手动触发完成
                                     if (isCompleted.compareAndSet(false, true)) {
                                         latch.countDown();
@@ -325,7 +325,7 @@ public class AliyunSttService implements SttService {
 
                 @Override
                 public void onClose(int code, String reason) {
-                    logger.info("Qwen 语音识别连接关闭 - code: {}, reason: {}", code, reason);
+                    log.info("Qwen 语音识别连接关闭 - code: {}, reason: {}", code, reason);
                     if (isCompleted.compareAndSet(false, true)) {
                         latch.countDown();
                     }
@@ -338,7 +338,7 @@ public class AliyunSttService implements SttService {
             try {
                 conversation.connect();
             } catch (NoApiKeyException e) {
-                logger.error("API Key 无效", e);
+                log.error("API Key 无效", e);
                 hasError.set(true);
                 return SttResult.textOnly("");
             }
@@ -364,11 +364,11 @@ public class AliyunSttService implements SttService {
                             String audioB64 = Base64.getEncoder().encodeToString(audioChunk);
                             conversation.appendAudio(audioB64);
                         } catch (Exception e) {
-                            logger.error("发送音频数据时发生错误", e);
+                            log.error("发送音频数据时发生错误", e);
                         }
                     },
                     error -> {
-                        logger.error("音频流错误", error);
+                        log.error("音频流错误", error);
                         conversation.close(1000, "error");
                         if (isCompleted.compareAndSet(false, true)) {
                             latch.countDown();
@@ -388,16 +388,16 @@ public class AliyunSttService implements SttService {
             boolean completed = latch.await(90, TimeUnit.SECONDS);
 
             if (!completed) {
-                logger.warn("语音识别超时({})", model);
+                log.warn("语音识别超时({})", model);
                 // 超时情况下主动关闭连接
                 try {
                     conversation.close(1000, "timeout");
                 } catch (Exception e) {
-                    logger.error("关闭连接时发生错误", e);
+                    log.error("关闭连接时发生错误", e);
                 }
             }
         } catch (Exception e) {
-            logger.error("流式识别过程中发生错误({})", model, e);
+            log.error("流式识别过程中发生错误({})", model, e);
             hasError.set(true);
             // 发生异常时尝试关闭连接
             try {
@@ -405,7 +405,7 @@ public class AliyunSttService implements SttService {
                     conversationRef.get().close(1000, "error");
                 }
             } catch (Exception ex) {
-                logger.error("关闭连接时发生错误", ex);
+                log.error("关闭连接时发生错误", ex);
             }
         }
 

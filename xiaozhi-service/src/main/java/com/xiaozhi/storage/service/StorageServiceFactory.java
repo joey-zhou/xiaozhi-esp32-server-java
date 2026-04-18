@@ -7,10 +7,9 @@ import com.xiaozhi.storage.service.impl.LocalStorageService;
 import com.xiaozhi.storage.service.impl.TencentCosStorageService;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 存储服务工厂。
  * 从 sys_config（configType="oss"）读取默认 OSS 配置，按 provider 创建对应实现。
@@ -18,10 +17,9 @@ import org.springframework.stereotype.Component;
  * <p>
  * 云端客户端会被缓存复用（COS/OSS SDK 客户端均线程安全），当 provider 配置变更时自动重建。
  */
+@Slf4j
 @Component
 public class StorageServiceFactory {
-
-    private static final Logger logger = LoggerFactory.getLogger(StorageServiceFactory.class);
 
     @Resource
     private ConfigService configService;
@@ -55,11 +53,11 @@ public class StorageServiceFactory {
                 shutdownCached();
                 cachedCloudService = createStorageService(ossConfig);
                 cachedProvider = provider;
-                logger.info("存储服务已切换到: {}", provider);
+                log.info("存储服务已切换到: {}", provider);
                 return cachedCloudService;
             }
         } catch (Exception e) {
-            logger.warn("获取 OSS 配置失败，使用本地存储: {}", e.getMessage());
+            log.warn("获取 OSS 配置失败，使用本地存储: {}", e.getMessage());
             return localStorageService;
         }
     }
@@ -72,7 +70,7 @@ public class StorageServiceFactory {
             case "tencent" -> new TencentCosStorageService(config);
             case "aliyun" -> new AliyunOssStorageService(config);
             default -> {
-                logger.warn("未知的存储 provider: {}，使用本地存储", config.getProvider());
+                log.warn("未知的存储 provider: {}，使用本地存储", config.getProvider());
                 yield localStorageService;
             }
         };

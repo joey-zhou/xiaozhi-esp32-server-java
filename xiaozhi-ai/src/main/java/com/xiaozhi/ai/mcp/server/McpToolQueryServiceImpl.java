@@ -7,10 +7,12 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * MCP 工具查询服务实现。
  * 委托 ToolsGlobalRegistry 获取全局工具元数据。
  */
+@Slf4j
 @Service
 public class McpToolQueryServiceImpl implements McpToolQueryService {
 

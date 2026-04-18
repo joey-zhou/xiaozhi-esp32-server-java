@@ -21,10 +21,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class DifyChatModel implements ChatModel {
     private DifyChatClient chatClient;
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DifyChatModel.class);
-
     /**
      * 构造函数
      *
@@ -51,16 +52,16 @@ public class DifyChatModel implements ChatModel {
         try {
             // 发送消息并获取响应
             ChatMessageResponse response = chatClient.sendChatMessage(message);
-            logger.debug("回复: {}", response.getAnswer());
-            logger.debug("会话ID: {}", response.getConversationId());
-            logger.debug("消息ID: {}", response.getMessageId());
+            log.debug("回复: {}", response.getAnswer());
+            log.debug("会话ID: {}", response.getConversationId());
+            log.debug("消息ID: {}", response.getMessageId());
             return new ChatResponse(List.of(new Generation(AssistantMessage.builder()
                     .content(response.getAnswer())
                     .properties(Map.of("messageId", response.getMessageId(), "conversationId", response.getConversationId()))
                     .build())));
 
         } catch (IOException e) {
-            logger.error("错误: ", e);
+            log.error("错误: ", e);
             return ChatResponse.builder().generations(Collections.emptyList()).build();
         }
 
@@ -103,7 +104,6 @@ public class DifyChatModel implements ChatModel {
                                 .build());
                     }
 
-
                     @Override
                     public void onMessageEnd(MessageEndEvent event) {
                         // 通知完成
@@ -117,7 +117,7 @@ public class DifyChatModel implements ChatModel {
 
                     @Override
                     public void onException(Throwable throwable) {
-                        logger.error("异常: {}", throwable.getMessage());
+                        log.error("异常: {}", throwable.getMessage());
                         sink.error(throwable);
                     }
 

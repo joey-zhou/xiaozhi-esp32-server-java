@@ -12,16 +12,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.token.TokenCache;
 import com.xiaozhi.utils.JsonUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Component
 public class AliyunTokenProvider implements TokenProvider {
-
-    private static final Logger logger = LoggerFactory.getLogger(AliyunTokenProvider.class);
 
     private static final List<String> SUPPORTED_PROVIDERS = List.of("aliyun", "aliyun-nls");
 
@@ -62,7 +61,7 @@ public class AliyunTokenProvider implements TokenProvider {
             }
             return new TokenCache(token, expireTimeSeconds * 1000L);
         } catch (ClientException e) {
-            logger.error("调用阿里云API失败: {}", e.getMessage(), e);
+            log.error("调用阿里云API失败: {}", e.getMessage(), e);
             throw new IllegalStateException("调用阿里云API失败: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new IllegalStateException("获取阿里云Token失败: " + e.getMessage(), e);

@@ -5,15 +5,14 @@ import com.xiaozhi.operationlog.convert.OperationLogConvert;
 import com.xiaozhi.operationlog.dal.mysql.mapper.OperationLogMapper;
 import com.xiaozhi.operationlog.service.OperationLogService;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class OperationLogServiceImpl implements OperationLogService {
-
-    private static final Logger logger = LoggerFactory.getLogger(OperationLogServiceImpl.class);
 
     @Resource
     private OperationLogMapper operationLogMapper;
@@ -23,11 +22,11 @@ public class OperationLogServiceImpl implements OperationLogService {
 
     @Override
     @Async
-    public void saveAsync(OperationLogBO log) {
+    public void saveAsync(OperationLogBO operationLog) {
         try {
-            operationLogMapper.insert(operationLogConvert.toDO(log));
+            operationLogMapper.insert(operationLogConvert.toDO(operationLog));
         } catch (Exception e) {
-            logger.error("保存操作日志失败: module={} operation={}", log.getModule(), log.getOperation(), e);
+            log.error("保存操作日志失败: module={} operation={}", operationLog.getModule(), operationLog.getOperation(), e);
         }
     }
 }

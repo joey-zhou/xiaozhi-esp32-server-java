@@ -9,24 +9,22 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 视觉对话（MCP 识图接口）
  * 由设备 MCP 客户端调用，Bearer token 为 sessionId。
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/vl")
 @Tag(name = "视觉对话管理", description = "视觉对话相关操作")
 public class VLChatController {
-
-    private static final Logger logger = LoggerFactory.getLogger(VLChatController.class);
 
     @Resource
     private VisionService visionService;
@@ -63,10 +61,10 @@ public class VLChatController {
             String result = visionService.recognize(file, question);
             return success(result);
         } catch (IllegalArgumentException | IllegalStateException e) {
-            logger.warn("视觉对话请求失败, sessionId={}, error={}", sessionId, e.getMessage());
+            log.warn("视觉对话请求失败, sessionId={}, error={}", sessionId, e.getMessage());
             return failure(e.getMessage());
         } catch (RuntimeException e) {
-            logger.error("视觉对话处理失败, sessionId={}", sessionId, e);
+            log.error("视觉对话处理失败, sessionId={}", sessionId, e);
             return failure("视觉对话处理失败，请稍后重试");
         }
     }

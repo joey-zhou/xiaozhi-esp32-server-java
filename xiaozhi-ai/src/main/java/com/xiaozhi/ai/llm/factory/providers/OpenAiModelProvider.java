@@ -4,8 +4,6 @@ import com.xiaozhi.ai.llm.factory.ChatModelProvider;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import io.micrometer.observation.ObservationRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -31,15 +29,15 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.net.http.HttpClient;
 import java.time.Duration;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * OpenAI及兼容OpenAI协议的模型提供者
  * 支持: OpenAI, Azure OpenAI, 各种兼容OpenAI的本地模型等
  */
+@Slf4j
 @Component
 public class OpenAiModelProvider implements ChatModelProvider {
     
-    private static final Logger logger = LoggerFactory.getLogger(OpenAiModelProvider.class);
-
     @Lazy
     @Autowired
     private ToolCallingManager toolCallingManager;
@@ -94,7 +92,7 @@ public class OpenAiModelProvider implements ChatModelProvider {
                 .observationRegistry(observationRegistry)
                 .build();
         
-        logger.info("Created OpenAI ChatModel: model={}, endpoint={}", model, endpoint);
+        log.info("Created OpenAI ChatModel: model={}, endpoint={}", model, endpoint);
         return chatModel;
     }
 
@@ -117,7 +115,7 @@ public class OpenAiModelProvider implements ChatModelProvider {
                         .requestFactory(createRequestFactory()))
                 .build();
         var options = OpenAiEmbeddingOptions.builder().model(config.getConfigName()).build();
-        logger.debug("创建 OpenAI EmbeddingModel: model={}, endpoint={}", config.getConfigName(), config.getApiUrl());
+        log.debug("创建 OpenAI EmbeddingModel: model={}, endpoint={}", config.getConfigName(), config.getApiUrl());
         return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED, options);
     }
 

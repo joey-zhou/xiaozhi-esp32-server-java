@@ -18,8 +18,6 @@ import com.xiaozhi.event.SpeechRecognizedEvent;
 
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -32,6 +30,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.*;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 对话处理服务
  * 负责处理语音识别和对话生成的业务逻辑
@@ -42,9 +41,9 @@ import java.util.*;
  * 4. 对话中止（abort）
  * 5. 监控数据记录
  */
+@Slf4j
 @Service
 public class DialogueService{
-    private static final Logger logger = LoggerFactory.getLogger(DialogueService.class);
     private static final String ABORT_REASON_VAD = "检测到vad";
 
     @Resource
@@ -67,7 +66,6 @@ public class DialogueService{
 
     @Resource
     private StorageServiceFactory storageServiceFactory;
-
 
     @org.springframework.context.event.EventListener
     public void onApplicationEvent(ChatAbortedEvent event) {
@@ -139,7 +137,7 @@ public class DialogueService{
                     break;
             }
         } catch (Exception e) {
-            logger.error("处理音频数据失败: {}", e.getMessage(), e);
+            log.error("处理音频数据失败: {}", e.getMessage(), e);
         }
     }
 
@@ -197,7 +195,7 @@ public class DialogueService{
                 handleText(session, sttResult);
 
             } catch (Exception e) {
-                logger.error("流式识别错误: {}", e.getMessage(), e);
+                log.error("流式识别错误: {}", e.getMessage(), e);
             }
         });
     }
@@ -206,7 +204,7 @@ public class DialogueService{
      * 处理语音唤醒
      */
     public void handleWakeWord(ChatSession session, String text) {
-        logger.info("检测到唤醒词: {}", text);
+        log.info("检测到唤醒词: {}", text);
         try {
             // 设置为 SPEAKING 状态，在唤醒响应期间忽略 VAD 检测
             session.transitionTo(DeviceState.SPEAKING);
@@ -218,7 +216,7 @@ public class DialogueService{
 
             personaFactory.buildPersona(session).chat(text, false);
         } catch (Exception e) {
-            logger.error("处理唤醒词失败: {}", e.getMessage(), e);
+            log.error("处理唤醒词失败: {}", e.getMessage(), e);
         }
     }
 
@@ -238,7 +236,7 @@ public class DialogueService{
             String llmText = sttResult.hasEmotion()
                     ? "[" + sttResult.emotion() + "]" + text : text;
             if (sttResult.hasEmotion()) {
-                logger.info("检测到用户情感: {} (置信度: {}, 强度: {})",
+                log.info("检测到用户情感: {} (置信度: {}, 强度: {})",
                         sttResult.emotion(), sttResult.emotionScore(), sttResult.emotionDegree());
             }
 
@@ -252,14 +250,13 @@ public class DialogueService{
             try {
                 persona.chat(llmText, true);
             } catch (Exception e) {
-                logger.error("LLM对话处理失败: {}", e.getMessage(), e);
+                log.error("LLM对话处理失败: {}", e.getMessage(), e);
             }
 
         } catch (Exception e) {
-            logger.error("处理文本失败: {}", e.getMessage(), e);
+            log.error("处理文本失败: {}", e.getMessage(), e);
         }
     }
-
 
     /**
      * 发送告别语并在播放完成后关闭会话
@@ -288,7 +285,7 @@ public class DialogueService{
     public void abortDialogue(ChatSession session, String reason) {
         try {
             String sessionId = session.getSessionId();
-            logger.info("中止对话 - SessionId: {}, Reason: {}", sessionId, reason);
+            log.info("中止对话 - SessionId: {}, Reason: {}", sessionId, reason);
 
             // 关闭音频流
             // 注意：当reason是"检测到vad"时，不关闭音频流和重置状态
@@ -325,7 +322,7 @@ public class DialogueService{
                 }
             }
         } catch (Exception e) {
-            logger.error("中止对话失败: {}", e.getMessage(), e);
+            log.error("中止对话失败: {}", e.getMessage(), e);
         }
     }
 
@@ -339,13 +336,13 @@ public class DialogueService{
             return;
         }
         AudioUtils.saveAsWav(path, fullPcmData);
-        logger.debug("用户音频已保存: {}", path);
+        log.debug("用户音频已保存: {}", path);
 
         try {
             String storedPath = storageServiceFactory.getStorageService().upload(path, path.toString());
             session.setUserAudioPath(Path.of(storedPath));
         } catch (Exception e) {
-            logger.warn("上传用户音频失败，保留本地路径: {}", path, e);
+            log.warn("上传用户音频失败，保留本地路径: {}", path, e);
         }
     }
 

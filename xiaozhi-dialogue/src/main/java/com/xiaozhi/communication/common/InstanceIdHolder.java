@@ -1,22 +1,20 @@
 package com.xiaozhi.communication.common;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.net.InetAddress;
 import java.util.UUID;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 实例标识持有者。
  * 优先使用配置的 {@code xiaozhi.instance.id}，未配置时自动生成（hostname + 随机后缀）。
  * Pod/进程重启即重新注册。
  */
+@Slf4j
 @Component
 public class InstanceIdHolder {
-
-    private static final Logger logger = LoggerFactory.getLogger(InstanceIdHolder.class);
 
     private final String instanceId;
 
@@ -33,7 +31,7 @@ public class InstanceIdHolder {
             String suffix = UUID.randomUUID().toString().substring(0, 8);
             this.instanceId = host + "-" + suffix;
         }
-        logger.info("实例标识已生成: {}", instanceId);
+        log.info("实例标识已生成: {}", instanceId);
     }
 
     public String getInstanceId() {

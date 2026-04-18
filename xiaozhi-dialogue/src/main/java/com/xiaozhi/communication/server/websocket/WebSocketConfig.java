@@ -1,8 +1,6 @@
 package com.xiaozhi.communication.server.websocket;
 
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,11 +11,12 @@ import org.springframework.web.socket.server.standard.ServletServerContainerFact
 
 import com.xiaozhi.communication.ServerAddressProvider;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Configuration
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
-
-    private static final Logger logger = LoggerFactory.getLogger(WebSocketConfig.class);
 
     // 路径常量已移至 ServerAddressProvider.WS_PATH（xiaozhi-common），保留引用以兼容现有代码
     public static final String WS_PATH = ServerAddressProvider.WS_PATH;
@@ -45,9 +44,9 @@ public class WebSocketConfig implements WebSocketConfigurer {
         registry.addHandler(webSocketHandler, WS_PATH)
                 .setAllowedOrigins("*");
 
-        logger.info("==========================================================");
-        logger.info("WebSocket服务地址: {}", serverAddressProvider.getWebsocketAddress());
-        logger.info("==========================================================");
+        log.info("==========================================================");
+        log.info("WebSocket服务地址: {}", serverAddressProvider.getWebsocketAddress());
+        log.info("==========================================================");
     }
 
     @Bean

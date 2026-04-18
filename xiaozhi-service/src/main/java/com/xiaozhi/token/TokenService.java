@@ -6,8 +6,6 @@ import com.xiaozhi.token.provider.TokenProvider;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -20,10 +18,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class TokenService implements TokenResolver {
-
-    private static final Logger logger = LoggerFactory.getLogger(TokenService.class);
 
     private static final String TOKEN_KEY_PREFIX = "xiaozhi:token:";
     private static final String LOCK_KEY_PREFIX = "xiaozhi:token:lock:";

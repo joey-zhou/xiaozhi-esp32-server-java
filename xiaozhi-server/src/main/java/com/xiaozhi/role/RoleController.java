@@ -21,6 +21,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.file.Path;
@@ -32,6 +33,7 @@ import java.nio.file.Path;
  * 
  */
 
+@Slf4j
 @RestController
 @RequestMapping("/api/role")
 @Tag(name = "角色管理", description = "角色相关操作")
@@ -151,10 +153,10 @@ public class RoleController extends BaseController {
 
             return ApiResponse.success("操作成功", audioFilePath != null ? audioFilePath.toString() : null);
         } catch (IndexOutOfBoundsException e) {
-            logger.error(e.getMessage(), e);
+            log.error(e.getMessage(), e);
             throw new IllegalStateException("请先到语音合成配置页面配置对应Key", e);
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
+            log.error(e.getMessage(), e);
             throw new OperationFailedException("测试语音合成失败", e);
         }
     }

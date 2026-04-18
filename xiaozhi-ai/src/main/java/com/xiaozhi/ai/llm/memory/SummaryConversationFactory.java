@@ -1,8 +1,6 @@
 package com.xiaozhi.ai.llm.memory;
 
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
@@ -13,6 +11,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import com.xiaozhi.common.model.bo.RoleBO;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 当前的10秒断链只是为了省电，而一般的我们日常自然人之间的对话Conversation 不会是以10秒那么短的时间间隔作为感知的一段对话。
  * SessionID是一个技术名词，不是一个用户关心的概念，即使开机与关机与不是用户关心的。
@@ -28,14 +27,13 @@ import com.xiaozhi.common.model.bo.RoleBO;
  *
  * 引入 CONVERSATION_INTERVAL_HOURS 是为了支持业务感知上的一段对话的概念（脱离技术意义上的关于连接会话session_id）。
  */
+@Slf4j
 @Service
 public class SummaryConversationFactory implements ConversationFactory{
-    private static final Logger logger = LoggerFactory.getLogger(SummaryConversationFactory.class);
     private final ChatMemory chatMemory;
     private final SystemPromptTemplate SUMMARIZER_SYSTEM_PROMPT_TEMPLATE;
     private final PromptTemplate initSummarizerPromptTemplate ;
     private final PromptTemplate againSummarizerPromptTemplate ;
-
 
     // Summary场景仅使用 chatModel.call(String)，不传入ToolCallbacks，不会触发工具调用。
     @Autowired
@@ -45,7 +43,6 @@ public class SummaryConversationFactory implements ConversationFactory{
     private int maxMessages;
     @Value("${conversation.batch-size:4}")
     private int batchSize;
-
 
     @Autowired
     public SummaryConversationFactory(ChatMemory chatMemory) {
@@ -63,8 +60,7 @@ public class SummaryConversationFactory implements ConversationFactory{
 
     @Override
     public Conversation initConversation(String ownerId, Integer userId, RoleBO role, String sessionId) {
-        logger.debug("初始化SummaryConversation基础配置参数，maxMessages：{}，batchSize：{}",maxMessages,batchSize);
-
+        log.debug("初始化SummaryConversation基础配置参数，maxMessages：{}，batchSize：{}",maxMessages,batchSize);
 
         ChatModel chatModel = chatModelFactory.getChatModel(role);
         // 测试时，可将batchSeconds调小。实际生产的默认值可以先考虑：20,16,60。

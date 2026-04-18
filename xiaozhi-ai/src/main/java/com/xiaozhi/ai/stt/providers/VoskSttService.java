@@ -5,8 +5,6 @@ import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.utils.AudioUtils;
 import jakarta.annotation.PostConstruct;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.vosk.LibVosk;
 import org.vosk.LogLevel;
 import org.vosk.Model;
@@ -25,13 +23,14 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Vosk STT服务实现
  * 使用JDK 21虚拟线程实现异步处理
  */
+@Slf4j
 public class VoskSttService implements SttService {
 
-    private static final Logger logger = LoggerFactory.getLogger(VoskSttService.class);
     private static final String PROVIDER_NAME = "vosk";
 
     // 使用平台线程池执行 JNI native 识别任务，避免虚拟线程与 native 内存绑定冲突
@@ -81,9 +80,9 @@ public class VoskSttService implements SttService {
                 // 如果是 macOS 并且是 ARM 架构（M 系列芯片）
                 Path libPath = Path.of(nativeLibDir).toAbsolutePath().normalize().resolve("libvosk.dylib");
                 System.load(libPath.toString());
-                logger.info("Vosk library loaded for macOS M-series chip.");
+                log.info("Vosk library loaded for macOS M-series chip.");
             } else {
-                logger.info("Not macOS M-series chip, skipping Vosk library load.");
+                log.info("Not macOS M-series chip, skipping Vosk library load.");
             }
             // 禁用Vosk日志输出
             LibVosk.setLogLevel(LogLevel.WARNINGS);
@@ -95,10 +94,10 @@ public class VoskSttService implements SttService {
             }
             model = new Model(voskModelPath);
             modelLoaded = true;
-            logger.info("Vosk 模型加载成功！路径: {}", voskModelPath);
+            log.info("Vosk 模型加载成功！路径: {}", voskModelPath);
         } catch (Exception e) {
             modelLoaded = false;
-            logger.warn("Vosk 模型加载失败！将使用其他STT服务: {}", e.getMessage());
+            log.warn("Vosk 模型加载失败！将使用其他STT服务: {}", e.getMessage());
             throw new Exception("Vosk model loading failed: " + e.getMessage(), e);
         }
     }
@@ -120,7 +119,7 @@ public class VoskSttService implements SttService {
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
         if (!isModelLoaded()) {
-            logger.error("Vosk模型未加载，无法进行流式识别！");
+            log.error("Vosk模型未加载，无法进行流式识别！");
             return null;
         }
 
@@ -134,7 +133,7 @@ public class VoskSttService implements SttService {
         audioSink.subscribe(
                 data -> audioQueue.offer(data),
                 error -> {
-                    logger.error("音频流处理错误", error);
+                    log.error("音频流处理错误", error);
                     isCompleted.set(true);
                 },
                 () -> isCompleted.set(true)
@@ -155,7 +154,7 @@ public class VoskSttService implements SttService {
                                 if (jsonResult.has("text") && !jsonResult.getString("text").isEmpty()) {
                                     String text = jsonResult.getString("text").replaceAll("\\s+", "");
                                     recognizedText.add(text);
-                                    logger.debug("Vosk识别中间结果: {}", text);
+                                    log.debug("Vosk识别中间结果: {}", text);
                                 }
                             }
                         }
@@ -168,13 +167,13 @@ public class VoskSttService implements SttService {
                                 String text = jsonFinal.getString("text").replaceAll("\\s+", "");
                                 if (!text.isEmpty()) {
                                     recognizedText.add(text);
-                                    logger.debug("Vosk识别最终结果: {}", text);
+                                    log.debug("Vosk识别最终结果: {}", text);
                                 }
                             }
                             break;
                         }
                     } catch (InterruptedException e) {
-                        logger.warn("音频数据队列等待被中断", e);
+                        log.warn("音频数据队列等待被中断", e);
                         Thread.currentThread().interrupt();
                         break;
                     }
@@ -186,18 +185,18 @@ public class VoskSttService implements SttService {
                 }
 
             } catch (Exception e) {
-                logger.error("Vosk流式识别过程中发生错误", e);
+                log.error("Vosk流式识别过程中发生错误", e);
             }
         });
 
         try {
             future.get(90, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            logger.warn("等待Vosk识别完成时被中断", e);
+            log.warn("等待Vosk识别完成时被中断", e);
             Thread.currentThread().interrupt();
             future.cancel(true);
         } catch (Exception e) {
-            logger.error("Vosk识别任务执行失败", e);
+            log.error("Vosk识别任务执行失败", e);
             future.cancel(true);
         }
 

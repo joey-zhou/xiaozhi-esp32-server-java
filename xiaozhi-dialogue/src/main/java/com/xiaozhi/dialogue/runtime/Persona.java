@@ -10,8 +10,6 @@ import com.xiaozhi.ai.stt.SttService;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
@@ -33,7 +31,7 @@ import java.util.List;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-
+import lombok.extern.slf4j.Slf4j;
 /**
  * 人物角色、虚拟形象，描述角色的属性和行为。Domain Entity: CharacterRole(聊天角色,Persona)，管理对话历史记录，管理对话工具调用等。
  * 聚合着ChatModel、TTS(Synthersizer)、Player
@@ -56,10 +54,9 @@ import java.util.concurrent.atomic.AtomicReference;
  * 持久化由 PersonaListener.onDialogueTurn(DialogueTurn) 回调处理。
  * ConversationIdentifier = deviceId + sessionId + roleId
  */
+@Slf4j
 @Builder(toBuilder = true)
 public class Persona {
-
-    private static final Logger logger = LoggerFactory.getLogger(Persona.class);
 
     /**
      * ToolContext 中传递 sessionId 而非整个 ChatSession，避免序列化问题。
@@ -210,7 +207,6 @@ public class Persona {
         Flux<ChatResponse> chatResponseFlux = chatStream(now, new UserMessage(userMessage), useFunctionCall);
         synthesizer.synthesize(convert(chatResponseFlux));
     }
-
 
     /**
      * 检查当前Persona是否处于活跃状态（LLM生成中、TTS合成中、音频播放中等）。

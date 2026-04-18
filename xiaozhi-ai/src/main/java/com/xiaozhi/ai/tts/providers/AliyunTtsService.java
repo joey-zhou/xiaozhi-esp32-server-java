@@ -12,8 +12,6 @@ import com.xiaozhi.ai.tts.XiaozhiTtsOptions;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.utils.AudioUtils;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
@@ -30,10 +28,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.HashMap;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class AliyunTtsService implements TtsService {
-    private static final Logger logger = LoggerFactory.getLogger(AliyunTtsService.class);
-
     private static final String PROVIDER_NAME = "aliyun";
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long RETRY_DELAY_MS = 1000;
@@ -148,7 +146,7 @@ public class AliyunTtsService implements TtsService {
                 return new String[]{model, voice};
             }
             // 如果模型名称无效，将整个字符串视为音色名
-            logger.warn("无效的千问模型名称: {}, 使用默认模型 qwen3-tts-flash-realtime", model);
+            log.warn("无效的千问模型名称: {}, 使用默认模型 qwen3-tts-flash-realtime", model);
             return new String[]{"qwen3-tts-flash-realtime", voiceParam};
         }
 
@@ -194,7 +192,7 @@ public class AliyunTtsService implements TtsService {
                 return new String[]{model, voice};
             }
             // 如果模型名称无效，将整个字符串视为音色名
-            logger.warn("无效的 CosyVoice 模型名称: {}, 使用默认模型 cosyvoice-v2", model);
+            log.warn("无效的 CosyVoice 模型名称: {}, 使用默认模型 cosyvoice-v2", model);
             return new String[]{"cosyvoice-v2", voiceParam};
         }
 
@@ -230,7 +228,7 @@ public class AliyunTtsService implements TtsService {
                 }
             }
         } catch (Exception e) {
-            logger.error("语音合成aliyun -使用{}模型语音合成失败：", getVoiceName(), e);
+            log.error("语音合成aliyun -使用{}模型语音合成失败：", getVoiceName(), e);
             throw new Exception("语音合成失败");
         }
     }
@@ -264,10 +262,10 @@ public class AliyunTtsService implements TtsService {
                     result = future.get(TTS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 } catch (TimeoutException e) {
                     future.cancel(true);
-                    logger.warn("语音合成aliyun - 使用{}模型超时，正在重试 ({}/{})", getVoiceName(), attempts + 1, MAX_RETRY_ATTEMPTS);
+                    log.warn("语音合成aliyun - 使用{}模型超时，正在重试 ({}/{})", getVoiceName(), attempts + 1, MAX_RETRY_ATTEMPTS);
                     attempts++;
                     if (attempts >= MAX_RETRY_ATTEMPTS) {
-                        logger.error("语音合成aliyun - 使用{}模型多次超时，放弃重试", getVoiceName());
+                        log.error("语音合成aliyun - 使用{}模型多次超时，放弃重试", getVoiceName());
                         return null;
                     }
                     // 等待一段时间后重试
@@ -280,10 +278,10 @@ public class AliyunTtsService implements TtsService {
                     result.getOutput().getAudio() == null ||
                     result.getOutput().getAudio().getUrl() == null) {
 
-                    logger.warn("语音合成aliyun - 使用{}模型返回无效结果，正在重试 ({}/{})", getVoiceName(), attempts + 1, MAX_RETRY_ATTEMPTS);
+                    log.warn("语音合成aliyun - 使用{}模型返回无效结果，正在重试 ({}/{})", getVoiceName(), attempts + 1, MAX_RETRY_ATTEMPTS);
                     attempts++;
                     if (attempts >= MAX_RETRY_ATTEMPTS) {
-                        logger.error("语音合成aliyun - 使用{}模型多次返回无效结果，放弃重试", getVoiceName());
+                        log.error("语音合成aliyun - 使用{}模型多次返回无效结果，放弃重试", getVoiceName());
                         return null;
                     }
                     // 等待一段时间后重试
@@ -319,10 +317,10 @@ public class AliyunTtsService implements TtsService {
                     }
                 } catch (TimeoutException e) {
                     downloadFuture.cancel(true);
-                    logger.warn("语音合成aliyun - 使用{}模型下载音频超时，正在重试 ({}/{})", getVoiceName(), attempts + 1, MAX_RETRY_ATTEMPTS);
+                    log.warn("语音合成aliyun - 使用{}模型下载音频超时，正在重试 ({}/{})", getVoiceName(), attempts + 1, MAX_RETRY_ATTEMPTS);
                     attempts++;
                     if (attempts >= MAX_RETRY_ATTEMPTS) {
-                        logger.error("语音合成aliyun - 使用{}模型多次下载超时，放弃重试", getVoiceName());
+                        log.error("语音合成aliyun - 使用{}模型多次下载超时，放弃重试", getVoiceName());
                         return null;
                     }
                     // 等待一段时间后重试
@@ -334,17 +332,17 @@ public class AliyunTtsService implements TtsService {
             } catch (Exception e) {
                 attempts++;
                 if (attempts < MAX_RETRY_ATTEMPTS) {
-                    logger.warn("语音合成aliyun - 使用{}模型失败，正在重试 ({}/{}): {}", getVoiceName(), attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
+                    log.warn("语音合成aliyun - 使用{}模型失败，正在重试 ({}/{}): {}", getVoiceName(), attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
                     try {
                         // 等待一段时间后重试
                         TimeUnit.MILLISECONDS.sleep(RETRY_DELAY_MS);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        logger.error("重试等待被中断", ie);
+                        log.error("重试等待被中断", ie);
                         return null;
                     }
                 } else {
-                    logger.error("语音合成aliyun - 使用{}模型语音合成失败，已达到最大重试次数：", getVoiceName(), e);
+                    log.error("语音合成aliyun - 使用{}模型语音合成失败，已达到最大重试次数：", getVoiceName(), e);
                     return null;
                 }
             }
@@ -382,7 +380,7 @@ public class AliyunTtsService implements TtsService {
                         try {
                             synthesizer.getDuplexApi().close(1000, "completed");
                         } catch (Exception e) {
-                            logger.debug("关闭CosyVoice TTS连接时发生错误", e);
+                            log.debug("关闭CosyVoice TTS连接时发生错误", e);
                         }
                     }
                 });
@@ -393,10 +391,10 @@ public class AliyunTtsService implements TtsService {
                     audio = future.get(TTS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 } catch (TimeoutException e) {
                     future.cancel(true);
-                    logger.warn("语音合成aliyun - 使用{}模型超时，正在重试 ({}/{}) - 音色: {}", modelName, attempts + 1, MAX_RETRY_ATTEMPTS, actualVoiceName);
+                    log.warn("语音合成aliyun - 使用{}模型超时，正在重试 ({}/{}) - 音色: {}", modelName, attempts + 1, MAX_RETRY_ATTEMPTS, actualVoiceName);
                     attempts++;
                     if (attempts >= MAX_RETRY_ATTEMPTS) {
-                        logger.error("语音合成aliyun - 使用{}模型多次超时，放弃重试 - 音色: {}", modelName, actualVoiceName);
+                        log.error("语音合成aliyun - 使用{}模型多次超时，放弃重试 - 音色: {}", modelName, actualVoiceName);
                         return null;
                     }
                     // 等待一段时间后重试
@@ -408,12 +406,12 @@ public class AliyunTtsService implements TtsService {
                 if (audio == null) {
                     attempts++;
                     if (attempts < MAX_RETRY_ATTEMPTS) {
-                        logger.warn("语音合成aliyun - 使用{}模型返回null，正在重试 ({}/{}) - 音色: {}", modelName, attempts, MAX_RETRY_ATTEMPTS, actualVoiceName);
+                        log.warn("语音合成aliyun - 使用{}模型返回null，正在重试 ({}/{}) - 音色: {}", modelName, attempts, MAX_RETRY_ATTEMPTS, actualVoiceName);
                         // 等待一段时间后重试
                         TimeUnit.MILLISECONDS.sleep(RETRY_DELAY_MS);
                         continue;
                     } else {
-                        logger.error("语音合成aliyun - 使用{}模型多次返回null，放弃重试 - 音色: {}", modelName, actualVoiceName);
+                        log.error("语音合成aliyun - 使用{}模型多次返回null，放弃重试 - 音色: {}", modelName, actualVoiceName);
                         return null;
                     }
                 }
@@ -422,24 +420,24 @@ public class AliyunTtsService implements TtsService {
                 try (FileOutputStream fos = new FileOutputStream(outPath.toFile())) {
                     fos.write(audio.array());
                 } catch (IOException e) {
-                    logger.error("语音合成aliyun -使用{}模型语音合成失败 - 音色: {}", modelName, actualVoiceName, e);
+                    log.error("语音合成aliyun -使用{}模型语音合成失败 - 音色: {}", modelName, actualVoiceName, e);
                     return null;
                 }
                 return outPath;
             } catch (Exception e) {
                 attempts++;
                 if (attempts < MAX_RETRY_ATTEMPTS) {
-                    logger.warn("语音合成aliyun - 使用{}模型失败，正在重试 ({}/{}) - 音色: {}: {}", modelName, attempts, MAX_RETRY_ATTEMPTS, actualVoiceName, e.getMessage());
+                    log.warn("语音合成aliyun - 使用{}模型失败，正在重试 ({}/{}) - 音色: {}: {}", modelName, attempts, MAX_RETRY_ATTEMPTS, actualVoiceName, e.getMessage());
                     try {
                         // 等待一段时间后重试
                         TimeUnit.MILLISECONDS.sleep(RETRY_DELAY_MS);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        logger.error("重试等待被中断 - 模型: {}", modelName, ie);
+                        log.error("重试等待被中断 - 模型: {}", modelName, ie);
                         return null;
                     }
                 } else {
-                    logger.error("语音合成aliyun -使用{}模型语音合成失败，已达到最大重试次数 - 音色: {}", modelName, actualVoiceName, e);
+                    log.error("语音合成aliyun -使用{}模型语音合成失败，已达到最大重试次数 - 音色: {}", modelName, actualVoiceName, e);
                     return null;
                 }
             }
@@ -473,10 +471,10 @@ public class AliyunTtsService implements TtsService {
                     audio = future.get(TTS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 } catch (TimeoutException e) {
                     future.cancel(true);
-                    logger.warn("语音合成aliyun - 使用{}模型超时，正在重试 ({}/{})，文本：{}", getVoiceName(), attempts + 1, MAX_RETRY_ATTEMPTS, text);
+                    log.warn("语音合成aliyun - 使用{}模型超时，正在重试 ({}/{})，文本：{}", getVoiceName(), attempts + 1, MAX_RETRY_ATTEMPTS, text);
                     attempts++;
                     if (attempts >= MAX_RETRY_ATTEMPTS) {
-                        logger.error("语音合成aliyun - 使用{}模型多次超时，放弃重试，文本：{}", getVoiceName(), text);
+                        log.error("语音合成aliyun - 使用{}模型多次超时，放弃重试，文本：{}", getVoiceName(), text);
                         return null;
                     }
                     // 等待一段时间后重试
@@ -488,12 +486,12 @@ public class AliyunTtsService implements TtsService {
                 if (audio == null) {
                     attempts++;
                     if (attempts < MAX_RETRY_ATTEMPTS) {
-                        logger.warn("语音合成aliyun - 使用{}模型返回null，正在重试 ({}/{})", getVoiceName(), attempts, MAX_RETRY_ATTEMPTS);
+                        log.warn("语音合成aliyun - 使用{}模型返回null，正在重试 ({}/{})", getVoiceName(), attempts, MAX_RETRY_ATTEMPTS);
                         // 等待一段时间后重试
                         TimeUnit.MILLISECONDS.sleep(RETRY_DELAY_MS);
                         continue;
                     } else {
-                        logger.error("语音合成aliyun - 使用{}模型多次返回null，放弃重试", getVoiceName());
+                        log.error("语音合成aliyun - 使用{}模型多次返回null，放弃重试", getVoiceName());
                         return null;
                     }
                 }
@@ -502,24 +500,24 @@ public class AliyunTtsService implements TtsService {
                 try (FileOutputStream fos = new FileOutputStream(outPath.toFile())) {
                     fos.write(audio.array());
                 } catch (IOException e) {
-                    logger.error("语音合成aliyun - 使用{}模型失败：", getVoiceName(), e);
+                    log.error("语音合成aliyun - 使用{}模型失败：", getVoiceName(), e);
                     return null;
                 }
                 return outPath;
             } catch (Exception e) {
                 attempts++;
                 if (attempts < MAX_RETRY_ATTEMPTS) {
-                    logger.warn("语音合成aliyun - 使用{}模型失败，正在重试 ({}/{}): {}", getVoiceName(), attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
+                    log.warn("语音合成aliyun - 使用{}模型失败，正在重试 ({}/{}): {}", getVoiceName(), attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
                     try {
                         // 等待一段时间后重试
                         TimeUnit.MILLISECONDS.sleep(RETRY_DELAY_MS);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        logger.error("重试等待被中断", ie);
+                        log.error("重试等待被中断", ie);
                         return null;
                     }
                 } else {
-                    logger.error("语音合成aliyun - 使用{}模型失败，已达到最大重试次数：", getVoiceName(), e);
+                    log.error("语音合成aliyun - 使用{}模型失败，已达到最大重试次数：", getVoiceName(), e);
                     return null;
                 }
             }

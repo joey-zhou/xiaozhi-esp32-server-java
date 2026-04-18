@@ -11,8 +11,6 @@ import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -22,14 +20,14 @@ import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
 
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Redis 消息订阅配置。
  * 监听跨实例广播，在本实例执行对应操作。
  */
+@Slf4j
 @Configuration
 public class RedisSubscriber {
-
-    private static final Logger logger = LoggerFactory.getLogger(RedisSubscriber.class);
 
     @Resource
     private SessionManager sessionManager;
@@ -79,7 +77,7 @@ public class RedisSubscriber {
     public void onClearConversation(String deviceId) {
         sessionManager.findConversation(deviceId).ifPresent(conversation -> {
             conversation.clear();
-            logger.info("已清除设备对话历史（来自跨实例广播） - deviceId: {}", deviceId);
+            log.info("已清除设备对话历史（来自跨实例广播） - deviceId: {}", deviceId);
         });
     }
 
@@ -100,7 +98,7 @@ public class RedisSubscriber {
                 persona.getConversation().clear();
                 session.setPersona(null);
             }
-            logger.info("已清理设备 Persona（来自跨实例广播） - deviceId: {}", deviceId);
+            log.info("已清理设备 Persona（来自跨实例广播） - deviceId: {}", deviceId);
         }
     }
 
@@ -123,10 +121,10 @@ public class RedisSubscriber {
                 }
             }
             if (count > 0) {
-                logger.info("角色属性变更，已清理 {} 个 Persona（roleId: {}）", count, roleId);
+                log.info("角色属性变更，已清理 {} 个 Persona（roleId: {}）", count, roleId);
             }
         } catch (Exception e) {
-            logger.error("处理 roleUpdated 广播失败", e);
+            log.error("处理 roleUpdated 广播失败", e);
         }
     }
 
@@ -137,7 +135,7 @@ public class RedisSubscriber {
         ChatSession session = sessionManager.getSessionByDeviceId(deviceId);
         if (session != null) {
             sessionManager.closeSession(session);
-            logger.info("已关闭设备会话（来自跨实例广播） - deviceId: {}", deviceId);
+            log.info("已关闭设备会话（来自跨实例广播） - deviceId: {}", deviceId);
         }
     }
 
@@ -151,7 +149,7 @@ public class RedisSubscriber {
             if (freshDevice != null) {
                 freshDevice.setSessionId(session.getSessionId());
                 session.setDevice(freshDevice);
-                logger.info("已刷新设备信息（来自跨实例广播） - deviceId: {}", deviceId);
+                log.info("已刷新设备信息（来自跨实例广播） - deviceId: {}", deviceId);
             }
         }
     }
@@ -174,10 +172,10 @@ public class RedisSubscriber {
                 }
                 // Token 缓存（Coze OAuth、阿里云 Token 等）与 configType 无关，统一清除
                 tokenService.removeCache(config);
-                logger.info("已清除工厂缓存 - configType: {}, configId: {}", configType, configId);
+                log.info("已清除工厂缓存 - configType: {}, configId: {}", configType, configId);
             }
         } catch (Exception e) {
-            logger.error("处理 configChanged 广播失败", e);
+            log.error("处理 configChanged 广播失败", e);
         }
     }
 }

@@ -2,8 +2,6 @@ package com.xiaozhi.server.web;
 
 import com.xiaozhi.server.web.PageFilter;
 import jakarta.servlet.http.HttpServletRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 
 /**
@@ -13,7 +11,6 @@ import org.springframework.util.StringUtils;
  *
  */
 public class BaseController {
-    protected final Logger logger = LoggerFactory.getLogger(getClass());
 
     /**
      * 最大分页数量

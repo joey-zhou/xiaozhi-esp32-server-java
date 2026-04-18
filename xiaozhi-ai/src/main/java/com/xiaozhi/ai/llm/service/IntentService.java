@@ -1,19 +1,17 @@
 package com.xiaozhi.ai.llm.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 意图检测器 — 在调用 LLM 之前，通过关键词匹配检测用户输入的明确意图（<1ms）。
  * <p>
  * 只处理确定性意图（如退出），未来可扩展更多快路径意图。
  */
+@Slf4j
 @Service
 public class IntentService {
-
-    private static final Logger logger = LoggerFactory.getLogger(IntentService.class);
 
     private final ExitKeywordDetector exitKeywordDetector = new ExitKeywordDetector();
 
@@ -40,7 +38,7 @@ public class IntentService {
 
         // 退出意图
         if (exitKeywordDetector.detectExitIntent(userText)) {
-            logger.info("检测到退出意图: \"{}\"", userText);
+            log.info("检测到退出意图: \"{}\"", userText);
             return Intent.EXIT;
         }
 

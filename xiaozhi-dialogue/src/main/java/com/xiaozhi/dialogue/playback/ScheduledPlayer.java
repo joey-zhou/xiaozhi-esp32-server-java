@@ -6,8 +6,6 @@ import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.utils.AudioUtils;
 import io.jsonwebtoken.lang.Assert;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import reactor.core.Disposable;
@@ -22,6 +20,7 @@ import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 基于虚拟线程的音频流播放器。
  *
@@ -37,9 +36,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * - 第3帧开始按精确时间调度
  * - 效果：设备收到前2帧立即开始播放，不会因等待数据而破音
  */
+@Slf4j
 public class ScheduledPlayer extends Player {
-    private static final Logger logger = LoggerFactory.getLogger(ScheduledPlayer.class);
-
     // Opus帧发送间隔：60ms = 60,000,000 纳秒
     private static final long OPUS_FRAME_SEND_INTERVAL_NS = AudioUtils.OPUS_FRAME_DURATION_MS * 1_000_000L;
 
@@ -160,7 +158,7 @@ public class ScheduledPlayer extends Player {
                         }
                     },
                     throwable -> {
-                        logger.error("TTS模型生成输出内容时发生错误：{}", throwable.getMessage());
+                        log.error("TTS模型生成输出内容时发生错误：{}", throwable.getMessage());
                         // 当前TTS抛出异常，尝试订阅下一个Flux
                         subscribeNext();
                     },
@@ -292,7 +290,7 @@ public class ScheduledPlayer extends Player {
 
         // 检查播放状态
         if (!isPlaying()) {
-            logger.error("播放器状态异常：在非Playing状态下发送音频帧 - SessionId: {}", session.getSessionId());
+            log.error("播放器状态异常：在非Playing状态下发送音频帧 - SessionId: {}", session.getSessionId());
             sendStart();
         }
 

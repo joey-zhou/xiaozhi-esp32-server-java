@@ -6,14 +6,12 @@ import com.xiaozhi.ai.tts.XiaozhiTtsOptions;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.utils.AudioUtils;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.*;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 基于 sherpa-onnx 的本地语音合成服务
  * 支持 VITS、Kokoro、Matcha 等多种本地 TTS 模型
@@ -23,9 +21,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *         kokoro-multi-lang:kokoro:3
  *         matcha-zh-baker:matcha:0
  */
+@Slf4j
 public class SherpaOnnxTtsService implements TtsService {
-    private static final Logger logger = LoggerFactory.getLogger(SherpaOnnxTtsService.class);
-
     private static final String PROVIDER_NAME = "sherpa-onnx";
 
     // 缓存 OfflineTts 实例，避免重复加载模型（key = modelPath）
@@ -91,13 +88,13 @@ public class SherpaOnnxTtsService implements TtsService {
             long elapsed = System.currentTimeMillis() - start;
 
             if (audio == null || audio.getSamples() == null || audio.getSamples().length == 0) {
-                logger.error("sherpa-onnx 语音合成返回空音频，模型路径: {}", modelPath);
+                log.error("sherpa-onnx 语音合成返回空音频，模型路径: {}", modelPath);
                 return null;
             }
 
             float audioDuration = audio.getSamples().length / (float) audio.getSampleRate();
             float rtf = (elapsed / 1000.0f) / audioDuration;
-            logger.info("sherpa-onnx 语音合成完成 - 耗时: {}ms, 音频时长: {}s, RTF: {}",
+            log.info("sherpa-onnx 语音合成完成 - 耗时: {}ms, 音频时长: {}s, RTF: {}",
                     elapsed, String.format("%.2f", audioDuration), String.format("%.3f", rtf));
 
             // 将 float[] samples 转为 16-bit PCM byte[]
@@ -115,7 +112,7 @@ public class SherpaOnnxTtsService implements TtsService {
 
             return outPath;
         } catch (Exception e) {
-            logger.error("sherpa-onnx 语音合成失败 - 模型路径: {}, 错误: {}", modelPath, e.getMessage(), e);
+            log.error("sherpa-onnx 语音合成失败 - 模型路径: {}, 错误: {}", modelPath, e.getMessage(), e);
             throw new Exception("本地语音合成失败: " + e.getMessage());
         }
     }
@@ -132,7 +129,7 @@ public class SherpaOnnxTtsService implements TtsService {
      * 根据模型类型创建 OfflineTts 实例
      */
     private OfflineTts createTts() {
-        logger.info("初始化 sherpa-onnx TTS 模型 - 类型: {}, 路径: {}", modelType, modelPath);
+        log.info("初始化 sherpa-onnx TTS 模型 - 类型: {}, 路径: {}", modelType, modelPath);
 
         OfflineTtsModelConfig.Builder modelConfigBuilder = OfflineTtsModelConfig.builder()
                 .setNumThreads(2)

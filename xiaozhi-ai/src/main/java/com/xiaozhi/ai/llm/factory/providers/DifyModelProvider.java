@@ -7,19 +7,17 @@ import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.port.ConfigLookup;
 
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Dify模型提供者
  */
+@Slf4j
 @Component
 public class DifyModelProvider implements ChatModelProvider {
-    
-    private static final Logger logger = LoggerFactory.getLogger(DifyModelProvider.class);
     
     @Autowired
     private ConfigLookup configLookup;
@@ -49,7 +47,7 @@ public class DifyModelProvider implements ChatModelProvider {
         
         var chatModel = new DifyChatModel(endpoint, apiKey);
         
-        logger.info("Created Dify ChatModel: endpoint={}", endpoint);
+        log.info("Created Dify ChatModel: endpoint={}", endpoint);
         return chatModel;
     }
 }

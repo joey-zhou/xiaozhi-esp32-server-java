@@ -12,8 +12,6 @@ import com.xiaozhi.ai.tool.ToolsSessionHolder;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
 import org.apache.commons.text.StringSubstitutor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.ai.tool.metadata.ToolMetadata;
@@ -24,12 +22,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * Iot服务 - 负责iot处理和WebSocket发送
  */
+@Slf4j
 @Service
 public class IotService {
-    private static final Logger logger = LoggerFactory.getLogger(IotService.class);
     private static final String TAG = "IotService";
 
     @Resource
@@ -63,7 +62,7 @@ public class IotService {
         for (var state : states) {
             var iotDescriptor = chatSession.getIotDescriptors().get(state.getName());
             if (iotDescriptor == null) {
-                logger.error("[{}] - SessionId: {} 未找到设备: {} 的描述信息", TAG, sessionId, state.getName());
+                log.error("[{}] - SessionId: {} 未找到设备: {} 的描述信息", TAG, sessionId, state.getName());
                 continue;
             }
             for (var stateProp : state.getState().entrySet()) {
@@ -72,9 +71,9 @@ public class IotService {
                 var property = iotDescriptor.getProperties().get(propName);
                 if (property != null) {
                     property.setValue(propValue);
-                    logger.info("[{}] - SessionId: {} handleDeviceStates 物联网状态更新: {} , {} = {}", TAG, sessionId, state.getName(), propName, propValue);
+                    log.info("[{}] - SessionId: {} handleDeviceStates 物联网状态更新: {} , {} = {}", TAG, sessionId, state.getName(), propName, propValue);
                 } else {
-                    logger.error("[{}] - SessionId: {} handleDeviceStates 未找到设备 {} 的属性 {}", TAG, sessionId, state.getName(), propName);
+                    log.error("[{}] - SessionId: {} handleDeviceStates 未找到设备 {} 的属性 {}", TAG, sessionId, state.getName(), propName);
                 }
             }
         }
@@ -96,10 +95,10 @@ public class IotService {
             if (property != null) {
                 return property.getValue();
             } else {
-                logger.error("[{}] - SessionId: {} getIotStatus 未找到设备 {} 的属性 {}", TAG, sessionId, iotName, propertyName);
+                log.error("[{}] - SessionId: {} getIotStatus 未找到设备 {} 的属性 {}", TAG, sessionId, iotName, propertyName);
             }
         } else {
-            logger.error("[{}] - SessionId: {} getIotStatus 未找到设备 {}", TAG, sessionId, iotName);
+            log.error("[{}] - SessionId: {} getIotStatus 未找到设备 {}", TAG, sessionId, iotName);
         }
         return null;
     }
@@ -131,17 +130,17 @@ public class IotService {
                     typeCheck = true;
                 }
                 if (!typeCheck) {
-                    logger.error("[{}] - SessionId: {} setIotStatus 属性: {} 的值类型不匹配, 注册类型: {}, 入参类型: {}", TAG, sessionId, propertyName,
+                    log.error("[{}] - SessionId: {} setIotStatus 属性: {} 的值类型不匹配, 注册类型: {}, 入参类型: {}", TAG, sessionId, propertyName,
                             property.getType(), value.getClass().getSimpleName());
                     return false;
                 }
                 property.setValue(value);
-                logger.info("[{}] - SessionId: {} setIotStatus 物联网状态更新: {} , {} = {}", TAG, sessionId, iotName, propertyName, value);
+                log.info("[{}] - SessionId: {} setIotStatus 物联网状态更新: {} , {} = {}", TAG, sessionId, iotName, propertyName, value);
                 sendIotMessage(sessionId, iotName, propertyName, Collections.singletonMap(propertyName, value));
                 return true;
             }
         }
-        logger.error("[{}] - SessionId: {} setIotStatus 未找到设备 {} 的属性 {}", TAG, sessionId, iotName, propertyName);
+        log.error("[{}] - SessionId: {} setIotStatus 未找到设备 {} 的属性 {}", TAG, sessionId, iotName, propertyName);
         return false;
     }
 
@@ -155,7 +154,7 @@ public class IotService {
      */
     public boolean sendIotMessage(String sessionId, String iotName, String methodName, Map<String, Object> parameters) {
         try {
-            logger.info("[{}] - SessionId: {}, message send iotName: {}, methodName: {}, parameters: {}", TAG, sessionId,
+            log.info("[{}] - SessionId: {}, message send iotName: {}, methodName: {}, parameters: {}", TAG, sessionId,
                     iotName, methodName, JsonUtil.toJson(parameters));
             ChatSession chatSession = sessionManager.getSession(sessionId);
             IotDescriptor iotDescriptor = chatSession.getIotDescriptors().get(iotName);
@@ -167,10 +166,10 @@ public class IotService {
                 messageService.sendIotCommandMessage(chatSession, Collections.singletonList(command));
                 return true;
             } else {
-                logger.error("[{}] - SessionId: {}, {} method not found: {}", TAG, sessionId, iotName, methodName);
+                log.error("[{}] - SessionId: {}, {} method not found: {}", TAG, sessionId, iotName, methodName);
             }
         } catch (Exception e) {
-            logger.error("[{}] - SessionId: {}, error sending Iot message", TAG, sessionId, e);
+            log.error("[{}] - SessionId: {}, error sending Iot message", TAG, sessionId, e);
         }
         return false;
     }

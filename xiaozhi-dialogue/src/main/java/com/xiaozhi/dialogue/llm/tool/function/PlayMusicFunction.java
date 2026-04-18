@@ -8,8 +8,6 @@ import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.dialogue.llm.tool.media.MusicPlayer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
@@ -22,9 +20,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 //@Component
 public class PlayMusicFunction implements ToolsGlobalRegistry.GlobalFunction {
-    private static final Logger logger = LoggerFactory.getLogger(PlayMusicFunction.class);
     private static final String TOOL_NAME = "play_music";
     // 使用虚拟线程执行器处理定时任务
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(
@@ -49,7 +49,7 @@ public class PlayMusicFunction implements ToolsGlobalRegistry.GlobalFunction {
                         return "尝试播放歌曲《"+songName+"》";
                     }
                 }catch (Exception e){
-                    logger.error("device 音乐播放异常，song name: {}", songName, e);
+                    log.error("device 音乐播放异常，song name: {}", songName, e);
                     return "音乐播放失败";
                 }
             })

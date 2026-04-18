@@ -8,8 +8,6 @@ import com.xiaozhi.mcptoolexclude.dal.mysql.dataobject.McpToolExcludeDO;
 import com.xiaozhi.mcptoolexclude.dal.mysql.mapper.McpToolExcludeMapper;
 import com.xiaozhi.mcptoolexclude.service.McpToolExcludeService;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -21,10 +19,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class McpToolExcludeServiceImpl implements McpToolExcludeService {
 
-    private static final Logger logger = LoggerFactory.getLogger(McpToolExcludeServiceImpl.class);
     private static final String EXCLUDE_TYPE_GLOBAL = "global";
     private static final String EXCLUDE_TYPE_ROLE = "role";
     private static final String BIND_TYPE_MCP_SERVER = "mcp_server";
@@ -155,7 +155,7 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
                 mcpToolExcludeMapper.updateById(target);
             }
         } catch (Exception e) {
-            logger.error("Save MCP tool exclude config failed", e);
+            log.error("Save MCP tool exclude config failed", e);
             throw new OperationFailedException("保存MCP工具排除配置失败", e);
         }
     }
@@ -167,7 +167,7 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
             }
             return objectMapper.readValue(excludeToolsJson, new TypeReference<List<String>>() {});
         } catch (Exception e) {
-            logger.error("Parse MCP tool exclude json failed: {}", excludeToolsJson, e);
+            log.error("Parse MCP tool exclude json failed: {}", excludeToolsJson, e);
             return new ArrayList<>();
         }
     }

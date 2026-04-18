@@ -11,8 +11,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -26,17 +24,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 文件上传控制器
  * 
  * @author Joey
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/file")
 @Tag(name = "文件上传控制器", description = "文件上传相关操作")
 public class FileUploadController {
-    private static final Logger logger = LoggerFactory.getLogger(FileUploadController.class);
-
     /** 允许的文件类型分类（防止路径遍历） */
     private static final Set<String> ALLOWED_TYPES = Set.of("common", "image", "audio", "video", "document", "avatar");
 
@@ -111,11 +109,11 @@ public class FileUploadController {
         try {
             filePathOrUrl = storageService.upload(file, relativePath, fileName);
         } catch (IOException e) {
-            logger.error("文件上传失败: {}", e.getMessage(), e);
+            log.error("文件上传失败: {}", e.getMessage(), e);
             throw new OperationFailedException("文件上传失败，请稍后重试", e);
         }
 
-        logger.info("文件上传成功（{}）: {}", storageService.getProvider(), filePathOrUrl);
+        log.info("文件上传成功（{}）: {}", storageService.getProvider(), filePathOrUrl);
 
         // 计算文件哈希值
         String fileHash = FileHashUtil.calculateSha256(file);

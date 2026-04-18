@@ -2,8 +2,6 @@ package com.xiaozhi.ai.llm.providers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
@@ -22,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 讯飞星火大模型实现
  * 支持的模型版本:
@@ -37,9 +36,9 @@ import java.util.concurrent.TimeUnit;
  * - V1模型: https://www.xfyun.cn/doc/spark/HTTP%E8%B0%83%E7%94%A8%E6%96%87%E6%A1%A3.html
  * - X1模型: https://www.xfyun.cn/doc/spark/X1http.html
  */
+@Slf4j
 public class XingHuoChatModel implements ChatModel {
 
-    private static final Logger logger = LoggerFactory.getLogger(XingHuoChatModel.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     
@@ -87,7 +86,7 @@ public class XingHuoChatModel implements ChatModel {
             
             try (Response response = httpClient.newCall(request).execute()) {
                 if (!response.isSuccessful()) {
-                    logger.error("星火API请求失败: code={}, message={}", response.code(), response.message());
+                    log.error("星火API请求失败: code={}, message={}", response.code(), response.message());
                     return ChatResponse.builder().generations(Collections.emptyList()).build();
                 }
                 
@@ -119,7 +118,7 @@ public class XingHuoChatModel implements ChatModel {
                 
             }
         } catch (Exception e) {
-            logger.error("星火大模型调用失败", e);
+            log.error("星火大模型调用失败", e);
             return ChatResponse.builder().generations(Collections.emptyList()).build();
         }
     }
@@ -127,7 +126,7 @@ public class XingHuoChatModel implements ChatModel {
     @Override
     public Flux<ChatResponse> stream(Prompt prompt) {
         return Flux.create(sink -> {
-            logger.debug("星火大模型流式调用: model={}", model);
+            log.debug("星火大模型流式调用: model={}", model);
             
             // 使用数组来存储标志(因为在匿名内部类中需要修改)
             final boolean[] hasToolCall = {false};
@@ -145,7 +144,7 @@ public class XingHuoChatModel implements ChatModel {
                 httpClient.newCall(request).enqueue(new Callback() {
                     @Override
                     public void onFailure(Call call, IOException e) {
-                        logger.error("星火API流式请求失败", e);
+                        log.error("星火API流式请求失败", e);
                         sink.error(e);
                     }
 
@@ -219,14 +218,14 @@ public class XingHuoChatModel implements ChatModel {
                                 }
                             }
                         } catch (Exception e) {
-                            logger.error("处理流式响应失败", e);
+                            log.error("处理流式响应失败", e);
                             sink.error(e);
                         }
                     }
                 });
                 
             } catch (Exception e) {
-                logger.error("星火大模型流式调用失败", e);
+                log.error("星火大模型流式调用失败", e);
                 sink.error(e);
             }
         });
@@ -316,7 +315,7 @@ public class XingHuoChatModel implements ChatModel {
             }
             
         } catch (Exception e) {
-            logger.error("❌ 解析流式响应失败: {}", jsonData, e);
+            log.error("❌ 解析流式响应失败: {}", jsonData, e);
         }
     }
     
@@ -386,7 +385,7 @@ public class XingHuoChatModel implements ChatModel {
                 }
             }
         } catch (Exception e) {
-            logger.error("❌ 累积工具调用失败", e);
+            log.error("❌ 累积工具调用失败", e);
         }
     }
 
@@ -472,7 +471,7 @@ public class XingHuoChatModel implements ChatModel {
                 }
             }
         } catch (Exception e) {
-            logger.error("❌ 处理工具调用失败", e);
+            log.error("❌ 处理工具调用失败", e);
             sink.error(e);
         }
     }
@@ -543,7 +542,7 @@ public class XingHuoChatModel implements ChatModel {
                                     try {
                                         parameters = objectMapper.readValue(schemaStr, Map.class);
                                     } catch (Exception e) {
-                                        logger.warn("解析inputSchema失败: {}", schemaStr, e);
+                                        log.warn("解析inputSchema失败: {}", schemaStr, e);
                                     }
                                 }
                             } else if (inputSchema instanceof Map) {
@@ -566,7 +565,7 @@ public class XingHuoChatModel implements ChatModel {
                         }
                     }
                 } catch (Exception e) {
-                    logger.warn("添加工具定义失败: {}", e.getMessage(), e);
+                    log.warn("添加工具定义失败: {}", e.getMessage(), e);
                 }
             });
             

@@ -1,23 +1,21 @@
 package com.xiaozhi.utils;
 
 import io.github.biezhi.ome.OhMyEmail;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import static io.github.biezhi.ome.OhMyEmail.SMTP_QQ;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 邮件发送工具类
  * 
  * @author Joey
  */
+@Slf4j
 @Component
 public class EmailUtils {
-    
-    private static final Logger logger = LoggerFactory.getLogger(EmailUtils.class);
     
     @Value("${email.smtp.username}")
     private String emailUsername;
@@ -50,13 +48,13 @@ public class EmailUtils {
         try {
             // 验证邮箱格式
             if (!isValidEmail(to)) {
-                logger.error("邮箱格式不正确: {}", to);
+                log.error("邮箱格式不正确: {}", to);
                 return false;
             }
             
             // 检查邮箱配置
             if (!StringUtils.hasText(emailUsername) || !StringUtils.hasText(emailPassword)) {
-                logger.error("未配置第三方邮箱认证信息");
+                log.error("未配置第三方邮箱认证信息");
                 return false;
             }
             
@@ -70,12 +68,12 @@ public class EmailUtils {
                     .html(content)
                     .send();
             
-            logger.info("邮件发送成功: {} -> {}", fromName, to);
+            log.info("邮件发送成功: {} -> {}", fromName, to);
             return true;
             
         } catch (Exception e) {
             String errorMsg = getErrorMessage(e);
-            logger.error("邮件发送失败: {} -> {}, 错误: {}", fromName, to, errorMsg, e);
+            log.error("邮件发送失败: {} -> {}, 错误: {}", fromName, to, errorMsg, e);
             return false;
         }
     }

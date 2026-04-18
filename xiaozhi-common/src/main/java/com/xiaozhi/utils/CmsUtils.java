@@ -1,7 +1,5 @@
 package com.xiaozhi.utils;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -13,10 +11,11 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Component
 public class CmsUtils {
-
-    private static final Logger logger = LoggerFactory.getLogger(CmsUtils.class);
 
     // 缓存服务器IP地址 - 只在第一次调用getServerIp时初始化
     private String serverIp = null;
@@ -28,7 +27,6 @@ public class CmsUtils {
             "https://www.cip.cc/", // CIP.CC，返回详细信息
             "https://myip.ipip.net/json", // IPIP.net，返回详细信息
     };
-
 
     // 私有IP地址段
     private static final String[] PRIVATE_IP_PATTERNS = {
@@ -194,7 +192,7 @@ public class CmsUtils {
 
             return localIp;
         } catch (Exception e) {
-            logger.error("确定服务器IP时发生错误", e);
+            log.error("确定服务器IP时发生错误", e);
             return "127.0.0.1"; // 如果发生错误，返回本地回环地址
         }
     }
@@ -299,7 +297,7 @@ public class CmsUtils {
             }
 
         } catch (Exception e) {
-            logger.warn("获取Docker宿主机IP失败: {}", e.getMessage());
+            log.warn("获取Docker宿主机IP失败: {}", e.getMessage());
         }
 
         return null;
@@ -335,7 +333,7 @@ public class CmsUtils {
                         if (parts[0].equals("0.0.0.0") && parts[1].equals("0.0.0.0")) {
                             String gateway = parts[2];
                             if (gateway.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) {
-                                logger.debug("Windows网关IP: {}", gateway);
+                                log.debug("Windows网关IP: {}", gateway);
                                 return gateway;
                             }
                         }
@@ -343,7 +341,7 @@ public class CmsUtils {
                 }
             }
         } catch (Exception e) {
-            logger.debug("Windows网关检测失败: {}", e.getMessage());
+            log.debug("Windows网关检测失败: {}", e.getMessage());
         }
 
         // 尝试使用ipconfig命令
@@ -361,7 +359,7 @@ public class CmsUtils {
                         if (parts.length > 1) {
                             String gateway = parts[1].trim();
                             if (gateway.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) {
-                                logger.debug("Windows默认网关: {} (适配器: {})", gateway, currentAdapter);
+                                log.debug("Windows默认网关: {} (适配器: {})", gateway, currentAdapter);
                                 return gateway;
                             }
                         }
@@ -369,7 +367,7 @@ public class CmsUtils {
                 }
             }
         } catch (Exception e) {
-            logger.debug("Windows ipconfig检测失败: {}", e.getMessage());
+            log.debug("Windows ipconfig检测失败: {}", e.getMessage());
         }
 
         return null;
@@ -393,7 +391,7 @@ public class CmsUtils {
                         // 尝试提取网关IP
                         String gatewayIp = extractGatewayIp(line, cmdArray[0]);
                         if (gatewayIp != null) {
-                            logger.debug("Linux网关IP: {} (命令: {})", gatewayIp, String.join(" ", cmdArray));
+                            log.debug("Linux网关IP: {} (命令: {})", gatewayIp, String.join(" ", cmdArray));
                             return gatewayIp;
                         }
                     }
@@ -422,7 +420,7 @@ public class CmsUtils {
                                 int c = Integer.parseInt(hex.substring(2, 4), 16);
                                 int d = Integer.parseInt(hex.substring(0, 2), 16);
                                 String gateway = a + "." + b + "." + c + "." + d;
-                                logger.debug("从/proc/net/route读取到网关IP: {}", gateway);
+                                log.debug("从/proc/net/route读取到网关IP: {}", gateway);
                                 return gateway;
                             }
                         }
@@ -430,7 +428,7 @@ public class CmsUtils {
                 }
             }
         } catch (Exception e) {
-            logger.debug("读取Linux路由表失败: {}", e.getMessage());
+            log.debug("读取Linux路由表失败: {}", e.getMessage());
         }
 
         return null;
@@ -464,7 +462,7 @@ public class CmsUtils {
                 }
             }
         } catch (Exception e) {
-            logger.debug("解析网关IP失败: {}", e.getMessage());
+            log.debug("解析网关IP失败: {}", e.getMessage());
         }
         return null;
     }
@@ -515,7 +513,7 @@ public class CmsUtils {
                 }
             }
         } catch (Exception e) {
-            logger.warn("获取非Docker网络IP失败: {}", e.getMessage());
+            log.warn("获取非Docker网络IP失败: {}", e.getMessage());
         }
 
         return null;
@@ -663,7 +661,7 @@ public class CmsUtils {
                 }
             }
         } catch (Exception e) {
-            logger.debug("查询IP {} 失败: {}", ipAddress, e.getMessage());
+            log.debug("查询IP {} 失败: {}", ipAddress, e.getMessage());
         } finally {
             try {
                 if (reader != null) reader.close();
@@ -703,7 +701,6 @@ public class CmsUtils {
             return false;
         }
     }
-
 
     /**
      * 获取IP信息（服务器公网IP）
@@ -759,12 +756,12 @@ public class CmsUtils {
                         }
                     }
                 } else {
-                    logger.warn("IP信息服务返回非200状态码: {} - {}", service, connection.getResponseCode());
+                    log.warn("IP信息服务返回非200状态码: {} - {}", service, connection.getResponseCode());
                 }
             } catch (java.net.SocketTimeoutException e) {
-                logger.warn("获取IP信息超时，切换到下一个服务: {} - {}", service, e.getMessage());
+                log.warn("获取IP信息超时，切换到下一个服务: {} - {}", service, e.getMessage());
             } catch (Exception e) {
-                logger.warn("获取IP信息失败: {} - {}", service, e.getMessage());
+                log.warn("获取IP信息失败: {} - {}", service, e.getMessage());
             } finally {
                 // 关闭资源
                 try {
@@ -775,7 +772,7 @@ public class CmsUtils {
                         connection.disconnect();
                     }
                 } catch (Exception e) {
-                    logger.warn("关闭资源失败: {}", e.getMessage());
+                    log.warn("关闭资源失败: {}", e.getMessage());
                 }
             }
 
@@ -883,7 +880,7 @@ public class CmsUtils {
                 }
             }
         } catch (Exception e) {
-            logger.warn("解析IP信息失败: {}", e.getMessage());
+            log.warn("解析IP信息失败: {}", e.getMessage());
             // 解析异常，返回null
         }
 
@@ -994,7 +991,7 @@ public class CmsUtils {
             }
 
         } catch (Exception e) {
-            logger.error("获取本地IP地址失败: {}", e.getMessage(), e);
+            log.error("获取本地IP地址失败: {}", e.getMessage(), e);
         }
 
         return "127.0.0.1"; // 如果没有找到合适的IP，返回回环地址
@@ -1021,7 +1018,7 @@ public class CmsUtils {
             for (String envVar : dockerEnvVars) {
                 String value = System.getenv(envVar);
                 if (value != null) {
-                    logger.debug("检测到Docker环境变量 {}: {}", envVar, value);
+                    log.debug("检测到Docker环境变量 {}: {}", envVar, value);
                     return true;
                 }
             }
@@ -1029,7 +1026,7 @@ public class CmsUtils {
             // 方法3: 检查主机名是否包含docker相关标识
             String hostname = System.getenv("HOSTNAME");
             if (hostname != null && (hostname.contains("docker") || hostname.contains("container"))) {
-                logger.debug("检测到Docker相关主机名: {}", hostname);
+                log.debug("检测到Docker相关主机名: {}", hostname);
                 return true;
             }
 
@@ -1043,7 +1040,7 @@ public class CmsUtils {
                         String line;
                         while ((line = reader.readLine()) != null) {
                             if (line.contains("docker") || line.contains("kubepods")) {
-                                logger.debug("在cgroup中检测到Docker标识: {}", line);
+                                log.debug("在cgroup中检测到Docker标识: {}", line);
                                 return true;
                             }
                         }
@@ -1057,7 +1054,7 @@ public class CmsUtils {
                         String line;
                         while ((line = reader.readLine()) != null) {
                             if (line.contains("docker") || line.contains("kubepods")) {
-                                logger.debug("在self cgroup中检测到Docker标识: {}", line);
+                                log.debug("在self cgroup中检测到Docker标识: {}", line);
                                 return true;
                             }
                         }
@@ -1066,7 +1063,7 @@ public class CmsUtils {
             }
 
         } catch (Exception e) {
-            logger.warn("检测Docker环境时发生异常: {}", e.getMessage());
+            log.warn("检测Docker环境时发生异常: {}", e.getMessage());
             // 忽略异常，继续检查其他方法
         }
 

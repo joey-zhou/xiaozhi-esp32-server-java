@@ -10,8 +10,6 @@ import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.port.TokenResolver;
 import com.xiaozhi.common.model.bo.ConfigBO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,14 +17,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 阿里云NLS实时语音识别服务
  * 使用阿里云智能语音交互SDK实现STT功能
  * 参考文档: https://help.aliyun.com/zh/isi/developer-reference/sdk-for-java-8
  */
+@Slf4j
 public class AliyunNlsSttService implements SttService {
-    private static final Logger logger = LoggerFactory.getLogger(AliyunNlsSttService.class);
-
     private static final String PROVIDER_NAME = "aliyun-nls";
 
     // 阿里云NLS服务的默认URL
@@ -89,7 +87,7 @@ public class AliyunNlsSttService implements SttService {
                 try {
                     existing.client.shutdown();
                 } catch (Exception e) {
-                    logger.warn("关闭旧NlsClient失败", e);
+                    log.warn("关闭旧NlsClient失败", e);
                 }
             }
             NlsClient newClient = new NlsClient(NLS_URL, currentToken);
@@ -109,7 +107,7 @@ public class AliyunNlsSttService implements SttService {
             try {
                 removed.client.shutdown();
             } catch (Exception e) {
-                logger.warn("关闭NlsClient失败", e);
+                log.warn("关闭NlsClient失败", e);
             }
         }
     }
@@ -122,7 +120,7 @@ public class AliyunNlsSttService implements SttService {
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
         if (audioSink == null) {
-            logger.error("音频数据流为空");
+            log.error("音频数据流为空");
             return SttResult.textOnly("");
         }
 
@@ -170,14 +168,14 @@ public class AliyunNlsSttService implements SttService {
 
                 @Override
                 public void onTranscriptionComplete(SpeechTranscriberResponse response) {
-                    logger.info("NLS实时识别完成 - TaskId: {}", response.getTaskId());
+                    log.info("NLS实时识别完成 - TaskId: {}", response.getTaskId());
                     recognitionCompleted.set(true);
                     latch.countDown();
                 }
 
                 @Override
                 public void onFail(SpeechTranscriberResponse response) {
-                    logger.error("NLS实时识别失败 - TaskId: {}, Status: {}, StatusText: {}",
+                    log.error("NLS实时识别失败 - TaskId: {}, Status: {}, StatusText: {}",
                             response.getTaskId(),
                             response.getStatus(),
                             response.getStatusText());
@@ -220,12 +218,12 @@ public class AliyunNlsSttService implements SttService {
                                         // 发送音频数据
                                         finalTranscriber.send(audioChunk);
                                     } catch (Exception e) {
-                                        logger.error("发送音频数据失败", e);
+                                        log.error("发送音频数据失败", e);
                                     }
                                 }
                             },
                             error -> {
-                                logger.error("音频流处理错误", error);
+                                log.error("音频流处理错误", error);
                                 errorHolder[0].set(true);
                                 latch.countDown();
                             },
@@ -234,12 +232,12 @@ public class AliyunNlsSttService implements SttService {
                                     // 音频流结束，停止识别
                                     finalTranscriber.stop();
                                 } catch (Exception e) {
-                                    logger.error("停止识别失败", e);
+                                    log.error("停止识别失败", e);
                                 }
                             }
                     );
                 } catch (Exception e) {
-                    logger.error("处理音频流时发生错误", e);
+                    log.error("处理音频流时发生错误", e);
                     errorHolder[0].set(true);
                     latch.countDown();
                 }
@@ -248,13 +246,13 @@ public class AliyunNlsSttService implements SttService {
 
             // 等待识别完成或超时
             if (!latch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                logger.error("NLS实时识别超时");
+                log.error("NLS实时识别超时");
                 return SttResult.textOnly("");
             }
 
             // 检查识别是否失败
             if (recognitionFailed.get() || errorHolder[0].get()) {
-                logger.error("识别过程中发生错误");
+                log.error("识别过程中发生错误");
                 return SttResult.textOnly("");
             }
 
@@ -263,11 +261,11 @@ public class AliyunNlsSttService implements SttService {
             synchronized (resultBuilder) {
                 result = resultBuilder.toString().trim();
             }
-            logger.debug("阿里云NLS识别结果: {}", result);
+            log.debug("阿里云NLS识别结果: {}", result);
             return SttResult.textOnly(result);
 
         } catch (Exception e) {
-            logger.error("阿里云NLS实时识别失败", e);
+            log.error("阿里云NLS实时识别失败", e);
             // 连接异常时清除缓存，下次调用时重建client
             globalClientCache.remove(config.getConfigId());
             return SttResult.textOnly("");
@@ -277,7 +275,7 @@ public class AliyunNlsSttService implements SttService {
                 try {
                     transcriber.close();
                 } catch (Exception e) {
-                    logger.warn("关闭SpeechTranscriber失败", e);
+                    log.warn("关闭SpeechTranscriber失败", e);
                 }
             }
         }

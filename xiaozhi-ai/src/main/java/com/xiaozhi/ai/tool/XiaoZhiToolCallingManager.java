@@ -5,8 +5,6 @@ import com.xiaozhi.ai.tool.session.ToolSessionProvider;
 import com.xiaozhi.event.ToolCallCompletedEvent;
 
 import io.micrometer.observation.ObservationRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
@@ -37,17 +35,17 @@ import org.springframework.util.CollectionUtils;
 import java.util.*;
 import java.util.HashMap;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 自定义的工具调用管理器，用于处理工具调用和执行。
  * 基于Spring AI的DefaultToolCallingManager，增加了自定义的监控和元数据处理功能。
  * 包含对流式工具调用分片合并的修复（Spring AI issue #4629, #4790）。
  * 后续关注 Spring AI 是否有修复改问题
  */
+@Slf4j
 public class XiaoZhiToolCallingManager implements ToolCallingManager, ApplicationContextAware {
 
     private static ApplicationContext applicationContext;
-
-    private static final Logger logger = LoggerFactory.getLogger(XiaoZhiToolCallingManager.class);
 
     // @formatter:off
 
@@ -96,7 +94,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
             try {
                 return applicationContext.getBean(ToolSessionProvider.class);
             } catch (Exception e) {
-                logger.debug("无法获取ToolSessionProvider: {}", e.getMessage());
+                log.debug("无法获取ToolSessionProvider: {}", e.getMessage());
             }
         }
         return null;
@@ -122,10 +120,9 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
             applicationContext.publishEvent(new ToolCallCompletedEvent(
                     XiaoZhiToolCallingManager.class, sessionId, toolName, arguments, result, success, durationMs));
         } catch (Exception e) {
-            logger.debug("发布工具调用事件失败: {}", e.getMessage());
+            log.debug("发布工具调用事件失败: {}", e.getMessage());
         }
     }
-
 
     @Override
     public List<ToolDefinition> resolveToolDefinitions(ToolCallingChatOptions chatOptions) {
@@ -333,14 +330,14 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         List<AssistantMessage.ToolCall> valid = new ArrayList<>();
         for (AssistantMessage.ToolCall tc : merged) {
             if (!hasText(tc.name())) {
-                logger.warn("工具调用合并后仍缺少 name，跳过: id={}, arguments={}", tc.id(), tc.arguments());
+                log.warn("工具调用合并后仍缺少 name，跳过: id={}, arguments={}", tc.id(), tc.arguments());
             } else {
                 valid.add(tc);
             }
         }
 
         if (valid.size() != toolCalls.size()) {
-            logger.info("工具调用分片合并完成: {} 条 → {} 条", toolCalls.size(), valid.size());
+            log.info("工具调用分片合并完成: {} 条 → {} 条", toolCalls.size(), valid.size());
         }
         return valid;
     }
@@ -375,7 +372,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
 
             if (toolCallback == null) {
                 // 模型幻觉调用了未注册的工具，返回错误结果让模型自行总结回复，而不是崩掉整个流
-                logger.error("模型调用了未注册的工具: {}", toolName);
+                log.error("模型调用了未注册的工具: {}", toolName);
                 toolResponses.add(new ToolResponseMessage.ToolResponse(
                         toolCall.id(), toolName,
                         "工具 '" + toolName + "' 不存在或未注册，请告知用户该功能当前不可用。"));
@@ -417,14 +414,14 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
                             toolResult = toolCallback.call(toolInputArguments, toolContext);
                         }
                         catch (ToolExecutionException ex) {
-                            logger.error("Tool execution exception: ", ex);
+                            log.error("Tool execution exception: ", ex);
                             toolResult = this.toolExecutionExceptionProcessor.process(ex);
-                            logger.debug("Processed tool execution exception result: {}", toolResult);
+                            log.debug("Processed tool execution exception result: {}", toolResult);
                             success = false;
                             successRef[0] = false;
                         }
                         catch (Exception ex) {
-                            logger.error("Unexpected exception during tool execution: ", ex);
+                            log.error("Unexpected exception during tool execution: ", ex);
                             toolResult = "Error executing tool: " + ex.getMessage();
                             success = false;
                             successRef[0] = false;

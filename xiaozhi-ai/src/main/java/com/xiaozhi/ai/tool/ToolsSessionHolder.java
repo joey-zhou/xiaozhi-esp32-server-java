@@ -1,18 +1,16 @@
 package com.xiaozhi.ai.tool;
 
 import com.xiaozhi.common.model.bo.DeviceBO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
 
 import java.util.*;
 
+import lombok.extern.slf4j.Slf4j;
 /**
  * 与session绑定的functionTools
  */
+@Slf4j
 public class ToolsSessionHolder {
-    private final Logger logger = LoggerFactory.getLogger(ToolsSessionHolder.class);
-
     private static final String TAG = "FUNCTION_SESSION";
 
     private final Map<String, ToolCallback> functionRegistry = new HashMap<>();
@@ -39,11 +37,11 @@ public class ToolsSessionHolder {
         // Look up the function in the globalFunctionRegistry
         ToolCallback func = globalFunctionRegistry.resolve(name);
         if (func == null) {
-            logger.error("[{}] - SessionId:{} Function:{} not found in globalFunctionRegistry", TAG, sessionId, name);
+            log.error("[{}] - SessionId:{} Function:{} not found in globalFunctionRegistry", TAG, sessionId, name);
             return null;
         }
         functionRegistry.put(name, func);
-        logger.debug("[{}] - SessionId:{} Function:{} registered from global successfully", TAG, sessionId, name);
+        log.debug("[{}] - SessionId:{} Function:{} registered from global successfully", TAG, sessionId, name);
         return func;
     }
 
@@ -65,11 +63,11 @@ public class ToolsSessionHolder {
     public boolean unregisterFunction(String name) {
         // Check if the function exists before unregistering
         if (!functionRegistry.containsKey(name)) {
-            logger.error("[{}] - SessionId:{} Function:{} not found", TAG, sessionId, name);
+            log.error("[{}] - SessionId:{} Function:{} not found", TAG, sessionId, name);
             return false;
         }
         functionRegistry.remove(name);
-        logger.info("[{}] - SessionId:{} Function:{} unregistered successfully", TAG, sessionId, name);
+        log.info("[{}] - SessionId:{} Function:{} unregistered successfully", TAG, sessionId, name);
         return true;
     }
 
@@ -106,6 +104,6 @@ public class ToolsSessionHolder {
      */
     public void registerGlobalFunctionTools() {
         // 全局函数由 ToolRegistrationService 统一管理
-        logger.debug("[{}] - SessionId:{} 跳过自动注册全局函数，由 ToolRegistrationService 统一管理", TAG, sessionId);
+        log.debug("[{}] - SessionId:{} 跳过自动注册全局函数，由 ToolRegistrationService 统一管理", TAG, sessionId);
     }
 }
