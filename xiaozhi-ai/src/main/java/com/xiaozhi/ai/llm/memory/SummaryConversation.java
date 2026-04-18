@@ -1,7 +1,6 @@
 package com.xiaozhi.ai.llm.memory;
 
 import com.xiaozhi.common.model.bo.SummaryBO;
-import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 
 import lombok.Builder;
 import org.springframework.ai.chat.messages.*;
@@ -44,8 +43,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class SummaryConversation extends Conversation {
     private static final int CONVERSATION_INTERVAL_HOURS = 1;
-    private static final int DEFAULT_MAX_MESSAGES = 24;
-    private static final int DEFAULT_BATCH_SIZE = 20;
     private final PromptTemplate initSummarizerPromptTemplate ;
     private final PromptTemplate againSummarizerPromptTemplate ;
     private final ChatMemory chatMemory;
@@ -242,7 +239,8 @@ public class SummaryConversation extends Conversation {
             historyMessages.add(new SystemMessage("下面是你与用户最近聊天内容的摘要：\n" + summarySnapshot.getSummary()));
         }
         historyMessages.addAll(messageSnapshot);
-        return historyMessages;
+        // UserMessage 按 metadata 装配带前缀的副本供 LLM 使用
+        return historyMessages.stream().map(UserMessageAssembler::assemble).toList();
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.ai.llm.memory.ChatMemory;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.memory.ConversationContext;
+import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.ai.llm.memory.MessageWindowConversation;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.RoleBO;
@@ -22,7 +23,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -140,11 +143,16 @@ public class WebChatService {
             return Flux.error(new IllegalStateException("会话不存在或已过期: " + sessionId));
         }
 
-        UserMessage userMessage = new UserMessage(text);
+        // Web 场景：裸文本 UserMessage + 时间戳 metadata；
+        // Conversation 投影层会在送 LLM 前拼出 [时间戳] 文本 的前缀。
+        // 无 speaker/emotion，故不挂 MessageMetadataBO。
         LocalDateTime userCreatedAt = LocalDateTime.now();
+        Instant userInstant = userCreatedAt.atZone(ZoneId.systemDefault()).toInstant();
+        UserMessage userMessage = new UserMessage(text);
+        MessageTimeMetadata.setTimeMillis(userMessage, userInstant);
         conversation.add(userMessage);
 
-        // Web 场景无位置、无声纹
+        // Web 场景无位置
         List<Message> messages = conversation.messages(ConversationContext.EMPTY);
 
         Prompt prompt = new Prompt(messages);
@@ -162,6 +170,7 @@ public class WebChatService {
                     }
                     String reply = fullResponse.toString();
                     conversation.add(new AssistantMessage(reply));
+                    // 持久化裸文本（元数据由 Conversation 投影层按需拼前缀，DB 保持干净）
                     persistTurn(conversation, text, userCreatedAt, reply, LocalDateTime.now());
                 })
                 .doOnError(e -> log.error("Web 聊天流式响应失败: sessionId={}", sessionId, e));

@@ -17,6 +17,10 @@ import org.springframework.stereotype.Service;
  *   <li>Req/Resp ↔ BO 转换</li>
  *   <li>跨领域校验</li>
  * </ul>
+ * <p>
+ * 注：UserMessage 的元数据（时间戳/说话人/情绪）已由 {@code MessageMetadataBO} 以结构化方式
+ * 存在 sys_message.metadata 的 JSON 列中，{@code message} 列本身就是用户裸文本，前端直接展示无需剥离。
+ * 投影拼前缀由 {@code Conversation} 层在送 LLM 前按需做。
  */
 @Service
 public class MessageAppService {

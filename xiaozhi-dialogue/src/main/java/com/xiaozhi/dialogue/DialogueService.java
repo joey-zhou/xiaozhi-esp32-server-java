@@ -7,8 +7,11 @@ import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.dialogue.audio.VadService;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
+import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.ai.stt.SttResult;
+import com.xiaozhi.common.model.bo.MessageMetadataBO;
+import org.springframework.ai.chat.messages.UserMessage;
 import com.xiaozhi.dialogue.audio.VadService.VadStatus;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.runtime.Persona;
@@ -232,13 +235,7 @@ public class DialogueService{
 
             String text = sttResult.text();
 
-            // 情感标签拼接（textOnly 时 hasEmotion()=false，自动跳过）
-            String llmText = sttResult.hasEmotion()
-                    ? "[" + sttResult.emotion() + "]" + text : text;
-            if (sttResult.hasEmotion()) {
-                log.info("检测到用户情感: {} (置信度: {}, 强度: {})",
-                        sttResult.emotion(), sttResult.emotionScore(), sttResult.emotionDegree());
-            }
+            UserMessage userMessage = buildUserMessage(text, sttResult);
 
             // 意图检测
             if (intentService.detect(text) == IntentService.Intent.EXIT) {
@@ -248,7 +245,7 @@ public class DialogueService{
 
             // LLM+TTS
             try {
-                persona.chat(llmText, true);
+                persona.chat(userMessage, true);
             } catch (Exception e) {
                 log.error("LLM对话处理失败: {}", e.getMessage(), e);
             }
@@ -256,6 +253,31 @@ public class DialogueService{
         } catch (Exception e) {
             log.error("处理文本失败: {}", e.getMessage(), e);
         }
+    }
+
+    /**
+     * 构造带结构化元数据与时间戳的 UserMessage。
+     * 元数据不在 text 上做前缀拼接，而是走 UserMessage.metadata Map，
+     * 由 {@code UserMessageAssembler#assemble(Message)} 在送 LLM 前统一装配。
+     *
+     * @param text     用户裸文本
+     * @param sttResult STT 结果，可能含情绪信息
+     */
+    private static UserMessage buildUserMessage(String text, SttResult sttResult) {
+        MessageMetadataBO metadataBO = MessageMetadataBO.builder()
+                .emotion(sttResult.hasEmotion() ? sttResult.emotion() : null)
+                .emotionScore(sttResult.hasEmotion() ? sttResult.emotionScore() : null)
+                .emotionDegree(sttResult.hasEmotion() ? sttResult.emotionDegree() : null)
+                .build();
+        Map<String, Object> msgMeta = new HashMap<>();
+        // 只要任一字段有值就挂载；全空时不挂，保持 UserMessage.metadata 干净
+        if (StringUtils.hasText(metadataBO.getEmotion())) {
+            msgMeta.put(MessageMetadataBO.METADATA_KEY, metadataBO);
+        }
+        UserMessage userMessage = UserMessage.builder().text(text).metadata(msgMeta).build();
+        // 消息时间戳（投影层据此拼 [yyyy-MM-ddTHH:mm:ss] 前缀）
+        MessageTimeMetadata.setTimeMillis(userMessage, Instant.now());
+        return userMessage;
     }
 
     /**

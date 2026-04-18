@@ -1,6 +1,7 @@
 package com.xiaozhi.ai.llm.memory;
 
 import com.xiaozhi.common.model.bo.MessageBO;
+import com.xiaozhi.common.model.bo.MessageMetadataBO;
 import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.summary.service.SummaryService;
@@ -87,6 +88,12 @@ public class DatabaseChatMemory implements ChatMemory {
                 springMessage = AssistantMessage.builder().content(message.getMessage()).properties(metadata).build();
             }
         } else if (MessageBO.SENDER_USER.equals(role)) {
+            // 把持久化的结构化元数据（speaker/emotion 等）回灌到 UserMessage.metadata，
+            // 供 Conversation 层投影拼成文本前缀送 LLM
+            MessageMetadataBO userMetadata = message.getMetadata();
+            if (userMetadata != null) {
+                metadata.put(MessageMetadataBO.METADATA_KEY, userMetadata);
+            }
             springMessage = UserMessage.builder().text(message.getMessage()).metadata(metadata).build();
         } else {
             throw new IllegalArgumentException("Invalid role: " + role);

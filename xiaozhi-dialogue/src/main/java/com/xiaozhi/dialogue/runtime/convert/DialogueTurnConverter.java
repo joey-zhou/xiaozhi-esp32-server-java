@@ -5,12 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.memory.ToolCallMessageCodec;
 import com.xiaozhi.common.model.bo.MessageBO;
+import com.xiaozhi.common.model.bo.MessageMetadataBO;
 import com.xiaozhi.dialogue.runtime.DialogueContext;
 import com.xiaozhi.dialogue.runtime.DialogueTurn;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AbstractMessage;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.stereotype.Component;
@@ -81,6 +83,12 @@ public class DialogueTurnConverter {
                     messageBO.setAudioPath(userSpeechPath.toString());
                 }
                 messageBO.setCreateTime(LocalDateTime.ofInstant(turn.getUserMessageCreatedAt(), ZoneId.systemDefault()));
+                // 从 UserMessage.metadata 抽取结构化元数据（speaker/emotion 等）写入 MessageBO.metadata
+                if (message instanceof UserMessage userMessage
+                        && userMessage.getMetadata() != null
+                        && userMessage.getMetadata().get(MessageMetadataBO.METADATA_KEY) instanceof MessageMetadataBO metadata) {
+                    messageBO.setMetadata(metadata);
+                }
                 break;
             case ASSISTANT:
                 messageBO.setCreateTime(LocalDateTime.ofInstant(turn.getAssistantMessageCreatedAt(), ZoneId.systemDefault()));

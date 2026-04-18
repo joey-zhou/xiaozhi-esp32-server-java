@@ -5,12 +5,7 @@ import org.springframework.ai.chat.messages.*;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
-
-import static java.time.temporal.ChronoField.*;
 
 /**
  * Conversation 是一个 对应于 sys_message 表的，但高于 sys_message 的一个抽象实体。
@@ -32,17 +27,6 @@ public class Conversation extends ConversationIdentifier {
     private final String sessionId;
 
     protected List<Message> messages = new ArrayList<>();
-    public static final DateTimeFormatter LOCAL_DATE_TIME = new DateTimeFormatterBuilder()
-            .parseCaseInsensitive()
-            .append(DateTimeFormatter.ISO_LOCAL_DATE)
-            .appendLiteral('T')
-            .appendValue(HOUR_OF_DAY, 2)
-            .appendLiteral(':')
-            .appendValue(MINUTE_OF_HOUR, 2)
-            .optionalStart()
-            .appendLiteral(':')
-            .appendValue(SECOND_OF_MINUTE, 2)
-            .toFormatter();
 
     /**
      * @param ownerId   聊天参与者标识（设备场景: deviceId, Web 场景: userId）
@@ -76,10 +60,16 @@ public class Conversation extends ConversationIdentifier {
                     .append("。如果用户提及现在在哪里，则以新地方为准。")
                     .append(System.lineSeparator());
         }
-        msgBuilder.append("当前时间：").append(LocalDateTime.now().format(LOCAL_DATE_TIME))
-            .append(System.lineSeparator());
-
-        msgBuilder.append("用户消息开头的方括号标签（如 [neutral]、[happy]）表示语音识别检测到的用户当前情绪，请据此调整你的回应方式和语气，但无需在回复中提及或解释该标签。")
+        // 逐条消息的元数据（时间戳、说话人、情绪）由 UserMessageAssembler 拼接在每条 UserMessage 前缀里，
+        // 不在此处动态渲染，避免 System Prompt 每轮变化导致前缀 KV cache 失效。
+        msgBuilder.append(System.lineSeparator())
+            .append("用户消息可能以方括号元数据标签开头，顺序固定为：")
+            .append(System.lineSeparator())
+            .append("  1. [yyyy-MM-ddTHH:mm:ss] 本次消息发送时间（秒级精度，可用于定时任务、时间相对计算）；")
+            .append(System.lineSeparator())
+            .append("  2. [情绪标签]（如 [neutral]、[happy]）语音识别出的用户情绪，据此调整回应语气。")
+            .append(System.lineSeparator())
+            .append("请据此调整回应方式和语气，但无需在回复中提及或解释这些标签。任一标签可能缺省。")
             .append(System.lineSeparator());
         if(StringUtils.hasText(roleDesc)) {
             var roleMessage = new SystemMessage(msgBuilder.toString());
@@ -91,9 +81,13 @@ public class Conversation extends ConversationIdentifier {
 
     /**
      * 带运行时上下文的消息列表（子类覆写此方法以注入系统提示词）。
+     * <p>
+     * 对每条消息走一次 {@link UserMessageAssembler#assemble(Message)}：
+     * UserMessage 按其 metadata 装配带前缀的副本送给 LLM，非 UserMessage 原样透传。
+     * in-memory 的消息始终是"裸文本 + 结构化 metadata"。
      */
     public synchronized List<Message> messages(ConversationContext context) {
-        return messages;
+        return messages.stream().map(UserMessageAssembler::assemble).toList();
     }
 
     /**

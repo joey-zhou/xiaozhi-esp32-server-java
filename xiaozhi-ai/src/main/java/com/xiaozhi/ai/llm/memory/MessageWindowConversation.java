@@ -71,7 +71,8 @@ public class MessageWindowConversation extends Conversation {
             historyMessages.add(roleSystemMessage.get());
         }
         historyMessages.addAll(messages);
-        return historyMessages;
+        // UserMessage 按 metadata 装配带前缀的副本供 LLM 使用
+        return historyMessages.stream().map(UserMessageAssembler::assemble).toList();
     }
 
     @Override

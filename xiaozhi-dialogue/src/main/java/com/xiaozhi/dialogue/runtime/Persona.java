@@ -140,7 +140,7 @@ public class Persona {
                 .build();
 
         conversation.add(userMessage);
-        // 构建运行时上下文（位置等）传入 messages
+        // 构建运行时上下文
         ChatSession currentSession = getSession();
         String location = currentSession.getDevice() != null ? currentSession.getDevice().getLocation() : null;
         ConversationContext ctx = new ConversationContext(location);
@@ -191,20 +191,28 @@ public class Persona {
     }
 
     /**
-     * 默认情况下，启用工具调用
-     * @param userMessage
+     * 默认情况下，启用工具调用。
+     * @param userMessage 纯文本用户消息（便利方法，不带结构化元数据）
      */
     public void chat(String userMessage){
-        chat(userMessage,true);
+        chat(userMessage, true);
     }
 
     /**
-     * @param userMessage
-     * @param useFunctionCall
+     * 接收纯文本。内部包装为不带 metadata 的 UserMessage。
      */
     public void chat(String userMessage, boolean useFunctionCall){
+        chat(new UserMessage(userMessage), useFunctionCall);
+    }
+
+    /**
+     * 主入口：带元数据（time/speaker/emotion 等在 UserMessage.metadata 里）的对话。
+     * @param userMessage 已构造好的 Spring AI UserMessage，可附带 metadata
+     * @param useFunctionCall 是否启用工具调用
+     */
+    public void chat(UserMessage userMessage, boolean useFunctionCall){
         Instant now = Instant.now();
-        Flux<ChatResponse> chatResponseFlux = chatStream(now, new UserMessage(userMessage), useFunctionCall);
+        Flux<ChatResponse> chatResponseFlux = chatStream(now, userMessage, useFunctionCall);
         synthesizer.synthesize(convert(chatResponseFlux));
     }
 

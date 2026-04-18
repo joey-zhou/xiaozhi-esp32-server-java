@@ -21,6 +21,11 @@ public class MessageDO extends BaseDO {
     private String deviceId;
     private String sender;
     private String message;
+    /**
+     * UserMessage 附加元数据的 JSON 序列化字符串（speaker/emotion 等）。
+     * 仅 sender=user 的行可能有值，其他为 null。
+     */
+    private String metadata;
     private LocalDate statDate;
     private String audioPath;
     private String state;
