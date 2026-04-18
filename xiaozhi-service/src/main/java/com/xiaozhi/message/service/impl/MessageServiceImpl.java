@@ -228,6 +228,7 @@ public class MessageServiceImpl implements MessageService {
             .eq(MessageDO::getDeviceId, deviceId)
             .eq(MessageDO::getRoleId, roleId)
             .eq(MessageDO::getSender, MessageBO.SENDER_ASSISTANT)
+            .eq(MessageDO::getMessageType, MessageBO.MESSAGE_TYPE_NORMAL)
             .eq(MessageDO::getCreateTime, createTime)
             .select(MessageDO::getMessageId);
         MessageDO messageDO = messageMapper.selectOne(query);
