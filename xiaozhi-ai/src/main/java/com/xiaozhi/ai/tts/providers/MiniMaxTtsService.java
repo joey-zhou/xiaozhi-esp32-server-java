@@ -132,7 +132,6 @@ public class MiniMaxTtsService implements TtsService {
             throw new RuntimeException("发送TTS请求失败", e);
         }
     }
-
     
     @Data
     @Accessors(chain = true)

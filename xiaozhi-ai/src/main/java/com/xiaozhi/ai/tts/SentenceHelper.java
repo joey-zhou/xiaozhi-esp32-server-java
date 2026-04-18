@@ -5,6 +5,8 @@ import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,12 +50,11 @@ public class SentenceHelper implements ChatConverter {
      * 命令式分句：逐 token 输入，返回检测到的完整句子，未成句则返回空字符串。
      * 供 TTS Provider 内部 WebSocket 订阅回调使用。
      */
-    public String take(String token) {
+    public List<String> take(String token) {
+        List<String> sentences = new ArrayList<>();
         if (token == null || token.isEmpty()) {
-            return "";
+            return sentences;
         }
-
-        String detectedSentence = null;
 
         for (int i = 0; i < token.length();) {
             int codePoint = token.codePointAt(i);
@@ -96,7 +97,7 @@ public class SentenceHelper implements ChatConverter {
             if (shouldSendSentence && currentSentence.length() >= MIN_SENTENCE_LENGTH) {
                 String sentence = EmojiUtils.filterKaomoji(currentSentence.toString().trim());
                 if (containsSubstantialContent(sentence)) {
-                    detectedSentence = sentence;
+                    sentences.add(sentence);
                     currentSentence.setLength(0);
                 }
             }
@@ -104,7 +105,7 @@ public class SentenceHelper implements ChatConverter {
             i += Character.charCount(codePoint);
         }
 
-        return detectedSentence != null ? detectedSentence : "";
+        return sentences;
     }
 
     /**
@@ -114,11 +115,8 @@ public class SentenceHelper implements ChatConverter {
         return currentSentence.toString().trim();
     }
 
-    // ---- 响应式 API（供 FileSynthesizer 使用）----
-
     public void onToken(String token, FluxSink<String> sink) {
-        String sentence = take(token);
-        if (StringUtils.hasText(sentence)) {
+        for (String sentence : take(token)) {
             sink.next(sentence);
         }
     }
