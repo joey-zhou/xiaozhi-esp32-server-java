@@ -7,6 +7,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
+/**
+ * 根据角色的 memoryType 构造对应的 Conversation。
+ * <p>
+ * Conversation 只负责消息容器 / 窗口策略 / 摘要策略。
+ */
 @Primary
 @Service
 @Slf4j
@@ -22,7 +27,7 @@ public class DefaultConversationFactory implements ConversationFactory {
 
     @Override
     public Conversation initConversation(String ownerId, Integer userId, RoleBO role, String sessionId) {
-        Conversation conversation = switch (role.getMemoryType()) {
+        return switch (role.getMemoryType()) {
             case "summary" -> summaryConversationFactory.initConversation(ownerId, userId, role, sessionId);
             case "window" -> MessageWindowConversation.builder().chatMemory(chatMemory)
                     .maxMessages(maxMessages)
@@ -44,7 +49,5 @@ public class DefaultConversationFactory implements ConversationFactory {
                     .build();
             }
         };
-        
-        return conversation;
     }
 }

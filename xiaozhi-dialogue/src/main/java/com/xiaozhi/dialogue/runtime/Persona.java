@@ -28,7 +28,6 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-
 import java.util.concurrent.atomic.AtomicReference;
 
 import lombok.extern.slf4j.Slf4j;
@@ -140,6 +139,7 @@ public class Persona {
                 .build();
 
         conversation.add(userMessage);
+
         // 构建运行时上下文
         ChatSession currentSession = getSession();
         String location = currentSession.getDevice() != null ? currentSession.getDevice().getLocation() : null;
@@ -162,9 +162,15 @@ public class Persona {
         });
         return new MessageAggregator().aggregate(chatFlux, chatResponse -> {
             var toolCallDetails = getSession().drainToolCallDetails();
-            // 从 DialogueContext 中获取工具调用的中间消息
+            // 从 DialogueContext 中获取模型真实调用的工具调用链中间消息
             AssistantMessage toolCallAssistantMsg = getSession().getDialogueContext().drainToolCallAssistantMessage();
             ToolResponseMessage toolResponseMsg = getSession().getDialogueContext().drainToolResponseMessage();
+
+            // 合并本轮所有 tool chain：模型真实调用链（顺序即持久化顺序）
+            List<ToolChainPair> allChains = new ArrayList<>();
+            if (toolCallAssistantMsg != null && toolResponseMsg != null) {
+                allChains.add(new ToolChainPair(toolCallAssistantMsg, toolResponseMsg));
+            }
 
             DialogueTurn dialogueTurn = DialogueTurn.builder()
                     .userMessage(userMessage)
@@ -174,14 +180,13 @@ public class Persona {
                     .userSpeechPath(userSpeechPath)
                     .assistantMessageCreatedAt(ttft.get())
                     .toolCallDetails(toolCallDetails)
-                    .toolCallAssistantMessage(toolCallAssistantMsg)
-                    .toolResponseMessage(toolResponseMsg)
+                    .toolChains(allChains)
                     .build();
             // UserMessage 的时间戳应在 DialogueTurn 中注入，与 Conversation 持有的是同一个 UserMessage。
             dialogueTurn.injectInstants();
             listener.onDialogueTurn(dialogueTurn);
 
-            // 将工具调用链注入 Conversation 历史
+            // 模型真实调用的工具链注入 Conversation
             if (toolCallAssistantMsg != null && toolResponseMsg != null) {
                 conversation.addToolCallChain(toolCallAssistantMsg, toolResponseMsg);
             }

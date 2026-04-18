@@ -98,9 +98,8 @@ public class Conversation extends ConversationIdentifier {
     }
 
     /**
-     * 返回原始消息列表（不触发 RAG 检索等副作用）。
-     * 用于工具路由的 FC 上下文检测等只需读取历史的场景。
-     * 子类（如 RetrievalConversation）可覆写以返回底层 conversation 的原始消息。
+     * 返回原始消息列表（不触发任何投影副作用，文本保持"裸文本"，metadata 未拼前缀）。
+     * 用于工具路由的 FC 上下文检测。
      */
     public synchronized List<Message> rawMessages() {
         return messages;

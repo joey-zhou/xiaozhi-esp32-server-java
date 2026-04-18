@@ -8,6 +8,7 @@ import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.MessageMetadataBO;
 import com.xiaozhi.dialogue.runtime.DialogueContext;
 import com.xiaozhi.dialogue.runtime.DialogueTurn;
+import com.xiaozhi.dialogue.runtime.ToolChainPair;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AbstractMessage;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -50,13 +51,16 @@ public class DialogueTurnConverter {
         // 1. UserMessage
         messages.add(toMessageBO(turn, turn.getUserMessage()));
 
-        // 2 + 3. 如果有工具调用，插入中间消息：Assistant(toolCall) + Tool(response)
-        if (turn.getToolCallAssistantMessage() != null && turn.getToolResponseMessage() != null) {
-            messages.add(toToolCallAssistantMessageBO(turn));
-            messages.add(toToolResponseMessageBO(turn));
+        // 2. 按顺序插入所有工具调用链：每个 pair 拆成 Assistant(toolCall) + Tool(response) 两条
+        for (ToolChainPair chain : turn.getToolChains()) {
+            if (chain == null || chain.toolCallMessage() == null || chain.toolResponseMessage() == null) {
+                continue;
+            }
+            messages.add(toToolCallAssistantMessageBO(turn, chain.toolCallMessage()));
+            messages.add(toToolResponseMessageBO(turn, chain.toolResponseMessage()));
         }
 
-        // 4. 最终 AssistantMessage
+        // 3. 最终 AssistantMessage
         messages.add(toMessageBO(turn, finalAssistantMessage));
 
         return messages;
@@ -108,9 +112,8 @@ public class DialogueTurnConverter {
     }
 
     /** 构建工具调用请求的 MessageBO（sender=assistant, messageType=TOOL_CALL） */
-    private MessageBO toToolCallAssistantMessageBO(DialogueTurn turn) {
+    private MessageBO toToolCallAssistantMessageBO(DialogueTurn turn, AssistantMessage toolCallAssistantMessage) {
         Conversation conversation = turn.getConversation();
-        AssistantMessage toolCallAssistantMessage = turn.getToolCallAssistantMessage();
 
         MessageBO messageBO = new MessageBO();
         messageBO.setUserId(conversation.getUserId());
@@ -131,9 +134,8 @@ public class DialogueTurnConverter {
     }
 
     /** 构建工具执行结果的 MessageBO（sender=tool, messageType=TOOL_RESPONSE） */
-    private MessageBO toToolResponseMessageBO(DialogueTurn turn) {
+    private MessageBO toToolResponseMessageBO(DialogueTurn turn, ToolResponseMessage toolResponseMessage) {
         Conversation conversation = turn.getConversation();
-        ToolResponseMessage toolResponseMessage = turn.getToolResponseMessage();
 
         MessageBO messageBO = new MessageBO();
         messageBO.setUserId(conversation.getUserId());
