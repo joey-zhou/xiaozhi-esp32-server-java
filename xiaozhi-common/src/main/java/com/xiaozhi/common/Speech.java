@@ -11,6 +11,9 @@ public class Speech extends org.springframework.ai.audio.tts.Speech {
     @Getter
     private String text="";
 
+    @Getter
+    private String mood;
+
     /**
      * 标记数据是否已经是 Opus 编码帧。
      * true: getOutput() 返回的是单个 Opus 帧，Player 无需再做 PCM→Opus 转换。
@@ -32,6 +35,14 @@ public class Speech extends org.springframework.ai.audio.tts.Speech {
      */
     public Speech withText(String text) {
         this.text = text;
+        return this;
+    }
+
+    /**
+     * 设置情绪信息（从表情符号提取，用于设备表情展示）
+     */
+    public Speech withMood(String mood) {
+        this.mood = mood;
         return this;
     }
 

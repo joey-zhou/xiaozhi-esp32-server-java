@@ -19,6 +19,11 @@ import java.util.regex.Pattern;
  * 2. 命令式：take(String token) / take()，供 TTS Provider 内部 WebSocket 订阅使用
  */
 public class SentenceHelper implements ChatConverter {
+
+    /**
+     * 分句结果，包含去除表情符号后的纯文本和提取的情绪词。
+     */
+    public record SentenceResult(String text, String mood) {}
     // 句子结束标点符号模式（中英文句号、感叹号、问号）
     private static final Pattern SENTENCE_END_PATTERN = Pattern.compile("[。！？!?]");
 
@@ -50,8 +55,8 @@ public class SentenceHelper implements ChatConverter {
      * 命令式分句：逐 token 输入，返回检测到的完整句子，未成句则返回空字符串。
      * 供 TTS Provider 内部 WebSocket 订阅回调使用。
      */
-    public List<String> take(String token) {
-        List<String> sentences = new ArrayList<>();
+    public List<SentenceResult> take(String token) {
+        List<SentenceResult> sentences = new ArrayList<>();
         if (token == null || token.isEmpty()) {
             return sentences;
         }
@@ -95,9 +100,12 @@ public class SentenceHelper implements ChatConverter {
             }
 
             if (shouldSendSentence && currentSentence.length() >= MIN_SENTENCE_LENGTH) {
-                String sentence = EmojiUtils.filterKaomoji(currentSentence.toString().trim());
-                if (containsSubstantialContent(sentence)) {
-                    sentences.add(sentence);
+                String rawSentence = currentSentence.toString().trim();
+                List<String> moods = new ArrayList<>();
+                String cleanSentence = EmojiUtils.processSentence(rawSentence, moods);
+                if (containsSubstantialContent(cleanSentence)) {
+                    String mood = moods.isEmpty() ? null : moods.get(0);
+                    sentences.add(new SentenceResult(cleanSentence, mood));
                     currentSentence.setLength(0);
                 }
             }
@@ -111,25 +119,32 @@ public class SentenceHelper implements ChatConverter {
     /**
      * 命令式分句：刷出缓冲区剩余内容（在文本流结束时调用）。
      */
-    public String take() {
-        return currentSentence.toString().trim();
+    public SentenceResult take() {
+        String rawSentence = currentSentence.toString().trim();
+        if (rawSentence.isEmpty()) {
+            return new SentenceResult("", null);
+        }
+        List<String> moods = new ArrayList<>();
+        String cleanSentence = EmojiUtils.processSentence(rawSentence, moods);
+        String mood = moods.isEmpty() ? null : moods.get(0);
+        return new SentenceResult(cleanSentence, mood);
     }
 
-    public void onToken(String token, FluxSink<String> sink) {
-        for (String sentence : take(token)) {
-            sink.next(sentence);
+    public void onToken(String token, FluxSink<SentenceResult> sink) {
+        for (SentenceResult result : take(token)) {
+            sink.next(result);
         }
     }
 
-    public void onComplete(FluxSink<String> sink) {
-        String sentence = take();
-        if (StringUtils.hasText(sentence)) {
-            sink.next(sentence);
+    public void onComplete(FluxSink<SentenceResult> sink) {
+        SentenceResult result = take();
+        if (StringUtils.hasText(result.text())) {
+            sink.next(result);
         }
         sink.complete();
     }
 
-    public Flux<String> convert(Flux<String> stringFlux) {
+    public Flux<SentenceResult> convert(Flux<String> stringFlux) {
         return Flux.create(sink ->
                 stringFlux.subscribe(
                         token -> this.onToken(token, sink),

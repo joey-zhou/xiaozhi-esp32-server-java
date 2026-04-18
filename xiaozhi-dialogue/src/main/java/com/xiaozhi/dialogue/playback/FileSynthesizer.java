@@ -49,7 +49,9 @@ public class FileSynthesizer extends Synthesizer {
      */
     @Override
     public void synthesize(Flux<String> stringFlux) {
-        llmDisposable = new SentenceHelper().convert(stringFlux).subscribe(text -> {
+        llmDisposable = new SentenceHelper().convert(stringFlux).subscribe(result -> {
+            String text = result.text();
+            String mood = result.mood();
             Flux<Speech> lazyTtsFlux = Flux.create(sink -> {
                 try {
                     Path audioPath = ttsService.textToSpeech(text);
@@ -57,7 +59,7 @@ public class FileSynthesizer extends Synthesizer {
                         List<byte[]> chunks = AudioUtils.readAsPcmChunks(audioPath.toString());
                         boolean first = true;
                         for (byte[] chunk : chunks) {
-                            sink.next(first ? new Speech(chunk, text) : new Speech(chunk));
+                            sink.next(first ? new Speech(chunk, text).withMood(mood) : new Speech(chunk));
                             first = false;
                         }
                     } else {

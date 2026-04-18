@@ -1,6 +1,7 @@
 package com.xiaozhi.dialogue.playback;
 
 import com.xiaozhi.common.Speech;
+import com.xiaozhi.utils.EmojiUtils;
 
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.message.MessageSender;
@@ -14,7 +15,6 @@ import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.*;
@@ -278,14 +278,9 @@ public class ScheduledPlayer extends Player {
         // 发送文本和表情（如果有）
         String text = speech.getText();
         if (StringUtils.hasText(text)) {
-            List<String> moods = Collections.emptyList();
-            if (moods != null && !moods.isEmpty()) {
-                sendEmotion(moods.get(0));
-            }
-
-            if (StringUtils.hasText(text)) {
-                sendSentenceStart(text);
-            }
+            String mood = speech.getMood();
+            sendEmotion(StringUtils.hasText(mood) ? mood : EmojiUtils.getRandomEmotion());
+            sendSentenceStart(text);
         }
 
         // 检查播放状态

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -213,6 +214,22 @@ public class EmojiUtils {
      */
     public static String getEmotionByEmoji(String emoji) {
         return emojiToEmotionMap.getOrDefault(emoji, "happy");
+    }
+
+    /**
+     * 所有可用的情绪词列表（用于随机选取）
+     */
+    private static final String[] EMOTIONS = {
+            "neutral", "happy", "laughing", "funny", "sad", "angry", "crying",
+            "loving", "embarrassed", "surprised", "shocked", "thinking", "winking",
+            "cool", "relaxed", "delicious", "kissy", "confident", "sleepy", "silly", "confused"
+    };
+
+    /**
+     * 随机返回一个情绪词（当句子没有表情符号时使用）
+     */
+    public static String getRandomEmotion() {
+        return EMOTIONS[ThreadLocalRandom.current().nextInt(EMOTIONS.length)];
     }
 
     /**
