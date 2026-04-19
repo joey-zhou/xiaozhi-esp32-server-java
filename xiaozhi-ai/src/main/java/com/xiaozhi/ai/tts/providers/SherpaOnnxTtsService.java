@@ -41,8 +41,8 @@ public class SherpaOnnxTtsService implements TtsService {
     public SherpaOnnxTtsService(
             ConfigBO config,
             String voiceName,
-            Float pitch,
-            Float speed,
+            Double pitch,
+            Double speed,
             String outputPath,
             String ttsModelsDir) {
         this.options = XiaozhiTtsOptions.builder().voiceName(voiceName).pitch(pitch).speed(speed).build();
@@ -81,7 +81,7 @@ public class SherpaOnnxTtsService implements TtsService {
     public Path textToSpeech(String text) throws Exception {
         try {
             OfflineTts tts = getOrCreateTts();
-            float ttsSpeed = (getSpeed() != null) ? getSpeed() : 1.0f;
+            float ttsSpeed = (getSpeed() != null) ? getSpeed().floatValue() : 1.0f;
 
             long start = System.currentTimeMillis();
             GeneratedAudio audio = tts.generate(text, speakerId, ttsSpeed);

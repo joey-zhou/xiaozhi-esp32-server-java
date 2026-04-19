@@ -20,8 +20,8 @@ public class RoleDO extends BaseDO {
     private String roleName;
     private String roleDesc;
     private String voiceName;
-    private Float ttsPitch;
-    private Float ttsSpeed;
+    private Double ttsPitch;
+    private Double ttsSpeed;
     private String state;
     private Integer ttsId;
     private Integer modelId;

@@ -12,8 +12,8 @@ import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
 
 /**
- * 工具调用观察处理器，用于捕获工具调用前后的信息
- * 包括函数名称、参数、callId、工具名称、参数和执行结果
+ * 工具调用观察处理器，用于捕获工具调用前后的信息。
+ * 包括函数名称、参数、callId、工具名称、参数和执行结果。
  */
 @Slf4j
 @Component
@@ -23,7 +23,6 @@ public class ToolCallingObservationHandler implements ObservationHandler<ToolCal
 
     @Autowired(required = false)
     private ToolSessionProvider toolSessionProvider;
-
 
     @Override
     public void onStart(ToolCallingObservationContext context) {

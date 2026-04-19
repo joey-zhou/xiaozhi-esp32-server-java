@@ -29,4 +29,5 @@ public class ConfigDO extends BaseDO {
     private String apiUrl;
     private String state;
     private String isDefault;
+    private Boolean enableThinking;
 }

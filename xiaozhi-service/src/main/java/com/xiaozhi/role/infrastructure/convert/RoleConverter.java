@@ -25,8 +25,8 @@ public class RoleConverter {
                 d.getTopP() != null ? d.getTopP() : 0.9d);
 
         VoiceConfig voice = new VoiceConfig(d.getTtsId(), d.getSttId(), d.getVoiceName(),
-                d.getTtsPitch() != null ? d.getTtsPitch() : 1.0f,
-                d.getTtsSpeed() != null ? d.getTtsSpeed() : 1.0f);
+                d.getTtsPitch() != null ? d.getTtsPitch() : 1.0,
+                d.getTtsSpeed() != null ? d.getTtsSpeed() : 1.0);
 
         AudioConfig audio = new AudioConfig(d.getVadEnergyTh(), d.getVadSpeechTh(),
                 d.getVadSilenceTh(), d.getVadSilenceMs());

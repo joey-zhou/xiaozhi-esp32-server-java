@@ -11,8 +11,8 @@ public class RoleBO {
     private String roleName;
     private String roleDesc;
     private String voiceName;
-    private Float ttsPitch = 1.0f;
-    private Float ttsSpeed = 1.0f;
+    private Double ttsPitch = 1.0;
+    private Double ttsSpeed = 1.0;
     private String state;
     private Integer ttsId;
     private Integer modelId;

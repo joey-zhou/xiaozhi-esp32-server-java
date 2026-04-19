@@ -46,6 +46,7 @@ public class ConfigBO {
     private String apiUrl;
     private String state;
     private String isDefault;
+    private Boolean enableThinking;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

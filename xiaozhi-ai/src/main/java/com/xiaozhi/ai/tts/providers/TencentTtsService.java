@@ -43,7 +43,7 @@ public class TencentTtsService implements TtsService {
     // SpeechClient应用全局创建一个即可,生命周期可和整个应用保持一致
     private static final SpeechClient speechClient = new SpeechClient(DEFAULT_TTS_REQ_URL);
 
-    public TencentTtsService(ConfigBO config, String voiceName, Float pitch, Float speed, String outputPath) {
+    public TencentTtsService(ConfigBO config, String voiceName, Double pitch, Double speed, String outputPath) {
         this.options = XiaozhiTtsOptions.builder().voiceName(voiceName).pitch(pitch).speed(speed).build();
         this.appId = config.getAppId();
         this.secretId = config.getApiKey();
@@ -84,7 +84,7 @@ public class TencentTtsService implements TtsService {
             request.setVoiceType(voiceType);
 
             // 将我们的参数（0.5-2.0）映射到腾讯云的参数（-2到6）
-            float tencentSpeed = (getSpeed() - 0.5f) * (4.0f / 1.5f) - 2.0f;
+            float tencentSpeed = (float) ((getSpeed() - 0.5) * (4.0 / 1.5) - 2.0);
             tencentSpeed = Math.max(-2.0f, Math.min(6.0f, tencentSpeed));
             request.setSpeed(tencentSpeed);
 

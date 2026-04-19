@@ -23,8 +23,8 @@ public class TestVoiceReq {
     private String voiceName;
 
     @Schema(description = "语音音调(0.5-2.0)")
-    private Float ttsPitch;
+    private Double ttsPitch;
 
     @Schema(description = "语音语速(0.5-2.0)")
-    private Float ttsSpeed;
+    private Double ttsSpeed;
 }

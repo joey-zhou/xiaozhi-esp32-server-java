@@ -114,7 +114,7 @@ public class AliyunTtsService implements TtsService {
     private final String outputPath;
 
     public AliyunTtsService(ConfigBO config,
-            String voiceName, Float pitch, Float speed, String outputPath) {
+            String voiceName, Double pitch, Double speed, String outputPath) {
         this.apiKey = config.getApiKey();
         this.options = XiaozhiTtsOptions.builder().voiceName(voiceName).pitch(pitch).speed(speed).build();
         this.outputPath = outputPath;
@@ -209,7 +209,6 @@ public class AliyunTtsService implements TtsService {
     public XiaozhiTtsOptions getOptions() {
         return options;
     }
-
 
     @Override
     public Path textToSpeech(String text) throws Exception {
@@ -364,8 +363,8 @@ public class AliyunTtsService implements TtsService {
                                 .apiKey(apiKey)
                                 .model(modelName)  // 使用解析出的模型名
                                 .voice(actualVoiceName)  // 使用解析出的音色名
-                                .speechRate(getSpeed())
-                                .pitchRate(getPitch())
+                                .speechRate(getSpeed().floatValue())
+                                .pitchRate(getPitch().floatValue())
                                 .format(com.alibaba.dashscope.audio.ttsv2.SpeechSynthesisAudioFormat.WAV_16000HZ_MONO_16BIT)
                                 .build();
 
@@ -453,8 +452,8 @@ public class AliyunTtsService implements TtsService {
                         .apiKey(apiKey)
                         .model(getVoiceName())
                         .text(text)
-                        .rate(getSpeed())
-                        .pitch(getPitch())
+                        .rate(getSpeed().floatValue())
+                        .pitch(getPitch().floatValue())
                         .sampleRate(AudioUtils.SAMPLE_RATE)
                         .format(SpeechSynthesisAudioFormat.WAV)
                         .build();

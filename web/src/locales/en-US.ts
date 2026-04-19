@@ -556,6 +556,8 @@ export default {
     update: 'Update {type}',
     parameterConfig: 'Parameter Configuration',
     defaultTip: 'When set as default, this configuration will be used first',
+    enableThinking: 'Thinking Mode',
+    enableThinkingTip: 'Enable deep thinking capability (requires model support, e.g. o1/o3/GLM-Z1)',
     chatModel: 'Chat Model',
     visionModel: 'Vision Model',
     intentModel: 'Intent Model',
@@ -879,6 +881,8 @@ export default {
     emptyHint: 'What shall we talk about?',
     inputPlaceholder: 'Type a message, start exploring...',
     connectFirst: 'Please select a role first',
+    thinkingInProgress: 'Thinking...',
+    thinkingDone: 'Thought complete',
   },
 
   memory: {

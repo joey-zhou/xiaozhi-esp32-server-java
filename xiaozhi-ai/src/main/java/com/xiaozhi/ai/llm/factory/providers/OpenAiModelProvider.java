@@ -31,8 +31,10 @@ import java.time.Duration;
 
 import lombok.extern.slf4j.Slf4j;
 /**
- * OpenAI及兼容OpenAI协议的模型提供者
- * 支持: OpenAI, Azure OpenAI, 各种兼容OpenAI的本地模型等
+ * OpenAI及兼容OpenAI协议的模型提供者。
+ * 支持: OpenAI, Azure OpenAI, 各种兼容OpenAI的本地模型等。
+ * <p>
+ * 通过配置 {@code enableThinking} 控制是否启用推理模式（{@code reasoningEffort}）。
  */
 @Slf4j
 @Component
@@ -77,13 +79,21 @@ public class OpenAiModelProvider implements ChatModelProvider {
                         .requestFactory(createRequestFactory()))
                 .build();
         
-        var openAiChatOptions = OpenAiChatOptions.builder()
+        boolean enableThinking = Boolean.TRUE.equals(config.getEnableThinking());
+
+        var chatOptionsBuilder = OpenAiChatOptions.builder()
                 .model(model)
                 .temperature(temperature)
                 .topP(topP)
                 .maxCompletionTokens(2000)
-                .streamUsage(true)
-                .build();
+                .streamUsage(true);
+
+        if (enableThinking) {
+            chatOptionsBuilder.reasoningEffort("medium");
+            log.info("OpenAI model {} 已启用思考模式，reasoningEffort=medium", model);
+        }
+
+        var openAiChatOptions = chatOptionsBuilder.build();
         
         var chatModel = OpenAiChatModel.builder()
                 .openAiApi(openAiApi)
@@ -92,7 +102,7 @@ public class OpenAiModelProvider implements ChatModelProvider {
                 .observationRegistry(observationRegistry)
                 .build();
         
-        log.info("Created OpenAI ChatModel: model={}, endpoint={}", model, endpoint);
+        log.info("Created OpenAI ChatModel: model={}, endpoint={}, thinking={}", model, endpoint, enableThinking);
         return chatModel;
     }
 

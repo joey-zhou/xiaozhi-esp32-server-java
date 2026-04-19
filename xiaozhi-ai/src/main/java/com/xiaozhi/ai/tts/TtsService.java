@@ -5,12 +5,13 @@ import java.util.UUID;
 
 /**
  * TTS服务接口。
- * 重构方向：对齐 Spring AI 的 {@link org.springframework.ai.audio.tts.TextToSpeechModel}。
- * 当前接口结构与 Spring AI 的映射关系：
+ * 与 Spring AI 的 {@link org.springframework.ai.audio.tts.TextToSpeechModel} 对齐关系：
  * <ul>
- *   <li>TtsService → TextToSpeechModel（call 模式）</li>
- *   <li>voiceName/speed/pitch 等 Getter → TextToSpeechOptions（配置参数对象化）</li>
+ *   <li>TtsService → TextToSpeechModel（call 模式） — 通过 {@link TtsServiceAdapter} 桥接</li>
+ *   <li>{@link XiaozhiTtsOptions} → TextToSpeechOptions — 直接实现</li>
  * </ul>
+ *
+ * @see TtsServiceAdapter 将 TtsService 适配为 Spring AI TextToSpeechModel 的适配器
  */
 public interface TtsService {
 
@@ -34,14 +35,14 @@ public interface TtsService {
   /**
    * 获取语速
    */
-  default Float getSpeed() {
+  default Double getSpeed() {
     return getOptions().getSpeed();
   }
 
   /**
    * 获取音调
    */
-  default Float getPitch() {
+  default Double getPitch() {
     return getOptions().getPitch();
   }
 

@@ -19,7 +19,7 @@ public class EdgeTtsService implements TtsService {
     private final XiaozhiTtsOptions options;
     private final String outputPath;
 
-    public EdgeTtsService(String voiceName, Float pitch, Float speed, String outputPath) {
+    public EdgeTtsService(String voiceName, Double pitch, Double speed, String outputPath) {
         this.options = XiaozhiTtsOptions.builder().voiceName(voiceName).pitch(pitch).speed(speed).build();
         this.outputPath = outputPath;
     }

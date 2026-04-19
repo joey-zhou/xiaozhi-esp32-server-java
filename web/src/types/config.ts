@@ -24,6 +24,7 @@ export interface Config {
   ak?: string
   sk?: string
   apiUrl?: string
+  enableThinking?: boolean
   // 支持动态字段
   [key: string]: any
 }
@@ -92,4 +93,7 @@ export interface LLMModel {
 export interface LLMFactory {
   name: string
   llm: LLMModel[]
+  url?: string
+  rank?: string
+  status?: string
 }

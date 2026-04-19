@@ -6,6 +6,7 @@ import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.memory.ConversationContext;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.ai.llm.memory.MessageWindowConversation;
+import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.message.service.MessageService;
@@ -26,6 +27,7 @@ import reactor.core.publisher.Flux;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -130,13 +132,14 @@ public class WebChatService {
     }
 
     /**
-     * 流式聊天：接收用户文本，返回 AI 回复的文本流，并在完成时持久化 user/assistant 两条消息。
+     * 流式聊天：接收用户文本，返回 AI 回复的 ChatToken 流（包含思考过程和正式回复），
+     * 并在完成时持久化 user/assistant 两条消息。
      *
      * @param sessionId 会话 ID
      * @param text      用户输入文本
-     * @return AI 回复文本流
+     * @return ChatToken 流，前端可根据 type 区分 thinking/content
      */
-    public Flux<String> chatStream(String sessionId, String text) {
+    public Flux<ChatToken> chatStream(String sessionId, String text) {
         Conversation conversation = conversations.get(sessionId);
         ChatModel chatModel = chatModels.get(sessionId);
         if (conversation == null || chatModel == null) {
@@ -162,8 +165,24 @@ public class WebChatService {
         return chatModel.stream(prompt)
                 .mapNotNull(ChatResponse::getResult)
                 .mapNotNull(Generation::getOutput)
-                .mapNotNull(AssistantMessage::getText)
-                .doOnNext(fullResponse::append)
+                .flatMap(message -> {
+                    List<ChatToken> tokens = new ArrayList<>();
+                    Object reasoning = message.getMetadata().get("reasoningContent");
+                    if (reasoning instanceof String r && !r.isEmpty()) {
+                        tokens.add(ChatToken.thinking(r));
+                    }
+                    String content = message.getText();
+                    if (content != null && !content.isEmpty()) {
+                        tokens.add(ChatToken.content(content));
+                    }
+                    return Flux.fromIterable(tokens);
+                })
+                .doOnNext(token -> {
+                    // 只累积正式回复内容，思考过程不持久化
+                    if (token.isContent()) {
+                        fullResponse.append(token.text());
+                    }
+                })
                 .doOnComplete(() -> {
                     if (fullResponse.isEmpty()) {
                         return;

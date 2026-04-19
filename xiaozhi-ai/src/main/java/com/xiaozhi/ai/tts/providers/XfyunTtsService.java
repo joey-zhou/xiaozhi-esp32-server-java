@@ -42,7 +42,7 @@ public class XfyunTtsService implements TtsService {
     private String apiKey;
     private String apiSecret;
 
-    public XfyunTtsService(ConfigBO config, String voiceName, Float pitch, Float speed, String outputPath) {
+    public XfyunTtsService(ConfigBO config, String voiceName, Double pitch, Double speed, String outputPath) {
         this.options = XiaozhiTtsOptions.builder().voiceName(voiceName).pitch(pitch).speed(speed).build();
         this.outputPath = outputPath;
         this.appId = config.getAppId();

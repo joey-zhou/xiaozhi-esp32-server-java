@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue.runtime;
 
+import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.ai.llm.memory.Conversation;
@@ -218,7 +219,9 @@ public class Persona {
     public void chat(UserMessage userMessage, boolean useFunctionCall){
         Instant now = Instant.now();
         Flux<ChatResponse> chatResponseFlux = chatStream(now, userMessage, useFunctionCall);
-        synthesizer.synthesize(convert(chatResponseFlux));
+        Flux<ChatToken> tokenFlux = convert(chatResponseFlux);
+        // 设备对话管道：过滤掉思考内容，只将正式回复传给语音合成
+        synthesizer.synthesize(tokenFlux.filter(ChatToken::isContent).map(ChatToken::text));
     }
 
     /**
@@ -268,10 +271,26 @@ public class Persona {
 
     }
 
-    private Flux<String> convert(Flux<ChatResponse> chatResponseFlux) {
+    /**
+     * 将 ChatResponse 流转换为 ChatToken 流，包含思考内容和正式回复。
+     * <p>
+     * Spring AI 1.1.0+ 中，启用 reasoningEffort 后，推理内容通过
+     * {@code AssistantMessage.getProperties().get("reasoningContent")} 返回。
+     */
+    private Flux<ChatToken> convert(Flux<ChatResponse> chatResponseFlux) {
         return chatResponseFlux.mapNotNull(ChatResponse::getResult)
                 .mapNotNull(Generation::getOutput)
-                .mapNotNull(AssistantMessage::getText);
-
+                .flatMap(message -> {
+                    List<ChatToken> tokens = new ArrayList<>();
+                    Object reasoning = message.getMetadata().get("reasoningContent");
+                    if (reasoning instanceof String r && !r.isEmpty()) {
+                        tokens.add(ChatToken.thinking(r));
+                    }
+                    String text = message.getText();
+                    if (text != null && !text.isEmpty()) {
+                        tokens.add(ChatToken.content(text));
+                    }
+                    return Flux.fromIterable(tokens);
+                });
     }
 }

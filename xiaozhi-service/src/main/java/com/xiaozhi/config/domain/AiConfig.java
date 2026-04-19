@@ -39,6 +39,9 @@ public class AiConfig {
     private String sk;
     private String apiUrl;
 
+    // ── 能力 ──────────────────────────────────────────────────────────────────
+    private Boolean enableThinking;
+
     // ── 状态 ──────────────────────────────────────────────────────────────────
     private String  state;
     private boolean isDefault;
@@ -57,9 +60,10 @@ public class AiConfig {
     public static AiConfig newConfig(Integer userId, String configType, String provider,
                                      String configName, String configDesc, String modelType,
                                      String appId, String apiKey, String apiSecret,
-                                     String ak, String sk, String apiUrl, boolean isDefault) {
+                                     String ak, String sk, String apiUrl,
+                                     Boolean enableThinking, boolean isDefault) {
         AiConfig c = new AiConfig();
-        c.userId = userId;
+        c.userId     = userId;
         c.configType = configType;
         c.provider   = provider;
         c.configName = configName;
@@ -71,6 +75,7 @@ public class AiConfig {
         c.ak         = ak;
         c.sk         = sk;
         c.apiUrl     = apiUrl;
+        c.enableThinking = enableThinking;
         c.state      = STATE_ENABLED;
         c.isDefault  = isDefault;
         if (isDefault) c.signals.add(DomainSignal.DEFAULT_CHANGED);
@@ -82,7 +87,7 @@ public class AiConfig {
                 bo.getConfigName(), bo.getConfigDesc(), bo.getModelType(),
                 bo.getAppId(), bo.getApiKey(), bo.getApiSecret(),
                 bo.getAk(), bo.getSk(), bo.getApiUrl(),
-                "1".equals(bo.getIsDefault()));
+                bo.getEnableThinking(), "1".equals(bo.getIsDefault()));
     }
 
     /** 从持久层重建聚合根（Repository 专用，不产生任何信号）。 */
@@ -91,6 +96,7 @@ public class AiConfig {
                                         String configName, String configDesc, String modelType,
                                         String appId, String apiKey, String apiSecret,
                                         String ak, String sk, String apiUrl,
+                                        Boolean enableThinking,
                                         String state, boolean isDefault,
                                         LocalDateTime createTime, LocalDateTime updateTime) {
         AiConfig c = new AiConfig();
@@ -107,6 +113,7 @@ public class AiConfig {
         c.ak         = ak;
         c.sk         = sk;
         c.apiUrl     = apiUrl;
+        c.enableThinking = enableThinking;
         c.state      = state;
         c.isDefault  = isDefault;
         c.createTime = createTime;
@@ -132,12 +139,13 @@ public class AiConfig {
     public void update(ConfigBO bo) {
         update(bo.getConfigName(), bo.getConfigDesc(), bo.getModelType(), bo.getProvider(),
                 bo.getAppId(), bo.getApiKey(), bo.getApiSecret(), bo.getAk(), bo.getSk(),
-                bo.getApiUrl(), bo.getIsDefault() == null ? null : "1".equals(bo.getIsDefault()));
+                bo.getApiUrl(), bo.getEnableThinking(),
+                bo.getIsDefault() == null ? null : "1".equals(bo.getIsDefault()));
     }
 
     public void update(String configName, String configDesc, String modelType, String provider,
                        String appId, String apiKey, String apiSecret, String ak, String sk,
-                       String apiUrl, Boolean isDefault) {
+                       String apiUrl, Boolean enableThinking, Boolean isDefault) {
         if (configName != null) this.configName = configName;
         if (configDesc != null) this.configDesc = configDesc;
         if (modelType  != null) this.modelType  = modelType;
@@ -148,6 +156,7 @@ public class AiConfig {
         if (ak         != null) this.ak         = ak;
         if (sk         != null) this.sk         = sk;
         if (apiUrl     != null) this.apiUrl     = apiUrl;
+        if (enableThinking != null) this.enableThinking = enableThinking;
         if (isDefault  != null) {
             if (isDefault && !this.isDefault) {
                 this.isDefault = true;

@@ -56,6 +56,7 @@ const formData = ref<Partial<Config>>({
   apiSecret: undefined,
   ak: undefined,
   sk: undefined,
+  enableThinking: false,
 })
 
 // 表格列配置
@@ -181,7 +182,8 @@ function handleEdit(record: Config) {
   // 设置表单值，将后端的 string ('0'/'1') 转换为 boolean
   formData.value = {
     ...record,
-    isDefault: props.configType != 'tts' ? record.isDefault === '1' : false
+    isDefault: props.configType != 'tts' ? record.isDefault === '1' : false,
+    enableThinking: !!record.enableThinking,
   }
 
   // LLM 更新模型选项
@@ -286,6 +288,7 @@ function resetForm() {
     apiSecret: undefined,
     ak: undefined,
     sk: undefined,
+    enableThinking: false,
   }
 }
 
@@ -423,6 +426,9 @@ fetchData()
               <template v-if="column.dataIndex === 'modelType' && configType === 'llm'">
                 <a-tag :color="getModelTypeTag(record.modelType).color">
                   {{ getModelTypeTag(record.modelType).text }}
+                </a-tag>
+                <a-tag v-if="record.enableThinking" color="cyan">
+                  {{ t('config.enableThinking') }}
                 </a-tag>
               </template>
 
@@ -576,6 +582,18 @@ fetchData()
               <a-switch v-model:checked="formData.isDefault" />
               <span style="margin-left: 8px; color: var(--ant-color-text-tertiary)">
                 {{ t('config.defaultTip') }}
+              </span>
+            </a-form-item>
+
+            <!-- 思考模式开关（仅 LLM） -->
+            <a-form-item
+              v-if="configType === 'llm'"
+              :label="t('config.enableThinking')"
+              name="enableThinking"
+            >
+              <a-switch v-model:checked="formData.enableThinking" />
+              <span style="margin-left: 8px; color: var(--ant-color-text-tertiary)">
+                {{ t('config.enableThinkingTip') }}
               </span>
             </a-form-item>
 

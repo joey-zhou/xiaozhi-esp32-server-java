@@ -43,6 +43,9 @@ public class ConfigResp {
     @Schema(description = "是否默认配置(1是 0否)")
     private String isDefault;
 
+    @Schema(description = "是否启用思考模式")
+    private Boolean enableThinking;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "创建时间")
     private LocalDateTime createTime;

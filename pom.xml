@@ -27,7 +27,7 @@
         <!-- Spring Data Redis 3.5.x 存在 DefaultedRedisConnection.pExpire 无限递归 bug，锁定到 3.4.x 版本 -->
         <spring-data-bom.version>2024.1.2</spring-data-bom.version>
         <!-- Spring AI -->
-        <spring-ai.version>1.1.2</spring-ai.version>
+        <spring-ai.version>1.1.4</spring-ai.version>
         <!-- 第三方版本号 -->
         <lombok.version>1.18.42</lombok.version>
         <sa-token.version>1.39.0</sa-token.version>

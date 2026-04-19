@@ -40,11 +40,11 @@ public class TtsServiceFactory {
      */
     public TtsService getDefaultTtsService() {
         var config = new ConfigBO().setProvider(DEFAULT_PROVIDER);
-        return getTtsService(config, TtsServiceFactory.DEFAULT_VOICE, 1.0f, 1.0f);
+        return getTtsService(config, TtsServiceFactory.DEFAULT_VOICE, 1.0, 1.0);
     }
 
     // 创建缓存键（包含pitch和speed）
-    private String createCacheKey(ConfigBO config, String provider, String voiceName, Float pitch, Float speed) {
+    private String createCacheKey(ConfigBO config, String provider, String voiceName, Double pitch, Double speed) {
         Integer configId = -1;
         if (config != null && config.getConfigId() != null) {
             configId = config.getConfigId();
@@ -55,7 +55,7 @@ public class TtsServiceFactory {
     /**
      * 根据配置获取TTS服务（带pitch和speed参数）
      */
-    public TtsService getTtsService(ConfigBO config, String voiceName, Float pitch, Float speed) {
+    public TtsService getTtsService(ConfigBO config, String voiceName, Double pitch, Double speed) {
         final ConfigBO finalConfig = !ObjectUtils.isEmpty(config) ? config : new ConfigBO().setProvider(DEFAULT_PROVIDER);
         String provider = finalConfig.getProvider();
         String cacheKey = createCacheKey(finalConfig, provider, voiceName, pitch, speed);
@@ -67,7 +67,7 @@ public class TtsServiceFactory {
     /**
      * 根据配置创建API类型的TTS服务（带pitch和speed参数）
      */
-    private TtsService createApiService(ConfigBO config, String voiceName, Float pitch, Float speed) {
+    private TtsService createApiService(ConfigBO config, String voiceName, Double pitch, Double speed) {
         // Make sure output dir exists
         String outputPath = AudioUtils.AUDIO_PATH;
         ensureOutputPath(outputPath);

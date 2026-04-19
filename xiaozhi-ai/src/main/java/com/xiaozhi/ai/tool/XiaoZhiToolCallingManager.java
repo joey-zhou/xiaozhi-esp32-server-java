@@ -39,8 +39,12 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 自定义的工具调用管理器，用于处理工具调用和执行。
  * 基于Spring AI的DefaultToolCallingManager，增加了自定义的监控和元数据处理功能。
+ * <p>
  * 包含对流式工具调用分片合并的修复（Spring AI issue #4629, #4790）。
- * 后续关注 Spring AI 是否有修复改问题
+ * 此问题在 Spring AI 1.1.4 中可能已被官方修复，mergeFragmentedToolCalls 方法作为安全网保留。
+ * 当日志不再出现 "工具调用分片合并完成" 消息时，可考虑移除该逻辑。
+ * <p>
+ * TODO: [Spring AI 升级追踪] 升级到 1.1.4 后观察日志，若分片合并不再触发，可移除 mergeFragmentedToolCalls 方法。
  */
 @Slf4j
 public class XiaoZhiToolCallingManager implements ToolCallingManager, ApplicationContextAware {
@@ -337,7 +341,8 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         }
 
         if (valid.size() != toolCalls.size()) {
-            log.info("工具调用分片合并完成: {} 条 → {} 条", toolCalls.size(), valid.size());
+            log.warn("工具调用分片合并触发: {} 条 → {} 条（若升级 Spring AI 1.1.4+ 后仍频繁出现，请提交 issue）",
+                    toolCalls.size(), valid.size());
         }
         return valid;
     }

@@ -163,6 +163,7 @@ CREATE TABLE `xiaozhi`.`sys_config` (
   `sk` text DEFAULT NULL COMMENT 'Secret Key',
   `apiUrl` varchar(255) DEFAULT NULL COMMENT 'API地址',
   `isDefault` enum('1','0') DEFAULT '0' COMMENT '是否为默认配置: 1-是, 0-否',
+  `enableThinking` tinyint(1) DEFAULT NULL COMMENT '是否启用思考模式',
   `state` enum('1','0') DEFAULT '1' COMMENT '状态：1-启用，0-禁用',
   `createTime` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updateTime` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

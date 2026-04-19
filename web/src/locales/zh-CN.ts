@@ -554,6 +554,8 @@ export default {
     update: '更新{type}',
     parameterConfig: '参数配置',
     defaultTip: '设为默认后将优先使用此配置',
+    enableThinking: '思考模式',
+    enableThinkingTip: '开启后模型将使用深度思考能力（需模型支持，如 o1/o3/GLM-Z1 等）',
     chatModel: '对话模型',
     visionModel: '视觉模型',
     intentModel: '意图模型',
@@ -879,6 +881,8 @@ export default {
     emptyHint: '我们聊点什么？',
     inputPlaceholder: '输入消息，开始探索...',
     connectFirst: '请先选择角色并开始聊天',
+    thinkingInProgress: '思考中...',
+    thinkingDone: '已完成思考',
   },
 
   memory: {

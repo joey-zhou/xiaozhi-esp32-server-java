@@ -43,7 +43,7 @@ public class MiniMaxTtsService implements TtsService {
     public static final String APPLICATION_JSON_CHARSET_UTF_8 = "application/json; charset=utf-8";
     private static final MediaType JSON = MediaType.parse(APPLICATION_JSON_CHARSET_UTF_8);
 
-    public MiniMaxTtsService(ConfigBO config, String voiceName, Float pitch, Float speed, String outputPath) {
+    public MiniMaxTtsService(ConfigBO config, String voiceName, Double pitch, Double speed, String outputPath) {
         this.groupId = config.getAppId();
         this.apiKey = config.getApiKey();
         this.options = XiaozhiTtsOptions.builder().voiceName(voiceName).pitch(pitch).speed(speed).build();
@@ -51,7 +51,7 @@ public class MiniMaxTtsService implements TtsService {
         this.model = config.getConfigName();
         // 设置音调（需要映射：我们的 [0.5, 2] → MiniMax的 [-12, 12]）
         // 映射公式：minimax_pitch = (our_pitch - 1.0) × 24
-        minimaxPitch = (int)Math.round((getPitch() - 1.0f) * 24);
+        minimaxPitch = (int)Math.round((getPitch() - 1.0) * 24);
         // 确保值在有效范围内
         minimaxPitch = Math.max(-12, Math.min(12, minimaxPitch));
     }

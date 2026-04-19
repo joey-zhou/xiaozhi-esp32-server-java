@@ -1,5 +1,8 @@
 import { http } from './request'
 import { useUserStore } from '@/store/user'
+import type { ChatToken } from '@/types/chat'
+
+export type { ChatToken }
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -30,7 +33,7 @@ export async function* chatStream(
   sessionId: string,
   text: string,
   signal?: AbortSignal
-): AsyncGenerator<string> {
+): AsyncGenerator<ChatToken> {
   const userStore = useUserStore()
   const url = `${BASE_URL}/chat/stream?sessionId=${encodeURIComponent(sessionId)}&text=${encodeURIComponent(text)}`
 
@@ -68,18 +71,27 @@ export async function* chatStream(
 
       for (const line of lines) {
         if (line.startsWith('data:')) {
-          const data = line.slice(5)
+          const data = line.slice(5).trim()
           if (data) {
-            yield data
+            try {
+              yield JSON.parse(data) as ChatToken
+            } catch {
+              // 兼容纯文本（降级为 content）
+              yield { type: 'content', text: data } as ChatToken
+            }
           }
         }
       }
     }
     // 处理剩余 buffer
     if (buffer.startsWith('data:')) {
-      const data = buffer.slice(5)
+      const data = buffer.slice(5).trim()
       if (data) {
-        yield data
+        try {
+          yield JSON.parse(data) as ChatToken
+        } catch {
+          yield { type: 'content', text: data } as ChatToken
+        }
       }
     }
   } finally {

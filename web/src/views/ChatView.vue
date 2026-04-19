@@ -1,32 +1,46 @@
 <script setup lang="ts">
-import { ref, nextTick, onBeforeUnmount, computed, watch } from 'vue'
+import { ref, nextTick, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { message as antMessage } from 'ant-design-vue'
-import { ArrowUpOutlined, UserOutlined, PlusOutlined, ClockCircleOutlined, DeleteOutlined, DownOutlined, CheckOutlined, SettingOutlined, MenuFoldOutlined } from '@ant-design/icons-vue'
+import {
+  ArrowUpOutlined,
+  UserOutlined,
+  PlusOutlined,
+  ClockCircleOutlined,
+  DeleteOutlined,
+  DownOutlined,
+  CheckOutlined,
+  SettingOutlined,
+  MenuFoldOutlined,
+} from '@ant-design/icons-vue'
 import { useSelectLoadMore } from '@/composables/useSelectLoadMore'
+import { useChatSession } from '@/composables/useChatSession'
 import { queryRoles } from '@/services/role'
-import { openChatSession, closeChatSession, chatStream } from '@/services/chat'
-import { queryConversations, queryMessages } from '@/services/message'
-import type { Conversation, Message } from '@/types/message'
+import type { Conversation } from '@/types/message'
 import type { Role } from '@/types/role'
 import RobotAvatar from '@/components/RobotAvatar.vue'
+import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
 
 const { t } = useI18n()
 
-interface ChatMessage {
-  id: number
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-  streaming?: boolean
-}
+// 会话 / 消息 / 历史
+const {
+  sessionId,
+  sending,
+  messages,
+  conversations,
+  loadingConversations,
+  thinkingExpanded,
+  loadConversations,
+  selectConversation: selectConversationRaw,
+  startNewChat,
+  sendMessage: sendMessageToSession,
+  toggleThinking,
+} = useChatSession()
 
 // 角色选择
 const {
   list: roles,
-  loading: rolesLoading,
   load: loadRoles,
-  onPopupScroll: onRolePopupScroll,
 } = useSelectLoadMore<Role>(queryRoles)
 const selectedRoleId = ref<number | undefined>(undefined)
 
@@ -42,14 +56,7 @@ watch(roles, (newRoles) => {
   }
 }, { immediate: true })
 
-// 会话状态
-const sessionId = ref<string>('')
-const activeSessionId = ref<string>('') // 通过 openChatSession 打开的活跃会话
-const connecting = ref(false)
-
-// 历史会话列表
-const conversations = ref<Conversation[]>([])
-const loadingConversations = ref(false)
+// UI 状态：历史记录抽屉
 const showHistory = ref(false)
 
 function toggleHistory() {
@@ -64,16 +71,11 @@ function formatTime(timeStr: string) {
   return `${d.getMonth() + 1}-${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
 }
 
-// 聊天消息
-const messages = ref<ChatMessage[]>([])
+// 视图状态：输入框 / 滚动 / 角色弹窗
 const inputText = ref('')
-const sending = ref(false)
-const messageIdCounter = ref(0)
 const chatContainerRef = ref<HTMLDivElement>()
 const textareaRef = ref()
-
-// 当前流式请求的 AbortController
-let currentAbort: AbortController | null = null
+const rolePopoverOpen = ref(false)
 
 const selectedRole = computed(() => roles.value.find((r: Role) => r.roleId === selectedRoleId.value))
 const selectedRoleName = computed(() => selectedRole.value?.roleName || '')
@@ -83,97 +85,6 @@ const selectedRoleAvatar = computed(() => selectedRole.value?.avatar || '')
 loadRoles()
 loadConversations()
 
-async function loadConversations() {
-  loadingConversations.value = true
-  try {
-    // 仅加载 Web 来源的会话，避免混入设备对话（每次连接都会产生新 sessionId）
-    const res = await queryConversations({ pageNo: 1, pageSize: 50, source: 'web' })
-    conversations.value = res.data.list
-  } catch (e: unknown) {
-    antMessage.error('加载历史会话失败: ' + (e instanceof Error ? e.message : String(e)))
-  } finally {
-    loadingConversations.value = false
-  }
-}
-
-async function selectConversation(conv: Conversation) {
-  if (sending.value) {
-    antMessage.warning('当前对话正在进行中，请稍后再试')
-    return
-  }
-  
-  if (sessionId.value === conv.sessionId) return
-
-  // 关闭当前可能活跃的会话
-  if (currentAbort) {
-    currentAbort.abort()
-    currentAbort = null
-  }
-  if (activeSessionId.value) {
-    closeChatSession(activeSessionId.value).catch(() => {})
-    activeSessionId.value = ''
-  }
-
-  sessionId.value = conv.sessionId
-  selectedRoleId.value = conv.roleId
-  messages.value = []
-  
-  // 加载该会话的历史消息
-  try {
-    const res = await queryMessages({ 
-      pageNo: 1, 
-      pageSize: 100, 
-      sessionId: conv.sessionId 
-    })
-    
-    // 接口返回是倒序的(ORDER BY createTime DESC)，我们需要正序显示
-    const historyMsgs: ChatMessage[] = res.data.list.reverse().map((m: Message) => ({
-      id: ++messageIdCounter.value,
-      role: m.sender === 'user' ? 'user' : 'assistant',
-      content: m.message,
-      timestamp: m.createTime ? new Date(m.createTime) : new Date(),
-    }))
-
-    messages.value = historyMsgs
-    scrollToBottom()
-  } catch (e: unknown) {
-    antMessage.error('加载消息记录失败: ' + (e instanceof Error ? e.message : String(e)))
-  }
-}
-
-async function startNewChat() {
-  if (currentAbort) {
-    currentAbort.abort()
-    currentAbort = null
-  }
-  if (activeSessionId.value) {
-    try {
-      await closeChatSession(activeSessionId.value)
-    } catch {
-      // 忽略关闭错误
-    }
-    activeSessionId.value = ''
-  }
-  sessionId.value = ''
-  messages.value = []
-  sending.value = false
-  inputText.value = ''
-}
-
-function handleRoleChange() {
-  startNewChat()
-}
-
-const rolePopoverOpen = ref(false)
-
-function selectRole(role: Role) {
-  if (role.roleId !== selectedRoleId.value) {
-    selectedRoleId.value = role.roleId
-    handleRoleChange()
-  }
-  rolePopoverOpen.value = false
-}
-
 function scrollToBottom() {
   nextTick(() => {
     if (chatContainerRef.value) {
@@ -182,85 +93,46 @@ function scrollToBottom() {
   })
 }
 
+function focusInput() {
+  nextTick(() => {
+    const el = textareaRef.value?.$el?.querySelector('textarea') || textareaRef.value?.$el
+    el?.focus()
+  })
+}
+
+async function selectConversation(conv: Conversation) {
+  const switched = await selectConversationRaw(conv, scrollToBottom)
+  if (switched) {
+    selectedRoleId.value = conv.roleId
+  }
+}
+
+async function handleNewChat() {
+  await startNewChat()
+  inputText.value = ''
+}
+
+function selectRole(role: Role) {
+  if (role.roleId !== selectedRoleId.value) {
+    selectedRoleId.value = role.roleId
+    handleNewChat()
+  }
+  rolePopoverOpen.value = false
+}
+
 async function sendMessage() {
   const text = inputText.value.trim()
   if (!text || sending.value || !selectedRoleId.value) return
 
   // 立即清空输入框并重新聚焦
   inputText.value = ''
-  nextTick(() => {
-    const el = textareaRef.value?.$el?.querySelector('textarea') || textareaRef.value?.$el
-    el?.focus()
-  })
+  focusInput()
 
-  // 若无活跃会话，则打开一次：sessionId 已有值（浏览历史后续聊）→ 传给后端续接；否则创建新会话
-  let openedNow = false
-  if (!activeSessionId.value) {
-    connecting.value = true
-    try {
-      const resp = await openChatSession(selectedRoleId.value, sessionId.value || undefined)
-      const data = resp as unknown as { sessionId: string }
-      sessionId.value = data.sessionId
-      activeSessionId.value = data.sessionId
-      openedNow = true
-    } catch (e: unknown) {
-      antMessage.error('建立会话失败: ' + (e instanceof Error ? e.message : String(e)))
-      connecting.value = false
-      return
-    }
-    connecting.value = false
-  }
-
-  // 添加用户消息
-  const userMsg: ChatMessage = {
-    id: ++messageIdCounter.value,
-    role: 'user',
-    content: text,
-    timestamp: new Date(),
-  }
-  messages.value.push(userMsg)
-  scrollToBottom()
-
-  // 添加 AI 占位消息
-  messages.value.push({
-    id: ++messageIdCounter.value,
-    role: 'assistant',
-    content: '',
-    timestamp: new Date(),
-    streaming: true,
-  })
-  // 从响应式数组中获取代理对象，确保后续修改能触发视图更新
-  const assistantMsg = messages.value[messages.value.length - 1]!
-  scrollToBottom()
-
-  sending.value = true
-  currentAbort = new AbortController()
-
-  try {
-    for await (const chunk of chatStream(sessionId.value, text, currentAbort.signal)) {
-      assistantMsg.content += chunk
-      scrollToBottom()
-    }
-  } catch (e: unknown) {
-    if (e instanceof DOMException && e.name === 'AbortError') {
-      // 用户主动取消
-    } else {
-      assistantMsg.content += '\n\n⚠️ 回复中断: ' + (e instanceof Error ? e.message : String(e))
-    }
-  } finally {
-    assistantMsg.streaming = false
-    sending.value = false
-    currentAbort = null
-    // 重新聚焦输入框
-    nextTick(() => {
-      const el = textareaRef.value?.$el?.querySelector('textarea') || textareaRef.value?.$el
-      el?.focus()
-    })
-    scrollToBottom()
-    // 新开/续接会话发送完一轮后，刷新列表（新会话入列表，续接会话上浮）
-    if (openedNow) {
-      loadConversations()
-    }
+  const { openedNow, success } = await sendMessageToSession(text, selectedRoleId.value, scrollToBottom)
+  focusInput()
+  // 新开/续接会话发送完一轮后，刷新列表（新会话入列表，续接会话上浮）
+  if (success && openedNow) {
+    loadConversations()
   }
 }
 
@@ -270,13 +142,6 @@ function handleKeyDown(e: KeyboardEvent) {
     sendMessage()
   }
 }
-
-onBeforeUnmount(() => {
-  if (currentAbort) currentAbort.abort()
-  if (activeSessionId.value) {
-    closeChatSession(activeSessionId.value).catch(() => {})
-  }
-})
 </script>
 
 <template>
@@ -318,7 +183,7 @@ onBeforeUnmount(() => {
         </a-popover>
 
         <a-space>
-          <a-button type="text" @click="startNewChat">
+          <a-button type="text" @click="handleNewChat">
             <template #icon><PlusOutlined /></template>
             {{ t('chat.newChat') }}
           </a-button>
@@ -355,10 +220,19 @@ onBeforeUnmount(() => {
                 {{ msg.role === 'user' ? t('chat.me') : (selectedRoleName || t('chat.defaultAssistant')) }}
               </a-typography-text>
               <div class="message-bubble" :class="msg.role">
-                <div v-if="msg.streaming && !msg.content" class="typing-indicator">
+                <div v-if="msg.streaming && !msg.content && !msg.thinking" class="typing-indicator">
                   <span></span><span></span><span></span>
                 </div>
-                <template v-else>{{ msg.content }}</template>
+                <template v-else>
+                  <ThinkingBlock
+                    v-if="msg.thinking"
+                    :content="msg.thinking"
+                    :done="msg.thinkingDone"
+                    :expanded="thinkingExpanded[msg.id]"
+                    @toggle="toggleThinking(msg.id)"
+                  />
+                  <template v-if="msg.content">{{ msg.content }}</template>
+                </template>
               </div>
             </div>
           </div>

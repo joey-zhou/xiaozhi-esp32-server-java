@@ -45,4 +45,7 @@ public class ConfigUpdateReq {
 
     @Schema(description = "是否默认配置(1是 0否)")
     private String isDefault;
+
+    @Schema(description = "是否启用思考模式(模型支持时生效)")
+    private Boolean enableThinking;
 }

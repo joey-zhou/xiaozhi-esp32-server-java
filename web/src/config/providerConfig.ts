@@ -5,7 +5,6 @@
 
 import type { ConfigTypeInfo } from '@/types/config'
 
-
 // 配置类型信息映射
 export const configTypeMap: Record<string, ConfigTypeInfo> = {
   llm: {
@@ -23,16 +22,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'sk-...',
           span: 12,
           help: '在 https://platform.openai.com/api-keys 申请'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.openai.com/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'OpenAI官方地址或代理地址'
         }
       ],
       // 阿里云系列
@@ -45,16 +34,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'your-api-key',
           span: 12,
           help: '在 https://bailian.console.aliyun.com/?apiKey=1#/api-key 申请'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: '阿里云通义千问 API 接口地址'
         }
       ],
       // 讯飞星火
@@ -97,16 +76,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'your-api-key',
           span: 12,
           help: '在 https://bigmodel.cn/usercenter/proj-mgmt/apikeys 申请'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://open.bigmodel.cn/api/paas/v4',
-          span: 12,
-          suffix: '/chat/completions',
-          help: '智谱AI大模型 API 接口地址'
         }
       ],
       // DeepSeek
@@ -119,16 +88,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'your-api-key',
           span: 12,
           help: '在 https://platform.deepseek.com/ 申请'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.deepseek.com',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'DeepSeek API 接口地址'
         }
       ],
       // 火山引擎
@@ -163,16 +122,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'your-api-key',
           span: 12,
           help: '在 https://platform.minimaxi.com/ 申请'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.minimax.chat/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'MiniMax API 接口地址'
         }
       ],
       // 腾讯混元
@@ -185,16 +134,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'your-api-key',
           span: 12,
           help: '在 https://console.cloud.tencent.com/hunyuan/start 申请混元 API Key'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.hunyuan.cloud.tencent.com/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: '腾讯混元大模型 API 接口地址'
         }
       ],
       // 百度文心
@@ -229,16 +168,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'your-api-key',
           span: 12,
           help: '在 https://platform.moonshot.cn/console/api-keys 申请'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.moonshot.cn/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'Moonshot API 接口地址'
         }
       ],
       // 硅基流动
@@ -251,16 +180,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'your-api-key',
           span: 12,
           help: '在 https://cloud.siliconflow.cn/account/ak 申请'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.siliconflow.cn/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: '硅基流动 API 接口地址'
         }
       ],
       // 百度文心一言
@@ -372,16 +291,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'your-api-key',
           span: 12,
           help: '在 https://console.mistral.ai/ 申请'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.mistral.ai/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'Mistral API 接口地址'
         }
       ],
       // Google Gemini
@@ -570,16 +479,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'your-api-key',
           span: 12,
           help: '在 https://ai.gitee.com/ 平台申请'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://ai.gitee.com/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'GiteeAI API 接口地址'
         }
       ],
       // DeepInfra

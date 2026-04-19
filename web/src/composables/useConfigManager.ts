@@ -34,6 +34,7 @@ export function useConfigManager(configType: ConfigType) {
     embedding?: LLMModel[]
   }
   const llmFactoryData = ref<Record<string, LLMFactoryModelInfo>>({})
+  const llmFactoryUrls = ref<Record<string, string>>({})
   const availableProviders = ref<Array<{ value: string; label: string; configNameOptions?: string[] }>>([])
 
   // 查询表单
@@ -58,12 +59,53 @@ export function useConfigManager(configType: ConfigType) {
 
   // 当前类型字段
   const currentTypeFields = computed((): ConfigField[] => {
+    if (!currentType.value) return []
+
     const typeFieldsMap = configTypeInfo.value.typeFields || {}
-    
-    if (configType === 'llm' && currentType.value && !typeFieldsMap[currentType.value]) {
-      return typeFieldsMap['default'] || []
+
+    if (configType === 'llm') {
+      // 如果 providerConfig 有明确定义，使用它
+      if (typeFieldsMap[currentType.value]) {
+        const fields = [...(typeFieldsMap[currentType.value] || [])]
+        // 如果没有 apiUrl 字段但工厂有 URL，自动追加
+        const factoryUrl = llmFactoryUrls.value[currentType.value]
+        if (factoryUrl && !fields.some(f => f.name === 'apiUrl')) {
+          fields.push({
+            name: 'apiUrl',
+            label: 'API URL',
+            required: true,
+            inputType: 'text',
+            placeholder: factoryUrl,
+            span: 12,
+            suffix: '/chat/completions',
+          })
+        }
+        return fields
+      }
+
+      // 没有明确定义：根据工厂数据自动生成默认字段
+      const factoryUrl = llmFactoryUrls.value[currentType.value] || ''
+      return [
+        {
+          name: 'apiKey',
+          label: 'API Key',
+          required: true,
+          inputType: 'password',
+          placeholder: 'your-api-key',
+          span: 12,
+        },
+        {
+          name: 'apiUrl',
+          label: 'API URL',
+          required: true,
+          inputType: 'text',
+          placeholder: factoryUrl,
+          span: 12,
+          suffix: '/chat/completions',
+        }
+      ]
     }
-    
+
     return typeFieldsMap[currentType.value] || []
   })
 
@@ -78,6 +120,8 @@ export function useConfigManager(configType: ConfigType) {
 
     const factoryData: Record<string, LLMFactoryModelInfo> = {}
     const providers: Array<{ value: string; label: string }> = []
+    const urls: Record<string, string> = {}
+    const ranks: Record<string, number> = {}
 
     llmFactoriesData.factory_llm_infos.forEach((factory: LLMFactory) => {
       const providerName = factory.name
@@ -85,6 +129,16 @@ export function useConfigManager(configType: ConfigType) {
         value: providerName,
         label: providerName,
       })
+
+      // 存储工厂 URL
+      if (factory.url) {
+        urls[providerName] = factory.url
+      }
+
+      // 存储排序权重
+      if (factory.rank) {
+        ranks[providerName] = parseInt(factory.rank) || 0
+      }
 
       // 按模型类型分组存储模型
       const modelsByType: LLMFactoryModelInfo = {
@@ -120,27 +174,14 @@ export function useConfigManager(configType: ConfigType) {
     })
 
     llmFactoryData.value = factoryData
+    llmFactoryUrls.value = urls
 
-    // 按照 providerConfig 中 typeFields 的顺序排序
-    const typeFieldsKeys = Object.keys(configTypeMap.llm?.typeFields || {})
+    // 按照工厂 rank 排序（降序，rank 越大越靠前），相同 rank 按字母排序
     const sortedProviders = providers.sort((a, b) => {
-      const indexA = typeFieldsKeys.indexOf(a.value)
-      const indexB = typeFieldsKeys.indexOf(b.value)
-
-      // 如果都在 typeFields 中，按照 typeFields 的顺序
-      if (indexA !== -1 && indexB !== -1) {
-        return indexA - indexB
-      }
-      // 如果只有 a 在 typeFields 中，a 排前面
-      if (indexA !== -1) {
-        return -1
-      }
-      // 如果只有 b 在 typeFields 中，b 排前面
-      if (indexB !== -1) {
-        return 1
-      }
-      // 如果都不在 typeFields 中，保持原顺序
-      return 0
+      const rankA = ranks[a.value] || 0
+      const rankB = ranks[b.value] || 0
+      if (rankA !== rankB) return rankB - rankA
+      return a.label.localeCompare(b.label)
     })
 
     availableProviders.value = sortedProviders

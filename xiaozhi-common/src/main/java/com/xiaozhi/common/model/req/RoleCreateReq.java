@@ -22,10 +22,10 @@ public class RoleCreateReq {
     private String voiceName;
 
     @Schema(description = "语音音调")
-    private Float ttsPitch;
+    private Double ttsPitch;
 
     @Schema(description = "语音语速")
-    private Float ttsSpeed;
+    private Double ttsSpeed;
 
     @Schema(description = "状态(1启用 0禁用)")
     private String state;

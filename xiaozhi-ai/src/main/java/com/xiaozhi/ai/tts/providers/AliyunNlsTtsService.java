@@ -21,8 +21,6 @@ import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentHashMap;
 
-import java.util.concurrent.atomic.AtomicReference;
-
 import lombok.extern.slf4j.Slf4j;
 /**
  * 阿里云NLS标准语音合成服务
@@ -66,7 +64,7 @@ public class AliyunNlsTtsService implements TtsService {
     // Token管理器
     private final TokenResolver tokenResolver;
 
-    public AliyunNlsTtsService(ConfigBO config, String voiceName, Float pitch, Float speed, String outputPath, TokenResolver tokenResolver) {
+    public AliyunNlsTtsService(ConfigBO config, String voiceName, Double pitch, Double speed, String outputPath, TokenResolver tokenResolver) {
         this.config = config;
         this.options = XiaozhiTtsOptions.builder().voiceName(voiceName).pitch(pitch).speed(speed).build();
         this.outputPath = outputPath;

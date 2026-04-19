@@ -58,8 +58,8 @@ public interface RoleConvert {
     @Mapping(target = "updateTime", ignore = true)
     RoleResp toResp(RoleBO roleBO);
 
-    @Mapping(target = "ttsPitch", source = "ttsPitch", defaultValue = "1.0f")
-    @Mapping(target = "ttsSpeed", source = "ttsSpeed", defaultValue = "1.0f")
+    @Mapping(target = "ttsPitch", source = "ttsPitch", defaultValue = "1.0")
+    @Mapping(target = "ttsSpeed", source = "ttsSpeed", defaultValue = "1.0")
     @Mapping(target = "temperature", source = "temperature", defaultValue = "0.7d")
     @Mapping(target = "topP", source = "topP", defaultValue = "0.9d")
     RoleBO toBO(RoleDO roleDO);
