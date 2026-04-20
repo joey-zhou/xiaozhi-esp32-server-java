@@ -1,6 +1,7 @@
 package com.xiaozhi.ai.llm.service;
 
 import jakarta.annotation.Resource;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.content.Media;
@@ -47,7 +48,11 @@ public class VisionService {
                 .text(question)
                 .build();
 
-        String result = chatModel.call(userMessage);
+        String result = ChatClient.create(chatModel)
+                .prompt()
+                .messages(userMessage)
+                .call()
+                .content();
         log.info("视觉识别完成 - 问题: {}, 结果: {}", question, result);
         return result;
     }

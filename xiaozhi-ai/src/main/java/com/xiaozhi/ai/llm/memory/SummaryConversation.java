@@ -3,6 +3,7 @@ package com.xiaozhi.ai.llm.memory;
 import com.xiaozhi.common.model.bo.SummaryBO;
 
 import lombok.Builder;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.*;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.PromptTemplate;
@@ -16,7 +17,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -46,7 +46,7 @@ public class SummaryConversation extends Conversation {
     private final PromptTemplate initSummarizerPromptTemplate ;
     private final PromptTemplate againSummarizerPromptTemplate ;
     private final ChatMemory chatMemory;
-    private final ChatModel chatModel;
+    private final ChatClient chatClient;
     private final Object summaryLock = new Object();
     // 运行时不应该发生变化，避免计算错误
 
@@ -79,7 +79,7 @@ public class SummaryConversation extends Conversation {
         this.chatMemory = chatMemory;
 
         Assert.notNull(chatModel, "chatModel must not be null");
-        this.chatModel = chatModel;
+        this.chatClient = ChatClient.create(chatModel);
 
         // 在新建Conversation时，可以加载以前的已有的Summary。
         this.lastSummary = chatMemory.findLastSummary(getOwnerId(), getRoleId());
@@ -156,21 +156,7 @@ public class SummaryConversation extends Conversation {
 
     protected void summaryMessages(List<Message> needSummaryMessages) {
         // 1. Process memory messages as a string.
-        String memory = needSummaryMessages.stream()
-                .map(m -> {
-                    if (m.getMessageType() == MessageType.TOOL) {
-                        return "TOOL:" + m.getText();
-                    }
-                    if (m.getMessageType() == MessageType.ASSISTANT && m instanceof AssistantMessage am
-                            && am.getToolCalls() != null && !am.getToolCalls().isEmpty()) {
-                        String toolNames = am.getToolCalls().stream()
-                                .map(tc -> tc.name())
-                                .collect(Collectors.joining(","));
-                        return "ASSISTANT:[tool_call:" + toolNames + "]";
-                    }
-                    return m.getMessageType() + ":" + m.getText();
-                })
-                .collect(Collectors.joining(System.lineSeparator()));
+        String memory = MessageHistoryFormatter.format(needSummaryMessages);
 
         // 2. 拼接提示词
         String lastSummaryText;
@@ -194,7 +180,10 @@ public class SummaryConversation extends Conversation {
             // 3. Call the model.
             log.info("调用大模型进行摘要：{}", factExtractPrompt);
 
-            String factExtract = chatModel.call(factExtractPrompt);
+            String factExtract = chatClient.prompt()
+                    .user(factExtractPrompt)
+                    .call()
+                    .content();
             log.info("大模型从对话里提取用户重要备忘: {}", factExtract);
 
             // 4. 入库存储。

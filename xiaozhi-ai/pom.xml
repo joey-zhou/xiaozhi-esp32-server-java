@@ -17,6 +17,11 @@
         </dependency>
         <!-- xiaozhi-common 通过 xiaozhi-service 传递 -->
         <!-- Spring AI -->
+        <!-- ChatClient API（Spring AI 1.1 起从 spring-ai-model 拆出到独立 artifact） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-client-chat</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-openai</artifactId>
