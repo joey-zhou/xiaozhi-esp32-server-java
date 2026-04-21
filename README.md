@@ -19,6 +19,9 @@
   <a href="https://github.com/joey-zhou/xiaozhi-esp32-server-java/graphs/contributors">
     <img alt="GitHub Contributors" src="https://img.shields.io/github/contributors/joey-zhou/xiaozhi-esp32-server-java?logo=github" />
   </a>
+  <a href="https://safeskill.dev/scan/joey-zhou-xiaozhi-esp32-server-java">
+    <img alt="SafeSkill 80/100" src="https://img.shields.io/badge/SafeSkill-80%2F100_Passes%20with%20Notes-yellow" />
+  </a>
   <a href="https://github.com/joey-zhou/xiaozhi-esp32-server-java/issues">
     <img alt="Issues" src="https://img.shields.io/github/issues/joey-zhou/xiaozhi-esp32-server-java?color=0088ff" />
   </a>
