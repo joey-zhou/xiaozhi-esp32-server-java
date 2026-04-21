@@ -72,7 +72,6 @@ export default {
     successMessage: '操作成功',
     errorMessage: '操作失败',
     loadDataFailed: '加载数据失败',
-    customize: '自定义',
     // 通用字段
     avatar: '头像',
     name: '名称',

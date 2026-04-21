@@ -6,7 +6,7 @@ import { useTable } from '@/composables/useTable'
 import { useInlineEdit } from '@/composables/useInlineEdit'
 import { useLoadingStore } from '@/store/loading'
 import { useMemoryView } from '@/composables/useMemoryView'
-import { queryDevices, addDevice, updateDevice, deleteDevice, clearDeviceMemory, generateDeviceToken } from '@/services/device'
+import { queryDevices, addDevice, updateDevice, deleteDevice, clearDeviceMemory } from '@/services/device'
 import { queryRoles } from '@/services/role'
 import DeviceEditDialog from '@/components/DeviceEditDialog.vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
@@ -354,43 +354,6 @@ function getRoleName(roleId?: number) {
   return role ? role.roleName : `角色ID:${roleId}`
 }
 
-/**
- * 生成设备消息token并跳转到资源生成器
- */
-async function handleCustomize(record: Device) {
-  if (!record.deviceId) {
-    message.error(t('device.invalidDeviceId'))
-    return
-  }
-
-  try {
-    const res = await generateDeviceToken(record.deviceId)
-    if (res.code === 200 && res.data) {
-      const token = res.data.token
-      
-      // 构建跳转URL - 跳转到xiaozhi-assets-generator页面
-      const protocol = window.location.protocol
-      const hostname = window.location.hostname
-      
-      // 本地开发环境使用generator项目的端口(3000)，生产环境使用当前端口
-      const isDev = import.meta.env.DEV
-      const port = isDev ? 3000 : window.location.port
-      const baseUrl = `${protocol}//${hostname}${port ? ':' + port : ''}`
-      
-      // 构建带token的URL，跳转到资源生成器
-      const targetUrl = `${baseUrl}/tools/assets-generator/?token=${encodeURIComponent(token)}`
-      
-      // 在新窗口中打开
-      window.open(targetUrl, '_blank', 'noopener,noreferrer')
-    } else {
-      message.error(res.message || t('device.generateTokenFailed'))
-    }
-  } catch (error) {
-    console.error('生成设备消息token失败:', error)
-    message.error(t('common.serverMaintenance'))
-  }
-}
-
 // 处理分页变化
 const onTableChange = (pag: TablePaginationConfig) => {
   handleTableChange(pag)
@@ -597,15 +560,7 @@ fetchData()
               @view="() => handleEditWithDialog(record)"
               @delete="() => handleDeleteDevice(record)"
             >
-              <!-- 自定义 -->
               <template #actions>
-                <a
-                  v-permission="'system:device:customize'"
-                  @click="() => handleCustomize(record)"
-                  style="color: #52c41a"
-                >
-                  {{ t('common.customize') }}
-                </a>
                 <a
                   v-permission="'system:device:memory'"
                   @click="() => navigateToMemory({ roleId: record.roleId, deviceId: record.deviceId })"

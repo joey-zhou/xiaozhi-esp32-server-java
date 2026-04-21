@@ -79,7 +79,9 @@ public class SummaryConversation extends Conversation {
         this.chatMemory = chatMemory;
 
         Assert.notNull(chatModel, "chatModel must not be null");
-        this.chatClient = ChatClient.create(chatModel);
+        this.chatClient = ChatClient.builder(chatModel)
+                .defaultAdvisors()
+                .build();
 
         // 在新建Conversation时，可以加载以前的已有的Summary。
         this.lastSummary = chatMemory.findLastSummary(getOwnerId(), getRoleId());

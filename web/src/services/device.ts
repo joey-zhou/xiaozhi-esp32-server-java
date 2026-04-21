@@ -36,10 +36,3 @@ export function deleteDevice(deviceId: string) {
 export function clearDeviceMemory(deviceId: string) {
   return http.delete(api.message.delete, { deviceId })
 }
-
-/**
- * 生成设备消息token
- */
-export function generateDeviceToken(deviceId: string) {
-  return http.post<{ token: string }>(api.device.generateToken, { deviceId })
-}

@@ -31,9 +31,9 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.util.*;
-import java.util.HashMap;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -41,10 +41,9 @@ import lombok.extern.slf4j.Slf4j;
  * 基于Spring AI的DefaultToolCallingManager，增加了自定义的监控和元数据处理功能。
  * <p>
  * 包含对流式工具调用分片合并的修复（Spring AI issue #4629, #4790）。
- * 此问题在 Spring AI 1.1.4 中可能已被官方修复，mergeFragmentedToolCalls 方法作为安全网保留。
- * 当日志不再出现 "工具调用分片合并完成" 消息时，可考虑移除该逻辑。
+ * 该问题在 Spring AI 1.1.4 中仍未修复，mergeToolCalls 方法作为必要的修复保留。
  * <p>
- * TODO: [Spring AI 升级追踪] 升级到 1.1.4 后观察日志，若分片合并不再触发，可移除 mergeFragmentedToolCalls 方法。
+ * TODO: [Spring AI 升级追踪] 持续关注后续版本是否修复分片问题，届时可移除 mergeToolCalls 方法。
  */
 @Slf4j
 public class XiaoZhiToolCallingManager implements ToolCallingManager, ApplicationContextAware {
@@ -93,7 +92,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
     /**
      * 获取 ToolSessionProvider
      */
-    private static ToolSessionProvider getToolSessionProvider() {
+    private static ToolSessionProvider sessionProvider() {
         if (applicationContext != null) {
             try {
                 return applicationContext.getBean(ToolSessionProvider.class);
@@ -105,16 +104,9 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
     }
 
     /**
-     * 判断是否为MCP调用（根据工具名称判断，MCP工具通常以mcp_开头）
-     */
-    private static boolean isMcpCall(String toolName) {
-        return toolName != null && toolName.startsWith("mcp_");
-    }
-
-    /**
      * 发布工具调用事件
      */
-    private static void publishToolCallCompletedEvent(String sessionId, String toolName, String arguments,
+    private static void publishToolEvent(String sessionId, String toolName, String arguments,
                                           String result, boolean success, long startTimeMs) {
         if (applicationContext == null) {
             return;
@@ -169,7 +161,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         AssistantMessage originalAssistantMessage = toolCallGeneration.get().getOutput();
 
         // 修复流式分片导致的 ToolCall 拆分问题
-        List<AssistantMessage.ToolCall> mergedToolCalls = mergeFragmentedToolCalls(originalAssistantMessage.getToolCalls());
+        List<AssistantMessage.ToolCall> mergedToolCalls = mergeToolCalls(originalAssistantMessage.getToolCalls());
         AssistantMessage assistantMessage = (mergedToolCalls == originalAssistantMessage.getToolCalls())
                 ? originalAssistantMessage
                 : AssistantMessage.builder()
@@ -180,27 +172,27 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
 
         ToolContext toolContext = buildToolContext(prompt, assistantMessage);
 
-        XiaoZhiToolCallingManager.InternalToolExecutionResult internalToolExecutionResult = executeToolCall(prompt, assistantMessage,
+        XiaoZhiToolCallingManager.ToolExecResult toolExecResult = executeToolCall(prompt, assistantMessage,
                 toolContext);
 
         // 将中间消息（模型的 tool_call 请求 + 工具执行结果）存入 ToolSession，供 Persona 注入 Conversation
         String sessionId = toolContext.getContext().get("sessionId") instanceof String s ? s : null;
         if (sessionId != null) {
-            ToolSessionProvider provider = getToolSessionProvider();
+            ToolSessionProvider provider = sessionProvider();
             if (provider != null) {
                 ToolSession toolSession = provider.getSession(sessionId);
                 if (toolSession != null) {
-                    toolSession.addToolCallMessages(assistantMessage, internalToolExecutionResult.toolResponseMessage());
+                    toolSession.addToolCallMessages(assistantMessage, toolExecResult.toolResponseMessage());
                 }
             }
         }
 
-        List<Message> conversationHistory = buildConversationHistoryAfterToolExecution(prompt.getInstructions(),
-                assistantMessage, internalToolExecutionResult.toolResponseMessage());
+        List<Message> conversationHistory = buildPostToolHistory(prompt.getInstructions(),
+                assistantMessage, toolExecResult.toolResponseMessage());
 
         return ToolExecutionResult.builder()
                 .conversationHistory(conversationHistory)
-                .returnDirect(internalToolExecutionResult.returnDirect())
+                .returnDirect(toolExecResult.returnDirect())
                 .build();
     }
 
@@ -211,35 +203,14 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
                 && !CollectionUtils.isEmpty(toolCallingChatOptions.getToolContext())) {
             toolContextMap = new HashMap<>(toolCallingChatOptions.getToolContext());
 
-            List<Message> messageHistory = new ArrayList<>(prompt.copy().getInstructions());
-
-            // 确保工具调用消息包含正确的元数据
-            if (!CollectionUtils.isEmpty(assistantMessage.getToolCalls())) {
-                Map<String, Object> metadata = new HashMap<>(assistantMessage.getMetadata());
-                String toolName = assistantMessage.getToolCalls().get(0).name();
-                metadata.put("toolName", toolName);
-                AssistantMessage updatedAssistantMessage = AssistantMessage.builder()
-                        .content(assistantMessage.getText())
-                        .properties(metadata)
-                        .toolCalls(assistantMessage.getToolCalls())
-                        .build();
-                messageHistory.add(updatedAssistantMessage);
-            } else {
-                messageHistory.add(AssistantMessage.builder()
-                        .content(assistantMessage.getText())
-                        .properties(assistantMessage.getMetadata())
-                        .toolCalls(assistantMessage.getToolCalls())
-                        .build());
-            }
-
             toolContextMap.put(ToolContext.TOOL_CALL_HISTORY,
-                    buildConversationHistoryBeforeToolExecution(prompt, assistantMessage));
+                    buildPreToolHistory(prompt, assistantMessage));
         }
 
         return new ToolContext(toolContextMap);
     }
 
-    private static List<Message> buildConversationHistoryBeforeToolExecution(Prompt prompt,
+    private static List<Message> buildPreToolHistory(Prompt prompt,
                                                                              AssistantMessage assistantMessage) {
         List<Message> messageHistory = new ArrayList<>(prompt.copy().getInstructions());
 
@@ -266,7 +237,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
     }
 
     /**
-     * 修复流式响应中工具调用分片问题（Spring AI issue #4629, #4790）。
+     * 合并流式响应中被拆分的工具调用（Spring AI issue #4629, #4790，1.1.4 仍未修复）。
      * <p>
      * 部分 OpenAI 兼容 API（千问、阿里云等）在流式返回 tool call 时，续传 chunk 的 id 为空字符串 "" 而非 null，
      * 导致 OpenAiStreamFunctionCallingHelper.merge() 将同一个 tool call 的 name 和 arguments 拆成多条记录。
@@ -282,14 +253,14 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
      * - id 为空且 name 为空的条目视为续传片段，合并到紧邻的上一个 tool call
      * - 合并后仍缺少 name 的条目会被 warn 并跳过（arguments 允许为空，部分工具不需要参数）
      */
-    private static List<AssistantMessage.ToolCall> mergeFragmentedToolCalls(List<AssistantMessage.ToolCall> toolCalls) {
+    private static List<AssistantMessage.ToolCall> mergeToolCalls(List<AssistantMessage.ToolCall> toolCalls) {
         if (toolCalls == null || toolCalls.size() <= 1) {
             return toolCalls;
         }
 
         // 快速检查：如果所有条目都有 name，说明没有分片问题，直接返回
         boolean hasFragment = toolCalls.stream()
-                .anyMatch(tc -> !hasText(tc.name()));
+                .anyMatch(tc -> !StringUtils.hasText(tc.name()));
         if (!hasFragment) {
             return toolCalls;
         }
@@ -303,12 +274,12 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         for (AssistantMessage.ToolCall tc : toolCalls) {
             // 判断是否为续传：同一 id 或无 id 无 name 的孤立片段
             boolean isContinuation = currentId != null
-                    && ((!hasText(tc.id()) && !hasText(tc.name()))
-                        || (hasText(tc.id()) && tc.id().equals(currentId)));
+                    && ((!StringUtils.hasText(tc.id()) && !StringUtils.hasText(tc.name()))
+                        || (StringUtils.hasText(tc.id()) && tc.id().equals(currentId)));
 
             if (isContinuation) {
                 // 续传片段：合并到当前 tool call
-                if (hasText(tc.name()) && !hasText(currentName)) {
+                if (StringUtils.hasText(tc.name()) && !StringUtils.hasText(currentName)) {
                     currentName = tc.name();
                 }
                 if (tc.arguments() != null && !tc.arguments().isEmpty()) {
@@ -319,9 +290,9 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
                 if (currentName != null) {
                     merged.add(new AssistantMessage.ToolCall(currentId, currentType, currentName, currentArgs.toString()));
                 }
-                currentId = hasText(tc.id()) ? tc.id() : "";
-                currentType = hasText(tc.type()) ? tc.type() : "function";
-                currentName = hasText(tc.name()) ? tc.name() : null;
+                currentId = StringUtils.hasText(tc.id()) ? tc.id() : "";
+                currentType = StringUtils.hasText(tc.type()) ? tc.type() : "function";
+                currentName = StringUtils.hasText(tc.name()) ? tc.name() : null;
                 currentArgs = new StringBuilder(tc.arguments() != null ? tc.arguments() : "");
             }
         }
@@ -333,7 +304,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         // 验证：只拦截缺 name 的，arguments 允许为空（部分工具不需要参数）
         List<AssistantMessage.ToolCall> valid = new ArrayList<>();
         for (AssistantMessage.ToolCall tc : merged) {
-            if (!hasText(tc.name())) {
+            if (!StringUtils.hasText(tc.name())) {
                 log.warn("工具调用合并后仍缺少 name，跳过: id={}, arguments={}", tc.id(), tc.arguments());
             } else {
                 valid.add(tc);
@@ -341,20 +312,16 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         }
 
         if (valid.size() != toolCalls.size()) {
-            log.warn("工具调用分片合并触发: {} 条 → {} 条（若升级 Spring AI 1.1.4+ 后仍频繁出现，请提交 issue）",
+            log.warn("工具调用分片合并触发: {} 条 → {} 条",
                     toolCalls.size(), valid.size());
         }
         return valid;
     }
 
-    private static boolean hasText(String s) {
-        return s != null && !s.isBlank();
-    }
-
     /**
      * Execute the tool call and return the response message.
      */
-    private XiaoZhiToolCallingManager.InternalToolExecutionResult executeToolCall(Prompt prompt, AssistantMessage assistantMessage,
+    private XiaoZhiToolCallingManager.ToolExecResult executeToolCall(Prompt prompt, AssistantMessage assistantMessage,
                                                                                   ToolContext toolContext) {
         List<ToolCallback> toolCallbacks = List.of();
         if (prompt.getOptions() instanceof ToolCallingChatOptions toolCallingChatOptions) {
@@ -400,12 +367,11 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
             String sessionId = toolContext.getContext().get("sessionId") instanceof String s ? s : null;
             ToolSession toolSession = null;
             if (sessionId != null) {
-                toolSession = getToolSessionProvider() != null ? getToolSessionProvider().getSession(sessionId) : null;
+                toolSession = sessionProvider() != null ? sessionProvider().getSession(sessionId) : null;
                 observationContext.put("sessionId", sessionId);
             }
 
             // 记录工具调用开始时间
-            final boolean isMcp = isMcpCall(toolName);
             final long[] startTimeRef = new long[]{System.currentTimeMillis()};
             final boolean[] successRef = new boolean[]{true};
 
@@ -414,7 +380,6 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
                             this.observationRegistry)
                     .observe(() -> {
                         String toolResult;
-                        boolean success = true;
                         try {
                             toolResult = toolCallback.call(toolInputArguments, toolContext);
                         }
@@ -422,13 +387,11 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
                             log.error("Tool execution exception: ", ex);
                             toolResult = this.toolExecutionExceptionProcessor.process(ex);
                             log.debug("Processed tool execution exception result: {}", toolResult);
-                            success = false;
                             successRef[0] = false;
                         }
                         catch (Exception ex) {
                             log.error("Unexpected exception during tool execution: ", ex);
                             toolResult = "Error executing tool: " + ex.getMessage();
-                            success = false;
                             successRef[0] = false;
                         }
                         observationContext.setToolCallResult(toolResult);
@@ -442,18 +405,18 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
             }
 
             // 发布工具调用事件
-            publishToolCallCompletedEvent(sessionId, toolName, toolInputArguments, toolCallResult,
+            publishToolEvent(sessionId, toolName, toolInputArguments, toolCallResult,
                     successRef[0], startTimeRef[0]);
 
             toolResponses.add(new ToolResponseMessage.ToolResponse(toolCall.id(), toolName,
                     toolCallResult != null ? toolCallResult : ""));
         }
 
-        return new XiaoZhiToolCallingManager.InternalToolExecutionResult(ToolResponseMessage.builder().responses(toolResponses).build(),
+        return new XiaoZhiToolCallingManager.ToolExecResult(ToolResponseMessage.builder().responses(toolResponses).build(),
                 returnDirect != null && returnDirect);
     }
 
-    private List<Message> buildConversationHistoryAfterToolExecution(List<Message> previousMessages,
+    private List<Message> buildPostToolHistory(List<Message> previousMessages,
                                                                      AssistantMessage assistantMessage, ToolResponseMessage toolResponseMessage) {
         List<Message> messages = new ArrayList<>(previousMessages);
 
@@ -484,7 +447,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         return new XiaoZhiToolCallingManager.Builder();
     }
 
-    private record InternalToolExecutionResult(ToolResponseMessage toolResponseMessage, boolean returnDirect) {
+    private record ToolExecResult(ToolResponseMessage toolResponseMessage, boolean returnDirect) {
     }
 
     public final static class Builder {

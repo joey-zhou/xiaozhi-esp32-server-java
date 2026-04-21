@@ -23,7 +23,6 @@ export default {
     update: '/device',
     delete: '/device',
     export: '/device/export',
-    generateToken: '/device/generateToken',
   },
   agent: {
     query: '/agent',

@@ -48,7 +48,9 @@ public class VisionService {
                 .text(question)
                 .build();
 
-        String result = ChatClient.create(chatModel)
+        String result = ChatClient.builder(chatModel)
+                .defaultAdvisors()
+                .build()
                 .prompt()
                 .messages(userMessage)
                 .call()

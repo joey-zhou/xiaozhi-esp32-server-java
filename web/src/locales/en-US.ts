@@ -70,7 +70,6 @@ export default {
     successMessage: 'Operation successful',
     errorMessage: 'Operation failed',
     loadDataFailed: 'Failed to load data',
-    customize: 'Customize',
     // Common fields
     avatar: 'Avatar',
     name: 'Name',

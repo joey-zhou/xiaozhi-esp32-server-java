@@ -23,6 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -178,10 +180,21 @@ public class DeviceMcpService {
             return collectedNames;
         }
 
+        // 按原名长度倒序构建 original -> sanitized 映射：
+        // 长名先替换能避免短名字是长名字子串时替换错位
+        // （例如 description 里同时存在 self.audio_speaker 和 self.audio_speaker.set_volume）
+        Map<String, String> nameMapping = new LinkedHashMap<>();
+        tools.stream()
+                .map(t -> (String) t.get("name"))
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparingInt(String::length).reversed())
+                .forEach(original -> nameMapping.put(original, sanitizeToolName(original)));
+
         for (Map<String, Object> tool : tools) {
-            String name = (String) tool.get("name");
-            String funcName = "mcp_" + name.replace(".", "_");
-            String funcDescription = (String) tool.get("description");
+            final String name = (String) tool.get("name");
+            String funcName = nameMapping.get(name);
+            // 同步替换 description 中出现的原始工具名，避免模型照描述文本输出未注册的原名
+            String funcDescription = sanitizeDescription((String) tool.get("description"), nameMapping);
             Object inputSchema = tool.get("inputSchema");
 
             ToolCallback toolCallback = FunctionToolCallback
@@ -251,6 +264,32 @@ public class DeviceMcpService {
         } catch (Exception e) {
             log.warn("DeviceId: {}, failed to persist mcp_list", deviceId, e);
         }
+    }
+
+    /**
+     * 将设备端 MCP 工具名规范化为 OpenAI Function Calling 兼容名称。
+     * <p>
+     * 保留字母、数字、下划线、连字符和中文，其他字符（包括 '.'）替换为 '_'。
+     */
+    static String sanitizeToolName(String rawName) {
+        return rawName.replaceAll("[^a-zA-Z0-9_\\-\\u4e00-\\u9fff]", "_");
+    }
+
+    /**
+     * 将 description 中引用的工具原名替换为 sanitized 名称，
+     * 避免 LLM 按描述里的原名（如 {@code self.get_device_status}）输出导致 resolve 失败。
+     * <p>
+     * 传入的 mapping 应按原名长度倒序，避免短名字是长名字子串时替换错位。
+     */
+    static String sanitizeDescription(String description, Map<String, String> nameMapping) {
+        if (description == null || description.isEmpty() || nameMapping == null || nameMapping.isEmpty()) {
+            return description;
+        }
+        String result = description;
+        for (Map.Entry<String, String> entry : nameMapping.entrySet()) {
+            result = result.replace(entry.getKey(), entry.getValue());
+        }
+        return result;
     }
 
     public DeviceMcpMessage sendMcpRequest(ChatSession chatSession, DeviceMcpMessage mcpMessage) {

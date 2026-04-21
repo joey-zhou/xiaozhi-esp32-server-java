@@ -12,10 +12,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * Dialogue 独立启动入口
  * <p>
- * 包含：WebSocket/AI 对话、长期记忆、MCP 工具调用。
+ * 包含：WebSocket/MQTT。
  * 可横向扩展，通过 Redis Pub/Sub 与其他实例协作。
  * <p>
- * 数据库 Migration 仅在 xiaozhi-server 中执行（spring.flyway.enabled=false）。
  */
 @SpringBootApplication
 @EnableCaching
