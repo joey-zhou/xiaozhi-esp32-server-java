@@ -20,12 +20,26 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class DifyChatModel implements ChatModel {
+    /**
+     * Persona 在 ToolContext 中放入的 sessionId 键，与
+     * {@code com.xiaozhi.dialogue.runtime.Persona.TOOL_CONTEXT_SESSION_ID_KEY} 保持一致。
+     * 此处用字面量是因为 xiaozhi-ai 模块不依赖 xiaozhi-dialogue。
+     */
+    private static final String TOOL_CONTEXT_SESSION_ID_KEY = "sessionId";
+
     private DifyChatClient chatClient;
+
+    /**
+     * 按 sessionId 缓存 Dify 返回的 conversation_id，使多轮对话能延续 Dify 智能体侧的会话记忆。
+     */
+    private final Map<String, String> conversationIds = new ConcurrentHashMap<>();
+
     /**
      * 构造函数
      *
@@ -44,9 +58,13 @@ public class DifyChatModel implements ChatModel {
     public ChatResponse call(Prompt prompt) {
 
         // 创建聊天消息
+        // inputs 必须为非 null（即使没有 App 变量也要传空对象），否则 Dify 服务端会拒绝请求。
+        // conversationId 用上一轮 Dify 返回的会话 ID，使智能体能延续上下文记忆。
         ChatMessage message = ChatMessage.builder()
                 .query(prompt.getContents())
+                .inputs(Map.of())
                 .user(resolveUserId(prompt))
+                .conversationId(getCurrentConversationId(prompt))
                 .responseMode(ResponseMode.BLOCKING)
                 .build();
         try {
@@ -55,6 +73,7 @@ public class DifyChatModel implements ChatModel {
             log.debug("回复: {}", response.getAnswer());
             log.debug("会话ID: {}", response.getConversationId());
             log.debug("消息ID: {}", response.getMessageId());
+            saveCurrentConversationId(prompt, response.getConversationId());
             return new ChatResponse(List.of(new Generation(AssistantMessage.builder()
                     .content(response.getAnswer())
                     .properties(Map.of("messageId", response.getMessageId(), "conversationId", response.getConversationId()))
@@ -71,9 +90,13 @@ public class DifyChatModel implements ChatModel {
     public Flux<ChatResponse> stream(Prompt prompt) {
         Flux<ChatResponse> responseFlux = Flux.create(sink -> {
 
+            // inputs 必须为非 null（即使没有 App 变量也要传空对象），否则 Dify 服务端会拒绝请求。
+            // conversationId 用上一轮 Dify 返回的会话 ID，使智能体能延续上下文记忆。
             ChatMessage message = ChatMessage.builder()
                     .user(resolveUserId(prompt))
                     .query(prompt.getUserMessage().getText())
+                    .inputs(Map.of())
+                    .conversationId(getCurrentConversationId(prompt))
                     .responseMode(ResponseMode.STREAMING)
                     .build();
 
@@ -106,7 +129,8 @@ public class DifyChatModel implements ChatModel {
 
                     @Override
                     public void onMessageEnd(MessageEndEvent event) {
-                        // 通知完成
+                        // 必须先持久化 conversationId 再 complete，避免下一轮 chatStream 在 save 之前就读取到旧值。
+                        saveCurrentConversationId(prompt, event.getConversationId());
                         sink.complete();
                     }
 
@@ -144,5 +168,44 @@ public class DifyChatModel implements ChatModel {
             }
         }
         return "user_" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    /**
+     * 从 ToolContext 取出 sessionId，回查上一轮 Dify 返回的 conversation_id。
+     * 拿不到时返回 null：Dify 接口将其视为开启全新会话。
+     */
+    private String getCurrentConversationId(Prompt prompt) {
+        String sessionId = extractSessionId(prompt);
+        if (sessionId == null) {
+            return null;
+        }
+        return conversationIds.get(sessionId);
+    }
+
+    /**
+     * 持久化 Dify 返回的 conversation_id。仅在拿到有效 sessionId 与 conversationId 时写入。
+     */
+    private void saveCurrentConversationId(Prompt prompt, String conversationId) {
+        if (conversationId == null || conversationId.isBlank()) {
+            return;
+        }
+        String sessionId = extractSessionId(prompt);
+        if (sessionId == null) {
+            return;
+        }
+        conversationIds.put(sessionId, conversationId);
+    }
+
+    private String extractSessionId(Prompt prompt) {
+        if (prompt.getOptions() instanceof ToolCallingChatOptions toolCallingChatOptions) {
+            Map<String, Object> toolContext = toolCallingChatOptions.getToolContext();
+            if (toolContext != null) {
+                Object value = toolContext.get(TOOL_CONTEXT_SESSION_ID_KEY);
+                if (value instanceof String sessionId && !sessionId.isBlank()) {
+                    return sessionId;
+                }
+            }
+        }
+        return null;
     }
 }
