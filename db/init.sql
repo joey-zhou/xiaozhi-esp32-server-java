@@ -84,12 +84,17 @@ CREATE TABLE `xiaozhi`.`sys_message` (
   `userId` int unsigned DEFAULT NULL COMMENT '用户ID',
   `deviceId` varchar(30) NOT NULL COMMENT '设备ID',
   `sessionId` varchar(100) NOT NULL COMMENT '会话ID',
-  `sender` enum('user','assistant','tool') NOT NULL COMMENT '消息发送方：user-用户，assistant-人工智能，tool-工具响应',
+  `sender` enum('user','assistant') NOT NULL COMMENT '消息发送方：user-用户，assistant-人工智能',
   `roleId` int unsigned DEFAULT NULL COMMENT 'AI扮演的角色ID',
   `message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '消息内容',
+  `tokens` int unsigned DEFAULT 0 COMMENT 'tokens数量',
   `messageType` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '消息类型',
   `audioPath` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '语音文件路径',
   `state` enum('1','0') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '1' COMMENT '状态：1-有效，0-删除',
+  `sttDuration` DECIMAL(6,2) DEFAULT 0.00 COMMENT '用户音频时长(秒)',
+  `ttsDuration` DECIMAL(6,2) DEFAULT 0.00 COMMENT '语音合成音频时长(秒)',
+  `ttfsTime` int unsigned DEFAULT NULL COMMENT 'llm首句响应时间',
+  `responseTime` int unsigned DEFAULT NULL COMMENT '响应时间(毫秒)，从静音结束后开始请求模型到语音合成首次出声',
   `toolCalls` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '工具调用详情JSON，包含name/arguments/result',
   `statDate` DATE NOT NULL COMMENT '统计日期，用于索引',
   `createTime` DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '消息发送时间(毫秒精度)',
@@ -163,7 +168,6 @@ CREATE TABLE `xiaozhi`.`sys_config` (
   `sk` text DEFAULT NULL COMMENT 'Secret Key',
   `apiUrl` varchar(255) DEFAULT NULL COMMENT 'API地址',
   `isDefault` enum('1','0') DEFAULT '0' COMMENT '是否为默认配置: 1-是, 0-否',
-  `enableThinking` tinyint(1) DEFAULT NULL COMMENT '是否启用思考模式',
   `state` enum('1','0') DEFAULT '1' COMMENT '状态：1-启用，0-禁用',
   `createTime` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updateTime` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -172,12 +176,6 @@ CREATE TABLE `xiaozhi`.`sys_config` (
   KEY `configType` (`configType`),
   KEY `provider` (`provider`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表(模型、语音识别、语音合成等)';
-
-INSERT INTO `xiaozhi`.`sys_config` (`userId`, `configType`, `provider`, `configName`, `configDesc`, `isDefault`, `state`)
-SELECT u.`userId`, 'oss', 'local', '默认本地存储', '未配置云存储时默认使用本地存储', '1', '1'
-FROM `xiaozhi`.`sys_user` u
-WHERE u.`username` = 'admin'
-LIMIT 1;
 
 -- xiaozhi.sys_template definition
 DROP TABLE IF EXISTS `xiaozhi`.`sys_template`;
@@ -367,9 +365,8 @@ INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `pe
 (NULL, '角色配置', 'system:role', 'menu', '/role', 'page/Role', 'user-add', 5, '1', '1'),
 (NULL, '提示词模板管理', 'system:prompt-template', 'menu', '/prompt-template', 'page/PromptTemplate', 'snippets', 6, '0', '1'),
 (NULL, '配置管理', 'system:config', 'menu', '/config', 'common/PageView', 'setting', 7, '1', '1'),
-(NULL, 'Web 聊天', 'system:chat', 'menu', '/chat', 'page/Chat', 'message', 8, '1', '1'),
-(NULL, '设置', 'system:setting', 'menu', '/setting', 'common/PageView', 'setting', 9, '1', '1'),
-(NULL, '权限角色', 'system:auth-role', 'menu', '/auth-role', 'page/AuthRole', 'safety-certificate', 10, '1', '1');
+(NULL, '设置', 'system:setting', 'menu', '/setting', 'common/PageView', 'setting', 8, '1', '1'),
+(NULL, '权限角色', 'system:auth-role', 'menu', '/auth-role', 'page/AuthRole', 'safety-certificate', 9, '1', '1');
 
 -- 配置管理子菜单 (parentId=7 即配置管理)
 INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
@@ -388,19 +385,6 @@ INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `pe
 SELECT `permissionId`, '保存授权', 'system:auth-role:assign', 'button', NULL, NULL, NULL, 1, '0', '1'
 FROM `xiaozhi`.`sys_permission`
 WHERE `permissionKey` = 'system:auth-role';
-
--- Web 聊天 API 子权限
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`)
-SELECT permissionId, '开启会话', 'system:chat:api:open', 'api', NULL, NULL, NULL, 1, '0', '1'
-FROM `xiaozhi`.`sys_permission` WHERE `permissionKey` = 'system:chat';
-
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`)
-SELECT permissionId, '流式聊天', 'system:chat:api:stream', 'api', NULL, NULL, NULL, 2, '0', '1'
-FROM `xiaozhi`.`sys_permission` WHERE `permissionKey` = 'system:chat';
-
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`)
-SELECT permissionId, '关闭会话', 'system:chat:api:close', 'api', NULL, NULL, NULL, 3, '0', '1'
-FROM `xiaozhi`.`sys_permission` WHERE `permissionKey` = 'system:chat';
 
 -- 隐藏菜单: 文件能力
 INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
@@ -509,11 +493,7 @@ permissionKey IN (
     'system:setting',
     'system:setting:account',
     'system:setting:config',
-    'system:config',
-    'system:chat',
-    'system:chat:api:open',
-    'system:chat:api:stream',
-    'system:chat:api:close'
+    'system:config'
 );
 
 -- 将admin用户设为管理员角色
