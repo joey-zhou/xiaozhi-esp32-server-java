@@ -201,11 +201,12 @@ const platformModal = useModal<PlatformConfig>({
       })
     } else {
       // 新增模式：使用默认值
+      // configName 用 provider 名作为默认值（每用户每 provider 仅一份平台凭据，不会重名），
       currentConfigId.value = null
       Object.assign(platformForm, {
         configType: 'agent',
         provider: searchForm.value.provider,
-        configName: '',
+        configName: searchForm.value.provider,
         configDesc: '',
         appId: '',
         apiKey: '',
