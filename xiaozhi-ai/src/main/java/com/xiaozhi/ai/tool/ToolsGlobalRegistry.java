@@ -5,6 +5,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.resolution.ToolCallbackResolver;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -25,6 +27,24 @@ public class ToolsGlobalRegistry implements ToolCallbackResolver {
 
     @Autowired(required = false)
     protected List<GlobalFunction> globalFunctions = List.of();
+
+    @Autowired(required = false)
+    private GlobalToolRedisRegistry globalToolRedisRegistry;
+
+    /**
+     * 应用启动后，将本进程注册的 GlobalFunction 元数据发布到 Redis，
+     * 使 server 进程能在"排除工具"界面拿到由 dialogue 进程持有的工具列表。
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void publishGlobalToolMetadata() {
+        if (globalToolRedisRegistry == null || globalFunctions == null || globalFunctions.isEmpty()) {
+            return;
+        }
+        List<GlobalToolRedisRegistry.ToolSummary> summaries = globalFunctions.stream()
+                .map(f -> new GlobalToolRedisRegistry.ToolSummary(f.getToolName(), f.getToolDescription()))
+                .toList();
+        globalToolRedisRegistry.publish(summaries);
+    }
 
     @Override
     public ToolCallback resolve(@NotNull String toolName) {
