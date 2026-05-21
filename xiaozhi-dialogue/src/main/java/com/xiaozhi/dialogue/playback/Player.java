@@ -183,6 +183,7 @@ public abstract class Player {
      * 自然说完的时候，内部会控制sendStop，但内部不能调用这个stop方法。
      */
     public void stop() {
+        isPlaying = false;
         // 子类（如ScheduledPlayer）会覆盖此方法进行更详细的清理
         log.info("已取消音频发送任务 - SessionId: {}", session.getSessionId());
     }
