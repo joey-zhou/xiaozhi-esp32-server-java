@@ -35,6 +35,26 @@
             <groupId>dev.onvoid.webrtc</groupId>
             <artifactId>webrtc-java</artifactId>
         </dependency>
+        <!--
+          webrtc-java 的 native 库（.dll/.so）按平台分 classifier 打包。
+          默认仅靠 webrtc-java 自身的 OS profile 拉取“构建机器”所在平台的 native，
+          导致 Windows 上打的 fat jar 里只有 Windows native，部署到 Linux 后
+          AudioProcessing 类初始化失败（Could not initialize class）。
+          这里显式声明各目标平台的 native，保证 fat jar 跨平台可用。
+          换部署架构时按需增删（如 linux-aarch64 / macos-aarch64）。
+        -->
+        <dependency>
+            <groupId>dev.onvoid.webrtc</groupId>
+            <artifactId>webrtc-java</artifactId>
+            <version>${webrtc.version}</version>
+            <classifier>windows-x86_64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>dev.onvoid.webrtc</groupId>
+            <artifactId>webrtc-java</artifactId>
+            <version>${webrtc.version}</version>
+            <classifier>linux-x86_64</classifier>
+        </dependency>
         <dependency>
             <groupId>com.microsoft.onnxruntime</groupId>
             <artifactId>onnxruntime</artifactId>
