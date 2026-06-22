@@ -4,11 +4,13 @@ import { message as antMessage, Modal } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import type { FormInstance, TableColumnsType } from 'ant-design-vue'
 import { useConfigManager } from '@/composables/useConfigManager'
+import { useUserStore } from '@/store/user'
 import TableActionButtons from '@/components/TableActionButtons.vue'
 import type { ConfigType, Config, ConfigField } from '@/types/config'
 import { addConfig, updateConfig } from '@/services/config'
 
 const { t } = useI18n()
+const userStore = useUserStore()
 
 interface Props {
   configType: ConfigType
@@ -474,7 +476,7 @@ fetchData()
 
         <!-- 创建/编辑标签页 -->
         <a-tab-pane
-          v-permission="editingConfigId ? `${configTypeInfo.permissionPrefix}:update` : `${configTypeInfo.permissionPrefix}:create`"
+          v-if="userStore.hasPermission(editingConfigId ? `${configTypeInfo.permissionPrefix}:update` : `${configTypeInfo.permissionPrefix}:create`)"
           key="2"
           :tab="editingConfigId ? `${t('config.update', { type: t(configTypeInfo.label) })}` : `${t('config.create')} ${t(configTypeInfo.label)}`"
         >

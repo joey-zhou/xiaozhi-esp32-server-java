@@ -15,6 +15,7 @@ import { useTable } from '@/composables/useTable'
 import { useRoleManager } from '@/composables/useRoleManager'
 import { useMemoryView } from '@/composables/useMemoryView'
 import { useClipboard } from '@/composables/useClipboard'
+import { useUserStore } from '@/store/user'
 import { ROUTES } from '@/router/routes'
 import { queryRoles, addRole, updateRole, deleteRole, testVoice, getSystemGlobalTools, getDisabledTools, updateToolsStatus } from '@/services/role'
 import { queryTemplates } from '@/services/template'
@@ -29,6 +30,7 @@ import TableActionButtons from '@/components/TableActionButtons.vue'
 const { t } = useI18n()
 const { getAvatarUrl } = useAvatar()
 const { copy } = useClipboard()
+const userStore = useUserStore()
 
 const router = useRouter()
 const { navigateToMemory } = useMemoryView()
@@ -949,7 +951,7 @@ if (!editingRoleId.value) {
         <a-tab-pane
           key="2"
           :tab="editingRoleId ? t('role.updateRole') : t('role.createRole')"
-          v-permission="editingRoleId ? 'system:role:update' : 'system:role:create'"
+          v-if="userStore.hasPermission(editingRoleId ? 'system:role:update' : 'system:role:create')"
         >
           <a-form
             ref="formRef"

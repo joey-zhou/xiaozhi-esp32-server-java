@@ -36,19 +36,14 @@
             <artifactId>webrtc-java</artifactId>
         </dependency>
         <!--
-          webrtc-java 的 native 库（.dll/.so）按平台分 classifier 打包。
-          默认仅靠 webrtc-java 自身的 OS profile 拉取“构建机器”所在平台的 native，
-          导致 Windows 上打的 fat jar 里只有 Windows native，部署到 Linux 后
-          AudioProcessing 类初始化失败（Could not initialize class）。
-          这里显式声明各目标平台的 native，保证 fat jar 跨平台可用。
-          换部署架构时按需增删（如 linux-aarch64 / macos-aarch64）。
+          webrtc-java 的 native 库（.dll/.so/.dylib）按平台分 classifier 打包。
+          不带 classifier 的主依赖会通过 webrtc-java 自身的 OS profile 自动拉取
+          “构建机器”所在平台的 native——所以本地开发（Mac/Windows）本机打包本机运行无需额外声明。
+          但部署目标是 Linux 服务器，打包机器（Mac/Windows/Linux）未必是 Linux，
+          auto-profile 不保证带上 linux native，会导致服务器上 AudioProcessing
+          初始化失败（Could not initialize class）。故显式声明 linux-x86_64 兜底。
+          若服务器换架构（如 ARM），把 classifier 改为 linux-aarch64。
         -->
-        <dependency>
-            <groupId>dev.onvoid.webrtc</groupId>
-            <artifactId>webrtc-java</artifactId>
-            <version>${webrtc.version}</version>
-            <classifier>windows-x86_64</classifier>
-        </dependency>
         <dependency>
             <groupId>dev.onvoid.webrtc</groupId>
             <artifactId>webrtc-java</artifactId>
