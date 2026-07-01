@@ -2,6 +2,7 @@ package com.xiaozhi.communication.common;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.xiaozhi.common.model.bo.DeviceBO;
+import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.ai.stt.SttServiceFactory;
 import com.xiaozhi.token.TokenService;
@@ -49,6 +50,9 @@ public class RedisSubscriber {
 
     @Resource
     private DeviceService deviceService;
+
+    @Resource
+    private PersonaFactory personaFactory;
 
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory) {
@@ -169,6 +173,8 @@ public class RedisSubscriber {
                     sttServiceFactory.removeCache(config);
                 } else if ("tts".equals(configType)) {
                     ttsServiceFactory.removeCache(config);
+                } else if ("llm".equals(configType)) {
+                    personaFactory.clearPersonasByModelId(configId);
                 }
                 // Token 缓存（Coze OAuth、阿里云 Token 等）与 configType 无关，统一清除
                 tokenService.removeCache(config);

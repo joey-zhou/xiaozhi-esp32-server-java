@@ -145,6 +145,31 @@ public class PersonaFactory {
     }
 
     /**
+     * LLM 配置变更：清理引用该配置（role.modelId）的活跃 Persona，下次对话时重新构建
+     */
+    public void clearPersonasByModelId(Integer configId) {
+        int count = 0;
+        for (ChatSession session : sessionManager.getAllSessions()) {
+            DeviceBO device = session.getDevice();
+            if (device == null || device.getRoleId() == null) {
+                continue;
+            }
+            RoleBO role = roleService.getBO(device.getRoleId());
+            if (role != null && configId.equals(role.getModelId())) {
+                Persona persona = session.getPersona();
+                if (persona != null) {
+                    persona.getConversation().clear();
+                    session.setPersona(null);
+                    count++;
+                }
+            }
+        }
+        if (count > 0) {
+            log.info("LLM 配置变更，已清理 {} 个 Persona（configId: {}）", count, configId);
+        }
+    }
+
+    /**
      * 初始化STT服务，将重要信息记录日志
      * @param role
      * @return
