@@ -228,11 +228,16 @@ async function handleSubmit() {
       // 如果模型名称不存在，则提示用户是否继续
       if (!isValid && validModels.length > 0) {
         try {
-          await Modal.confirm({
-            title: t('common.confirmSubmit'),
-            content: t('config.modelNameInvalid', { name: submitData.configName }),
-            okText: t('common.confirm'),
-            cancelText: t('common.cancel'),
+          // Modal.confirm 本身不返回可 await 的 Promise，需手动包装 onOk/onCancel
+          await new Promise<void>((resolve, reject) => {
+            Modal.confirm({
+              title: t('common.confirmSubmit'),
+              content: t('config.modelNameInvalid', { name: submitData.configName }),
+              okText: t('common.confirm'),
+              cancelText: t('common.cancel'),
+              onOk: () => resolve(),
+              onCancel: () => reject(new Error('cancelled')),
+            })
           })
           // 用户点击确认，继续执行
         } catch {
