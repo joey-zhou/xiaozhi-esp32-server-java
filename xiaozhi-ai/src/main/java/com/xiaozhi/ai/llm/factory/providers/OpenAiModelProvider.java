@@ -20,8 +20,6 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.client.reactive.JdkClientHttpConnector;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -60,15 +58,11 @@ public class OpenAiModelProvider implements ChatModelProvider {
         Double temperature = role.getTemperature();
         Double topP = role.getTopP();
         
-        MultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
-        headers.add("Content-Type", "application/json");
-        
         // LM Studio不支持Http/2，所以需要强制使用HTTP/1.1
         var openAiApi = OpenAiApi.builder()
                 .apiKey(StringUtils.hasText(apiKey) ? new SimpleApiKey(apiKey) : new NoopApiKey())
                 .baseUrl(endpoint)
                 .completionsPath("/chat/completions")
-                .headers(headers)
                 .webClientBuilder(WebClient.builder()
                         // Force HTTP/1.1 for streaming
                         .clientConnector(new JdkClientHttpConnector(HttpClient.newBuilder()
@@ -78,7 +72,7 @@ public class OpenAiModelProvider implements ChatModelProvider {
                 .restClientBuilder(RestClient.builder()
                         .requestFactory(createRequestFactory()))
                 .build();
-        
+
         boolean enableThinking = Boolean.TRUE.equals(config.getEnableThinking());
 
         var chatOptionsBuilder = OpenAiChatOptions.builder()
@@ -108,14 +102,10 @@ public class OpenAiModelProvider implements ChatModelProvider {
 
     @Override
     public EmbeddingModel createEmbeddingModel(ConfigBO config) {
-        MultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
-        headers.add("Content-Type", "application/json");
-
         var openAiApi = OpenAiApi.builder()
                 .apiKey(StringUtils.hasText(config.getApiKey()) ? new SimpleApiKey(config.getApiKey()) : new NoopApiKey())
                 .baseUrl(config.getApiUrl())
                 .embeddingsPath("/embeddings")
-                .headers(headers)
                 .webClientBuilder(WebClient.builder()
                         .clientConnector(new JdkClientHttpConnector(HttpClient.newBuilder()
                                 .version(HttpClient.Version.HTTP_1_1)

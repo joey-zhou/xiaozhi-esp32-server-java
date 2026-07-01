@@ -102,7 +102,7 @@ public class ChatModelFactory {
      * @param role 角色配置
      * @return ChatModel实例
      */
-    private ChatModel createChatModel(ConfigBO config, RoleBO role) {
+    public ChatModel createChatModel(ConfigBO config, RoleBO role) {
         String providerName = config.getProvider().toLowerCase();
         
         // 从providers Map中获取对应的Provider

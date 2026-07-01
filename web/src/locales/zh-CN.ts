@@ -535,6 +535,9 @@ export default {
 
   config: {
     llm: '模型',
+    test: '测试连接',
+    testSuccess: '测试成功',
+    testFailed: '测试失败',
     stt: '语音识别',
     tts: '语音合成',
     oss: '对象存储',

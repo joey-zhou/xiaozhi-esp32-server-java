@@ -32,6 +32,13 @@ export function deleteConfig(configId: number) {
 }
 
 /**
+ * 测试配置（使用当前表单值，可能尚未保存）
+ */
+export function testConfig(data: Partial<Config>) {
+  return http.post(api.config.test, data)
+}
+
+/**
  * 查询平台配置
  */
 export function queryPlatformConfig(configType: string, provider: string) {

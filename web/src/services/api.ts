@@ -53,6 +53,7 @@ export default {
     query: '/config',
     update: '/config',
     delete: '/config',
+    test: '/config/test',
   },
   mcpTool: {
     toggleRoleTool: '/mcpTool/role',         // PATCH /mcpTool/role/{roleId}/tools

@@ -537,6 +537,9 @@ export default {
 
   config: {
     llm: 'Model',
+    test: 'Test Connection',
+    testSuccess: 'Test succeeded',
+    testFailed: 'Test failed',
     stt: 'Speech Recognition',
     tts: 'Text to Speech',
     oss: 'Object Storage',

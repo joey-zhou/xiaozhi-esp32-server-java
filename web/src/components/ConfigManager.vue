@@ -7,7 +7,7 @@ import { useConfigManager } from '@/composables/useConfigManager'
 import { useUserStore } from '@/store/user'
 import TableActionButtons from '@/components/TableActionButtons.vue'
 import type { ConfigType, Config, ConfigField } from '@/types/config'
-import { addConfig, updateConfig } from '@/services/config'
+import { addConfig, updateConfig, testConfig } from '@/services/config'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -191,6 +191,48 @@ function handleEdit(record: Config) {
   // LLM 更新模型选项
   if (props.configType === 'llm') {
     updateModelOptions(record.provider, record.modelType || 'chat')
+  }
+}
+
+// 测试连接中
+const testing = ref(false)
+
+/**
+ * 测试配置（使用当前表单值，无需先保存）
+ */
+async function handleTest() {
+  if (!formRef.value) return
+
+  try {
+    await formRef.value.validate()
+
+    const submitData: Partial<Config> = {
+      ...formData.value,
+      configId: editingConfigId.value,
+      configType: props.configType,
+    }
+    submitData.isDefault = formData.value.isDefault == '1' ? '1' : '0'
+
+    testing.value = true
+    const res = await testConfig(submitData)
+
+    if (res.code === 200) {
+      Modal.success({
+        title: t('config.testSuccess'),
+        content: res.message,
+      })
+    } else {
+      Modal.error({
+        title: t('config.testFailed'),
+        content: res.message,
+      })
+    }
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'errorFields' in error) {
+      antMessage.error(t('config.fillRequiredFields'))
+    }
+  } finally {
+    testing.value = false
   }
 }
 
@@ -674,6 +716,9 @@ fetchData()
                   @click="handleSubmit"
                 >
                   {{ editingConfigId ? t('config.update', { type: t(configTypeInfo.label) }) : t('config.create', { type: t(configTypeInfo.label) }) }}
+                </a-button>
+                <a-button v-if="props.configType === 'llm'" :loading="testing" @click="handleTest">
+                  {{ t('config.test') }}
                 </a-button>
                 <a-button @click="handleCancel">{{ t('common.cancel') }}</a-button>
               </a-space>

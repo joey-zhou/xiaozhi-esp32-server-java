@@ -2,6 +2,7 @@ package com.xiaozhi.config.convert;
 
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.req.ConfigCreateReq;
+import com.xiaozhi.common.model.req.ConfigTestReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
 import com.xiaozhi.common.model.resp.ConfigResp;
 import com.xiaozhi.config.dal.mysql.dataobject.ConfigDO;
@@ -62,4 +63,6 @@ public interface ConfigConvert {
     ConfigBO toBO(ConfigUpdateReq req);
 
     ConfigResp toResp(ConfigBO configBO);
+
+    ConfigBO toBO(ConfigTestReq req);
 }

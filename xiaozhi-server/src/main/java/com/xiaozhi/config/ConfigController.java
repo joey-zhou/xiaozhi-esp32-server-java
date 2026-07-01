@@ -8,6 +8,7 @@ import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.ConfigCreateReq;
 import com.xiaozhi.common.model.req.ConfigPageReq;
+import com.xiaozhi.common.model.req.ConfigTestReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.config.ConfigAppService;
@@ -77,6 +78,20 @@ public class ConfigController extends BaseController {
     @Operation(summary = "添加配置信息", description = "添加新的LLM/STT/TTS配置")
     public ApiResponse<?> create(@Valid @RequestBody ConfigCreateReq req) {
         return ApiResponse.success(configAppService.create(req, StpUtil.getLoginIdAsInt()));
+    }
+
+    /**
+     * 测试配置
+     *
+     * @param req 测试参数（表单当前值，可能未保存）
+     * @return
+     */
+    @PostMapping("/test")
+    @ResponseBody
+    @SaCheckPermission("system:config:api:list")
+    @Operation(summary = "测试配置", description = "使用当前表单参数测试模型配置是否可用")
+    public ApiResponse<?> test(@Valid @RequestBody ConfigTestReq req) {
+        return configAppService.test(req);
     }
 
     /**

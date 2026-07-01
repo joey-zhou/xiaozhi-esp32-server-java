@@ -1151,13 +1151,6 @@
                     "is_tools": true
                 },
                 {
-                    "llm_name": "doubao-seed-1-6-lite-251015",
-                    "tags": "LLM,CHAT,256K,IMAGE2TEXT,REASONING",
-                    "max_tokens": 256000,
-                    "model_type": "chat",
-                    "is_tools": true
-                },
-                {
                     "llm_name": "doubao-seed-1-6-flash-250828",
                     "tags": "LLM,CHAT,256K,IMAGE2TEXT,FAST,REASONING",
                     "max_tokens": 256000,
