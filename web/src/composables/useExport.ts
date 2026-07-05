@@ -210,7 +210,7 @@ export function useExport() {
   }
   
   /**
-   * 导出为 Excel（使用 CSV 格式，Excel 可以打开）
+   * 导出为 Excel（生成真实的 .xlsx 文件）
    */
   const exportToExcel = async <T>(
     data: T[],
@@ -228,16 +228,49 @@ export function useExport() {
         message.loading(t('export.exporting'))
       }
       
-      const csv = convertToCSV(data, options.columns)
+      // 确定列配置（未指定时使用首行所有字段）
+      const firstItem = data[0] as object
+      const cols: ExportColumn<T>[] = options.columns || Object.keys(firstItem).map(key => ({
+        key,
+        title: key,
+      }))
+
+      // 按需加载 exceljs，避免仅使用 CSV 导出的页面也加载该库
+      const ExcelJS = (await import('exceljs')).default
+
+      // 创建工作簿和工作表
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('Sheet1')
+
+      // 设置表头列
+      worksheet.columns = cols.map(col => ({
+        header: col.title,
+        key: col.key,
+        width: 20,
+      }))
+
+      // 表头样式加粗
+      worksheet.getRow(1).font = { bold: true }
+
+      // 填充数据行
+      data.forEach(record => {
+        const recordObj = record as { [key: string]: unknown }
+        const row: { [key: string]: unknown } = {}
+        cols.forEach(col => {
+          let value: unknown = recordObj[col.key]
+          if (col.format) {
+            value = col.format(value, record)
+          }
+          row[col.key] = value === null || value === undefined ? '' : value
+        })
+        worksheet.addRow(row)
+      })
+
+      // 生成 xlsx 二进制并触发下载
+      const buffer = await workbook.xlsx.writeBuffer()
       const filename = `${options.filename || 'export'}.xlsx`
-      
-      // 使用 UTF-16LE 编码和特殊格式让 Excel 识别
-      const BOM = '\ufeff'
-      const csvWithBOM = BOM + csv
-      
-      // 创建 Excel 兼容的 CSV
-      const blob = new Blob([csvWithBOM], { 
-        type: 'application/vnd.ms-excel;charset=utf-8;' 
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       })
       const url = URL.createObjectURL(blob)
       

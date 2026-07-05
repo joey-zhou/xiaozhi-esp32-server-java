@@ -82,10 +82,7 @@ public class OpenAiModelProvider implements ChatModelProvider {
                 .maxCompletionTokens(2000)
                 .streamUsage(true);
 
-        if (enableThinking) {
-            chatOptionsBuilder.reasoningEffort("medium");
-            log.info("OpenAI model {} 已启用思考模式，reasoningEffort=medium", model);
-        }
+        applyThinkingOptions(chatOptionsBuilder, enableThinking, model);
 
         var openAiChatOptions = chatOptionsBuilder.build();
         
@@ -98,6 +95,24 @@ public class OpenAiModelProvider implements ChatModelProvider {
         
         log.info("Created OpenAI ChatModel: model={}, endpoint={}, thinking={}", model, endpoint, enableThinking);
         return chatModel;
+    }
+
+    /**
+     * 应用思考（推理）相关参数。
+     * <p>
+     * OpenAI 及标准兼容协议：启用时设置 {@code reasoningEffort=medium}，
+     * 关闭时不下发该参数（由服务端决定默认行为）。
+     * 子类可 override 以适配各厂商差异（如火山需要显式下发以关闭思考）。
+     *
+     * @param builder        OpenAiChatOptions 构造器
+     * @param enableThinking 是否启用思考
+     * @param model          模型名称（用于日志）
+     */
+    protected void applyThinkingOptions(OpenAiChatOptions.Builder builder, boolean enableThinking, String model) {
+        if (enableThinking) {
+            builder.reasoningEffort("medium");
+            log.info("OpenAI model {} 已启用思考模式，reasoningEffort=medium", model);
+        }
     }
 
     @Override

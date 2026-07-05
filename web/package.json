@@ -30,6 +30,7 @@
     "ant-design-vue": "^4.2.6",
     "axios": "^1.12.2",
     "dayjs": "^1.11.18",
+    "exceljs": "^4.4.0",
     "jsencrypt": "^3.5.4",
     "jsonp": "^0.2.1",
     "mammoth": "^1.11.0",
