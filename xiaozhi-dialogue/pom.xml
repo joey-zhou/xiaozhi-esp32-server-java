@@ -37,18 +37,35 @@
         </dependency>
         <!--
           webrtc-java 的 native 库（.dll/.so/.dylib）按平台分 classifier 打包。
-          不带 classifier 的主依赖会通过 webrtc-java 自身的 OS profile 自动拉取
-          “构建机器”所在平台的 native——所以本地开发（Mac/Windows）本机打包本机运行无需额外声明。
-          但部署目标是 Linux 服务器，打包机器（Mac/Windows/Linux）未必是 Linux，
-          auto-profile 不保证带上 linux native，会导致服务器上 AudioProcessing
-          初始化失败（Could not initialize class）。故显式声明 linux-x86_64 兜底。
-          若服务器换架构（如 ARM），把 classifier 改为 linux-aarch64。
+          不带 classifier 的主依赖只会拉取“打包机器”所在平台的 native，
+          本项目是 Mac 打包、Linux 服务器 Docker 运行，平台不匹配会导致运行时
+          AudioProcessing 初始化失败（Could not initialize class）。
+          因此显式声明所有目标平台的 native，全部打进 jar，无论服务器是 x86_64
+          还是 aarch64（ARM）都能加载。Mac 两个架构一并声明，方便本地开发运行。
         -->
         <dependency>
             <groupId>dev.onvoid.webrtc</groupId>
             <artifactId>webrtc-java</artifactId>
             <version>${webrtc.version}</version>
             <classifier>linux-x86_64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>dev.onvoid.webrtc</groupId>
+            <artifactId>webrtc-java</artifactId>
+            <version>${webrtc.version}</version>
+            <classifier>linux-aarch64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>dev.onvoid.webrtc</groupId>
+            <artifactId>webrtc-java</artifactId>
+            <version>${webrtc.version}</version>
+            <classifier>macos-x86_64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>dev.onvoid.webrtc</groupId>
+            <artifactId>webrtc-java</artifactId>
+            <version>${webrtc.version}</version>
+            <classifier>macos-aarch64</classifier>
         </dependency>
         <dependency>
             <groupId>com.microsoft.onnxruntime</groupId>

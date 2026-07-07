@@ -57,6 +57,8 @@
         <logger name="com.xiaozhi" level="DEBUG" />
         <logger name="com.xiaozhi.dialogue" level="DEBUG" />
         <logger name="com.alibaba.dashscope.protocol.okhttp" level="WARN" />
+        <!-- streamable-http 服务器可选的 GET/SSE 重连流未实现时的无害告警，官方 SDK 已标注 "safely ignored" -->
+        <logger name="io.modelcontextprotocol.client.transport.WebClientStreamableHttpTransport" level="ERROR" />
     </springProfile>
 
     <!-- 生产环境配置 -->
@@ -69,6 +71,7 @@
         <logger name="com.xiaozhi" level="INFO" />
         <logger name="org.springframework.web" level="ERROR" />
         <logger name="com.alibaba.dashscope.protocol.okhttp" level="WARN" />
+        <logger name="io.modelcontextprotocol.client.transport.WebClientStreamableHttpTransport" level="ERROR" />
     </springProfile>
     
     <!-- 默认配置（如果没有指定profile） -->

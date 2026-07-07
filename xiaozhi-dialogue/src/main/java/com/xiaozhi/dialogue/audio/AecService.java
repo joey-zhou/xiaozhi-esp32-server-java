@@ -41,6 +41,10 @@ public class AecService {
     // 每会话 AEC 状态
     private final ConcurrentHashMap<String, AecState> states = new ConcurrentHashMap<>();
 
+    // WebRTC native 库不可用时置位（如打包机与运行机平台不匹配导致 NoClassDefFoundError）。
+    // 置位后 AEC 整体降级：不再尝试初始化，也不阻断设备连接与对话。
+    private volatile boolean nativeUnavailable = false;
+
     // 10ms 帧参数 (16kHz mono, 16-bit)
     private static final int FRAME_BYTES_10MS = 320;      // bytes
 
@@ -49,14 +53,17 @@ public class AecService {
      * 如果已存在则复用（保留已收敛的滤波器状态），不存在才新建。
      */
     public void initSession(String sessionId) {
-        if (!enabled) return;
+        if (!enabled || nativeUnavailable) return;
         if (states.containsKey(sessionId)) return;
         try {
-            AecState existing = states.putIfAbsent(sessionId, new AecState());
-            if (existing == null) {
-            }
-        } catch (Exception e) {
-            log.error("AEC会话初始化失败: {}", sessionId, e);
+            states.putIfAbsent(sessionId, new AecState());
+        } catch (Throwable t) {
+            // NoClassDefFoundError 等 native 初始化失败属于 Error，不能只 catch Exception，
+            // 否则会击穿到调用方（连接建立流程）导致设备无法连接。
+            // 这里降级：标记 native 不可用，后续不再尝试，AEC 静默关闭但不影响连接与对话。
+            nativeUnavailable = true;
+            log.error("AEC native 库初始化失败，已降级关闭回声消除（不影响设备连接与对话）。" +
+                    "常见原因：打包平台与运行平台不匹配，webrtc-java native 库缺失。SessionId: {}", sessionId, t);
         }
     }
 
@@ -80,7 +87,7 @@ public class AecService {
      */
     @EventListener
     public void onTtsPlaybackEnd(TtsPlaybackCompletedEvent event) {
-        if (!enabled) return;
+        if (!enabled || nativeUnavailable) return;
         String sessionId = event.getSessionId();
         AecState old = states.get(sessionId);
         if (old == null) return;
@@ -98,8 +105,8 @@ public class AecService {
                     fresh.dispose();
                 }
             }
-        } catch (Exception e) {
-            log.warn("AEC重建失败: {}: {}", sessionId, e.getMessage());
+        } catch (Throwable t) {
+            log.warn("AEC重建失败: {}: {}", sessionId, t.getMessage());
         }
     }
 
