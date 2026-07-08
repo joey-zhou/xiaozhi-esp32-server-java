@@ -9,7 +9,7 @@ import java.nio.file.Path;
  * 对象存储服务接口。
  * 通过 {@link StorageServiceFactory} 获取当前生效的实现。
  * <p>
- * 支持本地文件存储和多云 OSS（腾讯云 COS、阿里云 OSS）。
+ * 支持本地文件存储和多云 OSS（腾讯云 COS、阿里云 OSS、S3 兼容如 MinIO）。
  * 配置通过 sys_config 表（configType="oss"）管理，前端管理员可在设置页面选择存储方式。
  */
 public interface StorageService {

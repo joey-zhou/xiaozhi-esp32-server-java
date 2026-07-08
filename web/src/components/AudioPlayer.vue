@@ -109,20 +109,22 @@ function loadAudio(url: string) {
   loadError.value = false
 
   try {
-    // 检查是否为 Blob URL 或 Data URL
-    if (url.startsWith('blob:') || url.startsWith('data:')) {
-      // 对于 blob URL，直接加载
-      wavesurfer.value.load(url)
-    } else {
-      // 使用统一的资源 URL 处理函数
-      const audioUrl = getResourceUrl(url)
-      if (audioUrl) {
-        wavesurfer.value.load(audioUrl)
-      } else {
-        loading.value = false
-        loadError.value = true
-      }
+    // 统一解析出最终加载地址：blob/data URL 直接用，其余走资源 URL 处理
+    const target =
+      url.startsWith('blob:') || url.startsWith('data:') ? url : getResourceUrl(url)
+    if (!target) {
+      loading.value = false
+      loadError.value = true
+      return
     }
+    // WaveSurfer.load() 返回 Promise，加载失败（网络错误/签名过期/CORS 等）会 reject 出
+    // TypeError: Failed to fetch。必须在此捕获，否则会冒泡成全局未处理 Promise 报错。
+    // UI 状态已由上面的 'error' 事件负责更新，这里的 catch 仅做兜底与静默。
+    Promise.resolve(wavesurfer.value.load(target)).catch((error) => {
+      loading.value = false
+      loadError.value = true
+      console.debug('音频加载失败（已忽略）:', error)
+    })
   } catch (error) {
     loading.value = false
     loadError.value = true

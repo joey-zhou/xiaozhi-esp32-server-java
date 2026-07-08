@@ -4,6 +4,7 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.storage.service.impl.AliyunOssStorageService;
 import com.xiaozhi.storage.service.impl.LocalStorageService;
+import com.xiaozhi.storage.service.impl.S3StorageService;
 import com.xiaozhi.storage.service.impl.TencentCosStorageService;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
@@ -71,6 +72,9 @@ public class StorageServiceFactory {
         return switch (config.getProvider()) {
             case "tencent" -> new TencentCosStorageService(config);
             case "aliyun" -> new AliyunOssStorageService(config);
+            // S3 兼容存储：前端按厂商分列，底层统一走 S3StorageService（仅 endpoint 不同）
+            case "s3", "minio", "r2", "b2", "huawei-obs", "wasabi", "do-spaces", "qiniu" ->
+                    new S3StorageService(config);
             default -> {
                 log.warn("未知的存储 provider: {}，使用本地存储", config.getProvider());
                 yield localStorageService;
@@ -103,6 +107,8 @@ public class StorageServiceFactory {
             cos.shutdown();
         } else if (cachedCloudService instanceof AliyunOssStorageService oss) {
             oss.shutdown();
+        } else if (cachedCloudService instanceof S3StorageService s3) {
+            s3.shutdown();
         }
     }
 

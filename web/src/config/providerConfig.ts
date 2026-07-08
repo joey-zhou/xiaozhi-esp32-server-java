@@ -3,7 +3,20 @@
  * 统一管理各类服务的提供商信息，便于维护和扩展
  */
 
-import type { ConfigTypeInfo } from '@/types/config'
+import type { ConfigField, ConfigTypeInfo } from '@/types/config'
+
+/**
+ * S3 兼容对象存储的通用字段。
+ * MinIO / Cloudflare R2 / Backblaze B2 / 华为 OBS / Wasabi / DigitalOcean Spaces / 七牛 Kodo 等
+ * 底层都走后端同一个 S3StorageService，仅 Endpoint 提示不同，故共用此函数生成字段。
+ */
+const s3CompatibleFields = (endpointPlaceholder: string, endpointHelp: string): ConfigField[] => [
+  { name: 'apiUrl', label: 'Endpoint', required: true, inputType: 'text', span: 12, help: endpointHelp, placeholder: endpointPlaceholder },
+  { name: 'ak', label: 'Access Key', required: true, inputType: 'password', span: 12, help: 'Access Key / AccessKey ID', placeholder: 'access-key' },
+  { name: 'sk', label: 'Secret Key', required: true, inputType: 'password', span: 12, help: '对应 Access Key 的密钥', placeholder: 'secret-key' },
+  { name: 'configName', label: 'Bucket', required: true, inputType: 'text', span: 12, help: '存储桶名称', placeholder: 'my-bucket' },
+  { name: 'appId', label: 'Region', required: false, inputType: 'text', span: 12, help: '区域，可留空（默认 us-east-1）', placeholder: 'us-east-1' },
+]
 
 // 配置类型信息映射
 export const configTypeMap: Record<string, ConfigTypeInfo> = {
@@ -1226,7 +1239,15 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
     typeOptions: [
       { label: 'Local', value: 'local', key: '0' },
       { label: 'Tencent Cloud (COS)', value: 'tencent', key: '1' },
-      { label: 'Aliyun (OSS)', value: 'aliyun', key: '2' }
+      { label: 'Aliyun (OSS)', value: 'aliyun', key: '2' },
+      { label: 'MinIO', value: 'minio', key: '3' },
+      { label: 'Cloudflare R2', value: 'r2', key: '4' },
+      { label: 'Backblaze B2', value: 'b2', key: '5' },
+      { label: '华为云 OBS', value: 'huawei-obs', key: '6' },
+      { label: 'Wasabi', value: 'wasabi', key: '7' },
+      { label: 'DigitalOcean Spaces', value: 'do-spaces', key: '8' },
+      { label: '七牛云 Kodo', value: 'qiniu', key: '9' },
+      { label: 'S3 兼容 (其它)', value: 's3', key: '10' }
     ],
     typeFields: {
       local: [],
@@ -1314,7 +1335,15 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           help: '存储桶名称',
           placeholder: 'my-bucket'
         }
-      ]
+      ],
+      s3: s3CompatibleFields('http://host:9000', '任意 S3 兼容服务地址（path-style）'),
+      minio: s3CompatibleFields('http://localhost:9000', '自建 MinIO 服务地址'),
+      r2: s3CompatibleFields('https://<account>.r2.cloudflarestorage.com', 'Cloudflare R2 的 S3 API 地址'),
+      b2: s3CompatibleFields('https://s3.us-west-002.backblazeb2.com', 'Backblaze B2 的 S3 Endpoint'),
+      'huawei-obs': s3CompatibleFields('https://obs.cn-north-4.myhuaweicloud.com', '华为云 OBS Endpoint'),
+      wasabi: s3CompatibleFields('https://s3.us-east-1.wasabisys.com', 'Wasabi 的 S3 Endpoint'),
+      'do-spaces': s3CompatibleFields('https://<region>.digitaloceanspaces.com', 'DigitalOcean Spaces Endpoint'),
+      qiniu: s3CompatibleFields('https://s3.cn-east-1.qiniucs.com', '七牛云 Kodo 的 S3 网关地址')
     }
   }
 };
