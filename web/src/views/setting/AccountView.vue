@@ -8,7 +8,7 @@ import type { Rule } from 'ant-design-vue/es/form'
 import { useUserStore } from '@/store/user'
 import { useAvatar } from '@/composables/useAvatar'
 import { updateUser } from '@/services/user'
-import { uploadFile } from '@/services/upload'
+import { uploadFile, type UploadResponse } from '@/services/upload'
 import type { User, UpdateUserParams } from '@/types/user'
 import type { UploadProps } from 'ant-design-vue'
 
@@ -178,9 +178,12 @@ const beforeAvatarUpload: UploadProps['beforeUpload'] = (file) => {
   }
 
   avatarLoading.value = true
-  uploadFile(file, 'avatar')
-    .then(url => {
-      updateUserAvatar(url as string)
+  uploadFile(file, 'avatar', { fullResponse: true })
+    .then(res => {
+      const data = res as UploadResponse
+      // 本地存储返回 relativePath（相对路径，避免把主机名写死进库）；
+      // 云存储（MinIO/S3）无 relativePath，存签名 URL，后端会剥签名入库、读取时自动重签
+      updateUserAvatar(data.relativePath || data.url)
     })
     .catch(error => {
       message.error(t('common.avatarUploadFailed') + error)
@@ -191,24 +194,21 @@ const beforeAvatarUpload: UploadProps['beforeUpload'] = (file) => {
 }
 
 // 更新用户头像
-const updateUserAvatar = async (avatarUrl: string) => {
+// avatarPath 已是待入库值：本地为相对路径，云端为完整 URL（后端负责剥签名/重签名）
+const updateUserAvatar = async (avatarPath: string) => {
   try {
-    // 将完整URL转换为相对路径存储
-    const relativePath = getRelativePath(avatarUrl)
-    
     const updateData: UpdateUserParams = {
       userId: userInfo.value.userId,
       username: userInfo.value.username,
-      avatar: relativePath
+      avatar: avatarPath
     } as UpdateUserParams
-    
+
     const res = await updateUser(updateData)
-    
+
     if (res.code === 200) {
-      // 更新本地用户信息，存储相对路径
       userStore.updateUserInfo({
         ...userInfo.value,
-        avatar: relativePath
+        avatar: avatarPath
       })
       message.success(t('common.avatarUploadSuccess'))
     } else {
@@ -218,32 +218,6 @@ const updateUserAvatar = async (avatarUrl: string) => {
     message.error(t('common.avatarUploadFailed') + error)
   } finally {
     avatarLoading.value = false
-  }
-}
-
-// 将完整URL转换为相对路径
-const getRelativePath = (fullUrl: string): string => {
-  if (!fullUrl) return ''
-  
-  // 如果已经是相对路径，直接返回
-  if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
-    return fullUrl
-  }
-  
-  // 提取相对路径部分
-  // 例如：http://192.168.5.165:8091/uploads/avatar/2025/10/06/xxx.jpg
-  // 转换为：uploads/avatar/2025/10/06/xxx.jpg
-  try {
-    const url = new URL(fullUrl)
-    return url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname
-  } catch {
-    // 如果URL解析失败，尝试简单的字符串处理
-    const parts = fullUrl.split('/')
-    const uploadIndex = parts.findIndex(part => part === 'uploads')
-    if (uploadIndex !== -1) {
-      return parts.slice(uploadIndex).join('/')
-    }
-    return fullUrl
   }
 }
 </script>
