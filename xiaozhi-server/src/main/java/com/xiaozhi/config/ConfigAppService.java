@@ -98,7 +98,7 @@ public class ConfigAppService {
     /**
      * 测试配置：使用表单当前值（可能未保存）直接发起一次真实调用，将 Provider 报错原样返回给前端。
      */
-    public ApiResponse<?> test(ConfigTestReq req) {
+    public ApiResponse<Void> test(ConfigTestReq req) {
         if (!"llm".equals(req.getConfigType())) {
             return ApiResponse.error("暂不支持测试该类型配置");
         }

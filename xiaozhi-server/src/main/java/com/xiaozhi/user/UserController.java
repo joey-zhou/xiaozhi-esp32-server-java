@@ -21,6 +21,8 @@ import com.xiaozhi.common.model.req.UserTelLoginReq;
 import com.xiaozhi.common.model.req.UserUpdateReq;
 import com.xiaozhi.common.model.req.UserWechatLoginReq;
 import com.xiaozhi.common.model.resp.LoginResp;
+import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.resp.UserResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.security.AuthenticationService;
 import com.xiaozhi.user.service.UserService;
@@ -65,7 +67,7 @@ public class UserController extends BaseController {
 
     @GetMapping("/check-token")
     @Operation(summary = "检查Token有效性", description = "验证当前Token是否有效，有效则返回用户信息")
-    public ApiResponse<?> checkToken() {
+    public ApiResponse<LoginResp> checkToken() {
         if (!StpUtil.isLogin()) {
             return ApiResponse.unauthorized("Token无效或已过期");
         }
@@ -79,7 +81,7 @@ public class UserController extends BaseController {
 
     @PostMapping("/refresh-token")
     @Operation(summary = "刷新Token", description = "刷新Token有效期，返回新的Token")
-    public ApiResponse<?> refreshToken() {
+    public ApiResponse<LoginResp> refreshToken() {
         if (!StpUtil.isLogin()) {
             return ApiResponse.unauthorized("用户不存在");
         }
@@ -101,7 +103,7 @@ public class UserController extends BaseController {
     @PostMapping("/login")
     @AuditLog(module = "用户管理", operation = "用户登录")
     @Operation(summary = "用户名密码登录", description = "使用用户名/邮箱/手机号和密码进行登录")
-    public ApiResponse<?> login(@Valid @RequestBody UserLoginReq req, HttpServletRequest request) {
+    public ApiResponse<LoginResp> login(@Valid @RequestBody UserLoginReq req, HttpServletRequest request) {
         UserBO user = userAppService.login(req.getUsername(), req.getPassword());
         userAppService.recordLoginInfo(user, RequestContextUtils.getClientIp(request));
 
@@ -114,7 +116,7 @@ public class UserController extends BaseController {
     @PostMapping("/tel-login")
     @AuditLog(module = "用户管理", operation = "手机号登录")
     @Operation(summary = "手机号验证码登录", description = "使用手机号和验证码登录，未注册自动注册")
-    public ApiResponse<?> telLogin(@Valid @RequestBody UserTelLoginReq req, HttpServletRequest request) {
+    public ApiResponse<LoginResp> telLogin(@Valid @RequestBody UserTelLoginReq req, HttpServletRequest request) {
         if (!userService.checkCaptcha(req.getTel(), req.getCode())) {
             throw new IllegalArgumentException("验证码错误或已过期");
         }
@@ -142,7 +144,7 @@ public class UserController extends BaseController {
     @ResponseBody
     @AuditLog(module = "用户管理", operation = "微信登录")
     @Operation(summary = "微信登录", description = "使用微信 code 登录，未注册自动注册")
-    public ApiResponse<?> wxLogin(@Valid @RequestBody UserWechatLoginReq req, HttpServletRequest request) {
+    public ApiResponse<LoginResp> wxLogin(@Valid @RequestBody UserWechatLoginReq req, HttpServletRequest request) {
         Map<String, String> wxLoginInfo = wxLoginService.getWxLoginInfo(req.getCode());
         String openId = wxLoginInfo.get("openid");
         String unionId = wxLoginInfo.get("unionid");
@@ -186,7 +188,7 @@ public class UserController extends BaseController {
     @PostMapping("")
     @AuditLog(module = "用户管理", operation = "用户注册")
     @Operation(summary = "用户注册", description = "新用户注册")
-    public ApiResponse<?> create(@Valid @RequestBody UserRegisterReq req) {
+    public ApiResponse<UserResp> create(@Valid @RequestBody UserRegisterReq req) {
         return ApiResponse.success(userAppService.register(req));
     }
 
@@ -194,7 +196,7 @@ public class UserController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:user:api:list")
     @Operation(summary = "根据条件查询用户信息列表", description = "返回用户信息列表")
-    public ApiResponse<?> queryUsers(@Valid UserPageReq req) {
+    public ApiResponse<PageResp<UserResp>> queryUsers(@Valid UserPageReq req) {
         return ApiResponse.success(userAppService.page(req));
     }
 
@@ -203,7 +205,7 @@ public class UserController extends BaseController {
     @CheckOwner(resource = "user", id = "#userId")
     @AuditLog(module = "用户管理", operation = "更新用户信息")
     @Operation(summary = "修改用户信息", description = "更新用户个人信息")
-    public ApiResponse<?> update(@PathVariable Integer userId, @Valid @RequestBody UserUpdateReq req) {
+    public ApiResponse<UserResp> update(@PathVariable Integer userId, @Valid @RequestBody UserUpdateReq req) {
         return ApiResponse.success(userAppService.update(userId, req));
     }
 
@@ -211,7 +213,7 @@ public class UserController extends BaseController {
     @PostMapping("/resetPassword")
     @AuditLog(module = "用户管理", operation = "重置密码")
     @Operation(summary = "重置密码", description = "通过邮箱验证码重置密码")
-    public ApiResponse<?> resetPassword(@Valid @RequestBody UserResetPasswordReq req) {
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody UserResetPasswordReq req) {
         userAppService.resetPassword(req);
         return ApiResponse.success("密码重置成功");
     }
@@ -219,7 +221,7 @@ public class UserController extends BaseController {
     @SaIgnore
     @PostMapping("/sendEmailCaptcha")
     @Operation(summary = "发送邮箱验证码", description = "向指定邮箱发送验证码")
-    public ApiResponse<?> sendEmailCaptcha(@Valid @RequestBody UserSendCaptchaReq req) {
+    public ApiResponse<Void> sendEmailCaptcha(@Valid @RequestBody UserSendCaptchaReq req) {
         if ("forget".equals(req.getType()) && userService.getByEmail(req.getEmail()) == null) {
             throw new IllegalArgumentException("该邮箱未注册");
         }
@@ -235,7 +237,7 @@ public class UserController extends BaseController {
     @SaIgnore
     @PostMapping("/sendSmsCaptcha")
     @Operation(summary = "发送短信验证码", description = "向指定手机号发送验证码")
-    public ApiResponse<?> sendSmsCaptcha(@Valid @RequestBody UserSendCaptchaReq req) {
+    public ApiResponse<Void> sendSmsCaptcha(@Valid @RequestBody UserSendCaptchaReq req) {
         if ("forget".equals(req.getType()) && userService.getByTel(req.getTel()) == null) {
             throw new IllegalArgumentException("该手机号未注册");
         }
@@ -252,7 +254,7 @@ public class UserController extends BaseController {
     @GetMapping("/checkUser")
     @ResponseBody
     @Operation(summary = "检查用户名和手机号是否已存在", description = "返回检查结果")
-    public ApiResponse<?> checkUser(@Valid UserCheckReq req) {
+    public ApiResponse<Void> checkUser(@Valid UserCheckReq req) {
         if (StringUtils.hasText(req.getTel()) && userService.getByTel(req.getTel()) != null) {
             throw new IllegalStateException("手机已注册");
         }

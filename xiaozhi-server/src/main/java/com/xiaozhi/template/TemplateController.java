@@ -9,6 +9,8 @@ import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.TemplateCreateReq;
 import com.xiaozhi.common.model.req.TemplatePageReq;
 import com.xiaozhi.common.model.req.TemplateUpdateReq;
+import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.template.TemplateAppService;
 
@@ -36,7 +38,7 @@ public class TemplateController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:prompt-template:api:list")
     @Operation(summary = "根据条件查询角色模板", description = "返回模板列表")
-    public ApiResponse<?> list(@Valid TemplatePageReq req) {
+    public ApiResponse<PageResp<TemplateResp>> list(@Valid TemplatePageReq req) {
         return ApiResponse.success(templateAppService.page(req, StpUtil.getLoginIdAsInt()));
     }
 
@@ -48,7 +50,7 @@ public class TemplateController extends BaseController {
     @SaCheckPermission("system:prompt-template:api:create")
     @AuditLog(module = "模板管理", operation = "创建模板")
     @Operation(summary = "添加角色模板", description = "添加新的提示词模板")
-    public ApiResponse<?> create(@Valid @RequestBody TemplateCreateReq req) {
+    public ApiResponse<TemplateResp> create(@Valid @RequestBody TemplateCreateReq req) {
         return ApiResponse.success(templateAppService.create(req, StpUtil.getLoginIdAsInt()));
     }
 
@@ -61,7 +63,7 @@ public class TemplateController extends BaseController {
     @CheckOwner(resource = "template", id = "#templateId")
     @AuditLog(module = "模板管理", operation = "更新模板")
     @Operation(summary = "更新角色模板", description = "更新提示词模板信息")
-    public ApiResponse<?> update(@PathVariable Integer templateId, @Valid @RequestBody TemplateUpdateReq req) {
+    public ApiResponse<TemplateResp> update(@PathVariable Integer templateId, @Valid @RequestBody TemplateUpdateReq req) {
         return ApiResponse.success(templateAppService.update(templateId, req));
     }
 
@@ -74,7 +76,7 @@ public class TemplateController extends BaseController {
     @CheckOwner(resource = "template", id = "#templateId")
     @AuditLog(module = "模板管理", operation = "删除模板")
     @Operation(summary = "删除角色模板", description = "删除提示词模板（逻辑删除）")
-    public ApiResponse<?> delete(@PathVariable Integer templateId) {
+    public ApiResponse<Void> delete(@PathVariable Integer templateId) {
         templateAppService.delete(templateId);
         return ApiResponse.success("删除成功");
     }

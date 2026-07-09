@@ -6,6 +6,8 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.agent.AgentAppService;
 import com.xiaozhi.common.model.req.AgentPageReq;
+import com.xiaozhi.common.model.resp.AgentResp;
+import com.xiaozhi.common.model.resp.PageResp;
 import com.xiaozhi.common.web.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,7 +41,7 @@ public class AgentController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:config:agent:api:list")
     @Operation(summary = "根据条件查询智能体", description = "返回智能体列表信息，会自动查询平台当前存在的智能体并同步本地配置")
-    public ApiResponse<?> list(@Valid AgentPageReq req) {
+    public ApiResponse<PageResp<AgentResp>> list(@Valid AgentPageReq req) {
         return ApiResponse.success(agentAppService.page(req, StpUtil.getLoginIdAsInt()));
     }
 }

@@ -12,6 +12,8 @@ import com.xiaozhi.common.model.req.RoleCreateReq;
 import com.xiaozhi.common.model.req.RolePageReq;
 import com.xiaozhi.common.model.req.RoleUpdateReq;
 import com.xiaozhi.common.model.req.TestVoiceReq;
+import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.resp.RoleResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -25,6 +27,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 角色管理
@@ -61,7 +65,7 @@ public class RoleController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:role:api:list")
     @Operation(summary = "根据条件查询角色信息", description = "返回角色信息列表")
-    public ApiResponse<?> list(@Valid RolePageReq req) {
+    public ApiResponse<PageResp<RoleResp>> list(@Valid RolePageReq req) {
         return ApiResponse.success(roleAppService.page(req, StpUtil.getLoginIdAsInt()));
     }
 
@@ -81,7 +85,7 @@ public class RoleController extends BaseController {
     @CheckOwner(resource = "config", id = "#param.sttId != null && #param.sttId > 0 ? #param.sttId : null")
     @CheckOwner(resource = "config", id = "#param.ttsId != null && #param.ttsId > 0 ? #param.ttsId : null")
     @Operation(summary = "更新角色信息", description = "更新语音助手角色配置")
-    public ApiResponse<?> update(@PathVariable Integer roleId, @Valid @RequestBody RoleUpdateReq param) {
+    public ApiResponse<RoleResp> update(@PathVariable Integer roleId, @Valid @RequestBody RoleUpdateReq param) {
         return ApiResponse.success(roleAppService.update(roleId, param));
     }
 
@@ -98,7 +102,7 @@ public class RoleController extends BaseController {
     @CheckOwner(resource = "config", id = "#param.sttId != null && #param.sttId > 0 ? #param.sttId : null")
     @CheckOwner(resource = "config", id = "#param.ttsId != null && #param.ttsId > 0 ? #param.ttsId : null")
     @Operation(summary = "添加角色信息", description = "添加新的语音助手角色")
-    public ApiResponse<?> create(@Valid @RequestBody RoleCreateReq param) {
+    public ApiResponse<RoleResp> create(@Valid @RequestBody RoleCreateReq param) {
         return ApiResponse.success(roleAppService.create(param, StpUtil.getLoginIdAsInt()));
     }
 
@@ -114,7 +118,7 @@ public class RoleController extends BaseController {
     @CheckOwner(resource = "role", id = "#roleId")
     @AuditLog(module = "角色管理", operation = "删除角色")
     @Operation(summary = "删除角色信息", description = "删除指定的语音助手角色")
-    public ApiResponse<?> delete(@PathVariable Integer roleId) {
+    public ApiResponse<Void> delete(@PathVariable Integer roleId) {
         roleAppService.delete(roleId);
         return ApiResponse.success("删除成功");
     }
@@ -126,7 +130,7 @@ public class RoleController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:role:api:list")
     @Operation(summary = "获取本地 sherpa-onnx 音色列表", description = "扫描配置的本地 TTS 模型目录，自动识别模型类型和 speaker")
-    public ApiResponse<?> listSherpaVoices() {
+    public ApiResponse<List<Map<String, Object>>> listSherpaVoices() {
         return ApiResponse.success(sherpaVoiceService.listVoices());
     }
 
@@ -135,7 +139,7 @@ public class RoleController extends BaseController {
     @SaCheckPermission("system:role:api:list")
     @CheckOwner(resource = "config", id = "#param.provider != 'edge' ? #param.ttsId : null")
     @Operation(summary = "测试语音合成", description = "测试指定配置的语音合成效果")
-    public ApiResponse<?> testAudio(@Valid TestVoiceReq param) {
+    public ApiResponse<String> testAudio(@Valid TestVoiceReq param) {
         ConfigBO config = null;
         if (!param.getProvider().equals("edge")) {
             if (param.getTtsId() == null) {

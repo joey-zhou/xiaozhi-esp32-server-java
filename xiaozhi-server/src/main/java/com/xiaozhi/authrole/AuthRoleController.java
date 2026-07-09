@@ -6,6 +6,9 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.authrole.AuthRoleAppService;
 import com.xiaozhi.common.model.req.AuthRolePageReq;
+import com.xiaozhi.common.model.resp.AuthRolePermissionConfigResp;
+import com.xiaozhi.common.model.resp.AuthRoleResp;
+import com.xiaozhi.common.model.resp.PageResp;
 import java.util.List;
 import com.xiaozhi.common.web.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,7 +35,7 @@ public class AuthRoleController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:auth-role:api:list")
     @Operation(summary = "根据条件查询后台权限角色", description = "返回后台权限角色列表")
-    public ApiResponse<?> list(@Valid AuthRolePageReq req) {
+    public ApiResponse<PageResp<AuthRoleResp>> list(@Valid AuthRolePageReq req) {
         return ApiResponse.success(authRoleAppService.page(req));
     }
 
@@ -40,7 +43,7 @@ public class AuthRoleController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:auth-role:api:detail")
     @Operation(summary = "获取后台权限角色授权配置", description = "返回角色权限树和已选权限")
-    public ApiResponse<?> getPermissionConfig(@PathVariable Integer authRoleId) {
+    public ApiResponse<AuthRolePermissionConfigResp> getPermissionConfig(@PathVariable Integer authRoleId) {
         return ApiResponse.success(authRoleAppService.getPermissionConfig(authRoleId));
     }
 
@@ -49,7 +52,7 @@ public class AuthRoleController extends BaseController {
     @SaCheckPermission("system:auth-role:api:assign")
     @AuditLog(module = "权限管理", operation = "更新角色权限")
     @Operation(summary = "更新后台权限角色授权配置", description = "保存角色已选权限")
-    public ApiResponse<?> assignPermissions(
+    public ApiResponse<AuthRolePermissionConfigResp> assignPermissions(
         @PathVariable Integer authRoleId,
         @RequestBody(required = false) List<Integer> permissionIds
     ) {

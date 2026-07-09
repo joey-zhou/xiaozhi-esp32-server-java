@@ -5,6 +5,7 @@ import com.xiaozhi.server.web.BaseController;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
@@ -24,6 +25,8 @@ import com.xiaozhi.common.model.req.DeviceCreateReq;
 import com.xiaozhi.common.model.req.DevicePageReq;
 import com.xiaozhi.common.model.req.DeviceUpdateReq;
 import com.xiaozhi.common.model.req.OtaReq;
+import com.xiaozhi.common.model.resp.DeviceResp;
+import com.xiaozhi.common.model.resp.PageResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.utils.JsonUtil;
 import com.xiaozhi.utils.RequestContextUtils;
@@ -60,7 +63,7 @@ public class DeviceController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:device:api:list")
     @Operation(summary = "根据条件查询设备", description = "返回设备信息列表")
-    public ApiResponse<?> list(@Valid DevicePageReq req) {
+    public ApiResponse<PageResp<DeviceResp>> list(@Valid DevicePageReq req) {
         return ApiResponse.success(deviceAppService.page(req, StpUtil.getLoginIdAsInt()));
     }
 
@@ -74,7 +77,7 @@ public class DeviceController extends BaseController {
     @CheckOwner(resource = "device", id = "#param.deviceIds != null ? #param.deviceIds.split(',') : null")
     @CheckOwner(resource = "role", id = "#param.roleId")
     @Operation(summary = "批量更新设备", description = "批量更新多个设备的角色")
-    public ApiResponse<?> batchUpdate(@Valid @RequestBody DeviceBatchUpdateReq param) {
+    public ApiResponse<Map<String, Object>> batchUpdate(@Valid @RequestBody DeviceBatchUpdateReq param) {
         Map<String, Object> data = deviceAppService.batchUpdate(param);
         return ApiResponse.success("成功更新" + data.get("successCount") + "个设备", data);
     }
@@ -87,7 +90,7 @@ public class DeviceController extends BaseController {
     @SaCheckPermission("system:device:api:create")
     @AuditLog(module = "设备管理", operation = "创建设备")
     @Operation(summary = "添加设备", description = "使用设备验证码添加设备到当前用户账户")
-    public ApiResponse<?> create(@Valid @RequestBody DeviceCreateReq param) {
+    public ApiResponse<DeviceResp> create(@Valid @RequestBody DeviceCreateReq param) {
         return ApiResponse.success(deviceAppService.create(param, StpUtil.getLoginIdAsInt()));
     }
 
@@ -101,7 +104,7 @@ public class DeviceController extends BaseController {
     @CheckOwner(resource = "role", id = "#param.roleId")
     @AuditLog(module = "设备管理", operation = "更新设备")
     @Operation(summary = "更新设备信息", description = "更新设备名称、角色、功能列表等信息")
-    public ApiResponse<?> update(@PathVariable String deviceId, @Valid @RequestBody DeviceUpdateReq param) {
+    public ApiResponse<DeviceResp> update(@PathVariable String deviceId, @Valid @RequestBody DeviceUpdateReq param) {
         return ApiResponse.success(deviceAppService.update(deviceId, param));
     }
 
@@ -114,7 +117,7 @@ public class DeviceController extends BaseController {
     @CheckOwner(resource = "device", id = "#deviceId")
     @AuditLog(module = "设备管理", operation = "删除设备")
     @Operation(summary = "删除设备", description = "从当前用户账户中删除指定设备")
-    public ApiResponse<?> delete(@PathVariable String deviceId) {
+    public ApiResponse<Void> delete(@PathVariable String deviceId) {
         deviceAppService.delete(deviceId);
         return ApiResponse.success("删除成功");
     }
