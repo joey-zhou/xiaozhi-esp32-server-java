@@ -1,7 +1,7 @@
 import { http } from './request'
 import api from './api'
 import type { DataResponse } from '@/types/api'
-import type { Role, RoleQueryParams, RoleFormData, TestVoiceParams } from '@/types/role'
+import type { Role, RoleQueryParams, RoleFormData, TestVoiceParams, TestVoiceResult } from '@/types/role'
 import type { McpToolItem, SystemGlobalToolSummary } from '@/types/mcpTool'
 
 /**
@@ -46,7 +46,7 @@ export function deleteRole(roleId: number) {
  * 测试语音
  */
 export function testVoice(data: Partial<TestVoiceParams>) {
-  return http.get<string>(api.role.testVoice, data)
+  return http.get<TestVoiceResult>(api.role.testVoice, data)
 }
 
 /**

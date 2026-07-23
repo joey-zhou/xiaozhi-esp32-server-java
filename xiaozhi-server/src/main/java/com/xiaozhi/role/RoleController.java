@@ -14,10 +14,13 @@ import com.xiaozhi.common.model.req.RoleUpdateReq;
 import com.xiaozhi.common.model.req.TestVoiceReq;
 import com.xiaozhi.common.model.resp.PageResp;
 import com.xiaozhi.common.model.resp.RoleResp;
+import com.xiaozhi.common.model.resp.TestVoiceResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.config.service.ConfigService;
+import com.xiaozhi.storage.service.StorageService;
+import com.xiaozhi.storage.service.StorageServiceFactory;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -54,6 +57,9 @@ public class RoleController extends BaseController {
 
     @Resource
     private ConfigService configService;
+
+    @Resource
+    private StorageServiceFactory storageServiceFactory;
 
     /**
      * 角色查询
@@ -139,7 +145,7 @@ public class RoleController extends BaseController {
     @SaCheckPermission("system:role:api:list")
     @CheckOwner(resource = "config", id = "#param.provider != 'edge' ? #param.ttsId : null")
     @Operation(summary = "测试语音合成", description = "测试指定配置的语音合成效果")
-    public ApiResponse<String> testAudio(@Valid TestVoiceReq param) {
+    public ApiResponse<TestVoiceResp> testAudio(@Valid TestVoiceReq param) {
         ConfigBO config = null;
         if (!param.getProvider().equals("edge")) {
             if (param.getTtsId() == null) {
@@ -155,7 +161,16 @@ public class RoleController extends BaseController {
             Path audioFilePath = ttsService.getTtsService(config, param.getVoiceName(), param.getTtsPitch(), param.getTtsSpeed())
                     .textToSpeech(param.getMessage());
 
-            return ApiResponse.success("操作成功", audioFilePath != null ? audioFilePath.toString() : null);
+            if (audioFilePath == null) {
+                throw new OperationFailedException("测试语音合成失败：未生成音频");
+            }
+
+            // 上传到当前生效的存储服务：本地返回相对路径，云存储返回完整 URL 并接管本地文件。
+            // 返回值经 @SignedFileUrl 由响应 Advice 统一签名，故本地/云端配置均生效。
+            StorageService storageService = storageServiceFactory.getStorageService();
+            String storedPath = storageService.upload(audioFilePath, audioFilePath.toString());
+
+            return ApiResponse.success("操作成功", new TestVoiceResp(storedPath));
         } catch (IndexOutOfBoundsException e) {
             log.error(e.getMessage(), e);
             throw new IllegalStateException("请先到语音合成配置页面配置对应Key", e);

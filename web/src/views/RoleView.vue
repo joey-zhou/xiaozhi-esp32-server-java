@@ -498,9 +498,9 @@ const handlePlayVoice = async (voiceName?: string) => {
       // 清除loading状态
       loadingVoiceId.value = ''
 
-      if (result.code === 200 && result.data) {
-        // 使用 getResourceUrl 处理音频路径
-        const audioUrl = getResourceUrl(result.data)
+      if (result.code === 200 && result.data?.audioUrl) {
+        // 使用 getResourceUrl 处理音频路径（云存储为完整 URL，直接返回；本地为相对路径，拼接后端地址）
+        const audioUrl = getResourceUrl(result.data.audioUrl)
         if (audioUrl) {
           // 创建音频对象
           audio = new Audio(audioUrl)

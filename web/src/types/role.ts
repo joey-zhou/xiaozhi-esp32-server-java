@@ -121,3 +121,6 @@ export interface TestVoiceParams {
   ttsSpeed?: number
 }
 
+export interface TestVoiceResult {
+  audioUrl: string
+}

@@ -125,7 +125,7 @@ export function useAudioPlayer() {
       // 清除loading状态
       loadingAudioId.value = ''
 
-      if (res.code !== 200 || !res.data) {
+      if (res.code !== 200 || !res.data?.audioUrl) {
         message.error(res.message || t('common.audioGenerateFailed'))
         return false
       }
@@ -153,7 +153,7 @@ export function useAudioPlayer() {
       }
 
       // 设置音频源并播放
-      const audioUrl = getResourceUrl(res.data)
+      const audioUrl = getResourceUrl(res.data.audioUrl)
       if (!audioUrl) {
         message.error(t('common.audioPathInvalid'))
         return false
