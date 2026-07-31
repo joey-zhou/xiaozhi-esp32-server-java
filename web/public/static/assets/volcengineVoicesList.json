@@ -1,787 +1,2569 @@
 [
   {
-    "label": "北京小爷（多情感）",
-    "value": "zh_male_beijingxiaoye_emo_v2_mars_bigtts",
+    "label": "Vivi",
+    "value": "zh_female_vv_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "小何",
+    "value": "zh_female_xiaohe_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "云舟",
+    "value": "zh_male_m191_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
-    "label": "柔美女友（多情感）",
-    "value": "zh_female_roumeinvyou_emo_v2_mars_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "阳光青年（多情感）",
-    "value": "zh_male_yangguangqingnian_emo_v2_mars_bigtts",
+    "label": "小天",
+    "value": "zh_male_taocheng_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
-    "label": "魅力女友（多情感）",
-    "value": "zh_female_meilinvyou_emo_v2_mars_bigtts",
-    "gender": "female",
+    "label": "刘飞",
+    "value": "zh_male_liufei_uranus_bigtts",
+    "gender": "male",
     "provider": "volcengine"
   },
   {
-    "label": "爽快思思（多情感）",
-    "value": "zh_female_shuangkuaisisi_emo_v2_mars_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "灿灿/Shiny",
-    "value": "zh_female_cancan_mars_bigtts",
+    "label": "魅力苏菲",
+    "value": "zh_female_sophie_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
     "label": "清新女声",
-    "value": "zh_female_qingxinnvsheng_mars_bigtts",
+    "value": "zh_female_qingxinnvsheng_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "爽快思思/Skye",
-    "value": "zh_female_shuangkuaisisi_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "温暖阿虎/Alvin",
-    "value": "zh_male_wennuanahu_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "少年梓辛/Brayan",
-    "value": "zh_male_shaonianzixin_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "知性女声",
-    "value": "zh_female_zhixingnvsheng_mars_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "清爽男大",
-    "value": "zh_male_qingshuangnanda_mars_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "邻家女孩",
-    "value": "zh_female_linjianvhai_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "渊博小叔",
-    "value": "zh_male_yuanboxiaoshu_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "阳光青年",
-    "value": "zh_male_yangguangqingnian_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "甜美小源",
-    "value": "zh_female_tianmeixiaoyuan_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "清澈梓梓",
-    "value": "zh_female_qingchezizi_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "解说小明",
-    "value": "zh_male_jieshuoxiaoming_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "开朗姐姐",
-    "value": "zh_female_kailangjiejie_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "邻家男孩",
-    "value": "zh_male_linjiananhai_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "甜美悦悦",
-    "value": "zh_female_tianmeiyueyue_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "心灵鸡汤",
-    "value": "zh_female_xinlingjitang_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "知性温婉",
-    "value": "ICL_zh_female_zhixingwenwan_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "暖心体贴",
-    "value": "ICL_zh_male_nuanxintitie_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "温柔文雅",
-    "value": "ICL_zh_female_wenrouwenya_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "开朗轻快",
-    "value": "ICL_zh_male_kailangqingkuai_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "活泼爽朗",
-    "value": "ICL_zh_male_huoposhuanglang_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "率真小伙",
-    "value": "ICL_zh_male_shuaizhenxiaohuo_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "温柔小哥",
-    "value": "zh_male_wenrouxiaoge_mars_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "Smith",
-    "value": "en_male_smith_mars_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "Anna",
-    "value": "en_female_anna_mars_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "Adam",
-    "value": "en_male_adam_mars_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "Sarah",
-    "value": "en_female_sarah_mars_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "Dryw",
-    "value": "en_male_dryw_mars_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "かずね（和音）/Javier or Álvaro",
-    "value": "multi_male_jingqiangkanye_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "はるこ（晴子）/Esmeralda",
-    "value": "multi_female_shuangkuaisisi_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "ひろし（広志）/Roberto",
-    "value": "multi_male_wanqudashu_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "あけみ（朱美）",
-    "value": "multi_female_gaolengyujie_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "Amanda",
-    "value": "en_female_amanda_mars_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "Jackson",
-    "value": "en_male_jackson_mars_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "京腔侃爷/Harmony",
-    "value": "zh_male_jingqiangkanye_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "湾湾小何",
-    "value": "zh_female_wanwanxiaohe_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "湾区大叔",
-    "value": "zh_female_wanqudashu_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "呆萌川妹",
-    "value": "zh_female_daimengchuanmei_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "广州德哥",
-    "value": "zh_male_guozhoudege_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "北京小爷",
-    "value": "zh_male_beijingxiaoye_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "浩宇小哥",
-    "value": "zh_male_haoyuxiaoge_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "广西远舟",
-    "value": "zh_male_guangxiyuanzhou_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "妹坨洁儿",
-    "value": "zh_female_meituojieer_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "豫州子轩",
-    "value": "zh_male_yuzhouzixuan_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "奶气萌娃",
-    "value": "zh_male_naiqimengwa_mars_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "婆婆",
-    "value": "zh_female_popo_mars_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "高冷御姐",
-    "value": "zh_female_gaolengyujie_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "傲娇霸总",
-    "value": "zh_male_aojiaobazong_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "魅力女友",
-    "value": "zh_female_meilinvyou_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "深夜播客",
-    "value": "zh_male_shenyeboke_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "柔美女友",
-    "value": "zh_female_sajiaonvyou_moon_bigtts",
+    "label": "知性灿灿",
+    "value": "zh_female_cancan_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
     "label": "撒娇学妹",
-    "value": "zh_female_yuanqinvyou_moon_bigtts",
+    "value": "zh_female_sajiaoxuemei_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "病弱少女",
-    "value": "ICL_zh_female_bingruoshaonv_tob",
+    "label": "甜美小源",
+    "value": "zh_female_tianmeixiaoyuan_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "活泼女孩",
-    "value": "ICL_zh_female_huoponvhai_tob",
+    "label": "甜美桃子",
+    "value": "zh_female_tianmeitaozi_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "东方浩然",
-    "value": "zh_male_dongfanghaoran_moon_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "绿茶小哥",
-    "value": "ICL_zh_male_lvchaxiaoge_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "娇弱萝莉",
-    "value": "ICL_zh_female_jiaoruoluoli_tob",
+    "label": "爽快思思",
+    "value": "zh_female_shuangkuaisisi_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "冷淡疏离",
-    "value": "ICL_zh_male_lengdanshuli_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "憨厚敦实",
-    "value": "ICL_zh_male_hanhoudunshi_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "傲气凌人",
-    "value": "ICL_zh_male_aiqilingren_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "活泼刁蛮",
-    "value": "ICL_zh_female_huopodiaoman_tob",
+    "label": "佩奇猪",
+    "value": "zh_female_peiqi_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "固执病娇",
-    "value": "ICL_zh_male_guzhibingjiao_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "撒娇粘人",
-    "value": "ICL_zh_male_sajiaonianren_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "傲慢娇声",
-    "value": "ICL_zh_female_aomanjiaosheng_tob",
+    "label": "邻家女孩",
+    "value": "zh_female_linjianvhai_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "潇洒随性",
-    "value": "ICL_zh_male_xiaosasuixing_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "腹黑公子",
-    "value": "ICL_zh_male_fuheigongzi_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "诡异神秘",
-    "value": "ICL_zh_male_guiyishenmi_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "儒雅才俊",
-    "value": "ICL_zh_male_ruyacaijun_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "病娇白莲",
-    "value": "ICL_zh_male_bingjiaobailian_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "正直青年",
-    "value": "ICL_zh_male_zhengzhiqingnian_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "娇憨女王",
-    "value": "ICL_zh_female_jiaohannvwang_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "病娇萌妹",
-    "value": "ICL_zh_female_bingjiaomengmei_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "青涩小生",
-    "value": "ICL_zh_male_qingsenaigou_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "纯真学弟",
-    "value": "ICL_zh_male_chunzhenxuedi_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "暖心学姐",
-    "value": "ICL_zh_female_nuanxinxuejie_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "可爱女生",
-    "value": "ICL_zh_female_keainvsheng_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "成熟姐姐",
-    "value": "ICL_zh_female_chengshujiejie_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "病娇姐姐",
-    "value": "ICL_zh_female_bingjiaojiejie_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "优柔帮主",
-    "value": "ICL_zh_male_youroubangzhu_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "优柔公子",
-    "value": "ICL_zh_male_yourougongzi_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "妩媚御姐",
-    "value": "ICL_zh_female_wumeiyujie_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "调皮公主",
-    "value": "ICL_zh_female_tiaopigongzhu_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "傲娇女友",
-    "value": "ICL_zh_female_aojiaonvyou_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "贴心男友",
-    "value": "ICL_zh_male_tiexinnanyou_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "少年将军",
-    "value": "ICL_zh_male_shaonianjiangjun_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "贴心女友",
-    "value": "ICL_zh_female_tiexinnvyou_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "病娇哥哥",
-    "value": "ICL_zh_male_bingjiaogege_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "学霸男同桌",
-    "value": "ICL_zh_male_xuebanantongzhuo_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "幽默叔叔",
-    "value": "ICL_zh_male_youmoshushu_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "性感御姐",
-    "value": "ICL_zh_female_xingganyujie_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "假小子",
-    "value": "ICL_zh_female_jiaxiaozi_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "冷峻上司",
-    "value": "ICL_zh_male_lengjunshangsi_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "温柔男同桌",
-    "value": "ICL_zh_male_wenrounantongzhuo_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "病娇弟弟",
-    "value": "ICL_zh_male_bingjiaodidi_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "幽默大爷",
-    "value": "ICL_zh_male_youmodaye_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "傲慢少爷",
-    "value": "ICL_zh_male_aomanshaoye_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "神秘法师",
-    "value": "ICL_zh_male_shenmifashi_tob",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "和蔼奶奶",
-    "value": "ICL_zh_female_heainainai_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "邻居阿姨",
-    "value": "ICL_zh_female_linjuayi_tob",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "温柔小雅",
-    "value": "zh_female_wenrouxiaoya_moon_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "天才童声",
-    "value": "zh_male_tiancaitongsheng_mars_bigtts",
+    "label": "少年梓辛",
+    "value": "zh_male_shaonianzixin_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
     "label": "猴哥",
-    "value": "zh_male_sunwukong_mars_bigtts",
+    "value": "zh_male_sunwukong_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
-    "label": "熊二",
-    "value": "zh_male_xionger_mars_bigtts",
+    "label": "Tina老师",
+    "value": "zh_female_yingyujiaoxue_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "暖阳女声",
+    "value": "zh_female_kefunvsheng_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "儿童绘本",
+    "value": "zh_female_xiaoxue_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "大壹",
+    "value": "zh_male_dayi_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
-    "label": "佩奇猪",
-    "value": "zh_female_peiqi_mars_bigtts",
+    "label": "黑猫侦探社咪仔",
+    "value": "zh_female_mizai_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "武则天",
-    "value": "zh_female_wuzetian_mars_bigtts",
+    "label": "鸡汤女",
+    "value": "zh_female_jitangnv_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "顾姐",
-    "value": "zh_female_gujie_mars_bigtts",
+    "label": "魅力女友",
+    "value": "zh_female_meilinvyou_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "樱桃丸子",
-    "value": "zh_female_yingtaowanzi_mars_bigtts",
+    "label": "流畅女声",
+    "value": "zh_female_liuchangnv_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "广告解说",
-    "value": "zh_male_chunhui_mars_bigtts",
+    "label": "儒雅逸辰",
+    "value": "zh_male_ruyayichen_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
-    "label": "少儿故事",
-    "value": "zh_female_shaoergushi_mars_bigtts",
-    "gender": "female",
-    "provider": "volcengine"
-  },
-  {
-    "label": "四郎",
-    "value": "zh_male_silang_mars_bigtts",
+    "label": "Tim",
+    "value": "en_male_tim_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
-    "label": "磁性解说男声/Morgan",
-    "value": "zh_male_jieshuonansheng_mars_bigtts",
+    "label": "Dacey",
+    "value": "en_female_dacey_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Stokie",
+    "value": "en_female_stokie_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温柔妈妈",
+    "value": "zh_female_wenroumama_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "解说小明",
+    "value": "zh_male_jieshuoxiaoming_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
-    "label": "鸡汤妹妹/Hope",
-    "value": "zh_female_jitangmeimei_mars_bigtts",
+    "label": "TVB女声",
+    "value": "zh_female_tvbnv_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "贴心女声/Candy",
-    "value": "zh_female_tiexinnvsheng_mars_bigtts",
-    "gender": "female",
+    "label": "译制片男",
+    "value": "zh_male_yizhipiannan_uranus_bigtts",
+    "gender": "male",
     "provider": "volcengine"
   },
   {
     "label": "俏皮女声",
-    "value": "zh_female_qiaopinvsheng_mars_bigtts",
+    "value": "zh_female_qiaopinv_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "萌丫头/Cutey",
-    "value": "zh_female_mengyatou_mars_bigtts",
+    "label": "直率英子",
+    "value": "zh_female_zhishuaiyingzi_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "懒音绵宝",
-    "value": "zh_male_lanxiaoyang_mars_bigtts",
+    "label": "邻家男孩",
+    "value": "zh_male_linjiananhai_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
-    "label": "亮嗓萌仔",
-    "value": "zh_male_dongmanhaimian_mars_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "悬疑解说",
-    "value": "zh_male_changtianyi_mars_bigtts",
+    "label": "四郎",
+    "value": "zh_male_silang_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
     "label": "儒雅青年",
-    "value": "zh_male_ruyaqingnian_mars_bigtts",
-    "gender": "male",
-    "provider": "volcengine"
-  },
-  {
-    "label": "霸气青叔",
-    "value": "zh_male_baqiqingshu_mars_bigtts",
+    "value": "zh_male_ruyaqingnian_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
     "label": "擎苍",
-    "value": "zh_male_qingcang_mars_bigtts",
+    "value": "zh_male_qingcang_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
-    "label": "活力小哥",
-    "value": "zh_male_yangguangqingnian_mars_bigtts",
+    "label": "熊二",
+    "value": "zh_male_xionger_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   },
   {
-    "label": "古风少御",
-    "value": "zh_female_gufengshaoyu_mars_bigtts",
+    "label": "樱桃丸子",
+    "value": "zh_female_yingtaowanzi_uranus_bigtts",
     "gender": "female",
     "provider": "volcengine"
   },
   {
-    "label": "温柔淑女",
-    "value": "zh_female_wenroushunv_mars_bigtts",
+    "label": "温暖阿虎",
+    "value": "zh_male_wennuanahu_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "奶气萌娃",
+    "value": "zh_male_naiqimengwa_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "婆婆",
+    "value": "zh_female_popo_uranus_bigtts",
     "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "高冷御姐",
+    "value": "zh_female_gaolengyujie_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "傲娇霸总",
+    "value": "zh_male_aojiaobazong_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "懒音绵宝",
+    "value": "zh_male_lanyinmianbao_uranus_bigtts",
+    "gender": "male",
     "provider": "volcengine"
   },
   {
     "label": "反卷青年",
-    "value": "zh_male_fanjuanqingnian_mars_bigtts",
+    "value": "zh_male_fanjuanqingnian_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温柔淑女",
+    "value": "zh_female_wenroushunv_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "古风少御",
+    "value": "zh_female_gufengshaoyu_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "活力小哥",
+    "value": "zh_male_huolixiaoge_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "霸气青叔",
+    "value": "zh_male_baqiqingshu_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "悬疑解说",
+    "value": "zh_male_xuanyijieshuo_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "萌丫头",
+    "value": "zh_female_mengyatou_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "贴心女声",
+    "value": "zh_female_tiexinnvsheng_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "鸡汤妹妹",
+    "value": "zh_female_jitangmei_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "磁性解说男声",
+    "value": "zh_male_cixingjieshuonan_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "亮嗓萌仔",
+    "value": "zh_male_liangsangmengzai_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "开朗姐姐",
+    "value": "zh_female_kailangjiejie_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "高冷沉稳",
+    "value": "zh_male_gaolengchenwen_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "深夜播客",
+    "value": "zh_male_shenyeboke_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "鲁班七号",
+    "value": "zh_male_lubanqihao_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "娇喘女声",
+    "value": "zh_female_jiaochuannv_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "林潇",
+    "value": "zh_female_linxiao_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "玲玲姐姐",
+    "value": "zh_female_lingling_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "春日部姐姐",
+    "value": "zh_female_chunribu_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "唐僧",
+    "value": "zh_male_tangseng_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "庄周",
+    "value": "zh_male_zhuangzhou_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "开朗弟弟",
+    "value": "zh_male_kailangdidi_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "猪八戒",
+    "value": "zh_male_zhubajie_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "感冒电音姐姐",
+    "value": "zh_female_ganmaodianyin_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "谄媚女声",
+    "value": "zh_female_chanmeinv_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "女雷神",
+    "value": "zh_female_nvleishen_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "亲切女声",
+    "value": "zh_female_qinqienv_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "快乐小东",
+    "value": "zh_male_kuailexiaodong_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "开朗学长",
+    "value": "zh_male_kailangxuezhang_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "悠悠君子",
+    "value": "zh_male_youyoujunzi_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "文静毛毛",
+    "value": "zh_female_wenjingmaomao_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "知性女声",
+    "value": "zh_female_zhixingnv_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清爽男大",
+    "value": "zh_male_qingshuangnanda_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "渊博小叔",
+    "value": "zh_male_yuanboxiaoshu_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "阳光青年",
+    "value": "zh_male_yangguangqingnian_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清澈梓梓",
+    "value": "zh_female_qingchezizi_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "甜美悦悦",
+    "value": "zh_female_tianmeiyueyue_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "心灵鸡汤",
+    "value": "zh_female_xinlingjitang_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温柔小哥",
+    "value": "zh_male_wenrouxiaoge_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "柔美女友",
+    "value": "zh_female_roumeinvyou_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "东方浩然",
+    "value": "zh_male_dongfanghaoran_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温柔小雅",
+    "value": "zh_female_wenrouxiaoya_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "天才童声",
+    "value": "zh_male_tiancaitongsheng_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "武则天",
+    "value": "zh_female_wuzetian_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "顾姐",
+    "value": "zh_female_gujie_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "广告解说",
+    "value": "zh_male_guanggaojieshuo_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "少儿故事",
+    "value": "zh_female_shaoergushi_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Charlie",
+    "value": "ICL_uranus_en_female_charlie_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Ethan",
+    "value": "ICL_uranus_en_male_ethan_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Alastor",
+    "value": "ICL_uranus_en_male_alastor_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Chucky",
+    "value": "ICL_uranus_en_male_chucky_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Noah",
+    "value": "ICL_uranus_en_male_noah_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Jigsaw",
+    "value": "ICL_uranus_en_male_jigsaw_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Clown Man",
+    "value": "ICL_uranus_en_male_clown_man_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Cartoon Chef",
+    "value": "ICL_uranus_en_male_cartoon_chef_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Frosty Man",
+    "value": "ICL_uranus_en_male_frosty_man_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "The Grinch",
+    "value": "ICL_uranus_en_male_the_grinch_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Kevin McCallister",
+    "value": "ICL_uranus_en_male_kevin_mccallister_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Michael",
+    "value": "ICL_uranus_en_male_michael_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Big Boogie",
+    "value": "ICL_uranus_en_male_big_boogie_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Xavier",
+    "value": "ICL_uranus_en_male_xavier_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Zayne",
+    "value": "ICL_uranus_en_male_zayne_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "客服婉君",
+    "value": "ICL_uranus_zh_female_kefuwanjun_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "傲娇女友",
+    "value": "ICL_uranus_zh_female_aojiaonvyou_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "傲慢娇声",
+    "value": "ICL_uranus_zh_female_aomanjiaosheng_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "邪魅女王",
+    "value": "ICL_uranus_zh_female_xiemeinvwang_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "病娇姐姐",
+    "value": "ICL_uranus_zh_female_bingjiaojiejie_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "病娇萌妹",
+    "value": "ICL_uranus_zh_female_bingjiaomengmei_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "病弱少女",
+    "value": "ICL_uranus_zh_female_bingruoshaonv_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "成熟温柔",
+    "value": "ICL_uranus_zh_female_chengshuwenrou_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "成熟姐姐",
+    "value": "ICL_uranus_zh_female_chengshujiejie_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "纯真少女",
+    "value": "ICL_uranus_zh_female_chunzhenshaonv_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "纯澈女生",
+    "value": "ICL_uranus_zh_female_chunchenvsheng_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "妩媚可人",
+    "value": "ICL_uranus_zh_female_wumeikeren_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "乖巧可儿",
+    "value": "ICL_uranus_zh_female_guaiqiaokeer_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "和蔼奶奶",
+    "value": "ICL_uranus_zh_female_heainainai_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "活泼刁蛮",
+    "value": "ICL_uranus_zh_female_huopodiaoman_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "活泼女孩",
+    "value": "ICL_uranus_zh_female_huoponvhai_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "娇憨女王",
+    "value": "ICL_uranus_zh_female_jiaohannvwang_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "娇弱萝莉",
+    "value": "ICL_uranus_zh_female_jiaoruoluoli_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "假小子",
+    "value": "ICL_uranus_zh_female_jiaxiaozi_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "精灵向导",
+    "value": "ICL_uranus_zh_female_jinglingxiangdao_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "开朗婷婷",
+    "value": "ICL_uranus_zh_female_kailangtingting_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "开心小鸿",
+    "value": "ICL_uranus_zh_female_kaixinxiaohong_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "可爱女生",
+    "value": "ICL_uranus_zh_female_keainvsheng_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "灵动欣欣",
+    "value": "ICL_uranus_zh_female_lingdongxinxin_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "邻居阿姨",
+    "value": "ICL_uranus_zh_female_linjuayi_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "甜美娇俏",
+    "value": "ICL_uranus_zh_female_tianmeijiaoqiao_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清冷高雅",
+    "value": "ICL_uranus_zh_female_qinglenggaoya_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "理性圆子",
+    "value": "ICL_uranus_zh_female_lixingyuanzi_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "性感魅惑",
+    "value": "ICL_uranus_zh_female_xingganmeihuo_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "暖心茜茜",
+    "value": "ICL_uranus_zh_female_nuanxinqianqian_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "暖心学姐",
+    "value": "ICL_uranus_zh_female_nuanxinxuejie_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清甜莓莓",
+    "value": "ICL_uranus_zh_female_qingtianmeimei_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清甜桃桃",
+    "value": "ICL_uranus_zh_female_qingtiantaotao_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清晰小雪",
+    "value": "ICL_uranus_zh_female_qingxixiaoxue_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "倾心少女",
+    "value": "ICL_uranus_zh_female_qingxinshaonv_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "柔骨魂师",
+    "value": "ICL_uranus_zh_female_rouguhunshi_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "软萌糖糖",
+    "value": "ICL_uranus_zh_female_ruanmengtangtang_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "软萌团子",
+    "value": "ICL_uranus_zh_female_ruanmengtuanzi_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "甜美活泼",
+    "value": "ICL_uranus_zh_female_tianmeihuopo_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "甜美小橘",
+    "value": "ICL_uranus_zh_female_tianmeixiaoju_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "甜美小雨",
+    "value": "ICL_uranus_zh_female_tianmeixiaoyu_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "调皮公主",
+    "value": "ICL_uranus_zh_female_tiaopigongzhu_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "贴心女友",
+    "value": "ICL_uranus_zh_female_tiexinnvyou_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温柔女神",
+    "value": "ICL_uranus_zh_female_wenrounvshen_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温柔文雅",
+    "value": "ICL_uranus_zh_female_wenrouwenya_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "知心姐姐",
+    "value": "ICL_uranus_zh_female_zhixinjiejie_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "妩媚御姐",
+    "value": "ICL_uranus_zh_female_wumeiyujie_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "元气甜妹",
+    "value": "ICL_uranus_zh_female_yuanqitianmei_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "邪魅御姐",
+    "value": "ICL_uranus_zh_female_xiemeiyujie_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "性感御姐",
+    "value": "ICL_uranus_zh_female_xingganyujie_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "秀丽倩倩",
+    "value": "ICL_uranus_zh_female_xiuliqianqian_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "贴心闺蜜",
+    "value": "ICL_uranus_zh_female_tiexinguimi_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "贴心妹妹",
+    "value": "ICL_uranus_zh_female_tiexinmeimei_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温柔白月光",
+    "value": "ICL_uranus_zh_female_wenroubaiyueguang_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "初恋女友",
+    "value": "ICL_uranus_zh_female_chuliannvyou_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "知性温婉",
+    "value": "ICL_uranus_zh_female_zhixingwenwan_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "傲气凌人",
+    "value": "ICL_uranus_zh_male_aoqilingren_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "黯刃秦主",
+    "value": "ICL_uranus_zh_male_anrenqinzhu_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "傲娇公子",
+    "value": "ICL_uranus_zh_male_aojiaogongzi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "傲娇精英",
+    "value": "ICL_uranus_zh_male_aojiaojingying_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "傲慢青年",
+    "value": "ICL_uranus_zh_male_aomanqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "傲慢少爷",
+    "value": "ICL_uranus_zh_male_aomanshaoye_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "枕边低语",
+    "value": "ICL_uranus_zh_male_zhenbiandiyu_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "霸道少爷",
+    "value": "ICL_uranus_zh_male_badaoshaoye_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "霸道总裁",
+    "value": "ICL_uranus_zh_male_badaozongcai_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "病娇白莲",
+    "value": "ICL_uranus_zh_male_bingjiaobailian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "病娇弟弟",
+    "value": "ICL_uranus_zh_male_bingjiaodidi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "病娇哥哥",
+    "value": "ICL_uranus_zh_male_bingjiaogege_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "病娇男友",
+    "value": "ICL_uranus_zh_male_bingjiaonanyou_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "病娇少年",
+    "value": "ICL_uranus_zh_male_bingjiaoshaonian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "病弱公子",
+    "value": "ICL_uranus_zh_male_bingruogongzi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "病弱少年",
+    "value": "ICL_uranus_zh_male_bingruoshaonian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "不羁青年",
+    "value": "ICL_uranus_zh_male_bujiqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "醇厚低音",
+    "value": "ICL_uranus_zh_male_chunhoudiyin_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "咆哮小哥",
+    "value": "ICL_uranus_zh_male_paoxiaoxiaoge_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "炀炀",
+    "value": "ICL_uranus_zh_male_yangyang_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "孱弱少爷",
+    "value": "ICL_uranus_zh_male_chanruoshaoye_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "成熟总裁",
+    "value": "ICL_uranus_zh_male_chengshuzongcai_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "沉稳明仔",
+    "value": "ICL_uranus_zh_male_chenwenmingzai_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清逸苏感",
+    "value": "ICL_uranus_zh_male_qingyisugan_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "纯真学弟",
+    "value": "ICL_uranus_zh_male_chunzhenxuedi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "磁性男嗓",
+    "value": "ICL_uranus_zh_male_cixingnansang_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "醋精男生",
+    "value": "ICL_uranus_zh_male_cujingnansheng_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "醋精男友",
+    "value": "ICL_uranus_zh_male_cujingnanyou_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "低音沉郁",
+    "value": "ICL_uranus_zh_male_diyinchenyu_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "风发少年",
+    "value": "ICL_uranus_zh_male_fengfashaonian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "儒雅公子",
+    "value": "ICL_uranus_zh_male_ruyagongzi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "腹黑公子",
+    "value": "ICL_uranus_zh_male_fuheigongzi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "干净少年",
+    "value": "ICL_uranus_zh_male_ganjingshaonian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "高冷总裁",
+    "value": "ICL_uranus_zh_male_gaolengzongcai_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "孤傲公子",
+    "value": "ICL_uranus_zh_male_guaogongzi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "孤高公子",
+    "value": "ICL_uranus_zh_male_gugaogongzi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "诡异神秘",
+    "value": "ICL_uranus_zh_male_guiyishenmi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "固执病娇",
+    "value": "ICL_uranus_zh_male_guzhibingjiao_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "憨厚敦实",
+    "value": "ICL_uranus_zh_male_hanhoudunshi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "活力青年",
+    "value": "ICL_uranus_zh_male_huoliqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "活泼男友",
+    "value": "ICL_uranus_zh_male_huoponanyou_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "活泼爽朗",
+    "value": "ICL_uranus_zh_male_huoposhuanglang_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "胡子叔叔",
+    "value": "ICL_uranus_zh_male_huzishushu_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "机甲智能",
+    "value": "ICL_uranus_zh_male_jijiazhineng_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "精英青年",
+    "value": "ICL_uranus_zh_male_jingyingqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "俊逸公子",
+    "value": "ICL_uranus_zh_male_junyigongzi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "开朗轻快",
+    "value": "ICL_uranus_zh_male_kailangqingkuai_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "开朗青年",
+    "value": "ICL_uranus_zh_male_kailangqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "蓝银草魂师",
+    "value": "ICL_uranus_zh_male_lanyincaohunshi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "冷傲总裁",
+    "value": "ICL_uranus_zh_male_lengaozongcai_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "冷淡疏离",
+    "value": "ICL_uranus_zh_male_lengdanshuli_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "冷峻高智",
+    "value": "ICL_uranus_zh_male_lengjungaozhi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "冷峻上司",
+    "value": "ICL_uranus_zh_male_lengjunshangsi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "冷酷哥哥",
+    "value": "ICL_uranus_zh_male_lengkugege_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "冷脸兄长",
+    "value": "ICL_uranus_zh_male_lenglianxiongzhang_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "冷脸学霸",
+    "value": "ICL_uranus_zh_male_lenglianxueba_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "冷漠男友",
+    "value": "ICL_uranus_zh_male_lengmonanyou_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "冷漠兄长",
+    "value": "ICL_uranus_zh_male_lengmoxiongzhang_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "凌云青年",
+    "value": "ICL_uranus_zh_male_lingyunqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清冷矜贵",
+    "value": "ICL_uranus_zh_male_qinglengjingui_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "绿茶小哥",
+    "value": "ICL_uranus_zh_male_lvchaxiaoge_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "懵懂青年",
+    "value": "ICL_uranus_zh_male_mengdongqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "闷油瓶小哥",
+    "value": "ICL_uranus_zh_male_menyoupingxiaoge_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "嚣张小哥",
+    "value": "ICL_uranus_zh_male_xiaozhangxiaoge_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "粘人男友",
+    "value": "ICL_uranus_zh_male_nianrennanyou_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "内敛才俊",
+    "value": "ICL_uranus_zh_male_neiliancaijun_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "暖心体贴",
+    "value": "ICL_uranus_zh_male_nuanxintitie_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "翩翩公子",
+    "value": "ICL_uranus_zh_male_pianpiangongzi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "沉稳优雅",
+    "value": "ICL_uranus_zh_male_chenwenyouya_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "青涩小生",
+    "value": "ICL_uranus_zh_male_qingsexiaosheng_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "青涩青年",
+    "value": "ICL_uranus_zh_male_qingseqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清爽少年",
+    "value": "ICL_uranus_zh_male_qingshuangshaonian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清新波波",
+    "value": "ICL_uranus_zh_male_qingxinbobo_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "亲切青年",
+    "value": "ICL_uranus_zh_male_qinqieqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "亲切小卓",
+    "value": "ICL_uranus_zh_male_qinqiexiaozhuo_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清朗温润",
+    "value": "ICL_uranus_zh_male_qinglangwenrun_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "热血少年",
+    "value": "ICL_uranus_zh_male_rexueshaonian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "儒雅才俊",
+    "value": "ICL_uranus_zh_male_ruyacaijun_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "儒雅君子",
+    "value": "ICL_uranus_zh_male_ruyajunzi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "儒雅总裁",
+    "value": "ICL_uranus_zh_male_ruyazongcai_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "撒娇男生",
+    "value": "ICL_uranus_zh_male_sajiaonansheng_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "撒娇男友",
+    "value": "ICL_uranus_zh_male_sajiaonanyou_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "撒娇粘人",
+    "value": "ICL_uranus_zh_male_sajiaonianren_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "洒脱青年",
+    "value": "ICL_uranus_zh_male_satuoqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "少年将军",
+    "value": "ICL_uranus_zh_male_shaonianjiangjun_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "深沉总裁",
+    "value": "ICL_uranus_zh_male_shenchenzongcai_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "机灵小伙",
+    "value": "ICL_uranus_zh_male_jilingxiaohuo_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "神秘法师",
+    "value": "ICL_uranus_zh_male_shenmifashi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "率真小伙",
+    "value": "ICL_uranus_zh_male_shuaizhenxiaohuo_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "爽朗小阳",
+    "value": "ICL_uranus_zh_male_shuanglangxiaoyang_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "低沉缱绻",
+    "value": "ICL_uranus_zh_male_dichenqianquan_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "斯文青年",
+    "value": "ICL_uranus_zh_male_siwenqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "甜系男友",
+    "value": "ICL_uranus_zh_male_tianxinanyou_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "贴心男友",
+    "value": "ICL_uranus_zh_male_tiexinnanyou_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温柔男同桌",
+    "value": "ICL_uranus_zh_male_wenrounantongzhuo_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温柔男友",
+    "value": "ICL_uranus_zh_male_wenrounanyou_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温柔学长",
+    "value": "ICL_uranus_zh_male_wenrouxuezhang_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温润学者",
+    "value": "ICL_uranus_zh_male_wenrunxuezhe_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温顺少年",
+    "value": "ICL_uranus_zh_male_wenshunshaonian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "寡言小哥",
+    "value": "ICL_uranus_zh_male_guayanxiaoge_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "小侯爷",
+    "value": "ICL_uranus_zh_male_xiaohouye_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "奶气小生",
+    "value": "ICL_uranus_zh_male_naiqixiaosheng_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "潇洒随性",
+    "value": "ICL_uranus_zh_male_xiaosasuixing_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温柔内敛",
+    "value": "ICL_uranus_zh_male_wenrouneilian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "学霸男同桌",
+    "value": "ICL_uranus_zh_male_xuebanantongzhuo_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "学霸同桌",
+    "value": "ICL_uranus_zh_male_xuebatongzhuo_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "阳光洋洋",
+    "value": "ICL_uranus_zh_male_yangguangyangyang_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温暖少年",
+    "value": "ICL_uranus_zh_male_wennuanshaonian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "意气少年",
+    "value": "ICL_uranus_zh_male_yiqishaonian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "油腻大叔",
+    "value": "ICL_uranus_zh_male_younidashu_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "幽默大爷",
+    "value": "ICL_uranus_zh_male_youmodaye_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "幽默叔叔",
+    "value": "ICL_uranus_zh_male_youmoshushu_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "优柔帮主",
+    "value": "ICL_uranus_zh_male_youroubangzhu_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "优柔公子",
+    "value": "ICL_uranus_zh_male_yourougongzi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "元气少年",
+    "value": "ICL_uranus_zh_male_yuanqishaonian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "仗剑君子",
+    "value": "ICL_uranus_zh_male_zhangjianjunzi_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "仗剑侠客",
+    "value": "ICL_uranus_zh_male_zhangjianxiake_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "正直青年",
+    "value": "ICL_uranus_zh_male_zhengzhiqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "直率青年",
+    "value": "ICL_uranus_zh_male_zhishuaiqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "中二青年",
+    "value": "ICL_uranus_zh_male_zhongerqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "自负青年",
+    "value": "ICL_uranus_zh_male_zifuqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "自信青年",
+    "value": "ICL_uranus_zh_male_zixinqingnian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "天才同桌",
+    "value": "ICL_uranus_zh_male_tiancaitongzhuo_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "清新沐沐",
+    "value": "ICL_uranus_zh_male_qingxinmumu_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "温婉珊珊",
+    "value": "ICL_uranus_zh_female_wenwanshanshan_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "热情艾娜",
+    "value": "ICL_uranus_zh_female_reqingaina_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "爽朗少年",
+    "value": "ICL_uranus_zh_male_shuanglangshaonian_tob",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "轻盈朵朵",
+    "value": "ICL_uranus_zh_female_qingyingduoduo_tob",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Dina",
+    "value": "ar_female_dina_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Fatma",
+    "value": "ar_female_fatma_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Youssef",
+    "value": "ar_male_youssef_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Stella",
+    "value": "de_female_bv081_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Rowan",
+    "value": "en_male_adam-imitation_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Alberto",
+    "value": "en_male_alberto_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Alex",
+    "value": "en_male_alex_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Allison",
+    "value": "en_female_allison_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Charlotte",
+    "value": "en_female_authoritative-british_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Margaret",
+    "value": "en_female_authoritative-informative_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Jones",
+    "value": "en_male_bill-jones_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Brad_Pitt",
+    "value": "en_male_brad_pitt_p1_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Brittney",
+    "value": "en_female_brittney_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Adrian",
+    "value": "en_male_bruce_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Leo",
+    "value": "en_male_chandler_p1_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Bob",
+    "value": "en_male_cowboy-bob_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "David",
+    "value": "en_male_david_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Orion",
+    "value": "en_male_deep-voice_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Julian",
+    "value": "en_male_diyuwenrounan_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Harrison",
+    "value": "en_male_evil-guy-oxley_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Jasper",
+    "value": "en_male_excited-male-voice_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Alfred",
+    "value": "en_male_father-christmas_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Holly",
+    "value": "en_female_female_tutor_ms-jenny_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Felix",
+    "value": "en_male_fernando-martinez_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Godfather",
+    "value": "en_male_godfather_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Gollum",
+    "value": "en_male_gollum_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Beau",
+    "value": "en_male_hades_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Hayley",
+    "value": "en_female_hayley_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Jamie",
+    "value": "en_male_jamie_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Jane",
+    "value": "en_female_jane_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Jenny",
+    "value": "en_female_jenny_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Blaze",
+    "value": "en_male_jidongchuanjiaoshi_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Jimmy",
+    "value": "en_male_jimmy_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Joanne",
+    "value": "en_female_joanne_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Joker",
+    "value": "en_male_joker_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Josh",
+    "value": "en_male_josh_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Kevin",
+    "value": "en_male_kevin_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Knightley",
+    "value": "en_male_knightley_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Lynn",
+    "value": "en_female_lana_del_rey_kelley_d_p1_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Ivy",
+    "value": "en_female_lana_del_rey_parky_s_p1_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Marcus",
+    "value": "en_male_marcus_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Mel",
+    "value": "en_female_mel_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Hank",
+    "value": "en_male_michael_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Chip",
+    "value": "en_male_michael-mouse_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Rory",
+    "value": "en_male_motivational-coach_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Myra",
+    "value": "en_female_myra_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Blair",
+    "value": "en_female_nadia_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Elaine",
+    "value": "en_female_pleasant-female_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Rachel",
+    "value": "en_female_rachel_p1_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Ronald",
+    "value": "en_male_ronald_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Russell",
+    "value": "en_male_russell_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Scarlet",
+    "value": "en_female_scarlet_p1_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Sharron",
+    "value": "en_female_sharron_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Simba",
+    "value": "en_male_simba_p1_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Skye",
+    "value": "en_female_skye_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Tom",
+    "value": "en_male_tom_hiddleston_p1_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Valentino",
+    "value": "en_male_valentino_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Megan",
+    "value": "en_female_wenrouzhishijieshuonv_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Kayla",
+    "value": "en_female_xinwenjieshuonv_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Dylan",
+    "value": "en_male_yangguangjieshuonan_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Zendaya",
+    "value": "en_female_zendaya_p1_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Gracie",
+    "value": "es_female_bv084_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Dani",
+    "value": "es_male_dani_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Guillem",
+    "value": "es_male_guillem_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Marisol",
+    "value": "es_female_ht_mx_f6_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Simone",
+    "value": "fr_female_fr_bv078_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Camille",
+    "value": "fr_female_fr_f47_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Maurice",
+    "value": "fr_male_fr_m29_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Rocco",
+    "value": "id_male_bv160_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Jude",
+    "value": "id_male_bv160dialogue_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Hugo",
+    "value": "id_male_bv160narration_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Clara",
+    "value": "id_female_bv161_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Sylvia",
+    "value": "id_female_bv161dialogue_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Celeste",
+    "value": "id_female_bv161narration_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Crew",
+    "value": "id_female_bv164_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Elian",
+    "value": "id_male_bv164dialogue_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Ronan",
+    "value": "id_male_bv164narration_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Chloe",
+    "value": "id_female_f20_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Han",
+    "value": "id_male_han_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Kyle",
+    "value": "id_male_m08_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Phulia",
+    "value": "id_female_phulia_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Bonnie",
+    "value": "ja_female_bv024_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Poppy",
+    "value": "ja_female_bv520_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Aoi",
+    "value": "ja_female_bv521_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Hana",
+    "value": "ja_female_bv522_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Lily",
+    "value": "ja_female_bv523_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Ken",
+    "value": "ja_male_bv524_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Shirou",
+    "value": "ja_female_shirou_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Jay",
+    "value": "ko_male_bv545_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Momo",
+    "value": "ko_female_bv546_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Minho",
+    "value": "ko_male_m03_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Ham",
+    "value": "ms_male_ham_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Naim",
+    "value": "ms_male_naim_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Irene",
+    "value": "mx_female_bv065_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Diego",
+    "value": "mx_male_bv165dialogue_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Marcos",
+    "value": "mx_male_bv165narrator_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Lucy",
+    "value": "mx_female_bv166dialogue_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Rosa",
+    "value": "mx_female_bv166emotion_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Freya",
+    "value": "mx_female_bv166narrator_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Derek",
+    "value": "mx_male_ht_mx_m012_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Leslie",
+    "value": "mx_female_leslie_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Marcelo",
+    "value": "mx_male_marcelo_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Sam",
+    "value": "pt_male_bv172_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Walter",
+    "value": "pt_male_bv172dialogue_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Vincent",
+    "value": "pt_male_bv172emotion_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Miles",
+    "value": "pt_male_bv172narrator_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Diana",
+    "value": "pt_female_bv173_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Elena",
+    "value": "pt_female_bv173dialogue_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Lola",
+    "value": "pt_female_bv173emotion_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Emma",
+    "value": "pt_female_bv173narrator_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Sofia",
+    "value": "pt_female_bv530_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Arthur",
+    "value": "pt_male_bv531_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Mari",
+    "value": "pt_female_mari_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Rael",
+    "value": "pt_male_rael_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Amelia",
+    "value": "ru_female_af07_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Irinae",
+    "value": "ru_female_irinae_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Pavel",
+    "value": "ru_male_pavel_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Ksenia",
+    "value": "ru_female_sophie_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Silas",
+    "value": "ru_male_vlad_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Valeria",
+    "value": "th_female_bv568_angry_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Iris",
+    "value": "th_female_bv568_fear_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Zara",
+    "value": "th_female_bv568_happy_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Valentina",
+    "value": "th_female_bv568_hate_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Mildred",
+    "value": "th_female_bv568_neutral_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Lydia",
+    "value": "th_female_bv568_sad_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Phoebe",
+    "value": "th_female_bv568_suprise_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Annika",
+    "value": "tl_female_annika_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Ed",
+    "value": "tl_male_ed_uranus_bigtts",
+    "gender": "male",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Hervie",
+    "value": "tl_female_hervie_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Hong",
+    "value": "vi_female_hong_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Ling",
+    "value": "vi_female_ling_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Linh",
+    "value": "vi_female_linh_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Partner",
+    "value": "vi_female_partner_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Ruan",
+    "value": "vi_female_ruan_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Wu",
+    "value": "vi_female_wu_uranus_bigtts",
+    "gender": "female",
+    "provider": "volcengine"
+  },
+  {
+    "label": "Wumg",
+    "value": "vi_male_wumg_uranus_bigtts",
     "gender": "male",
     "provider": "volcengine"
   }

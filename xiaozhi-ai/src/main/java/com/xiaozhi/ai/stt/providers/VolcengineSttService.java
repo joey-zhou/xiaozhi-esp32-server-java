@@ -33,8 +33,16 @@ import lombok.extern.slf4j.Slf4j;
 public class VolcengineSttService implements SttService {
     private static final String PROVIDER_NAME = "volcengine";
 
-    // WebSocket API地址
+    // WebSocket API地址：双向流式模式（优化版本），仅在结果变化时下发数据包，首尾字时延更优
     private static final String WS_API_URL = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async";
+
+    /**
+     * 资源ID：豆包流式语音识别大模型 2.0 小时版。
+     * <p>
+     * 1.0 资源（volc.bigasr.sauc.*）只接受旧版控制台的 App ID + Access Token 鉴权，
+     * 与新版控制台 API Key 不兼容，故不再支持。并发版为 volc.seedasr.sauc.concurrent。
+     */
+    private static final String RESOURCE_ID = "volc.seedasr.sauc.duration";
 
     // 识别超时时间（90秒）
     private static final long RECOGNITION_TIMEOUT_MS = 90000;
@@ -53,17 +61,13 @@ public class VolcengineSttService implements SttService {
     private static final byte NO_SEQUENCE = 0b0000;
     private static final byte LAST_PACKET = 0b0010;
 
-    private final String appId;
-    private final String accessToken;
-    private final String resourceId;
+    /** 新版控制台 API Key，v3 统一使用它鉴权，不再需要 appId */
+    private final String apiKey;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public VolcengineSttService(ConfigBO config) {
-        this.appId = config.getAppId();
-        this.accessToken = config.getApiKey();
-        // 固定使用豆包流式语音识别模型1.0小时版
-        this.resourceId = "volc.bigasr.sauc.duration";
+        this.apiKey = config.getApiKey();
     }
 
     @Override
@@ -74,7 +78,7 @@ public class VolcengineSttService implements SttService {
     @Override
     public SttResult stream(Flux<byte[]> audioFlux) {
         // 检查配置是否已设置
-        if (appId == null || accessToken == null) {
+        if (apiKey == null || apiKey.isBlank()) {
             log.error("火山引擎语音识别配置未设置，无法进行识别");
             return null;
         }
@@ -97,12 +101,12 @@ public class VolcengineSttService implements SttService {
                 () -> isCompleted.set(true)
         );
 
-        // 构建请求
+        // 构建请求：v3 使用新版控制台的 X-Api-Key 鉴权
         Request request = new Request.Builder()
                 .url(WS_API_URL)
-                .addHeader("X-Api-App-Key", appId)
-                .addHeader("X-Api-Access-Key", accessToken)
-                .addHeader("X-Api-Resource-Id", resourceId)
+                .addHeader("X-Api-Key", apiKey)
+                .addHeader("X-Api-Resource-Id", RESOURCE_ID)
+                .addHeader("X-Api-Request-Id", UUID.randomUUID().toString())
                 .addHeader("X-Api-Connect-Id", connectId)
                 .build();
 
@@ -226,6 +230,11 @@ public class VolcengineSttService implements SttService {
         request.put("show_utterances", true);
         request.put("result_type", "full");
         request.put("enable_emotion_detection", true);
+        // 2.0 大模型 SSD 能力，官方建议 ASR 2.0 开启
+        request.put("ssd_version", "200");
+        // 二遍识别：流式快速出字 + VAD 判停后用非流式模型重识别该分句，提升最终结果准确率。
+        // 仅双向流式优化版支持，开启后 definite=true 只出现在非流式重识别的结果中。
+        request.put("enable_nonstream", true);
         requestJson.set("request", request);
 
         String jsonStr = objectMapper.writeValueAsString(requestJson);
@@ -388,9 +397,19 @@ public class VolcengineSttService implements SttService {
                             }
                         }
                     }
-                    SttResult sttResult = topEmotion != null
-                            ? SttResult.withFullEmotion(text, topEmotion, topEmotionScore, topEmotionDegree, topEmotionDegreeScore)
-                            : SttResult.textOnly(text);
+                    SttResult sttResult;
+                    if (topEmotion != null) {
+                        sttResult = SttResult.withFullEmotion(text, topEmotion, topEmotionScore, topEmotionDegree, topEmotionDegreeScore);
+                    } else {
+                        // 本包没有携带情感时沿用已识别到的情感，而不是清空。
+                        // 开启二遍识别后，情感只随 definite=true 的非流式分句下发，
+                        // 其后到达的流式包不含 definite 分句，直接覆盖会丢失情感。
+                        SttResult previous = finalResult.get();
+                        sttResult = previous != null && previous.hasEmotion()
+                                ? SttResult.withFullEmotion(text, previous.emotion(), previous.emotionScore(),
+                                        previous.emotionDegree(), previous.emotionDegreeScore())
+                                : SttResult.textOnly(text);
+                    }
                     finalResult.set(sttResult);
                 }
             }

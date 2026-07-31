@@ -1072,22 +1072,14 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
         }
       ],
       volcengine: [
-        { 
-          name: 'appId', 
-          label: 'App ID', 
-          required: true, 
-          span: 12,
-          help: '在 https://console.volcengine.com/speech/app 获取应用ID',
-          placeholder: 'your-app-id'
-        },
-        { 
-          name: 'apiKey', 
-          label: 'Access Token', 
-          required: true, 
+        {
+          name: 'apiKey',
+          label: 'API Key',
+          required: true,
           inputType: 'password',
           span: 12,
-          help: '火山引擎语音识别服务访问令牌',
-          placeholder: 'your-access-token'
+          help: '在新版控制台 > API Key 管理获取（注意不是旧版控制台的 Access Token）',
+          placeholder: 'your-api-key'
         }
       ]
     }
@@ -1169,21 +1161,13 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
         }
       ],
       volcengine: [
-        { 
-          name: 'appId', 
-          label: 'App Id', 
-          required: true, 
+        {
+          name: 'apiKey',
+          label: 'API Key',
+          required: true,
           span: 12,
-          help: '在 https://console.volcengine.com/speech/app 申请',
-          placeholder: 'your-app-id'
-        },
-        { 
-          name: 'apiKey', 
-          label: 'Access Token', 
-          required: true, 
-          span: 12,
-          help: '火山引擎语音合成服务访问令牌',
-          placeholder: 'your-access-token'
+          help: '在新版控制台 > API Key 管理获取（注意不是旧版控制台的 Access Token）',
+          placeholder: 'your-api-key'
         }
       ],
       xfyun: [
