@@ -138,4 +138,21 @@ public class Conversation extends ConversationIdentifier {
         messages.add(toolResponse);
     }
 
+    /**
+     * 丢弃上轮被打断后留下的不完整消息，只保留到最后一条最终 AssistantMessage。
+     */
+    public synchronized void discardIncompleteTurn() {
+        int lastCompletedIndex = -1;
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            if (messages.get(i) instanceof AssistantMessage assistant
+                    && (assistant.getToolCalls() == null || assistant.getToolCalls().isEmpty())) {
+                lastCompletedIndex = i;
+                break;
+            }
+        }
+        if (lastCompletedIndex < messages.size() - 1) {
+            messages.subList(lastCompletedIndex + 1, messages.size()).clear();
+        }
+    }
+
 }

@@ -11,9 +11,7 @@ import com.xiaozhi.ai.stt.SttService;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -116,6 +114,10 @@ public class Persona {
      * @param useFunctionCall 是否使用函数调用
      */
     private Flux<ChatResponse> chatStream(Instant now, UserMessage userMessage, boolean useFunctionCall) {
+        long turnId = now.toEpochMilli();
+        conversation.discardIncompleteTurn();
+        getSession().getDialogueContext().startTurn(turnId);
+
         // userSpeechPath 从 session 中获取，避免参数层层穿透
         Path userSpeechPath = getSession().getUserAudioPath();
 
@@ -136,7 +138,7 @@ public class Persona {
                 .toolCallbacks(effectiveTools)
                 .toolContext(TOOL_CONTEXT_SESSION_ID_KEY, sessionId)
                 .toolContext("deviceId", ownerId)
-                .toolContext("conversationTimestamp", now.toEpochMilli())
+                .toolContext("conversationTimestamp", turnId)
                 .build();
 
         conversation.add(userMessage);
@@ -162,16 +164,17 @@ public class Persona {
             }
         });
         return new MessageAggregator().aggregate(chatFlux, chatResponse -> {
-            var toolCallDetails = getSession().drainToolCallDetails();
-            // 从 DialogueContext 中获取模型真实调用的工具调用链中间消息
-            AssistantMessage toolCallAssistantMsg = getSession().getDialogueContext().drainToolCallAssistantMessage();
-            ToolResponseMessage toolResponseMsg = getSession().getDialogueContext().drainToolResponseMessage();
+            DialogueContext dialogueContext = getSession().getDialogueContext();
+            DialogueContext.ToolCallSnapshot toolCallSnapshot = dialogueContext.snapshotToolCalls(turnId);
+            if (toolCallSnapshot == null) {
+                return;
+            }
+            var toolCallDetails = toolCallSnapshot.details();
+            // 模型本轮真实调用的工具链（一轮 tool loop 可能有多次，按顺序累积）
+            List<ToolChainPair> modelChains = toolCallSnapshot.chains();
 
             // 合并本轮所有 tool chain：模型真实调用链（顺序即持久化顺序）
-            List<ToolChainPair> allChains = new ArrayList<>();
-            if (toolCallAssistantMsg != null && toolResponseMsg != null) {
-                allChains.add(new ToolChainPair(toolCallAssistantMsg, toolResponseMsg));
-            }
+            List<ToolChainPair> allChains = new ArrayList<>(modelChains);
 
             DialogueTurn dialogueTurn = DialogueTurn.builder()
                     .userMessage(userMessage)
@@ -187,9 +190,8 @@ public class Persona {
             dialogueTurn.injectInstants();
             listener.onDialogueTurn(dialogueTurn);
 
-            // 模型真实调用的工具链注入 Conversation
-            if (toolCallAssistantMsg != null && toolResponseMsg != null) {
-                conversation.addToolCallChain(toolCallAssistantMsg, toolResponseMsg);
+            for (ToolChainPair chain : modelChains) {
+                conversation.addToolCallChain(chain.toolCallMessage(), chain.toolResponseMessage());
             }
             // 不能再从 ChatResponse 里取 AssistantMessage，因为已注入时间戳
             conversation.add(dialogueTurn.getAssistantMessage());

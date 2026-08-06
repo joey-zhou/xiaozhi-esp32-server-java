@@ -46,14 +46,15 @@ public class ChatSessionToolAdapter implements ToolSession {
     }
 
     @Override
-    public void addToolCallDetail(String name, String args, String result) {
-        chatSession.addToolCallDetail(name, args, result);
+    public void addToolCallDetail(Long turnId, String name, String args, String result) {
+        chatSession.addToolCallDetail(turnId, name, args, result);
     }
 
     @Override
-    public void addToolCallMessages(AssistantMessage toolCallAssistantMessage,
+    public void addToolCallMessages(Long turnId,
+                                    AssistantMessage toolCallAssistantMessage,
                                     ToolResponseMessage toolResponseMessage) {
-        chatSession.getDialogueContext().setToolCallMessages(toolCallAssistantMessage, toolResponseMessage);
+        chatSession.getDialogueContext().addToolChain(turnId, toolCallAssistantMessage, toolResponseMessage);
     }
 
     @Override

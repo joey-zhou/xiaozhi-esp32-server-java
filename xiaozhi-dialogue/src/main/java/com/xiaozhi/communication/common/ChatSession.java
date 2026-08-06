@@ -104,8 +104,7 @@ public abstract class ChatSession {
     public ToolsSessionHolder getToolsSessionHolder()                          { return dialogueContext.getToolsSessionHolder(); }
     public void setToolsSessionHolder(ToolsSessionHolder h)                    { dialogueContext.setToolsSessionHolder(h); }
     public List<ToolCallback> getToolCallbacks()                               { return dialogueContext.getToolCallbacks(); }
-    public void addToolCallDetail(String name, String args, String result)     { dialogueContext.addToolCallDetail(name, args, result); }
-    public List<DialogueContext.ToolCallInfo> drainToolCallDetails()           { return dialogueContext.drainToolCallDetails(); }
+    public void addToolCallDetail(Long turnId, String name, String args, String result) { dialogueContext.addToolCallDetail(turnId, name, args, result); }
     public boolean isFunctionCalled()                                          { return dialogueContext.isFunctionCalled(); }
 
     // ========== 超时断连标记 ==========

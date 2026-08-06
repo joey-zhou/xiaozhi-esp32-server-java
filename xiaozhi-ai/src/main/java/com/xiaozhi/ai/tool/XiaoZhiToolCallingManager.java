@@ -104,6 +104,13 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
     }
 
     /**
+     * 从 toolContext 取出发起本次工具调用时的对话轮次时间戳。
+     */
+    private static Long turnIdOf(ToolContext toolContext) {
+        return toolContext.getContext().get("conversationTimestamp") instanceof Long id ? id : null;
+    }
+
+    /**
      * 发布工具调用事件
      */
     private static void publishToolEvent(String sessionId, String toolName, String arguments,
@@ -182,7 +189,8 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
             if (provider != null) {
                 ToolSession toolSession = provider.getSession(sessionId);
                 if (toolSession != null) {
-                    toolSession.addToolCallMessages(assistantMessage, toolExecResult.toolResponseMessage());
+                    toolSession.addToolCallMessages(turnIdOf(toolContext), assistantMessage,
+                            toolExecResult.toolResponseMessage());
                 }
             }
         }
@@ -399,9 +407,11 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
                         return toolResult;
                     });
 
-            // 记录工具调用详情到session
+            // 记录工具调用详情到session。打断不会中断已在执行的工具，
+            // 故带上发起时的轮次代次，由 session 侧判断是否已过期。
             if (toolSession != null) {
-                toolSession.addToolCallDetail(toolName, toolInputArguments, toolCallResult);
+                toolSession.addToolCallDetail(turnIdOf(toolContext), toolName,
+                        toolInputArguments, toolCallResult);
             }
 
             // 发布工具调用事件
