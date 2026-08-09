@@ -83,6 +83,7 @@ public class OpenAiModelProvider implements ChatModelProvider {
                 .streamUsage(true);
 
         applyThinkingOptions(chatOptionsBuilder, enableThinking, model);
+        applyProviderOptions(chatOptionsBuilder, model);
 
         var openAiChatOptions = chatOptionsBuilder.build();
         
@@ -115,6 +116,15 @@ public class OpenAiModelProvider implements ChatModelProvider {
         }
     }
 
+    /**
+     * 应用提供商专属的 Chat API 请求参数。
+     *
+     * @param builder Chat 选项构造器
+     * @param model   模型名称（用于日志）
+     */
+    protected void applyProviderOptions(OpenAiChatOptions.Builder builder, String model) {
+    }
+
     @Override
     public EmbeddingModel createEmbeddingModel(ConfigBO config) {
         var openAiApi = OpenAiApi.builder()
@@ -143,4 +153,3 @@ public class OpenAiModelProvider implements ChatModelProvider {
         return factory;
     }
 }
-

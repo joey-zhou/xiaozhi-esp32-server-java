@@ -2,7 +2,6 @@
 import { ref, nextTick, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  ArrowUpOutlined,
   UserOutlined,
   PlusOutlined,
   ClockCircleOutlined,
@@ -18,7 +17,10 @@ import { queryRoles } from '@/services/role'
 import type { Conversation } from '@/types/message'
 import type { Role } from '@/types/role'
 import RobotAvatar from '@/components/RobotAvatar.vue'
+import ThinkingState from '@/components/chat/ThinkingState.vue'
 import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
+import StreamingText from '@/components/chat/StreamingText.vue'
+import ChatComposer from '@/components/chat/ChatComposer.vue'
 
 const { t } = useI18n()
 
@@ -34,6 +36,7 @@ const {
   selectConversation: selectConversationRaw,
   startNewChat,
   sendMessage: sendMessageToSession,
+  stopGeneration,
   toggleThinking,
 } = useChatSession()
 
@@ -74,7 +77,7 @@ function formatTime(timeStr: string) {
 // 视图状态：输入框 / 滚动 / 角色弹窗
 const inputText = ref('')
 const chatContainerRef = ref<HTMLDivElement>()
-const textareaRef = ref()
+const composerRef = ref<InstanceType<typeof ChatComposer>>()
 const rolePopoverOpen = ref(false)
 
 const selectedRole = computed(() => roles.value.find((r: Role) => r.roleId === selectedRoleId.value))
@@ -95,8 +98,7 @@ function scrollToBottom() {
 
 function focusInput() {
   nextTick(() => {
-    const el = textareaRef.value?.$el?.querySelector('textarea') || textareaRef.value?.$el
-    el?.focus()
+    composerRef.value?.focus()
   })
 }
 
@@ -136,12 +138,6 @@ async function sendMessage() {
   }
 }
 
-function handleKeyDown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    sendMessage()
-  }
-}
 </script>
 
 <template>
@@ -220,18 +216,21 @@ function handleKeyDown(e: KeyboardEvent) {
                 {{ msg.role === 'user' ? t('chat.me') : (selectedRoleName || t('chat.defaultAssistant')) }}
               </a-typography-text>
               <div class="message-bubble" :class="msg.role">
-                <div v-if="msg.streaming && !msg.content && !msg.thinking" class="typing-indicator">
-                  <span></span><span></span><span></span>
-                </div>
+                <ThinkingState v-if="msg.streaming && !msg.content && !msg.thinking" />
                 <template v-else>
                   <ThinkingBlock
                     v-if="msg.thinking"
                     :content="msg.thinking"
                     :done="msg.thinkingDone"
                     :expanded="thinkingExpanded[msg.id]"
+                    :duration-ms="msg.thinkingDurationMs"
                     @toggle="toggleThinking(msg.id)"
                   />
-                  <template v-if="msg.content">{{ msg.content }}</template>
+                  <StreamingText
+                    v-if="msg.content"
+                    :content="msg.content"
+                    :streaming="msg.streaming"
+                  />
                 </template>
               </div>
             </div>
@@ -241,28 +240,15 @@ function handleKeyDown(e: KeyboardEvent) {
 
       <!-- 输入区域 -->
       <div class="chat-input-wrapper">
-        <a-card :bordered="true" class="chat-input-card" :body-style="{ padding: '12px' }">
-          <a-textarea
-            ref="textareaRef"
-            v-model:value="inputText"
-            :placeholder="selectedRoleId ? t('chat.inputPlaceholder') : t('chat.connectFirst')"
-            :auto-size="{ minRows: 1, maxRows: 8 }"
-            :bordered="false"
-            @keydown="handleKeyDown"
-          />
-          <a-flex justify="end" :style="{ paddingTop: '8px' }">
-            <a-button
-              type="primary"
-              :disabled="!selectedRoleId || !inputText.trim() || sending"
-              :loading="sending"
-              @click="sendMessage"
-              shape="circle"
-              class="send-btn"
-            >
-              <template #icon><ArrowUpOutlined /></template>
-            </a-button>
-          </a-flex>
-        </a-card>
+        <ChatComposer
+          ref="composerRef"
+          v-model="inputText"
+          :disabled="!selectedRoleId"
+          :sending="sending"
+          :role-name="selectedRoleName"
+          @send="sendMessage"
+          @stop="stopGeneration"
+        />
         <a-typography-text type="secondary" :style="{ display: 'block', textAlign: 'center', marginTop: '12px', fontSize: '12px' }">
           {{ t('chat.disclaimer') }}
         </a-typography-text>
@@ -478,62 +464,22 @@ function handleKeyDown(e: KeyboardEvent) {
 }
 
 .message-bubble.assistant {
-  background: #fff;
-  border-top-left-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
-}
-
-.typing-indicator {
-  display: flex;
-  align-items: center;
-  gap: 4px;
   padding: 4px 0;
-}
-
-.typing-indicator span {
-  width: 6px;
-  height: 6px;
-  background: #8c8c8c;
-  border-radius: 50%;
-  animation: typing 1.4s infinite;
-}
-
-.typing-indicator span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.typing-indicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes typing {
-  0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
-  30% { opacity: 1; transform: scale(1); }
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* 输入区域 */
 .chat-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   max-width: 880px;
   margin: 0 auto;
   width: 100%;
-  padding: 16px 0 0 0;
-}
-
-.chat-input-card {
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-  transition: all 0.3s;
-}
-
-.chat-input-card:focus-within {
-  border-color: #1677ff;
-  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.08);
-}
-
-.send-btn {
-  width: 36px;
-  height: 36px;
-  font-size: 16px;
+  padding: 16px 24px 0;
+  box-sizing: border-box;
 }
 
 /* 历史记录时间线 */
@@ -563,5 +509,27 @@ function handleKeyDown(e: KeyboardEvent) {
 .history-item-meta {
   font-size: 12px;
   color: #8c8c8c;
+}
+
+@media (max-width: 600px) {
+  .chat-header {
+    padding: 0 12px;
+  }
+
+  .chat-messages {
+    padding: 18px 12px;
+  }
+
+  .message-row {
+    gap: 10px;
+  }
+
+  .message-content {
+    max-width: calc(100% - 46px);
+  }
+
+  .chat-input-wrapper {
+    padding: 10px 12px 0;
+  }
 }
 </style>

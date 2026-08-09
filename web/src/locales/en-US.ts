@@ -885,6 +885,19 @@ export default {
     connectFirst: 'Please select a role first',
     thinkingInProgress: 'Thinking...',
     thinkingDone: 'Thought complete',
+    thought: 'Thought',
+    thoughtDuration: ' for {seconds}s',
+    composer: {
+      addMenu: 'Add content or switch capability',
+      addImage: 'Add image',
+      attachFile: 'Attach file',
+      skills: 'Skills',
+      model: 'Current role',
+      followRole: 'Follow role configuration',
+      comingSoon: 'Coming soon',
+      stop: 'Stop generating',
+      send: 'Send',
+    },
   },
 
   memory: {

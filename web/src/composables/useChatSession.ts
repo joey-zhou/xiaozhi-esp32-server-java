@@ -110,6 +110,18 @@ export function useChatSession() {
     }
   }
 
+  function completeThinking(chatMessage: ChatMessage) {
+    if (!chatMessage.thinking || chatMessage.thinkingDone) return
+    chatMessage.thinkingDone = true
+    if (chatMessage.thinkingStartedAt) {
+      chatMessage.thinkingDurationMs = Date.now() - chatMessage.thinkingStartedAt
+    }
+  }
+
+  function stopGeneration() {
+    abortCurrentStream()
+  }
+
   async function closeActiveSessionQuietly() {
     if (activeSessionId.value) {
       try {
@@ -180,20 +192,17 @@ export function useChatSession() {
     try {
       for await (const token of chatStream(sessionId.value, text, currentAbort.signal)) {
         if (token.type === 'thinking') {
+          if (!assistantMsg.thinkingStartedAt) {
+            assistantMsg.thinkingStartedAt = Date.now()
+          }
           assistantMsg.thinking = (assistantMsg.thinking || '') + token.text
         } else {
-          // 思考阶段结束，标记为已完成
-          if (assistantMsg.thinking && !assistantMsg.thinkingDone) {
-            assistantMsg.thinkingDone = true
-          }
+          completeThinking(assistantMsg)
           assistantMsg.content += token.text
         }
         onScroll?.()
       }
-      // 流结束后确保 thinking 标记为 done
-      if (assistantMsg.thinking && !assistantMsg.thinkingDone) {
-        assistantMsg.thinkingDone = true
-      }
+      completeThinking(assistantMsg)
     } catch (e: unknown) {
       if (e instanceof DOMException && e.name === 'AbortError') {
         // 用户主动取消
@@ -201,6 +210,7 @@ export function useChatSession() {
         assistantMsg.content += '\n\n⚠️ 回复中断: ' + (e instanceof Error ? e.message : String(e))
       }
     } finally {
+      completeThinking(assistantMsg)
       assistantMsg.streaming = false
       sending.value = false
       currentAbort = null
@@ -233,6 +243,7 @@ export function useChatSession() {
     selectConversation,
     startNewChat,
     sendMessage,
+    stopGeneration,
     toggleThinking,
   }
 }

@@ -885,6 +885,19 @@ export default {
     connectFirst: '请先选择角色并开始聊天',
     thinkingInProgress: '思考中...',
     thinkingDone: '已完成思考',
+    thought: '思考',
+    thoughtDuration: '了 {seconds} 秒',
+    composer: {
+      addMenu: '添加内容或切换能力',
+      addImage: '添加图片',
+      attachFile: '添加文件',
+      skills: '技能',
+      model: '当前角色',
+      followRole: '跟随角色配置',
+      comingSoon: '能力即将接入',
+      stop: '停止生成',
+      send: '发送',
+    },
   },
 
   memory: {

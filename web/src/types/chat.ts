@@ -21,6 +21,10 @@ export interface ChatMessage {
   thinking?: string
   /** 思考是否已完成（切换 UI：思考中... → 已完成思考） */
   thinkingDone?: boolean
+  /** 首个思考片段到达的时间戳，用于计算本轮思考耗时 */
+  thinkingStartedAt?: number
+  /** 思考阶段耗时（毫秒） */
+  thinkingDurationMs?: number
   timestamp: Date
   /** 流式接收中 */
   streaming?: boolean
