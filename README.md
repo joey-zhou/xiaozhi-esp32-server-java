@@ -1,14 +1,14 @@
-<h1 align="center">Xiaozhi ESP32 Server Java</h1>
+<h1 align="center">Xiaozhi ESP32 Server Java — Brasil</h1>
 
 <p align="center">
-  基于 <a href="https://github.com/78/xiaozhi-esp32">Xiaozhi ESP32</a> 项目开发的 Java 版本服务端，包含完整前后端管理平台<br/>
-  为智能硬件设备提供强大的后端支持和直观的管理界面
+  Servidor em Java para o projeto <a href="https://github.com/78/xiaozhi-esp32">Xiaozhi ESP32</a>, com plataforma completa de administração (front-end + back-end)<br/>
+  Fork traduzido e adaptado para o público brasileiro, com backend robusto e interface de administração intuitiva para dispositivos de hardware inteligente
 </p>
 
 <p align="center">
-  <a href="https://github.com/joey-zhou/xiaozhi-esp32-server-java/issues">反馈问题</a>
-  · <a href="#deployment">部署文档</a>
-  · <a href="https://github.com/joey-zhou/xiaozhi-esp32-server-java/blob/main/CHANGELOG.md">更新日志</a>
+  <a href="https://github.com/Acogero/xiaozhi-brasil-esp32-server-java/issues">Reportar problema</a>
+  · <a href="#deployment">Documentação de implantação</a>
+  · <a href="https://github.com/Acogero/xiaozhi-brasil-esp32-server-java/blob/main/CHANGELOG.md">Changelog</a>
 </p>
 
 <p align="center">
@@ -16,212 +16,191 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/joey-zhou/xiaozhi-esp32-server-java/graphs/contributors">
-    <img alt="GitHub Contributors" src="https://img.shields.io/github/contributors/joey-zhou/xiaozhi-esp32-server-java?logo=github" />
+  <a href="https://github.com/Acogero/xiaozhi-brasil-esp32-server-java/graphs/contributors">
+    <img alt="GitHub Contributors" src="https://img.shields.io/github/contributors/Acogero/xiaozhi-brasil-esp32-server-java?logo=github" />
   </a>
-  <a href="https://safeskill.dev/scan/joey-zhou-xiaozhi-esp32-server-java">
-    <img alt="SafeSkill 80/100" src="https://img.shields.io/badge/SafeSkill-80%2F100_Passes%20with%20Notes-yellow" />
+  <a href="https://github.com/Acogero/xiaozhi-brasil-esp32-server-java/issues">
+    <img alt="Issues" src="https://img.shields.io/github/issues/Acogero/xiaozhi-brasil-esp32-server-java?color=0088ff" />
   </a>
-  <a href="https://github.com/joey-zhou/xiaozhi-esp32-server-java/issues">
-    <img alt="Issues" src="https://img.shields.io/github/issues/joey-zhou/xiaozhi-esp32-server-java?color=0088ff" />
+  <a href="https://github.com/Acogero/xiaozhi-brasil-esp32-server-java/pulls">
+    <img alt="GitHub pull requests" src="https://img.shields.io/github/issues-pr/Acogero/xiaozhi-brasil-esp32-server-java?color=0088ff" />
   </a>
-  <a href="https://github.com/joey-zhou/xiaozhi-esp32-server-java/pulls">
-    <img alt="GitHub pull requests" src="https://img.shields.io/github/issues-pr/joey-zhou/xiaozhi-esp32-server-java?color=0088ff" />
-  </a>
-  <a href="https://github.com/joey-zhou/xiaozhi-esp32-server-java/blob/main/LICENSE">
+  <a href="https://github.com/Acogero/xiaozhi-brasil-esp32-server-java/blob/main/LICENSE">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-white?labelColor=black" />
   </a>
-  <a href="https://github.com/joey-zhou/xiaozhi-esp32-server-java">
-    <img alt="stars" src="https://img.shields.io/github/stars/joey-zhou/xiaozhi-esp32-server-java?color=ffcb47&labelColor=black" />
+  <a href="https://github.com/Acogero/xiaozhi-brasil-esp32-server-java">
+    <img alt="stars" src="https://img.shields.io/github/stars/Acogero/xiaozhi-brasil-esp32-server-java?color=ffcb47&labelColor=black" />
   </a>
 </p>
 
 <p align="center">
-  <b>如果这个项目对您有帮助，请考虑给它一个 ⭐ Star！</b><br/>
-  您的支持是我们持续改进的动力！
+  <b>Se este projeto te ajudou, considere dar uma ⭐ Star!</b><br/>
+  Seu apoio é o que nos motiva a continuar melhorando!
 </p>
 
 ---
 
-## 项目简介
+## Sobre o projeto
 
-Xiaozhi ESP32 Server Java 是基于 [Xiaozhi ESP32](https://github.com/78/xiaozhi-esp32) 项目开发的 **Java 企业级服务端**，采用多模块 + 双进程架构设计，为 ESP32 智能硬件提供完整的后端支撑和可视化管理平台。
+Este é um fork em português do **Xiaozhi ESP32 Server Java**, baseado no projeto original de [joey-zhou](https://github.com/joey-zhou/xiaozhi-esp32-server-java), que por sua vez foi desenvolvido a partir do [Xiaozhi ESP32](https://github.com/78/xiaozhi-esp32). É um **servidor Java de nível empresarial**, com arquitetura multi-módulo e de processo duplo, que oferece suporte completo de backend e uma plataforma visual de administração para hardware inteligente baseado em ESP32.
 
-### 核心亮点
+O objetivo deste fork é traduzir a documentação, adaptar o projeto ao contexto brasileiro (idioma, integrações e comunidade) e evoluir o código com melhorias pensadas para quem está começando a mexer com ESP32 e IA por aqui.
 
-- **多模块 + 双进程架构** — 管理后台与对话服务独立运行，互不影响，支持分别扩容
-- **多 AI 平台集成** — OpenAI / 智谱 / 讯飞 / Ollama / Dify / Coze，MCP 工具协议扩展
-- **语音全链路** — 本地 & 云端 STT/TTS，音色克隆，实时打断，双向流式交互
-- **WebSocket + MQTT** — 实时双向通信，服务端主动唤醒，OTA 远程升级
-- **IoT 智能家居** — 语音指令控制设备，多设备协同，Function Call 智能决策
-- **RAG 知识库** — 文档上传，智能检索增强生成，长期记忆管理
-- **全链路监控** — Token / 时延 / 设备活跃度等多维度数据可视化
-- **一键部署** — bin 脚本 / Docker Compose，Flyway 自动建表，模型自动下载
+### Destaques principais
 
-### 技术栈
+- **Arquitetura multi-módulo + processo duplo** — o painel de administração e o serviço de diálogo rodam de forma independente, sem impacto mútuo, e podem escalar separadamente
+- **Integração com múltiplas plataformas de IA** — OpenAI / Zhipu / iFlytek / Ollama / Dify / Coze, com extensão via protocolo de ferramentas MCP
+- **Pipeline completo de voz** — STT/TTS local e em nuvem, clonagem de voz, interrupção em tempo real, interação bidirecional em streaming
+- **WebSocket + MQTT** — comunicação bidirecional em tempo real, ativação remota pelo servidor, atualização OTA
+- **Casa inteligente (IoT)** — controle de dispositivos por comando de voz, coordenação entre múltiplos dispositivos, decisões inteligentes via Function Call
+- **Base de conhecimento RAG** — upload de documentos, geração aumentada por recuperação, gerenciamento de memória de longo prazo
+- **Monitoramento completo** — visualização de dados multidimensionais: tokens, latência, atividade de dispositivos, entre outros
+- **Deploy em um comando** — scripts em `bin/` ou Docker Compose, criação automática de tabelas via Flyway, download automático de modelos
 
-| 类别 | 技术选型 |
+### Stack tecnológica
+
+| Categoria | Tecnologias |
 |------|----------|
-| **后端** | Spring Boot、Spring MVC、MyBatis-Plus、Flyway、WebSocket |
-| **前端** | Vue.js、Ant Design、响应式布局 |
-| **数据层** | MySQL 8.0、Redis 7 |
-| **语音识别** | Vosk、FunASR、阿里云、腾讯云、讯飞 |
-| **语音合成** | sherpa-onnx（本地）、火山引擎、阿里云、Edge TTS |
-| **大语言模型** | OpenAI、智谱 AI、讯飞星火、Ollama、Dify、Coze |
-| **扩展能力** | MCP 工具协议、Function Call、RAG 知识库、音色克隆 |
+| **Backend** | Spring Boot, Spring MVC, MyBatis-Plus, Flyway, WebSocket |
+| **Frontend** | Vue.js, Ant Design, layout responsivo |
+| **Camada de dados** | MySQL 8.0, Redis 7 |
+| **Reconhecimento de voz** | Vosk, FunASR, Alibaba Cloud, Tencent Cloud, iFlytek |
+| **Síntese de voz** | sherpa-onnx (local), Volcano Engine, Alibaba Cloud, Edge TTS |
+| **Modelos de linguagem** | OpenAI, Zhipu AI, iFlytek Spark, Ollama, Dify, Coze |
+| **Recursos avançados** | Protocolo de ferramentas MCP, Function Call, base de conhecimento RAG, clonagem de voz |
 
 ---
 
-## 项目架构
+## Arquitetura do projeto
 
 <div align="center">
-  <img src="docs/images/architecture.png" alt="系统架构图" width="900" />
-  <p><sub>📐 架构图源文件：<a href="docs/architecture.drawio">docs/architecture.drawio</a>（可用 <a href="https://app.diagrams.net">draw.io</a> 打开编辑）</sub></p>
+  <img src="docs/images/architecture.png" alt="Diagrama de arquitetura" width="900" />
+  <p><sub>📐 Arquivo-fonte do diagrama: <a href="docs/architecture.drawio">docs/architecture.drawio</a> (pode ser aberto e editado no <a href="https://app.diagrams.net">draw.io</a>)</sub></p>
 </div>
 
-> **双进程架构**：两个独立进程共享 MySQL 和 Redis，可分别部署与扩容。
-> - `xiaozhi-server` :8091 — 管理后台，提供 REST API、用户/设备/角色管理、OTA 升级
-> - `xiaozhi-dialogue` :8092 — 对话服务，处理 WebSocket/MQTT 实时音频流、AI 对话管道
+> **Arquitetura de processo duplo**: dois processos independentes compartilham MySQL e Redis, e podem ser implantados e escalados separadamente.
+> - `xiaozhi-server` :8091 — painel de administração, expõe a API REST e gerencia usuários/dispositivos/perfis, além da atualização OTA
+> - `xiaozhi-dialogue` :8092 — serviço de diálogo, processa o fluxo de áudio em tempo real via WebSocket/MQTT e o pipeline de conversação com IA
 >
-> `dialogue` 支持横向扩展，新实例自动注册至 `server`，通过设备 OTA 实现负载均衡。
+> O `dialogue` suporta escalonamento horizontal: novas instâncias se registram automaticamente no `server`, e o balanceamento de carga é feito através da OTA dos dispositivos.
 
 ---
 
-## 适用人群
+## Para quem é este projeto
 
-- 已购买 ESP32 硬件，需要功能完善的管理平台
-- 需要企业级稳定性和扩展性
-- 个人开发者，希望快速搭建使用
-- 需要支持大量设备并发连接的场景
+- Quem já tem hardware ESP32 e precisa de uma plataforma de administração completa
+- Quem precisa de estabilidade e escalabilidade de nível empresarial
+- Desenvolvedores individuais que querem montar uma solução rapidamente
+- Cenários que exigem suporte a um grande volume de dispositivos conectados simultaneamente
 
 ---
 
-## 功能对比
+## Comparação de funcionalidades
 
-> 部分功能未开源，有需求请通过下方联系方式沟通
+> Algumas funcionalidades não são open source. Se precisar delas, entre em contato pelos canais abaixo.
 
 <div align="center">
-  <img src="docs/images/featture-comparison.png" alt="开源版 vs 商业版功能对比" width="900" />
+  <img src="docs/images/featture-comparison.png" alt="Comparação entre versão open source e versão comercial" width="900" />
 </div>
 
 ---
 
 <a id="deployment"></a>
-## 部署文档
+## Documentação de implantação
 
-### 快速开始
+### Início rápido
 
 ```bash
-git clone https://github.com/joey-zhou/xiaozhi-esp32-server-java
-cd xiaozhi-esp32-server-java
-./scripts/download_models.sh   # 下载模型和原生库（首次必须）
-bin/all.sh start               # 一键编译并启动（server + dialogue）
-bin/all.sh status              # 查看状态
+git clone https://github.com/Acogero/xiaozhi-brasil-esp32-server-java
+cd xiaozhi-brasil-esp32-server-java
+./scripts/download_models.sh   # Baixa os modelos e bibliotecas nativas (obrigatório na primeira execução)
+bin/all.sh start               # Compila e inicia tudo em um comando (server + dialogue)
+bin/all.sh status               # Verifica o status
 ```
 
-> `models/` 和 `lib/` 不在 Git 仓库中，首次部署需通过脚本下载。使用第三方 STT/TTS 可只运行 `./scripts/download_base.sh`（仅下载 VAD 模型和原生库）。
+> As pastas `models/` e `lib/` não ficam no repositório Git — é preciso baixá-las via script na primeira implantação. Se for usar STT/TTS de terceiros, basta rodar `./scripts/download_base.sh` (baixa apenas o modelo VAD e as bibliotecas nativas).
 
-### 部署方式
+### Formas de implantação
 
-| 方式 | 文档 | 说明 |
+| Método | Documentação | Observação |
 |------|------|------|
-| 源码部署（Linux） | [CentOS 部署文档](./docs/CENTOS_DEVELOPMENT.md) | 推荐生产环境 |
-| 源码部署（Windows） | [Windows 部署文档](./docs/WINDOWS_DEVELOPMENT.md) | 开发和测试 |
-| Docker | [Docker 部署文档](./docs/DOCKER.md) | 快速容器化部署 |
-| 固件编译 | [固件编译文档](./docs/FIRMWARE-BUILD.md) | ESP32 固件编译和烧录 |
+| Deploy via código-fonte (Linux) | [Documentação de deploy no CentOS](./docs/CENTOS_DEVELOPMENT.md) | Recomendado para produção |
+| Deploy via código-fonte (Windows) | [Documentação de deploy no Windows](./docs/WINDOWS_DEVELOPMENT.md) | Para desenvolvimento e testes |
+| Docker | [Documentação de deploy com Docker](./docs/DOCKER.md) | Deploy rápido em container |
+| Compilação de firmware | [Documentação de compilação do firmware](./docs/FIRMWARE-BUILD.md) | Compilação e gravação do firmware do ESP32 |
 
-成功运行后，xiaozhi-server会输出 OTA 和 xiaozhi-dialogue会输出 WebSocket 连接地址，根据固件编译文档使设备接入服务使用。
+Após rodar com sucesso, o `xiaozhi-server` exibirá o endereço de OTA e o `xiaozhi-dialogue` exibirá o endereço de conexão WebSocket; use-os no dispositivo conforme a documentação de compilação do firmware.
 
 ---
 
-## 性能测试
+## Testes de performance
 
-我们开发了专门的 WebSocket 并发测试工具 [Xiaozhi Concurrent](https://github.com/joey-zhou/xiaozhi-concurrent)，用于评估系统的性能和稳定性。测试工具支持模拟大量设备同时连接，测试完整的 WebSocket 通信流程，并生成详细的性能报告和可视化图表。
+> ℹ️ **Nota sobre a origem dos dados**: os números abaixo vêm dos testes realizados pelo projeto original em chinês, em servidores na China. Ainda não rodamos um benchmark próprio para o fork brasileiro (com infraestrutura e condições de rede locais), então trate estes valores como referência do projeto upstream, não como garantia de desempenho por aqui. Pretendemos publicar números atualizados assim que tivermos um ambiente de teste no Brasil.
 
-> 📖 测试工具的详细使用说明、安装步骤和参数配置请查看：[Xiaozhi Concurrent 仓库](https://github.com/joey-zhou/xiaozhi-concurrent)
+Foi desenvolvida uma ferramenta dedicada de teste de concorrência via WebSocket, o [Xiaozhi Concurrent](https://github.com/joey-zhou/xiaozhi-concurrent), para avaliar a performance e a estabilidade do sistema. A ferramenta simula um grande número de dispositivos conectados simultaneamente, testa o fluxo completo de comunicação via WebSocket e gera relatórios de performance detalhados, com gráficos.
 
-### 基准测试结果
+> 📖 Instruções detalhadas de uso, instalação e configuração de parâmetros da ferramenta: [repositório Xiaozhi Concurrent](https://github.com/joey-zhou/xiaozhi-concurrent)
 
-以下测试数据基于**腾讯云服务器（8核8G，100M按量付费带宽）** 环境，**100个设备、100并发连接、持续5轮** 对话测试：
+### Resultado do benchmark (dados do projeto original)
 
-#### 性能指标
+Os dados abaixo foram obtidos em um **servidor Tencent Cloud (8 vCPUs, 8 GB RAM, banda de 100 Mbps sob demanda)**, em um teste de conversação com **100 dispositivos, 100 conexões simultâneas, 5 rodadas seguidas**.
 
-| 测试项目 | 成功率 | 平均时延 | 最小值 | 最大值 | 备注 |
+#### Indicadores de performance
+
+| Item testado | Taxa de sucesso | Latência média | Mínimo | Máximo | Observação |
 |---------|-------|---------|-------|-------|------|
-| WebSocket连接 | 100% (500/500) | 0.090s | - | - | 建立连接耗时 |
-| Hello握手 | 100% (500/500) | 0.073s | - | - | 握手响应时间 |
-| 唤醒词响应 | 100% (500/500) | 0.333s | - | - | 唤醒词到音频回复 |
-| 语音识别准确率 | 100% (500/500) | - | - | - | 真实音频识别 |
-| 语音识别时延 | - | 0.988s | 0.949s | 1.255s | ASR识别耗时（包含800ms静音） |
-| 服务器处理时延 | - | 0.849s | 0.454s | 3.759s | 服务端处理耗时（LLM+TTS） |
-| 用户感知时延 | - | 1.837s | 1.433s | 4.723s | 说话结束到收到回复 |
+| Conexão WebSocket | 100% (500/500) | 0,090s | - | - | Tempo para estabelecer a conexão |
+| Handshake Hello | 100% (500/500) | 0,073s | - | - | Tempo de resposta do handshake |
+| Resposta à palavra de ativação | 100% (500/500) | 0,333s | - | - | Da palavra de ativação até a resposta em áudio |
+| Precisão do reconhecimento de voz | 100% (500/500) | - | - | - | Reconhecimento com áudio real |
+| Latência do reconhecimento de voz | - | 0,988s | 0,949s | 1,255s | Tempo de ASR (inclui 800ms de silêncio) |
+| Latência de processamento no servidor | - | 0,849s | 0,454s | 3,759s | Tempo de processamento no servidor (LLM+TTS) |
+| Latência percebida pelo usuário | - | 1,837s | 1,433s | 4,723s | Do fim da fala até o recebimento da resposta |
 
-#### 服务器资源占用
+#### Uso de recursos do servidor
 
-| 资源类型 | 空闲时 | 峰值 | 说明 |
+| Tipo de recurso | Ocioso | Pico | Observação |
 |---------|-------|------|------|
-| CPU使用率 | 0% | 80% | 8核CPU占用率 |
-| 内存占用 | 1.8G | 1.96G | JVM堆内存稳定 |
-| 网络带宽(上行) | 0 | 2200KB/s | 客户端音频上传 |
-| 网络带宽(下行) | 0 | 3300KB/s | 服务端音频下发 |
-| WebSocket连接数 | 0 | 100 | 并发活跃连接数 |
+| Uso de CPU | 0% | 80% | Uso em 8 vCPUs |
+| Uso de memória | 1,8G | 1,96G | Heap da JVM estável |
+| Banda de rede (upload) | 0 | 2200KB/s | Upload de áudio do cliente |
+| Banda de rede (download) | 0 | 3300KB/s | Envio de áudio pelo servidor |
+| Conexões WebSocket | 0 | 100 | Conexões simultâneas ativas |
 
-#### 音频传输质量
+#### Qualidade da transmissão de áudio
 
-| 指标 | 数值 | 说明 |
+| Indicador | Valor | Observação |
 |-----|------|------|
-| 音频帧平均间隔 | 58.07ms | 音频帧发送间隔 |
-| 帧延迟率 | 8.47% (4226/49918) | >65ms |
+| Intervalo médio entre frames de áudio | 58,07ms | Intervalo de envio dos frames de áudio |
+| Taxa de atraso de frames | 8,47% (4226/49918) | > 65ms |
 
-### 测试结果可视化
+### Visualização dos resultados
 
 <div align="center">
-    <img src="docs/images/xiaozhi_test.png" alt="性能测试结果" width="800" style="margin: 10px;" />
-    <p><strong>并发测试数据可视化</strong> - 时延分布与性能指标统计</p>
+    <img src="docs/images/xiaozhi_test.png" alt="Resultado dos testes de performance" width="800" style="margin: 10px;" />
+    <p><strong>Visualização dos dados de teste de concorrência</strong> - distribuição de latência e estatísticas de performance</p>
 </div>
 
 ---
 
-### 商业合作
+## Comunidade e contribuição
 
-我们接受各种项目开发，如果您有特定需求或对商业版本感兴趣，欢迎通过微信联系洽谈。
+Contribuições de qualquer forma são bem-vindas! Se você tem uma boa ideia ou encontrou um problema, participe pelos canais abaixo:
 
-<img src="./web/public/static/img/wechat.png" alt="微信" width="200" />
+- **GitHub Issues**: [abra uma issue](https://github.com/Acogero/xiaozhi-brasil-esp32-server-java/issues) para reportar bugs ou sugerir melhorias
+- **GitHub Discussions**: _(em breve — link do fórum de discussões do fork)_
+- **Discord / Telegram**: _(em breve — canal da comunidade brasileira, adicione o link aqui quando estiver criado)_
 
-## 贡献指南
-
-欢迎任何形式的贡献！如果您有好的想法或发现问题，请通过以下方式联系我们：
-
-### 微信
-
-微信群超200人无法扫码进群，可以加我微信备注 小智 我拉你进微信群
-
-<img src="./web/public/static/img/wechat.png" alt="微信" width="200" />
-
-### QQ
-
-欢迎加入我们的QQ群一起交流讨论，QQ群号：790820705
-
-<img src="./web/public/static/img/qq.png" alt="QQ群" width="200" />
+> Os grupos de WeChat e QQ do projeto original continuam ativos para a comunidade chinesa; consulte o [repositório original](https://github.com/joey-zhou/xiaozhi-esp32-server-java) caso queira participar deles.
 
 ---
 
-## 免责声明
+## Aviso legal
 
-本项目仅提供技术实现代码，不提供任何媒体内容。用户在使用相关功能时应确保拥有合法的使用权或版权许可，并遵守所在地区的版权法律法规。
+Este projeto fornece apenas a implementação técnica em código, sem disponibilizar qualquer conteúdo de mídia. Ao usar as funcionalidades relacionadas, o usuário deve garantir que possui os direitos de uso ou licenças de direitos autorais aplicáveis, e deve cumprir a legislação de direitos autorais vigente em sua região.
 
-项目中可能涉及的示例内容或资源均来自网络或由用户投稿提供，仅用于功能演示和技术测试。如有任何内容侵犯了您的权益，请立即联系我们，我们将在核实后立即采取删除等处理措施。
+Eventuais conteúdos ou recursos de exemplo presentes no projeto vêm da internet ou foram enviados por usuários, e servem apenas para demonstração de funcionalidades e testes técnicos. Se algum conteúdo violar seus direitos, entre em contato imediatamente — o material será removido após a devida verificação.
 
-本项目开发者不对用户使用本项目代码获取或播放的任何内容承担法律责任。使用本项目即表示您同意自行承担使用过程中的全部法律风险和责任。
+Os desenvolvedores deste projeto não se responsabilizam legalmente por qualquer conteúdo obtido ou reproduzido pelos usuários através do código deste projeto. Ao utilizar este projeto, você concorda em assumir integralmente os riscos e responsabilidades legais decorrentes do seu uso.
 
 ---
-
-## Star History
-
-<a href="https://www.star-history.com/#joey-zhou/xiaozhi-esp32-server-java&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=joey-zhou/xiaozhi-esp32-server-java&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=joey-zhou/xiaozhi-esp32-server-java&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=joey-zhou/xiaozhi-esp32-server-java&type=Date" />
- </picture>
-</a>
