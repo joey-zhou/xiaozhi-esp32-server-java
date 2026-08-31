@@ -218,10 +218,10 @@ bin/all.sh status              # 查看状态
 
 ## Star History
 
-<a href="https://www.star-history.com/#joey-zhou/xiaozhi-esp32-server-java&Date">
+<a href="https://www.star-history.com/?repos=joey-zhou%2Fxiaozhi-esp32-server-java&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=joey-zhou/xiaozhi-esp32-server-java&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=joey-zhou/xiaozhi-esp32-server-java&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=joey-zhou/xiaozhi-esp32-server-java&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=joey-zhou/xiaozhi-esp32-server-java&type=date&theme=dark&legend=top-left&sealed_token=cpEQMSAk5IOPwigI3eiGZS8xxG4xz4bGeImmJ0L6_WH-TjV4tO7ncaHEYe83lB-I_R8NXCwdn3JnHimtlWGPEpryWJSjtc-00enTZqpbpv4kuBl9ixmm6hkGZKWnYjgvCdBetkxqSb4CoGij54KxAYaHRIAWA0zmZL-vrm1PzbtVrxnU46jg7S5T65K9" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=joey-zhou/xiaozhi-esp32-server-java&type=date&legend=top-left&sealed_token=cpEQMSAk5IOPwigI3eiGZS8xxG4xz4bGeImmJ0L6_WH-TjV4tO7ncaHEYe83lB-I_R8NXCwdn3JnHimtlWGPEpryWJSjtc-00enTZqpbpv4kuBl9ixmm6hkGZKWnYjgvCdBetkxqSb4CoGij54KxAYaHRIAWA0zmZL-vrm1PzbtVrxnU46jg7S5T65K9" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=joey-zhou/xiaozhi-esp32-server-java&type=date&legend=top-left&sealed_token=cpEQMSAk5IOPwigI3eiGZS8xxG4xz4bGeImmJ0L6_WH-TjV4tO7ncaHEYe83lB-I_R8NXCwdn3JnHimtlWGPEpryWJSjtc-00enTZqpbpv4kuBl9ixmm6hkGZKWnYjgvCdBetkxqSb4CoGij54KxAYaHRIAWA0zmZL-vrm1PzbtVrxnU46jg7S5T65K9" />
  </picture>
 </a>
