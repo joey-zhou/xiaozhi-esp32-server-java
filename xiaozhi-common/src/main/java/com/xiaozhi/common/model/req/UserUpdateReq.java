@@ -1,5 +1,6 @@
 package com.xiaozhi.common.model.req;
 
+import com.xiaozhi.common.annotation.SignedFileUrl;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
@@ -27,5 +28,6 @@ public class UserUpdateReq {
     private String name;
 
     @Schema(description = "新头像")
+    @SignedFileUrl
     private String avatar;
 }

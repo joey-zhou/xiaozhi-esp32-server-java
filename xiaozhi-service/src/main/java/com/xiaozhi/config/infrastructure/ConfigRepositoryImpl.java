@@ -52,8 +52,7 @@ public class ConfigRepositoryImpl implements ConfigRepository {
 
         var signals = config.pullSignals();
         if (signals.contains(AiConfig.DomainSignal.DEFAULT_CHANGED)) {
-            resetDefault(config.getUserId(), config.getConfigType(),
-                    config.getModelType(), config.getConfigId());
+            resetDefault(config.getConfigType(), config.getModelType(), config.getConfigId());
         }
 
         if (config.getConfigId() == null) {
@@ -84,14 +83,23 @@ public class ConfigRepositoryImpl implements ConfigRepository {
 
     // ── 私有辅助 ──────────────────────────────────────────────────────────────
 
-    private void resetDefault(Integer userId, String configType, String modelType, Integer excludeId) {
+    /**
+     * 清除同类型的其他默认配置。
+     * <p>
+     * oss/llm/tts 等均为管理员建立的全局配置（读取端 {@code getDefaultBO} 亦全局取默认），
+     * 因此默认约束是全局唯一，不按 userId 过滤——否则跨用户会残留多个默认（如种子的 admin local
+     * 存储与其他用户新建的默认并存）。
+     * <p>
+     * modelType 仅对 llm 有业务含义（chat/vision/intent/embedding 各保留一个默认）；oss/stt/tts
+     * 为单默认，即使库中存在 modelType 脏值也不应据此细分，否则会因 modelType 不匹配而漏清旧默认。
+     */
+    private void resetDefault(String configType, String modelType, Integer excludeId) {
         LambdaUpdateWrapper<ConfigDO> w = new LambdaUpdateWrapper<ConfigDO>()
-                .eq(ConfigDO::getUserId, userId)
                 .eq(ConfigDO::getConfigType, configType)
                 .eq(ConfigDO::getState, AiConfig.STATE_ENABLED)
                 .eq(ConfigDO::getIsDefault, "1")
                 .set(ConfigDO::getIsDefault, "0");
-        if (StringUtils.hasText(modelType)) {
+        if ("llm".equals(configType) && StringUtils.hasText(modelType)) {
             w.eq(ConfigDO::getModelType, modelType);
         }
         if (excludeId != null) {

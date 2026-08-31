@@ -9,7 +9,6 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.util.Assert;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -37,7 +36,10 @@ public class DialogueTurn {
     private Instant userMessageCreatedAt;
     private Instant assistantMessageCreatedAt;
     private List<DialogueContext.ToolCallInfo> toolCallDetails;
-    private Path userSpeechPath;
+    /** 用户音频持久化路径（本地相对路径或云存储完整 URL）。用原始字符串，避免 Path 破坏 URL。 */
+    private String userSpeechStoredPath;
+    /** 用户音频时长（秒），在保存音频时用本地文件算好，避免此处重复读文件（云端已删本地文件）。 */
+    private Double sttDuration;
 
     /**
      * 一轮内按时间顺序排列的工具调用链（可能为空）
@@ -52,7 +54,8 @@ public class DialogueTurn {
             UserMessage userMessage,
             ChatResponse chatResponse,
             Conversation conversation,
-            Path userSpeechPath,
+            String userSpeechStoredPath,
+            Double sttDuration,
             Instant userMessageCreatedAt,
             Instant assistantMessageCreatedAt,
             List<DialogueContext.ToolCallInfo> toolCallDetails,
@@ -65,7 +68,8 @@ public class DialogueTurn {
         this.userMessage = userMessage;
         this.chatResponse = chatResponse;
         this.conversation = conversation;
-        this.userSpeechPath = userSpeechPath;
+        this.userSpeechStoredPath = userSpeechStoredPath;
+        this.sttDuration = sttDuration;
         this.timeToFirstToken = Duration.between(userMessageCreatedAt, assistantMessageCreatedAt);
         this.userMessageCreatedAt = userMessageCreatedAt.truncatedTo(ChronoUnit.SECONDS);
         this.assistantMessageCreatedAt = assistantMessageCreatedAt.truncatedTo(ChronoUnit.SECONDS);

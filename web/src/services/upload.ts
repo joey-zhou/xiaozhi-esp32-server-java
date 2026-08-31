@@ -1,14 +1,25 @@
 import api from './api'
 import { useUserStore } from '@/store/user'
 
-export interface UploadResponse {
-  code: number
-  message: string
+export interface UploadData {
   url: string
   fileName?: string
   newFileName?: string
+  relativePath?: string
   fileHash?: string
   hash?: string
+}
+
+export interface UploadResponse extends UploadData {
+  code: number
+  message: string
+}
+
+// 后端实际返回结构：{ code, message, data: { url, ... } }
+interface UploadRawResponse {
+  code: number
+  message: string
+  data?: UploadData
 }
 
 export interface UploadOptions {
@@ -57,11 +68,17 @@ export function uploadFile(
     xhr.onload = function () {
       if (xhr.status === 200) {
         try {
-          const response: UploadResponse = JSON.parse(xhr.responseText)
-          if (response.code === 200) {
+          const raw: UploadRawResponse = JSON.parse(xhr.responseText)
+          if (raw.code === 200 && raw.data) {
+            // 将 data 展开到顶层，保持 UploadResponse 的向后兼容
+            const response: UploadResponse = {
+              code: raw.code,
+              message: raw.message,
+              ...raw.data
+            }
             resolve(options?.fullResponse ? response : response.url)
           } else {
-            reject(new Error(response.message || '上传失败'))
+            reject(new Error(raw.message || '上传失败'))
           }
         } catch (error) {
           reject(new Error('响应解析失败'))

@@ -1,5 +1,6 @@
 package com.xiaozhi.common.model.req;
 
+import com.xiaozhi.common.annotation.SignedFileUrl;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -16,6 +17,7 @@ public class RoleCreateReq {
     private String roleDesc;
 
     @Schema(description = "角色头像")
+    @SignedFileUrl
     private String avatar;
 
     @Schema(description = "语音名称")

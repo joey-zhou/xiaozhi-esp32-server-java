@@ -50,7 +50,8 @@ const formData = ref<Partial<Config>>({
   provider: undefined,
   configName: undefined,
   configDesc: undefined,
-  modelType: 'chat',
+  // modelType 仅对 llm 有意义（chat/vision/intent/embedding）；其他类型不应携带，避免写入脏值
+  modelType: props.configType === 'llm' ? 'chat' : undefined,
   isDefault: false,
   apiKey: undefined,
   apiUrl: undefined,
@@ -162,6 +163,16 @@ function handleModelTypeChange(value: string) {
 }
 
 /**
+ * apiUrl 输入框后缀提示：向量模型使用 embeddings 端点，而非 chat/completions
+ */
+function getFieldSuffix(field: ConfigField) {
+  if (field.name === 'apiUrl' && formData.value.modelType === 'embedding' && field.suffix?.endsWith('/chat/completions')) {
+    return field.suffix.replace(/\/chat\/completions$/, '/embeddings')
+  }
+  return field.suffix
+}
+
+/**
  * 处理标签页切换
  */
 function handleTabChange(key: string) {
@@ -184,6 +195,8 @@ function handleEdit(record: Config) {
   // 设置表单值，将后端的 string ('0'/'1') 转换为 boolean
   formData.value = {
     ...record,
+    // modelType 仅 llm 使用；非 llm 一律清空，避免把历史脏值再次提交
+    modelType: props.configType === 'llm' ? (record.modelType || 'chat') : undefined,
     isDefault: props.configType != 'tts' ? record.isDefault === '1' : false,
     enableThinking: !!record.enableThinking,
   }
@@ -329,7 +342,8 @@ function resetForm() {
     provider: undefined,
     configName: undefined,
     configDesc: undefined,
-    modelType: 'chat',
+    // modelType 仅对 llm 有意义，其他类型保持 undefined 不提交
+    modelType: props.configType === 'llm' ? 'chat' : undefined,
     isDefault: false,
     apiKey: undefined,
     apiUrl: undefined,
@@ -692,7 +706,7 @@ fetchData()
                       :type="field.inputType || 'text'"
                     >
                       <template v-if="field.suffix" #suffix>
-                        <span style="color: var(--ant-color-text-tertiary)">{{ field.suffix }}</span>
+                        <span style="color: var(--ant-color-text-tertiary)">{{ getFieldSuffix(field) }}</span>
                       </template>
                     </a-input>
                     <div v-if="field.help" class="field-help">

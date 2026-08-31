@@ -15,7 +15,8 @@ import lombok.extern.slf4j.Slf4j;
  * 从 sys_config（configType="oss"）读取默认 OSS 配置，按 provider 创建对应实现。
  * 无配置或配置无效时 fallback 到本地存储。
  * <p>
- * 云端客户端会被缓存复用（COS/OSS SDK 客户端均线程安全），当 provider 配置变更时自动重建。
+ * 云端客户端会被缓存复用（COS/OSS SDK 客户端均线程安全）。缓存标识由 provider + configId + updateTime
+ * 组成，因此切换 provider、切换默认配置、或修改当前配置的任意字段（ak/sk/endpoint/bucket 等）都会触发重建。
  */
 @Slf4j
 @Component
@@ -28,7 +29,7 @@ public class StorageServiceFactory {
     private LocalStorageService localStorageService;
 
     private volatile StorageService cachedCloudService;
-    private volatile String cachedProvider;
+    private volatile String cachedSignature;
 
     /**
      * 获取当前生效的存储服务
@@ -41,19 +42,20 @@ public class StorageServiceFactory {
                 return localStorageService;
             }
 
-            String provider = ossConfig.getProvider();
-            if (provider.equals(cachedProvider) && cachedCloudService != null) {
+            // 缓存标识包含 configId 与 updateTime：同 provider 下改动 ak/sk/endpoint/bucket 等字段也能触发重建
+            String signature = ossConfig.getProvider() + ":" + ossConfig.getConfigId() + ":" + ossConfig.getUpdateTime();
+            if (signature.equals(cachedSignature) && cachedCloudService != null) {
                 return cachedCloudService;
             }
 
             synchronized (this) {
-                if (provider.equals(cachedProvider) && cachedCloudService != null) {
+                if (signature.equals(cachedSignature) && cachedCloudService != null) {
                     return cachedCloudService;
                 }
                 shutdownCached();
                 cachedCloudService = createStorageService(ossConfig);
-                cachedProvider = provider;
-                log.info("存储服务已切换到: {}", provider);
+                cachedSignature = signature;
+                log.info("存储服务已切换到: {} (configId={})", ossConfig.getProvider(), ossConfig.getConfigId());
                 return cachedCloudService;
             }
         } catch (Exception e) {
@@ -78,6 +80,22 @@ public class StorageServiceFactory {
 
     private ConfigBO getDefaultOssConfig() {
         return configService.getDefaultBO("oss");
+    }
+
+    /**
+     * 清除进程内缓存的云存储客户端。
+     * <p>
+     * 供配置变更广播（{@code RedisSubscriber.onConfigChanged}）调用：OSS 默认配置切换后，
+     * 各实例需强制丢弃旧的缓存客户端，下次 {@link #getStorageService()} 重新按最新配置构建，
+     * 避免 dialogue 等独立进程继续使用切换前的存储服务。
+     */
+    public synchronized void refresh() {
+        // 先清除 default:oss 的 Redis 缓存，避免下面重建时又命中其它实例回填的旧默认配置
+        configService.evictDefaultCache("oss");
+        shutdownCached();
+        cachedCloudService = null;
+        cachedSignature = null;
+        log.info("存储服务缓存已清除，将按最新配置重建");
     }
 
     private void shutdownCached() {

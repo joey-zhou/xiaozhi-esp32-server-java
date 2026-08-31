@@ -101,6 +101,12 @@ public abstract class ChatSession {
     public Path getUserAudioPath()              { return dialogueContext.getUserAudioPath(); }
     public void setUserAudioPath(Path path)     { dialogueContext.setUserAudioPath(path); }
 
+    public String getUserAudioStoredPath()          { return dialogueContext.getUserAudioStoredPath(); }
+    public void setUserAudioStoredPath(String path) { dialogueContext.setUserAudioStoredPath(path); }
+
+    public double getSttDuration()              { return dialogueContext.getSttDuration(); }
+    public void setSttDuration(double duration) { dialogueContext.setSttDuration(duration); }
+
     public ToolsSessionHolder getToolsSessionHolder()                          { return dialogueContext.getToolsSessionHolder(); }
     public void setToolsSessionHolder(ToolsSessionHolder h)                    { dialogueContext.setToolsSessionHolder(h); }
     public List<ToolCallback> getToolCallbacks()                               { return dialogueContext.getToolCallbacks(); }

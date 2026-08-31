@@ -30,9 +30,23 @@ public class DialogueContext {
     private ToolsSessionHolder toolsSessionHolder;
 
     /**
-     * 当前对话轮次的用户音频保存路径，供 Function 复用
+     * 当前对话轮次的用户音频本地文件路径（WAV），供 Function 在本轮内即时读取。
+     * 上传云存储后本地临时文件可能已被删除。
      */
     private volatile Path userAudioPath;
+
+    /**
+     * 当前对话轮次用户音频的持久化存储路径：本地为相对路径，云存储为完整 URL。
+     * 与 {@link #userAudioPath} 区分——后者是 java.nio.file.Path（会破坏 URL 的双斜杠），
+     * 此处始终为原始字符串，用于写入 sys_message.audioPath。
+     */
+    private volatile String userAudioStoredPath;
+
+    /**
+     * 当前对话轮次用户音频时长（秒）。必须在上传云存储前用本地文件算好，
+     * 因为上传后本地文件会被删除，且云端 storedPath 无法当作本地文件读取。
+     */
+    private volatile double sttDuration = -1;
 
     /**
      * 当前对话轮次中的工具调用详情列表（包括内置Function和MCP工具）

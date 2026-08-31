@@ -307,6 +307,53 @@ public class AudioUtils {
     }
 
     /**
+     * 从字节数组读取PCM数据，按文件名/扩展名自动分派格式。
+     * <p>
+     * 用于音频来自对象存储（COS/OSS）等非本地文件的场景：先通过
+     * {@code StorageService.download(storedPath)} 拿到字节，再交给本方法，
+     * 避免把云端 URL 当本地路径 {@code Files.readAllBytes} 读取。
+     * wav/pcm 纯内存处理；mp3/opus 解码器基于文件，落一个临时文件复用现有逻辑，用完即删。
+     *
+     * @param data           音频字节
+     * @param fileNameForExt 用于判断格式的文件名或路径（仅取扩展名），如 "xxx.wav"
+     * @return PCM数据字节数组
+     */
+    public static byte[] readAsPcm(byte[] data, String fileNameForExt) throws IOException {
+        if (data == null || data.length == 0) {
+            throw new IOException("音频数据为空");
+        }
+        // 可能传入带签名参数的云存储 URL（如 xxx.wav?q-sign-algorithm=...），
+        // 需去掉查询串/锚点后再判断扩展名，否则会误判为不支持的格式
+        String forExt = fileNameForExt == null ? "" : fileNameForExt;
+        int queryIdx = forExt.indexOf('?');
+        if (queryIdx >= 0) {
+            forExt = forExt.substring(0, queryIdx);
+        }
+        int fragmentIdx = forExt.indexOf('#');
+        if (fragmentIdx >= 0) {
+            forExt = forExt.substring(0, fragmentIdx);
+        }
+        String lower = forExt.toLowerCase();
+        if (lower.endsWith(".wav")) {
+            return wavToPcm(data);
+        } else if (lower.endsWith(".pcm")) {
+            return data;
+        } else if (lower.endsWith(".mp3") || isOggOpus(lower)) {
+            // mp3/opus 解码器基于文件，落临时文件复用现有的文件版 readAsPcm
+            String suffix = lower.endsWith(".mp3") ? ".mp3" : (lower.endsWith(".opus") ? ".opus" : ".ogg");
+            Path temp = Files.createTempFile("audio-", suffix);
+            try {
+                Files.write(temp, data);
+                return readAsPcm(temp.toString());
+            } finally {
+                Files.deleteIfExists(temp);
+            }
+        } else {
+            throw new IOException("不支持的音频格式: " + fileNameForExt);
+        }
+    }
+
+    /**
      * 从文件读取PCM数据并按Opus帧大小（3840字节 = 60ms）分块返回。
      * 避免将整个音频文件作为单个byte[]持有，减少内存峰值。
      *
@@ -536,9 +583,15 @@ public class AudioUtils {
         try (FileOutputStream fos = new FileOutputStream(filePath);
              OpusFile opusFile = new OpusFile(fos, oi, ot)) {
 
-            // 写入每个Opus帧
+            // 写入每个Opus帧，并累加 granule position（Opus granule 恒为 48kHz 采样单位）。
+            // 必须设置：末页 granule 决定解码器输出的样本数（end-trim），若恒为 0，
+            // 符合规范的解码器（ffmpeg / 浏览器）会把整段音频裁掉，表现为时长 0、只放末尾或无法播放。
+            long granulePosition = 0;
             for (byte[] frame : opusFrames) {
-                opusFile.writeAudioData(new OpusAudioData(frame));
+                OpusAudioData audioData = new OpusAudioData(frame);
+                granulePosition += audioData.getNumberOfSamples();
+                audioData.setGranulePosition(granulePosition);
+                opusFile.writeAudioData(audioData);
             }
         }
     }

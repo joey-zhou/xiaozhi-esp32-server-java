@@ -52,7 +52,7 @@
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'templateContent'">
             <a-tooltip :title="record.templateContent" placement="leftTop">
-              <span>{{ record.templateContent }}</span>
+              <span class="ellipsis-text">{{ record.templateContent }}</span>
             </a-tooltip>
           </template>
 
@@ -524,6 +524,19 @@ fetchData()
 
 .search-card :deep(.ant-form-item) {
   margin-bottom: 0;
+}
+
+/* 表格文字省略样式，与角色等页面保持一致 */
+.ellipsis-text {
+  display: inline-block;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+:deep(.ant-table) .ant-table-tbody > tr > td {
+  max-width: 0;
 }
 
 .template-preview-content {

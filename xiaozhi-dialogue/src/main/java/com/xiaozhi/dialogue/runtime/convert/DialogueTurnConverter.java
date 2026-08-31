@@ -19,7 +19,6 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
-import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -78,13 +77,13 @@ public class DialogueTurnConverter {
         messageBO.setRoleId(conversation.getRoleId());
         messageBO.setMessageType(MessageBO.MESSAGE_TYPE_NORMAL);
 
-        Path userSpeechPath = turn.getUserSpeechPath();
+        String userSpeechStoredPath = turn.getUserSpeechStoredPath();
         List<DialogueContext.ToolCallInfo> toolCallDetails = turn.getToolCallDetails();
 
         switch (message.getMessageType()) {
             case USER:
-                if (userSpeechPath != null) {
-                    messageBO.setAudioPath(userSpeechPath.toString());
+                if (userSpeechStoredPath != null) {
+                    messageBO.setAudioPath(userSpeechStoredPath);
                 }
                 messageBO.setCreateTime(LocalDateTime.ofInstant(turn.getUserMessageCreatedAt(), ZoneId.systemDefault()));
                 // 从 UserMessage.metadata 抽取结构化元数据（speaker/emotion 等）写入 MessageBO.metadata

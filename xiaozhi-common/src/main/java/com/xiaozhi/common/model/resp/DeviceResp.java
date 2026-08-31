@@ -1,6 +1,7 @@
 package com.xiaozhi.common.model.resp;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.xiaozhi.common.annotation.SignedFileUrl;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -35,6 +36,7 @@ public class DeviceResp {
     private String code;
 
     @Schema(description = "音频路径")
+    @SignedFileUrl
     private String audioPath;
 
     @Schema(description = "WiFi 名称")

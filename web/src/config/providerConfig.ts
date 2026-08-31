@@ -932,9 +932,9 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
     label: 'config.stt',
     permissionPrefix: 'system:config',
     typeOptions: [
-      { label: 'Tencent', value: 'tencent', key: '0' },
+      { label: 'Tencent Cloud', value: 'tencent', key: '0' },
       {
-        label: 'Aliyun（DashScope）',
+        label: 'Aliyun (DashScope)',
         value: 'aliyun',
         key: '1',
         configNameOptions: [
@@ -952,10 +952,10 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           'qwen3-asr-flash-realtime',
         ]
       },
-      { label: 'Aliyun（NLS标准版）', value: 'aliyun-nls', key: '2' },
-      { label: 'Xfyun', value: 'xfyun', key: '3' },
+      { label: 'Aliyun (NLS)', value: 'aliyun-nls', key: '2' },
+      { label: 'XunFei', value: 'xfyun', key: '3' },
       { label: 'FunASR', value: 'funasr', key: '4' },
-      { label: 'Volcengine（doubao）', value: 'volcengine', key: '5' }
+      { label: 'VolcEngine (Doubao)', value: 'volcengine', key: '5' }
     ],
     typeFields: {
       tencent: [
@@ -1083,13 +1083,13 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
     label: 'config.tts',
     permissionPrefix: 'system:config',
     typeOptions: [
-      { label: 'Tencent', value: 'tencent', key: '0' },
-      { label: 'Aliyun', value: 'aliyun', key: '1' },
-      { label: 'Aliyun NLS', value: 'aliyun-nls', key: '2' },
-      { label: 'Volcengine(doubao)', value: 'volcengine', key: '3' },
-      { label: 'Xfyun', value: 'xfyun', key: '4' },
-      { label: 'Minimax', value: 'minimax', key: '5' },
-      { label: 'Sherpa-ONNX（本地）', value: 'sherpa-onnx', key: '6' }
+      { label: 'Tencent Cloud', value: 'tencent', key: '0' },
+      { label: 'Aliyun (DashScope)', value: 'aliyun', key: '1' },
+      { label: 'Aliyun (NLS)', value: 'aliyun-nls', key: '2' },
+      { label: 'VolcEngine (Doubao)', value: 'volcengine', key: '3' },
+      { label: 'XunFei', value: 'xfyun', key: '4' },
+      { label: 'MiniMax', value: 'minimax', key: '5' },
+      { label: 'Sherpa-ONNX', value: 'sherpa-onnx', key: '6' }
     ],
     typeFields: {
       tencent: [
@@ -1224,9 +1224,9 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
     label: 'config.oss',
     permissionPrefix: 'system:config',
     typeOptions: [
-      { label: '本地存储', value: 'local', key: '0' },
-      { label: '腾讯云 COS', value: 'tencent', key: '1' },
-      { label: '阿里云 OSS', value: 'aliyun', key: '2' }
+      { label: 'Local', value: 'local', key: '0' },
+      { label: 'Tencent Cloud (COS)', value: 'tencent', key: '1' },
+      { label: 'Aliyun (OSS)', value: 'aliyun', key: '2' }
     ],
     typeFields: {
       local: [],

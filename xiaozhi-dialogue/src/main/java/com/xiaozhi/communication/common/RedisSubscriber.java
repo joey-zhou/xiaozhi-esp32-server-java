@@ -8,6 +8,7 @@ import com.xiaozhi.ai.stt.SttServiceFactory;
 import com.xiaozhi.token.TokenService;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
+import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.utils.JsonUtil;
@@ -41,6 +42,9 @@ public class RedisSubscriber {
 
     @Resource
     private TtsServiceFactory ttsServiceFactory;
+
+    @Resource
+    private StorageServiceFactory storageServiceFactory;
 
     @Resource
     private TokenService tokenService;
@@ -166,6 +170,13 @@ public class RedisSubscriber {
             Map<String, Object> payload = JsonUtil.fromJson(message, new TypeReference<>() {});
             String configType = (String) payload.get("configType");
             Integer configId = (Integer) payload.get("configId");
+
+            // OSS 默认配置切换：清空存储工厂缓存，下次按最新配置重建（不依赖 configId 对应记录是否存在）
+            if ("oss".equals(configType)) {
+                storageServiceFactory.refresh();
+                log.info("已清除存储工厂缓存 - configType: oss, configId: {}", configId);
+                return;
+            }
 
             ConfigBO config = configService.getBO(configId);
             if (config != null) {

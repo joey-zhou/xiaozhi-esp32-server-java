@@ -1,6 +1,7 @@
 package com.xiaozhi.common.model.resp;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.xiaozhi.common.annotation.SignedFileUrl;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -26,6 +27,7 @@ public class UserResp {
     private String tel;
 
     @Schema(description = "头像")
+    @SignedFileUrl
     private String avatar;
 
     @Schema(description = "状态")

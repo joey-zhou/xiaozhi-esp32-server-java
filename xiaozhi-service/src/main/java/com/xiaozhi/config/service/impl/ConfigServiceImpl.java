@@ -113,6 +113,19 @@ public class ConfigServiceImpl implements ConfigService {
     }
 
     @Override
+    public void evictDefaultCache(String configType) {
+        if (!StringUtils.hasText(configType)) {
+            return;
+        }
+        Cache cache = cacheManager.getCache(CACHE_NAME);
+        if (cache == null) {
+            return;
+        }
+        // 清除无 modelType 的默认缓存；llm 的各 modelType 变体由各自变更时清理
+        cache.evict("default:" + configType);
+    }
+
+    @Override
     public List<ConfigBO> listBO(Integer userId, String configType, String provider, String modelType, String isDefault, String state) {
         return configMapper.selectList(buildQuery(userId, configType, provider, modelType, isDefault, state)).stream()
             .map(configConvert::toBO)

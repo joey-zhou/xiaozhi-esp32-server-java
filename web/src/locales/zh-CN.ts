@@ -905,5 +905,6 @@ export default {
     summary: '摘要',
     content: '内容',
     confirmDelete: '确定要删除该记忆吗？此操作不可恢复。',
+    needRoleAndDevice: '请先创建角色或绑定设备',
   },
 }

@@ -360,12 +360,19 @@ public class DialogueService{
         AudioUtils.saveAsWav(path, fullPcmData);
         log.debug("用户音频已保存: {}", path);
 
+        // 时长必须在上传前用本地文件算好：上传云存储后本地文件会被删除，
+        // 且云端 storedPath（完整 URL）无法当作本地文件读取。
+        session.setSttDuration(AudioUtils.getAudioDuration(path));
+
+        // 默认持久化路径为本地相对路径；上传成功则替换为云存储返回的 storedPath（可能是完整 URL）。
+        // storedPath 以原始 String 保存，不能经 Path.of 转换——否则 URL 的 "//" 会被规整成 "/"。
+        String storedPath = path.toString();
         try {
-            String storedPath = storageServiceFactory.getStorageService().upload(path, path.toString());
-            session.setUserAudioPath(Path.of(storedPath));
+            storedPath = storageServiceFactory.getStorageService().upload(path, path.toString());
         } catch (Exception e) {
             log.warn("上传用户音频失败，保留本地路径: {}", path, e);
         }
+        session.setUserAudioStoredPath(storedPath);
     }
 
 }

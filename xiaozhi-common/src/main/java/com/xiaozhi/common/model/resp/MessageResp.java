@@ -1,6 +1,7 @@
 package com.xiaozhi.common.model.resp;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.xiaozhi.common.annotation.SignedFileUrl;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -27,6 +28,7 @@ public class MessageResp {
     private String message;
 
     @Schema(description = "语音文件路径")
+    @SignedFileUrl
     private String audioPath;
 
     @Schema(description = "消息状态")

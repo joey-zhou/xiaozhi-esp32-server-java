@@ -23,7 +23,6 @@ import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Flux;
 
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +37,7 @@ import lombok.extern.slf4j.Slf4j;
  * 一是收到消息时，需要从 ChatSession 传导给到 Persona，然后 Persona 将消息传递给 ChatModel。
  * 二是发送消息时，需要从 Persona 将消息传递给 ChatSession。
  *
- * 用户音频文件 Path 通过 ChatSession.getUserAudioPath() 关联到 DialogueTurn，
+ * 用户音频的持久化路径与时长通过 ChatSession.getUserAudioStoredPath()/getSttDuration() 关联到 DialogueTurn，
  * DialogueTurn 作为 chatStream() 方法内局部变量构建（已实现）。
  *
  * 生命周期不同时间节点的几个事件：
@@ -118,8 +117,10 @@ public class Persona {
         conversation.discardIncompleteTurn();
         getSession().getDialogueContext().startTurn(turnId);
 
-        // userSpeechPath 从 session 中获取，避免参数层层穿透
-        Path userSpeechPath = getSession().getUserAudioPath();
+        // 用户音频的持久化路径与时长从 session 获取（在保存音频时已备好），避免参数层层穿透。
+        // 用 storedPath 字符串而非 Path：云存储 storedPath 是完整 URL，Path 会破坏其双斜杠。
+        String userSpeechStoredPath = getSession().getUserAudioStoredPath();
+        double sttDuration = getSession().getSttDuration();
 
         // time to first token，同时也应该是实质上的AssistantMessage createdAt 时间戳。
         // 在ChatModel生成完成时，语音合成器、播放器已经在工作了。但在第一个Token生成前，语音合成器与播放器还没有开始工作。
@@ -181,7 +182,8 @@ public class Persona {
                     .chatResponse(chatResponse)
                     .conversation(conversation)
                     .userMessageCreatedAt(now)
-                    .userSpeechPath(userSpeechPath)
+                    .userSpeechStoredPath(userSpeechStoredPath)
+                    .sttDuration(sttDuration)
                     .assistantMessageCreatedAt(ttft.get())
                     .toolCallDetails(toolCallDetails)
                     .toolChains(allChains)

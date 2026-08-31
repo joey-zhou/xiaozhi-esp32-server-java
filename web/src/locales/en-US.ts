@@ -905,5 +905,6 @@ export default {
     summary: 'Summary',
     content: 'Content',
     confirmDelete: 'Are you sure to delete this memory? This operation cannot be undone.',
+    needRoleAndDevice: 'Please create a role or bind a device first',
   },
 }

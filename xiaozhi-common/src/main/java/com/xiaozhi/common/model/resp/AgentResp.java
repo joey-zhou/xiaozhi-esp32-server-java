@@ -1,6 +1,7 @@
 package com.xiaozhi.common.model.resp;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.xiaozhi.common.annotation.SignedFileUrl;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -63,6 +64,7 @@ public class AgentResp {
     private String agentDesc;
 
     @Schema(description = "图标URL")
+    @SignedFileUrl
     private String iconUrl;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

@@ -203,6 +203,14 @@ async function handleRoleChange(roleIdValue: number) {
  * 获取记忆数据
  */
 async function fetchMemoryData() {
+  // 摘要/长期记忆按「设备+角色」存储，缺任一项会请求到 undefined/undefined，直接拦截并提示
+  if (memoryType.value !== 'chat' && (!selectedRoleId.value || !selectedDeviceId.value)) {
+    data.value = []
+    pagination.total = 0
+    antMessage.warning(t('memory.needRoleAndDevice'))
+    return
+  }
+
   const params: any = {
     pageNo: pagination.current || 1,
     pageSize: pagination.pageSize || 10,

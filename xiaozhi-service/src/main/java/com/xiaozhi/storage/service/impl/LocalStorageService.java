@@ -89,6 +89,18 @@ public class LocalStorageService implements StorageService {
     }
 
     @Override
+    public String getAccessUrl(String storedPath) {
+        // 本地存储返回相对路径，由前端拼接后端地址访问
+        return storedPath;
+    }
+
+    @Override
+    public String stripSignature(String url) {
+        // 本地路径无签名参数，原样返回
+        return url;
+    }
+
+    @Override
     public String getProvider() {
         return "local";
     }

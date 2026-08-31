@@ -125,7 +125,8 @@ public class FileUploadController {
 
         // 判断是否是完整 URL（云存储返回 https URL，本地返回相对路径）
         if (filePathOrUrl.startsWith("http://") || filePathOrUrl.startsWith("https://")) {
-            data.put("url", filePathOrUrl);
+            // 云存储私有桶下裸 URL 无法直接访问，返回带签名的临时 URL 供前端即时预览
+            data.put("url", storageService.getAccessUrl(filePathOrUrl));
         } else {
             String fullUrl = serverAddressProvider.getServerAddress() + "/" + filePathOrUrl;
             data.put("url", fullUrl);
