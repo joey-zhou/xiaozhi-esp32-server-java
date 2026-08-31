@@ -58,7 +58,25 @@ git clone https://github.com/joey-zhou/xiaozhi-esp32-server-java
 cd xiaozhi-esp32-server-java
 ```
 
-### 方式一：bin 脚本（Git Bash / WSL）
+### 方式一：PowerShell 脚本（推荐，原生 Windows）
+
+```powershell
+bin\all.ps1 start       # 编译并启动（server + dialogue）
+bin\all.ps1 status      # 查看状态
+bin\all.ps1 stop        # 停止
+bin\all.ps1 restart     # 重启
+
+# 也可单独管理
+bin\server.ps1 start
+bin\dialogue.ps1 start
+```
+
+> 首次运行如提示脚本被禁止执行，可在当前会话临时放开：
+> `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+> 或直接 `powershell -ExecutionPolicy Bypass -File bin\all.ps1 start`。
+> 脚本会优先使用 `JAVA_BIN` / `JAVA_HOME` 环境变量定位 JDK，未设置时使用 PATH 中的 `java`。
+
+### 方式二：bin 脚本（Git Bash）
 
 ```bash
 bin/all.sh start       # 编译并启动
@@ -66,17 +84,6 @@ bin/all.sh status      # 查看状态
 bin/all.sh restart     # 重启
 ```
 
-### 方式二：手动启动（CMD / PowerShell）
-
-```bash
-mvn clean install -DskipTests
-
-# 终端1：启动管理后台
-java -Djava.library.path=lib -jar xiaozhi-server\target\xiaozhi-server-*.jar
-
-# 终端2：启动对话服务
-java -Djava.library.path=lib -jar xiaozhi-dialogue\target\xiaozhi-dialogue-*-exec.jar
-```
 
 ### 前端
 
