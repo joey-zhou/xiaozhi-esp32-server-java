@@ -3,6 +3,7 @@ package com.xiaozhi.controller;
 import com.xiaozhi.device.DeviceController;
 import com.xiaozhi.common.model.req.DeviceBatchUpdateReq;
 import com.xiaozhi.common.model.req.DevicePageReq;
+import com.xiaozhi.common.model.req.DeviceScanBindReq;
 import com.xiaozhi.common.model.req.DeviceUpdateReq;
 import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
@@ -87,6 +88,39 @@ class DeviceControllerTest extends ControllerTestSupport {
             .andExpect(jsonPath("$.code").value(ResultStatus.SUCCESS))
             .andExpect(jsonPath("$.data.successCount").value(2))
             .andExpect(jsonPath("$.data.totalCount").value(2));
+    }
+
+    @Test
+    void scanBindDelegatesToAppService() throws Exception {
+        DeviceResp resp = new DeviceResp();
+        resp.setDeviceId("aa:bb:cc:dd:ee:ff");
+        when(deviceAppService.scanBind(any(DeviceScanBindReq.class), eq(7))).thenReturn(resp);
+
+        try (var ignored = mockLoginUser(7)) {
+            mockMvc.perform(post("/api/device/scan-bind")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"deviceId":"AA-BB-CC-DD-EE-FF"}
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(ResultStatus.SUCCESS))
+                .andExpect(jsonPath("$.data.deviceId").value("aa:bb:cc:dd:ee:ff"));
+        }
+
+        ArgumentCaptor<DeviceScanBindReq> captor = ArgumentCaptor.forClass(DeviceScanBindReq.class);
+        verify(deviceAppService).scanBind(captor.capture(), eq(7));
+        assertThat(captor.getValue().getDeviceId()).isEqualTo("AA-BB-CC-DD-EE-FF");
+    }
+
+    @Test
+    void scanBindReturnsBadRequestWhenDeviceIdBlank() throws Exception {
+        mockMvc.perform(post("/api/device/scan-bind")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"deviceId":""}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("设备ID不能为空"));
     }
 
     @Test

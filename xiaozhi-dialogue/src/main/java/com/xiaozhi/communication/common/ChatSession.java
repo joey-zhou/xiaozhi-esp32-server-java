@@ -24,6 +24,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,7 +54,7 @@ public abstract class ChatSession {
     /**
      * 设备服务端状态机。
      * 替代原有的 playing / musicPlaying / streamingState / inWakeupResponse 分散布尔字段。
-     * 只有 IDLE 状态才允许触发不活跃超时。
+     * IDLE 和 LISTENING 状态允许触发不活跃超时。
      */
     private volatile DeviceState deviceState = DeviceState.IDLE;
 
@@ -90,6 +91,12 @@ public abstract class ChatSession {
      */
     protected volatile Instant lastActivityTime;
 
+    /** 当前角色的会话空闲超时；0 表示不自动结束。 */
+    private volatile int inactiveTimeoutSeconds = 60;
+
+    /** 防止高频扫描重复触发告别语和关闭流程。 */
+    private final AtomicBoolean inactivityClosing = new AtomicBoolean(false);
+
     // ========== 对话层直通方法（内部委托给 dialogueContext，外部无需感知） ==========
 
     public Persona getPersona()                 { return dialogueContext.getPersona(); }
@@ -123,6 +130,14 @@ public abstract class ChatSession {
         this.sessionId = sessionId;
         this.lastActivityTime = Instant.now();
         this.dialogueContext = new DialogueContext();
+    }
+
+    public boolean tryBeginInactiveClose() {
+        return inactivityClosing.compareAndSet(false, true);
+    }
+
+    public void resetInactiveClosing() {
+        inactivityClosing.set(false);
     }
 
     public void clearAudioSinks(){

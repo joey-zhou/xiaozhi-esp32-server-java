@@ -21,6 +21,7 @@
         r.vadSpeechTh,
         r.vadSilenceTh,
         r.vadSilenceMs,
+        r.inactiveTimeoutSeconds,
         model_config.provider AS modelProvider,
         tts_config.provider AS ttsProvider,
         r.isDefault,

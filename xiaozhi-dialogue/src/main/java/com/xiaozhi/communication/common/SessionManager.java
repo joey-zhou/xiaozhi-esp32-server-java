@@ -11,7 +11,6 @@ import com.xiaozhi.event.DeviceUpdatedEvent;
 import com.xiaozhi.event.ChatSessionOpenedEvent;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.ContextClosedEvent;
@@ -65,30 +64,25 @@ public class SessionManager {
     @Resource
     private InstanceIdHolder instanceIdHolder;
 
-    @Value("${xiaozhi.check.inactive.session:true}")
-    private boolean checkInactiveSession;
-
     @PostConstruct
     public void init() {
-        if (checkInactiveSession) {
-            // 项目启动时，只重置属于本实例的设备为离线（延迟执行避免循环依赖）
-            scheduler.schedule(() -> {
-                try {
-                    Set<String> ownDeviceIds = deviceRegistry.getOwnDeviceIds();
-                    if (!ownDeviceIds.isEmpty()) {
-                        int updated = deviceRepository.batchUpdateState(ownDeviceIds, DeviceBO.DEVICE_STATE_OFFLINE);
-                        log.info("项目启动，重置本实例 {} 个设备状态为离线", updated);
-                        // 清理本实例旧的 Redis 映射
-                        for (String deviceId : ownDeviceIds) {
-                            deviceRegistry.unbind(deviceId);
-                        }
+        // 项目启动时，只重置属于本实例的设备为离线（延迟执行避免循环依赖）
+        scheduler.schedule(() -> {
+            try {
+                Set<String> ownDeviceIds = deviceRegistry.getOwnDeviceIds();
+                if (!ownDeviceIds.isEmpty()) {
+                    int updated = deviceRepository.batchUpdateState(ownDeviceIds, DeviceBO.DEVICE_STATE_OFFLINE);
+                    log.info("项目启动，重置本实例 {} 个设备状态为离线", updated);
+                    // 清理本实例旧的 Redis 映射
+                    for (String deviceId : ownDeviceIds) {
+                        deviceRegistry.unbind(deviceId);
                     }
-                    log.info("项目启动，instanceId: {}", instanceIdHolder.getInstanceId());
-                } catch (Exception e) {
-                    log.error("项目启动时重置设备状态失败", e);
                 }
-            }, 1, TimeUnit.SECONDS);
-        }
+                log.info("项目启动，instanceId: {}", instanceIdHolder.getInstanceId());
+            } catch (Exception e) {
+                log.error("项目启动时重置设备状态失败", e);
+            }
+        }, 1, TimeUnit.SECONDS);
     }
 
     public boolean isShuttingDown() {
@@ -109,6 +103,10 @@ public class SessionManager {
      * 打开音频通道并发布事件（供Handler调用）
      */
     public void openAudioChannel(String sessionId, String deviceId) {
+        ChatSession session = sessions.get(sessionId);
+        if (session != null) {
+            session.resetInactiveClosing();
+        }
         applicationContext.publishEvent(new ChatAudioOpenedEvent(this, sessionId, deviceId));
     }
 

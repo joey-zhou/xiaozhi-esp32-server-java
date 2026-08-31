@@ -21,6 +21,8 @@ import java.util.Objects;
 @Getter
 public class Role {
 
+    public static final int DEFAULT_INACTIVE_TIMEOUT_SECONDS = 60;
+
     /** 领域信号 */
     public enum DomainSignal { UPDATED }
 
@@ -34,6 +36,7 @@ public class Role {
     private String roleDesc;
     private String state;
     private boolean isDefault;
+    private int inactiveTimeoutSeconds;
 
     // --- Value objects (grouping flat DB columns) ---
     private LlmConfig llmConfig;
@@ -49,7 +52,7 @@ public class Role {
 
     /** 从持久层重建聚合根（Repository 专用） */
     public Role(Integer roleId, Integer userId, String avatar, String roleName, String roleDesc,
-                String state, boolean isDefault,
+                String state, boolean isDefault, Integer inactiveTimeoutSeconds,
                 LlmConfig llmConfig, VoiceConfig voiceConfig,
                 AudioConfig audioConfig, MemoryStrategy memoryStrategy,
                 LocalDateTime createTime, LocalDateTime updateTime) {
@@ -60,6 +63,8 @@ public class Role {
         this.roleDesc = roleDesc;
         this.state = state;
         this.isDefault = isDefault;
+        this.inactiveTimeoutSeconds = inactiveTimeoutSeconds != null
+                ? inactiveTimeoutSeconds : DEFAULT_INACTIVE_TIMEOUT_SECONDS;
         this.llmConfig = llmConfig != null ? llmConfig : LlmConfig.defaults();
         this.voiceConfig = voiceConfig != null ? voiceConfig : VoiceConfig.defaults();
         this.audioConfig = audioConfig != null ? audioConfig : AudioConfig.defaults();
@@ -72,8 +77,9 @@ public class Role {
     public static Role newRole(Integer userId, String roleName, String roleDesc, String avatar,
                                LlmConfig llmConfig, VoiceConfig voiceConfig,
                                AudioConfig audioConfig, MemoryStrategy memoryStrategy,
-                               boolean isDefault) {
+                               boolean isDefault, Integer inactiveTimeoutSeconds) {
         Role role = new Role(null, userId, avatar, roleName, roleDesc, "1", isDefault,
+                inactiveTimeoutSeconds,
                 llmConfig, voiceConfig, audioConfig, memoryStrategy,
                 null, null);
         role.signals.add(DomainSignal.UPDATED);
@@ -97,7 +103,7 @@ public class Role {
     public void update(String roleName, String roleDesc, String avatar,
                        LlmConfig llmConfig, VoiceConfig voiceConfig,
                        AudioConfig audioConfig, MemoryStrategy memoryStrategy,
-                       Boolean isDefault) {
+                       Boolean isDefault, Integer inactiveTimeoutSeconds) {
         if (roleName != null && !roleName.isBlank()) this.roleName = roleName;
         if (roleDesc != null) this.roleDesc = roleDesc;
         if (avatar != null) this.avatar = avatar;
@@ -106,6 +112,7 @@ public class Role {
         if (audioConfig != null) this.audioConfig = audioConfig;
         if (memoryStrategy != null) this.memoryStrategy = memoryStrategy;
         if (isDefault != null) this.isDefault = isDefault;
+        if (inactiveTimeoutSeconds != null) this.inactiveTimeoutSeconds = inactiveTimeoutSeconds;
         signals.add(DomainSignal.UPDATED);
     }
 

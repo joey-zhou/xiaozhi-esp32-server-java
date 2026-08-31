@@ -32,6 +32,8 @@ public interface DeviceMapper extends BaseMapper<DeviceDO> {
                          @Param("type") String type,
                          @Param("code") String code);
 
+    int deleteVerifyCodeByDeviceId(@Param("deviceId") String deviceId);
+
     int updateCodeAudioPath(@Param("deviceId") String deviceId,
                             @Param("sessionId") String sessionId,
                             @Param("code") String code,

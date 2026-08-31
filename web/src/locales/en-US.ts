@@ -473,6 +473,12 @@ export default {
     deleteRoleFailed: 'Delete failed',
     createRoleSuccess: 'Create successful',
     updateRoleSuccess: 'Update successful',
+    sessionSettings: 'Session Settings',
+    inactiveAutoEnd: 'End Idle Sessions',
+    inactiveAutoEndTip: 'Play a goodbye message and end the session after a period of inactivity',
+    inactiveDuration: 'Idle Duration',
+    inactiveDurationRange: 'Enter a duration from 10 to 3600 seconds',
+    seconds: 'seconds',
     checkForm: 'Please check if the form is filled correctly',
     
     // Voice test related

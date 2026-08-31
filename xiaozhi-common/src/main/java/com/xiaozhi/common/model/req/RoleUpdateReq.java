@@ -2,6 +2,8 @@ package com.xiaozhi.common.model.req;
 
 import com.xiaozhi.common.annotation.SignedFileUrl;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.Data;
 
 @Data
@@ -56,6 +58,11 @@ public class RoleUpdateReq {
 
     @Schema(description = "语音活动检测-静音毫秒数")
     private Integer vadSilenceMs;
+
+    @Schema(description = "会话空闲自动结束秒数，0表示关闭")
+    @Min(value = 0, message = "会话空闲时长不能小于0秒")
+    @Max(value = 3600, message = "会话空闲时长不能超过3600秒")
+    private Integer inactiveTimeoutSeconds;
 
     @Schema(description = "是否默认角色(1是 0否)")
     private String isDefault;

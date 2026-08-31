@@ -66,6 +66,9 @@ public class RoleResp {
     @Schema(description = "语音活动检测-静音毫秒数")
     private Integer vadSilenceMs;
 
+    @Schema(description = "会话空闲自动结束秒数，0表示关闭")
+    private Integer inactiveTimeoutSeconds;
+
     @Schema(description = "模型提供商")
     private String modelProvider;
 

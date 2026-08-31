@@ -77,6 +77,12 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     }
 
     @Override
+    public void invalidateVerifyCodes(String deviceId) {
+        if (deviceId == null || deviceId.isBlank()) return;
+        deviceMapper.deleteVerifyCodeByDeviceId(deviceId);
+    }
+
+    @Override
     @Transactional
     public void save(Device device) {
         DeviceDO dataObject = deviceConverter.toDataObject(device);

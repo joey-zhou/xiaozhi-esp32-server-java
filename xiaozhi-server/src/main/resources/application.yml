@@ -125,9 +125,6 @@ xiaozhi:
   vad:
     model:
       path: models/silero_vad.onnx
-  check:
-    inactive:
-      session: true
 
 # ============================================================
 # SpringDoc OpenAPI 配置

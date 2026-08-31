@@ -87,9 +87,6 @@ xiaozhi:
   vad:
     model:
       path: models/silero_vad.onnx
-  check:
-    inactive:
-      session: true
 
 # ============================================================
 # Sa-Token（仅用于 @SaIgnore 和无状态接口校验，token 验证依赖 Redis）

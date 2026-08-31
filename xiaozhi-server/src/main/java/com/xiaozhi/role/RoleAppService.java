@@ -52,7 +52,8 @@ public class RoleAppService {
                 new VoiceConfig(req.getTtsId(), req.getSttId(), req.getVoiceName(), req.getTtsPitch(), req.getTtsSpeed()),
                 new AudioConfig(req.getVadEnergyTh(), req.getVadSpeechTh(), req.getVadSilenceTh(), req.getVadSilenceMs()),
                 new MemoryStrategy(req.getMemoryType()),
-                "1".equals(req.getIsDefault()));
+                "1".equals(req.getIsDefault()),
+                req.getInactiveTimeoutSeconds());
         roleRepository.save(role);
 
         RoleBO created = roleService.getBO(role.getRoleId());
@@ -70,7 +71,8 @@ public class RoleAppService {
                 new VoiceConfig(req.getTtsId(), req.getSttId(), req.getVoiceName(), req.getTtsPitch(), req.getTtsSpeed()),
                 new AudioConfig(req.getVadEnergyTh(), req.getVadSpeechTh(), req.getVadSilenceTh(), req.getVadSilenceMs()),
                 new MemoryStrategy(req.getMemoryType()),
-                req.getIsDefault() == null ? null : "1".equals(req.getIsDefault()));
+                req.getIsDefault() == null ? null : "1".equals(req.getIsDefault()),
+                req.getInactiveTimeoutSeconds());
         roleRepository.save(role);
 
         RoleBO updated = roleService.getBO(roleId);

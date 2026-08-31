@@ -475,6 +475,12 @@ export default {
     deleteRoleFailed: '删除失败',
     createRoleSuccess: '创建成功',
     updateRoleSuccess: '更新成功',
+    sessionSettings: '会话设置',
+    inactiveAutoEnd: '空闲自动结束',
+    inactiveAutoEndTip: '设备长时间无交互时播放告别语并结束当前会话',
+    inactiveDuration: '空闲时长',
+    inactiveDurationRange: '空闲时长请输入 10 到 3600 秒',
+    seconds: '秒',
     checkForm: '请检查表单填写是否正确',
     
     // 音色测试相关

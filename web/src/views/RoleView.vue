@@ -78,6 +78,7 @@ const formData = reactive<RoleFormData>({
   vadSilenceTh: 0.3,
   vadEnergyTh: 0.01,
   vadSilenceMs: 1200,
+  inactiveTimeoutSeconds: 60,
   voiceName: undefined,
   ttsId: undefined,
   gender: '',
@@ -89,6 +90,18 @@ const formData = reactive<RoleFormData>({
 // 编辑状态
 const editingRoleId = ref<number>()
 const submitLoading = ref(false)
+const lastInactiveTimeoutSeconds = ref(60)
+const inactiveTimeoutEnabled = computed({
+  get: () => formData.inactiveTimeoutSeconds > 0,
+  set: (enabled: boolean) => {
+    if (enabled) {
+      formData.inactiveTimeoutSeconds = lastInactiveTimeoutSeconds.value
+    } else {
+      lastInactiveTimeoutSeconds.value = formData.inactiveTimeoutSeconds || 60
+      formData.inactiveTimeoutSeconds = 0
+    }
+  }
+})
 
 // 头像上传
 const avatarUrl = ref('')
@@ -254,6 +267,7 @@ const handleEdit = (record: Role) => {
       vadSilenceTh: record.vadSilenceTh ?? 0.3,
       vadEnergyTh: record.vadEnergyTh ?? 0.01,
       vadSilenceMs: record.vadSilenceMs ?? 1200,
+      inactiveTimeoutSeconds: record.inactiveTimeoutSeconds ?? 60,
       voiceName: record.voiceName || '',
       ttsId: voiceInfo?.ttsId,
       gender: voiceInfo?.gender || '',
@@ -261,6 +275,9 @@ const handleEdit = (record: Role) => {
       ttsSpeed: record.ttsSpeed ?? 1.0,
       memoryType: record.memoryType || 'window'
     })
+    lastInactiveTimeoutSeconds.value = record.inactiveTimeoutSeconds && record.inactiveTimeoutSeconds > 0
+      ? record.inactiveTimeoutSeconds
+      : 60
 
     // 加载 MCP 工具列表
     loadAllMcpTools()
@@ -418,6 +435,7 @@ const resetForm = () => {
     vadSilenceTh: 0.3,
     vadEnergyTh: 0.01,
     vadSilenceMs: 1200,
+    inactiveTimeoutSeconds: 60,
     voiceName: undefined,
     ttsId: undefined,
     gender: '',
@@ -425,6 +443,7 @@ const resetForm = () => {
     ttsSpeed: 1.0,
     memoryType: 'window'
   })
+  lastInactiveTimeoutSeconds.value = 60
 }
 
 // 模型类型变化
@@ -1033,6 +1052,39 @@ if (!editingRoleId.value) {
                   <span style="margin-left: 8px; color: var(--ant-color-text-tertiary)">
                     {{ t('role.defaultRoleTip') }}
                   </span>
+                </a-form-item>
+              </a-col>
+            </a-row>
+
+            <!-- 会话设置 -->
+            <a-divider orientation="left">{{ t('role.sessionSettings') }}</a-divider>
+
+            <a-row :gutter="20">
+              <a-col :span="24">
+                <a-form-item :label="t('role.inactiveAutoEnd')">
+                  <a-switch v-model:checked="inactiveTimeoutEnabled" />
+                  <span style="margin-left: 8px; color: var(--ant-color-text-tertiary)">
+                    {{ t('role.inactiveAutoEndTip') }}
+                  </span>
+                </a-form-item>
+              </a-col>
+
+              <a-col :xl="8" :lg="12" :xs="24">
+                <a-form-item
+                  :label="t('role.inactiveDuration')"
+                  name="inactiveTimeoutSeconds"
+                  :rules="inactiveTimeoutEnabled ? [{ type: 'number', min: 10, max: 3600, message: t('role.inactiveDurationRange') }] : []"
+                >
+                  <a-input-number
+                    v-model:value="formData.inactiveTimeoutSeconds"
+                    :disabled="!inactiveTimeoutEnabled"
+                    :min="10"
+                    :max="3600"
+                    :step="10"
+                    style="width: 100%"
+                  >
+                    <template #addonAfter>{{ t('role.seconds') }}</template>
+                  </a-input-number>
                 </a-form-item>
               </a-col>
             </a-row>

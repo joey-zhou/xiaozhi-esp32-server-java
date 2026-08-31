@@ -23,6 +23,7 @@ import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.DeviceBatchUpdateReq;
 import com.xiaozhi.common.model.req.DeviceCreateReq;
 import com.xiaozhi.common.model.req.DevicePageReq;
+import com.xiaozhi.common.model.req.DeviceScanBindReq;
 import com.xiaozhi.common.model.req.DeviceUpdateReq;
 import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
@@ -92,6 +93,18 @@ public class DeviceController extends BaseController {
     @Operation(summary = "添加设备", description = "使用设备验证码添加设备到当前用户账户")
     public ApiResponse<DeviceResp> create(@Valid @RequestBody DeviceCreateReq param) {
         return ApiResponse.success(deviceAppService.create(param, StpUtil.getLoginIdAsInt()));
+    }
+
+    /**
+     * 扫码绑定设备
+     */
+    @PostMapping("/scan-bind")
+    @ResponseBody
+    @SaCheckPermission("system:device:api:create")
+    @AuditLog(module = "设备管理", operation = "扫码绑定设备")
+    @Operation(summary = "扫码绑定设备", description = "使用设备二维码中的设备ID（MAC地址）绑定设备到当前用户账户，要求设备近期在线")
+    public ApiResponse<DeviceResp> scanBind(@Valid @RequestBody DeviceScanBindReq param) {
+        return ApiResponse.success(deviceAppService.scanBind(param, StpUtil.getLoginIdAsInt()));
     }
 
     /**

@@ -2,6 +2,7 @@ package com.xiaozhi.communication.common;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.xiaozhi.common.model.bo.DeviceBO;
+import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.ai.stt.SttServiceFactory;
@@ -10,6 +11,7 @@ import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.config.service.ConfigService;
+import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
@@ -58,6 +60,9 @@ public class RedisSubscriber {
     @Resource
     private PersonaFactory personaFactory;
 
+    @Resource
+    private RoleService roleService;
+
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
@@ -100,6 +105,11 @@ public class RedisSubscriber {
             if (freshDevice != null) {
                 freshDevice.setSessionId(session.getSessionId());
                 session.setDevice(freshDevice);
+                RoleBO role = roleService.getBO(freshDevice.getRoleId());
+                if (role != null) {
+                    session.setInactiveTimeoutSeconds(role.getInactiveTimeoutSeconds() != null
+                            ? role.getInactiveTimeoutSeconds() : 60);
+                }
             }
             Persona persona = session.getPersona();
             if (persona != null) {
@@ -116,10 +126,15 @@ public class RedisSubscriber {
     public void onRoleUpdated(String message) {
         try {
             Integer roleId = Integer.parseInt(message.trim());
+            RoleBO updatedRole = roleService.getBO(roleId);
             int count = 0;
             for (ChatSession session : sessionManager.getAllSessions()) {
                 DeviceBO device = session.getDevice();
                 if (device != null && roleId.equals(device.getRoleId())) {
+                    if (updatedRole != null) {
+                        session.setInactiveTimeoutSeconds(updatedRole.getInactiveTimeoutSeconds() != null
+                                ? updatedRole.getInactiveTimeoutSeconds() : 60);
+                    }
                     Persona persona = session.getPersona();
                     if (persona != null) {
                         persona.getConversation().clear();

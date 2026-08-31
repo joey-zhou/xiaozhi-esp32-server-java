@@ -100,6 +100,11 @@
         VALUES (#{deviceId}, #{sessionId}, #{type}, #{code}, NOW())
     </insert>
 
+    <delete id="deleteVerifyCodeByDeviceId">
+        DELETE FROM sys_code
+        WHERE deviceId = #{deviceId}
+    </delete>
+
     <update id="updateCodeAudioPath">
         UPDATE sys_code
         SET audioPath = #{audioPath}

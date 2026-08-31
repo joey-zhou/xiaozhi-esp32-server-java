@@ -17,6 +17,9 @@ public interface DeviceRepository {
     /** 按验证码查询（设备激活场景） */
     Optional<VerifyCode> findVerifyCode(String code, String deviceId, String sessionId);
 
+    /** 作废设备的全部验证码（绑定成功后调用，避免残留） */
+    void invalidateVerifyCodes(String deviceId);
+
     /**
      * 持久化聚合根（新建或更新）。
      * <p>实现类需在保存完成后调用 {@link Device#pullSignals()} 并发布对应 ApplicationEvent。

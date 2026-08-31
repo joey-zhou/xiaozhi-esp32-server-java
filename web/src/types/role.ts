@@ -35,6 +35,7 @@ export interface Role {
   vadSpeechTh?: number
   vadSilenceTh?: number
   vadSilenceMs?: number
+  inactiveTimeoutSeconds?: number
   modelProvider?: string
   ttsProvider?: string
   isDefault?: string | number // 服务器返回字符串 '1' 或 '0'，前端可能转为数字
@@ -101,6 +102,7 @@ export interface RoleFormData {
   vadSilenceTh?: number
   vadEnergyTh?: number
   vadSilenceMs?: number
+  inactiveTimeoutSeconds: number
   // 语音合成相关
   voiceName?: string
   ttsId?: number

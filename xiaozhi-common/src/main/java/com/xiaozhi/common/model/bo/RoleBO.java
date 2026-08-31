@@ -23,6 +23,7 @@ public class RoleBO {
     private Float vadSpeechTh;
     private Float vadSilenceTh;
     private Integer vadSilenceMs;
+    private Integer inactiveTimeoutSeconds = 60;
     private String isDefault;
     private String memoryType;
 }
