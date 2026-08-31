@@ -62,8 +62,8 @@ public class AecService {
             // 否则会击穿到调用方（连接建立流程）导致设备无法连接。
             // 这里降级：标记 native 不可用，后续不再尝试，AEC 静默关闭但不影响连接与对话。
             nativeUnavailable = true;
-            log.error("AEC native 库初始化失败，已降级关闭回声消除（不影响设备连接与对话）。" +
-                    "常见原因：打包平台与运行平台不匹配，webrtc-java native 库缺失。SessionId: {}", sessionId, t);
+            log.warn("AEC native 库初始化失败，已降级关闭回声消除（不影响设备连接与对话）。" +
+                    "可能原因：webrtc-java native 库缺失。详见异常堆栈定位具体原因。SessionId: {}", sessionId, t);
         }
     }
 
