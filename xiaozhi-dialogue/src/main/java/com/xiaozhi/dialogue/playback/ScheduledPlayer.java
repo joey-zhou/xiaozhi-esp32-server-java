@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import lombok.extern.slf4j.Slf4j;
@@ -79,6 +80,12 @@ public class ScheduledPlayer extends Player {
     private volatile boolean running = false;
     private Thread senderThread;
 
+    // 播放代次。每次 stop()（打断/清理）递增，使此前订阅的 Flux 回调失效。
+    // Player 是 session 级复用，打断后可能立即起新一轮对话；而上一轮的 TTS
+    // WebSocket 回调线程可能慢一拍仍在往队列 add 残帧，若不隔离会串进新一轮播放。
+    // subscribe() 捕获当轮代次，回调入队前校验代次未变，变了则丢弃残帧。
+    private final AtomicInteger generation = new AtomicInteger(0);
+
     public ScheduledPlayer(ChatSession session, MessageSender messageService) {
         super(session, messageService);
     }
@@ -116,6 +123,10 @@ public class ScheduledPlayer extends Player {
     private void subscribe(Flux<Speech> speechFlux) {
         Assert.notNull(speechFlux, "speechFlux 不能为空");
 
+        // 捕获当轮播放代次。若在本 Flux 存活期间发生过 stop()（打断），代次会递增，
+        // 此后本订阅的所有回调都属于"已作废的上一轮"，必须丢弃，避免残帧串入新一轮。
+        final int myGeneration = generation.get();
+
         // 当某句话的第一个PCM块太小、不足一个Opus帧时，文本暂存在此，等下一帧产生时再附加。
         // 使用局部变量而非类字段，每次subscribe()独立，subscribeNext()时自动重置，避免跨句污染。
         AtomicReference<String> pendingText = new AtomicReference<>(null);
@@ -126,6 +137,10 @@ public class ScheduledPlayer extends Player {
         Disposable disposable = speechFlux.subscribeOn(Schedulers.boundedElastic())
                 .subscribe(
                     speech -> {
+                        // 代次已变（本轮已被 stop 打断）：丢弃残帧，不再入队
+                        if (myGeneration != generation.get()) {
+                            return;
+                        }
                         // 更新活跃时间
                         session.setLastActivityTime(Instant.now());
 
@@ -188,10 +203,18 @@ public class ScheduledPlayer extends Player {
                     },
                     throwable -> {
                         log.error("TTS模型生成输出内容时发生错误：{}", throwable.getMessage());
+                        // 代次已变：本轮已作废，不再推进队列
+                        if (myGeneration != generation.get()) {
+                            return;
+                        }
                         // 当前TTS抛出异常，尝试订阅下一个Flux
                         subscribeNext();
                     },
                     () -> {
+                        // 代次已变（本轮已被 stop 打断）：丢弃收尾数据，也不订阅下一个 Flux
+                        if (myGeneration != generation.get()) {
+                            return;
+                        }
                         // 当前Flux完成，flush剩余数据
                         List<byte[]> opusFrames = opusProcessor.flushLeftover();
                         if (!CollectionUtils.isEmpty(opusFrames)) {
@@ -372,6 +395,11 @@ public class ScheduledPlayer extends Player {
     public void stop() {
         super.stop();
         running = false;
+
+        // 先递增代次：让此前订阅的 Flux 回调（可能仍在 TTS 回调线程上飞）立即失效，
+        // 之后它们的 add/addAll 会被 subscribe() 内的代次校验拦截，不会再污染队列。
+        // 必须在 clear() 之前递增，否则存在"clear 完成→慢回调 add 残帧→新一轮开始"的窗口。
+        generation.incrementAndGet();
 
         // 中断发送线程
         if (senderThread != null) {

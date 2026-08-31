@@ -36,6 +36,11 @@ public class SentenceHelper implements ChatConverter {
     // 换行符
     private static final Pattern NEWLINE_PATTERN = Pattern.compile("[\n\r]");
 
+    // 句末收尾符号（右引号、右括号等）。当它们紧跟在句末标点(。！？)后面时，
+    // 应当并入当前句一起收尾，而不是被甩到下一句开头，避免字幕引号错位、
+    // 以及把不闭合的引号送给TTS导致其误判"半句未结束"。
+    private static final Pattern CLOSING_MARK_PATTERN = Pattern.compile("[”’\"'）)】」』》〉〕｝\\]]");
+
     // 数字模式（用于检测小数点是否在数字中）
     private static final Pattern NUMBER_PATTERN = Pattern.compile("\\d+\\.\\d+");
 
@@ -47,6 +52,11 @@ public class SentenceHelper implements ChatConverter {
 
     private final StringBuilder currentSentence = new StringBuilder();
     private final StringBuilder contextBuffer = new StringBuilder();
+
+    // 遇到句末标点(。！？)后暂不立即切句，先等待下一个字符：
+    // 若为右引号/右括号则并入本句再切，否则在句末标点处切句。
+    // 该状态跨 take(token) 调用保持，因收尾符号可能在下一个 token 才到达。
+    private boolean awaitingClosing = false;
 
     public SentenceHelper() {
     }
@@ -65,12 +75,23 @@ public class SentenceHelper implements ChatConverter {
             int codePoint = token.codePointAt(i);
             String charStr = new String(Character.toChars(codePoint));
 
-            contextBuffer.append(charStr);
-            if (contextBuffer.length() > CONTEXT_BUFFER_MAX_LENGTH) {
-                contextBuffer.delete(0, contextBuffer.length() - CONTEXT_BUFFER_MAX_LENGTH);
+            // 处理"等待收尾符号"状态：上一字符是句末标点(。！？)并已触发切句，
+            // 此处根据当前字符决定右引号/右括号是否并入本句。
+            if (awaitingClosing) {
+                awaitingClosing = false;
+                if (CLOSING_MARK_PATTERN.matcher(charStr).find()) {
+                    // 收尾符号并入本句后一起切出，避免引号被甩到下一句开头
+                    appendToBuffers(charStr);
+                    flushSentence(sentences);
+                    i += Character.charCount(codePoint);
+                    continue;
+                } else {
+                    // 当前字符不是收尾符号：先把已累计的句子切出，再照常处理当前字符
+                    flushSentence(sentences);
+                }
             }
 
-            currentSentence.append(charStr);
+            appendToBuffers(charStr);
 
             boolean isEndMark = SENTENCE_END_PATTERN.matcher(charStr).find();
             boolean isPauseMark = PAUSE_PATTERN.matcher(charStr).find();
@@ -100,13 +121,12 @@ public class SentenceHelper implements ChatConverter {
             }
 
             if (shouldSendSentence && currentSentence.length() >= MIN_SENTENCE_LENGTH) {
-                String rawSentence = currentSentence.toString().trim();
-                List<String> moods = new ArrayList<>();
-                String cleanSentence = EmojiUtils.processSentence(rawSentence, moods);
-                if (containsSubstantialContent(cleanSentence)) {
-                    String mood = moods.isEmpty() ? null : moods.get(0);
-                    sentences.add(new SentenceResult(cleanSentence, mood));
-                    currentSentence.setLength(0);
+                // 句末标点触发的切句延后一格：等待下一字符，若为右引号/右括号则并入本句。
+                // 换行/停顿/表情等触发的切句无需等待收尾符号，直接切出。
+                if (isEndMark) {
+                    awaitingClosing = true;
+                } else {
+                    flushSentence(sentences);
                 }
             }
 
@@ -114,6 +134,35 @@ public class SentenceHelper implements ChatConverter {
         }
 
         return sentences;
+    }
+
+    /**
+     * 将字符同时追加到上下文缓冲和当前句缓冲，并维护上下文缓冲的最大长度。
+     */
+    private void appendToBuffers(String charStr) {
+        contextBuffer.append(charStr);
+        if (contextBuffer.length() > CONTEXT_BUFFER_MAX_LENGTH) {
+            contextBuffer.delete(0, contextBuffer.length() - CONTEXT_BUFFER_MAX_LENGTH);
+        }
+        currentSentence.append(charStr);
+    }
+
+    /**
+     * 将当前累计的句子过滤表情后切出并加入结果列表。
+     * 仅当过滤后仍有实质内容时才切出并清空当前句缓冲，否则保留继续累计。
+     */
+    private void flushSentence(List<SentenceResult> sentences) {
+        if (currentSentence.length() == 0) {
+            return;
+        }
+        String rawSentence = currentSentence.toString().trim();
+        List<String> moods = new ArrayList<>();
+        String cleanSentence = EmojiUtils.processSentence(rawSentence, moods);
+        if (containsSubstantialContent(cleanSentence)) {
+            String mood = moods.isEmpty() ? null : moods.get(0);
+            sentences.add(new SentenceResult(cleanSentence, mood));
+            currentSentence.setLength(0);
+        }
     }
 
     /**
