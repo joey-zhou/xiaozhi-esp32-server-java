@@ -4,6 +4,7 @@ import com.xiaozhi.device.DeviceController;
 import com.xiaozhi.common.model.req.DeviceBatchUpdateReq;
 import com.xiaozhi.common.model.req.DevicePageReq;
 import com.xiaozhi.common.model.req.DeviceUpdateReq;
+import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.common.model.resp.PageResp;
 import com.xiaozhi.common.web.ResultStatus;
@@ -116,6 +117,32 @@ class DeviceControllerTest extends ControllerTestSupport {
                 .content("{}"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error").value("设备ID不正确"));
+    }
+
+    @Test
+    void otaParsesEg800akDeviceInfo() throws Exception {
+        when(deviceAppService.handleOta(any())).thenReturn(Map.of(
+            "firmware", Map.of("url", "https://example.test/eg800ak.bin", "version", "2.4.0")
+        ));
+
+        mockMvc.perform(post("/api/device/ota")
+                .header("Device-Id", "aa:bb:cc:dd:ee:ff")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "chip_model_name": "ASR1605",
+                      "application": {"version": "2.3.0"},
+                      "board": {"type": "EG800AK"}
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.firmware.version").value("2.4.0"));
+
+        ArgumentCaptor<OtaReq> captor = ArgumentCaptor.forClass(OtaReq.class);
+        verify(deviceAppService).handleOta(captor.capture());
+        assertThat(captor.getValue().getChipModelName()).isEqualTo("ASR1605");
+        assertThat(captor.getValue().getVersion()).isEqualTo("2.3.0");
+        assertThat(captor.getValue().getType()).isEqualTo("EG800AK");
     }
 
     @Test
