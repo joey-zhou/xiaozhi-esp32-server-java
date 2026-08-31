@@ -139,6 +139,27 @@ public class ScheduledPlayer extends Player {
                         byte[] pcmData = speech.getOutput();
                         String text = speech.getText();
 
+                        // 句子边界对齐：带文本表示新句开始。先把上一句残留在编码器里的
+                        // 不足一帧的 PCM flush 成独立帧，避免上一句尾音与本句首帧 PCM 拼接，
+                        // 导致本句文本被绑定到混有上一句尾音的帧上（字幕相对音频提前、末句字幕丢失）。
+                        if (StringUtils.hasText(text)) {
+                            List<byte[]> tailFrames = opusProcessor.flushLeftover();
+                            if (!CollectionUtils.isEmpty(tailFrames)) {
+                                // 上一句的收尾帧不带文本，归属上一句
+                                String carriedText = pendingText.getAndSet(null);
+                                List<Speech> tailList = tailFrames.stream()
+                                        .map(Speech::new)
+                                        .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+                                // 若上一句因首帧 PCM 过小而暂存了文本却一直没凑够帧，
+                                // 此刻补绑到其收尾帧，避免上一句字幕彻底丢失
+                                if (StringUtils.hasText(carriedText)) {
+                                    Speech firstTail = tailList.remove(0);
+                                    tailList.add(0, new Speech(firstTail.getOutput(), carriedText));
+                                }
+                                allOpusFrames.addAll(tailList);
+                            }
+                        }
+
                         // 当前帧无文本，尝试取上次因PCM不足一帧而未能附加的文本
                         if (!StringUtils.hasText(text)) {
                             text = pendingText.getAndSet(null);

@@ -1,6 +1,6 @@
 # 忽略编译和构建目录
 target/
-lib/
+/lib/
 /com/
 usr/
 node_modules/
@@ -12,9 +12,9 @@ avatar/
 /uploads/
 /audio/
 /data/
-models/
+/models/
 *.zip
-*.log
+/logs/
 *.tmp
 *.swp
 *.swo
