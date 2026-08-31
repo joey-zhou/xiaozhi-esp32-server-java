@@ -45,8 +45,14 @@ export function register(data: {
   verifyCode: string
 }) {
   // 后端期望的参数名是 code，前端使用 verifyCode 更语义化
-  const { verifyCode, ...rest } = data
-  return http.post(api.user.add, { ...rest, code: verifyCode })
+  const { verifyCode, tel, ...rest } = data
+  // 手机号为选填项：后端 @Pattern 对空字符串会校验失败（null 才会跳过），
+  // 因此未填写时不要发送该字段，避免误报“手机号格式不正确”
+  const payload: Record<string, unknown> = { ...rest, code: verifyCode }
+  if (tel) {
+    payload.tel = tel
+  }
+  return http.post(api.user.add, payload)
 }
 
 /**

@@ -163,7 +163,7 @@ export function useAuth() {
         return false
       }
     } catch (error) {
-      message.error(t('common.error'))
+      // HTTP 错误已由全局响应拦截器统一提示，避免重复弹窗
       return false
     } finally {
       loading.value = false
@@ -191,7 +191,7 @@ export function useAuth() {
         return false
       }
     } catch (error) {
-      message.error(t('common.error'))
+      // HTTP 错误已由全局响应拦截器统一提示，避免重复弹窗
       return false
     } finally {
       loading.value = false

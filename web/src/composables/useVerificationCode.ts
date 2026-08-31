@@ -60,16 +60,13 @@ export function useVerificationCode() {
 
     try {
       // 先检查用户名和邮箱是否已存在
+      // 注意：后端在已存在时返回 HTTP 409（走 axios 错误分支并抛异常），
+      // 全局响应拦截器已统一弹出后端提示（如“邮箱已注册”），此处无需再判断 code。
       if (username) {
-        const checkRes = await checkUser({
+        await checkUser({
           username,
           email,
         })
-
-        if (checkRes.code !== 200) {
-          message.error(checkRes.message)
-          return false
-        }
       }
 
       // 发送验证码
@@ -82,12 +79,12 @@ export function useVerificationCode() {
         message.success(t('auth.verificationCodeSent'))
         startCountdown()
         return true
-      } else {
-        message.error(res.message || t('auth.sendVerificationCodeFailed'))
-        return false
       }
+
+      message.error(res.message || t('auth.sendVerificationCodeFailed'))
+      return false
     } catch (error) {
-      message.error(t('auth.sendVerificationCodeRetry'))
+      // 校验/发送过程中抛出的 HTTP 错误已由全局拦截器统一提示，避免重复弹窗
       return false
     } finally {
       sendCodeLoading.value = false
@@ -111,12 +108,12 @@ export function useVerificationCode() {
         message.success(t('auth.verificationCodeSent'))
         startCountdown()
         return true
-      } else {
-        message.error(res.message || t('auth.sendVerificationCodeFailed'))
-        return false
       }
+
+      message.error(res.message || t('auth.sendVerificationCodeFailed'))
+      return false
     } catch (error) {
-      message.error(t('auth.sendVerificationCodeRetry'))
+      // HTTP 错误已由全局拦截器统一提示，避免重复弹窗
       return false
     } finally {
       sendCodeLoading.value = false
@@ -135,12 +132,12 @@ export function useVerificationCode() {
       if (res.code === 200) {
         message.success(t('auth.verificationSuccess'))
         return true
-      } else {
-        message.error(res.message || t('auth.verificationCodeError'))
-        return false
       }
+
+      message.error(res.message || t('auth.verificationCodeError'))
+      return false
     } catch (error) {
-      message.error('验证失败，请稍后重试')
+      // HTTP 错误已由全局拦截器统一提示，避免重复弹窗
       return false
     }
   }

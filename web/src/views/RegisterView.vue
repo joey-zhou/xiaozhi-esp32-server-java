@@ -59,6 +59,12 @@ const rules = {
   verifyCode: verificationCodeRules,
 }
 
+const agreeTermsRules = [{
+  validator: (_rule: unknown, value: boolean) =>
+    value ? Promise.resolve() : Promise.reject(t('auth.agreeTermsRequired')),
+  trigger: 'change',
+}]
+
 const handleSendCode = async () => {
   try {
     await formRef.value?.validateFields(['email', 'username'])
@@ -218,7 +224,10 @@ const handleSubmit = async () => {
             </a-form-item>
 
             <!-- 用户协议 -->
-            <a-form-item name="agreeTerms" :rules="[{ required: true, message: t('auth.agreeTermsRequired') }]">
+            <a-form-item
+              name="agreeTerms"
+              :rules="agreeTermsRules"
+            >
               <a-checkbox v-model:checked="formData.agreeTerms">
                 {{ t('auth.agreeTerms') }}
                 <a href="#" class="terms-link">《用户协议》</a>
