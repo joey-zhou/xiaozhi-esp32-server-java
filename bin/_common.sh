@@ -16,10 +16,40 @@ _warn() { echo -e "${YELLOW}[xiaozhi]${NC} $*"; }
 _err()  { echo -e "${RED}[xiaozhi]${NC} $*" >&2; }
 _ok()   { echo -e "${GREEN}[xiaozhi]${NC} ${BOLD}$*${NC}"; }
 
+# ---- 部署模式检测 ----
+# 部署模式：$ROOT_DIR 下没有 pom.xml（纯 jar 部署）或没有 mvn 命令
+# 此时跳过编译，直接使用现成的 jar
+is_deploy_mode() {
+  [[ ! -f "$ROOT_DIR/pom.xml" ]] && return 0
+  ! command -v mvn >/dev/null 2>&1 && return 0
+  return 1
+}
+
+# ---- Java 可执行文件解析 ----
+# 优先级: $JAVA_BIN > $JAVA_HOME/bin/java > PATH 中的 java
+# 适配宝塔/独立安装 JDK 不在 PATH 的场景（例如 /www/server/java/jdk-21.0.2/bin/java）
+resolve_java() {
+  if [[ -n "$JAVA_BIN" && -x "$JAVA_BIN" ]]; then
+    echo "$JAVA_BIN"; return 0
+  fi
+  if [[ -n "$JAVA_HOME" && -x "$JAVA_HOME/bin/java" ]]; then
+    echo "$JAVA_HOME/bin/java"; return 0
+  fi
+  if command -v java >/dev/null 2>&1; then
+    command -v java; return 0
+  fi
+  return 1
+}
+
 # ---- 编译 ----
 # build <module>  — 只编译该模块及其依赖
 # build all       — 编译全部
 build() {
+  if is_deploy_mode; then
+    _info "部署模式：跳过编译（未检测到 pom.xml 或 mvn 命令）"
+    return 0
+  fi
+
   local target="${1:-all}"
   if [[ "$target" == "all" ]]; then
     _info "编译所有模块..."
@@ -34,14 +64,19 @@ build() {
 
 # ---- 查找 jar ----
 # xiaozhi-dialogue 使用 classifier=exec，产出 *-exec.jar；其余模块用普通 jar
+# 优先在 $ROOT_DIR 根目录查找（部署模式），找不到再回退到 $module/target/（开发模式）
 find_jar() {
-  local module="$1"
+  local module="$1" jar=""
   if [[ "$module" == "xiaozhi-dialogue" ]]; then
-    ls "$ROOT_DIR/$module/target/$module"-*-exec.jar 2>/dev/null | head -1
+    jar=$(ls "$ROOT_DIR/$module"-*-exec.jar 2>/dev/null | head -1)
+    [[ -z "$jar" ]] && jar=$(ls "$ROOT_DIR/$module/target/$module"-*-exec.jar 2>/dev/null | head -1)
   else
-    ls "$ROOT_DIR/$module/target/$module"-*.jar 2>/dev/null \
-      | grep -v 'original' | grep -v '\-exec\.jar' | head -1
+    jar=$(ls "$ROOT_DIR/$module"-*.jar 2>/dev/null \
+      | grep -v 'original' | grep -v '\-exec\.jar' | head -1)
+    [[ -z "$jar" ]] && jar=$(ls "$ROOT_DIR/$module/target/$module"-*.jar 2>/dev/null \
+      | grep -v 'original' | grep -v '\-exec\.jar' | head -1)
   fi
+  echo "$jar"
 }
 
 # ---- PID 文件路径 ----
@@ -72,15 +107,28 @@ start_service() {
     _err "$module jar 不存在，请先编译"; return 1
   fi
 
+  local java_bin
+  if ! java_bin="$(resolve_java)"; then
+    _err "未找到 java 可执行文件。请安装 JDK 21+ 或设置 JAVA_HOME / JAVA_BIN 环境变量"
+    _err "  例如: export JAVA_HOME=/www/server/java/jdk-21.0.2"
+    return 1
+  fi
+
   _info "启动 $name (port $port)..."
+  _info "  java: $java_bin"
+  mkdir -p "$LOGS_DIR"
 
-  nohup java \
-    -Djava.library.path="$ROOT_DIR/lib" \
-    -jar "$jar" \
-    > /dev/null 2>&1 &
+  # cd 到 ROOT_DIR 启动，确保:
+  #   1. Logback 配置中的 ./logs 写到 $ROOT_DIR/logs/
+  #   2. application.yml 中 lib/, models/silero_vad.onnx 等相对路径解析正确
+  ( cd "$ROOT_DIR" && exec nohup "$java_bin" \
+      -Djava.library.path="$ROOT_DIR/lib" \
+      -jar "$jar" \
+      >> "$LOGS_DIR/$name.out" 2>&1 ) &
 
-  echo $! > "$(pid_file "$name")"
-  _ok "$name 已启动  pid=$!  日志: logs/$name.log"
+  local pid=$!
+  echo "$pid" > "$(pid_file "$name")"
+  _ok "$name 已启动  pid=$pid  日志: logs/$name.log  控制台: logs/$name.out"
 }
 
 # ---- 停止单个服务 ----

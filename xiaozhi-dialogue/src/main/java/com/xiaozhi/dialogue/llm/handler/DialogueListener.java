@@ -6,6 +6,7 @@ import com.xiaozhi.dialogue.runtime.convert.DialogueTurnConverter;
 import com.xiaozhi.message.service.MessageService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -33,6 +34,11 @@ public class DialogueListener implements PersonaListener {
 
     @Override
     public void onError(Throwable error) {
-        log.error("LLM调用失败", error);
+        if (error instanceof WebClientResponseException webErr) {
+            log.error("LLM调用失败 status={} body={}",
+                    webErr.getStatusCode(), webErr.getResponseBodyAsString(), error);
+        } else {
+            log.error("LLM调用失败", error);
+        }
     }
 }

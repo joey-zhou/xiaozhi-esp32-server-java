@@ -54,6 +54,14 @@ public class ScheduledPlayer extends Player {
     // 句子间隔标记（空帧），发送线程遇到时跳过发送并增加playPosition间隔
     private static final Speech SENTENCE_GAP_MARKER = new Speech(new byte[0]);
 
+    // 允许的最大播放滞后阈值。
+    // 绝对时间调度依赖 startTimestamp + playPosition 推算每帧的应发时刻，但 playPosition 只在实际发帧时推进。
+    // 当上游 TTS 断流把队列抽干、设备已播完缓冲后，新帧涌入时应发时刻已远落在过去，
+    // 若直接零延迟连发会让积压帧（及其携带的文字）瞬间冲到音频前面（文字快于音频）。
+    // 故当落后超过此阈值时，判定为欠载，以"当前时刻"重锚定时间轴，让后续帧重新按实时节奏下发。
+    // 阈值需大于预缓冲(120ms)以免误伤正常的首帧预缓冲。
+    private static final long MAX_PLAYBACK_LAG_NS = 500 * 1_000_000L; // 500ms
+
     // Burst模式状态
     private long startTimestamp = 0;  // 播放开始的绝对时间戳（纳秒）
     private long playPosition = BURST_PREBUFFER_NS;  // 当前播放位置（纳秒），初始为-120ms实现预缓冲
@@ -275,14 +283,6 @@ public class ScheduledPlayer extends Player {
         // 更新活跃时间
         session.setLastActivityTime(Instant.now());
 
-        // 发送文本和表情（如果有）
-        String text = speech.getText();
-        if (StringUtils.hasText(text)) {
-            String mood = speech.getMood();
-            sendEmotion(StringUtils.hasText(mood) ? mood : EmojiUtils.getRandomEmotion());
-            sendSentenceStart(text);
-        }
-
         // 检查播放状态
         if (!isPlaying()) {
             log.error("播放器状态异常：在非Playing状态下发送音频帧 - SessionId: {}", session.getSessionId());
@@ -302,6 +302,16 @@ public class ScheduledPlayer extends Player {
         long currentTime = System.nanoTime();
         long delay = targetSendTime - currentTime;
 
+        // 欠载保护：当落后超过阈值（上游TTS断流，队列被抽干后又突然补充），
+        // 设备此时已播完缓冲。不能把积压帧零延迟连发（否则文字会抢在音频前面），
+        // 而应以"当前时刻"为锚点重置时间轴，使后续帧重新按实时节奏下发，断流退化为一次同步的停顿。
+        if (delay < -MAX_PLAYBACK_LAG_NS) {
+            log.info("检测到播放欠载，落后{}ms，重锚定时间轴 - SessionId: {}",
+                    -delay / 1_000_000L, session.getSessionId());
+            startTimestamp = currentTime - playPosition;
+            delay = 0;
+        }
+
         if (delay > 0) {
             // 需要等待
             try {
@@ -315,6 +325,17 @@ public class ScheduledPlayer extends Player {
             }
         }
         // else: delay <= 0，立即发送（预缓冲阶段）
+
+        // 发送文本和表情（如果有）。
+        // 必须在 pacing sleep 之后、与首帧音频紧邻发送：
+        // 句子间隔标记令 playPosition 瞬间推进300ms（无墙钟耗时），若在 sleep 前发送文本，
+        // 文字会比对应音频提前约300ms+到达设备，造成"文字先出、音频后到"的不同步。
+        String text = speech.getText();
+        if (StringUtils.hasText(text)) {
+            String mood = speech.getMood();
+            sendEmotion(StringUtils.hasText(mood) ? mood : EmojiUtils.getRandomEmotion());
+            sendSentenceStart(text);
+        }
 
         // 发送音频帧
         sendOpusFrame(frame);
