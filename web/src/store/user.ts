@@ -177,12 +177,28 @@ export const useUserStore = defineStore('user', () => {
   const isAdmin = computed(() => userInfo.value?.isAdmin == '1')
 
   // 权限检查方法
+
+  // 后端返回的是树形权限（菜单 root，其 children 挂 button/api 权限）。
+  // 将整棵树拍平成 Set，供 hasPermission 递归匹配（否则深层 button/api 权限查不到）。
+  const permissionKeySet = computed(() => {
+    const keys = new Set<string>()
+    const walk = (list?: Permission[]) => {
+      if (!list) return
+      for (const perm of list) {
+        if (perm.permissionKey) keys.add(perm.permissionKey)
+        if (perm.children?.length) walk(perm.children)
+      }
+    }
+    walk(permissions.value)
+    return keys
+  })
+
   const hasPermission = (permissionKey: string): boolean => {
     // 管理员拥有所有权限
     if (isAdmin.value) {
       return true
     }
-    return permissions.value.some(perm => perm.permissionKey === permissionKey)
+    return permissionKeySet.value.has(permissionKey)
   }
 
   const hasAnyPermission = (permissionKeys: string[]): boolean => {

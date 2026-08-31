@@ -1,7 +1,17 @@
 import { http } from './request'
 import api from './api'
+import type { DataResponse } from '@/types/api'
 import type { Role, RoleQueryParams, RoleFormData, TestVoiceParams } from '@/types/role'
 import type { McpToolItem, SystemGlobalToolSummary } from '@/types/mcpTool'
+
+/**
+ * 判断 roleId 是否为可用于拼接 URL 的有效值。
+ * 允许 0（用于获取全局禁用列表），仅拦截 null/undefined/NaN，
+ * 避免把字符串 "undefined" 拼进请求路径导致后端类型转换报错。
+ */
+function isValidRoleId(roleId: unknown): roleId is number {
+  return typeof roleId === 'number' && !Number.isNaN(roleId)
+}
 
 /**
  * 查询角色列表
@@ -57,6 +67,13 @@ export function getSystemGlobalTools() {
  * 获取角色禁用的工具列表
  */
 export function getDisabledTools(roleId: number) {
+  if (!isValidRoleId(roleId)) {
+    return Promise.resolve<DataResponse<{ roleDisabled: string[]; globalDisabled: string[] }>>({
+      code: 200,
+      data: { roleDisabled: [], globalDisabled: [] },
+      message: '',
+    })
+  }
   return http.get<{ roleDisabled: string[]; globalDisabled: string[] }>(
     `${api.mcpTool.disabledTools}/${roleId}/disabled-tools`
   )
@@ -66,5 +83,8 @@ export function getDisabledTools(roleId: number) {
  * 批量更新工具禁用状态
  */
 export function updateToolsStatus(roleId: number, excludeTools: string[]) {
+  if (!isValidRoleId(roleId)) {
+    return Promise.reject(new Error('roleId 无效，无法更新工具禁用状态'))
+  }
   return http.post(`${api.mcpTool.batchExclude}/${roleId}/exclude-tools`, { excludeTools })
 }
