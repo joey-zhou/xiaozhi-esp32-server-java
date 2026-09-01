@@ -13,6 +13,7 @@ import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.common.model.bo.MessageMetadataBO;
 import org.springframework.ai.chat.messages.UserMessage;
 import com.xiaozhi.dialogue.audio.VadService.VadStatus;
+import com.xiaozhi.dialogue.audio.AecService;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.enums.DeviceState;
@@ -32,6 +33,7 @@ import jakarta.annotation.Resource;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -47,7 +49,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 public class DialogueService{
-    private static final String ABORT_REASON_VAD = "检测到vad";
+    private static final String ABORT_REASON_ASR = "检测到用户说话";
 
     @Resource
     private PersonaFactory personaFactory;
@@ -57,6 +59,9 @@ public class DialogueService{
 
     @Resource
     private VadService vadService;
+
+    @Resource
+    private AecService aecService;
 
     @Resource
     private SessionManager sessionManager;
@@ -81,6 +86,13 @@ public class DialogueService{
      * 处理音频数据
      */
     public void processAudioData(ChatSession session, byte[] opusData) {
+        processAudioData(session, opusData, 0);
+    }
+
+    /**
+     * @param echoTimestamp 设备回显的下行帧时间戳，0 表示无；透传给 AEC 做参考对齐
+     */
+    public void processAudioData(ChatSession session, byte[] opusData, long echoTimestamp) {
         if (session == null || opusData == null || opusData.length == 0) {
             return;
         }
@@ -100,7 +112,7 @@ public class DialogueService{
             }
 
             // 处理VAD
-            VadService.VadResult vadResult = vadService.processAudio(sessionId, opusData);
+            VadService.VadResult vadResult = vadService.processAudio(sessionId, opusData, echoTimestamp);
             if (vadResult == null || vadResult.getStatus() == VadStatus.ERROR
                     || vadResult.getProcessedData() == null) {
                 return;
@@ -111,14 +123,8 @@ public class DialogueService{
             // 根据VAD状态处理
             switch (vadResult.getStatus()) {
                 case SPEECH_START:
-                    // 先启动STT（同步创建音频流），确保流已准备好
+                    // 启动STT（同步创建音频流），确保流已准备好。打断改由 ASR 首字触发，见 onSttPartialText
                     startStt(session, sessionId, vadResult.getProcessedData());
-                    // 再触发abort停止当前播放中的TTS
-                    // 通过Persona.isActive()综合判断整个管道是否活跃（LLM/TTS/Player任一层）
-                    Persona persona = session.getPersona();
-                    if (persona != null && persona.isActive()) {
-                        abortDialogue(session, ABORT_REASON_VAD);
-                    }
                     break;
 
                 case SPEECH_CONTINUE:
@@ -129,11 +135,7 @@ public class DialogueService{
                     break;
 
                 case SPEECH_END:
-                    // 语音结束，完成流式识别；状态切换为 THINKING 等待 LLM 响应
-                    if (session.getDeviceState() == DeviceState.LISTENING) {
-                        session.completeAudioStream();
-                        session.transitionTo(DeviceState.THINKING);
-                    }
+                    completeSpeechSegment(session);
                     break;
 
                 default:
@@ -141,6 +143,40 @@ public class DialogueService{
             }
         } catch (Exception e) {
             log.error("处理音频数据失败: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 收句：本轮语音到此为止，完成音频流并进入 THINKING 等待 LLM 响应。
+     * auto/realtime 由服务端 VAD 的 SPEECH_END 触发，manual 由客户端的 listen/stop 触发。
+     */
+    public void completeSpeechSegment(ChatSession session) {
+        if (session.getDeviceState() == DeviceState.LISTENING) {
+            session.setSpeechEndTime(Instant.now());
+            session.completeAudioStream();
+            session.transitionTo(DeviceState.THINKING);
+        }
+    }
+
+    /**
+     * ASR 首次识别出文本时打断当前回答。在 STT provider 的识别线程上执行。
+     *
+     * @param aborted 本轮是否已打断过，保证一轮只打断一次
+     */
+    private void onSttPartialText(ChatSession session, String partialText, AtomicBoolean aborted) {
+        if (!StringUtils.hasText(partialText) || aborted.get()) {
+            return;
+        }
+
+        // isActive() 覆盖 LLM/TTS/Player 任一层活跃
+        Persona persona = session.getPersona();
+        if (persona == null || !persona.isActive()) {
+            return;
+        }
+
+        if (aborted.compareAndSet(false, true)) {
+            // 切出识别线程，避免 abort 的耗时动作阻塞后续 ASR 包
+            Thread.startVirtualThread(() -> abortDialogue(session, ABORT_REASON_ASR));
         }
     }
 
@@ -176,7 +212,10 @@ public class DialogueService{
                     return;
                 }
 
-                var sttResult = persona.getSttService().stream(session.getAudioSinks().asFlux());
+                AtomicBoolean aborted = new AtomicBoolean(false);
+                var sttResult = persona.getSttService().stream(
+                        session.getAudioSinks().asFlux(),
+                        partialText -> onSttPartialText(session, partialText, aborted));
 
                 if (sttResult == null || !StringUtils.hasText(sttResult.text())) {
                     return;
@@ -309,10 +348,8 @@ public class DialogueService{
             String sessionId = session.getSessionId();
             log.info("中止对话 - SessionId: {}, Reason: {}", sessionId, reason);
 
-            // 关闭音频流
-            // 注意：当reason是"检测到vad"时，不关闭音频流和重置状态
-            // 因为这是用户打断TTS继续说话，startStt已经创建了新的音频流并设置为LISTENING
-            if (!ABORT_REASON_VAD.equals(reason)) {
+            // ASR 触发的打断不关流：startStt 刚建的新流上正跑着 STT
+            if (!ABORT_REASON_ASR.equals(reason)) {
                 session.closeAudioStream();
                 // abort 后服务端发 tts stop，设备切回聆听，服务端同步为 LISTENING
                 session.transitionTo(DeviceState.LISTENING);
@@ -328,6 +365,12 @@ public class DialogueService{
             Player player = session.getPlayer();
             if(player!=null){
                 player.stop();
+            }
+
+            // 已发送未播放的帧被设备丢弃、不会产生回声，清掉待喂入的 AEC 参考，
+            // 否则下一轮开头会被当参考喂入，污染对齐导致回声漏出
+            if (aecService != null) {
+                aecService.clearReference(session.getSessionId());
             }
 
             // 无论player是否存在，都需要发送stop消息通知设备进入聆听状态

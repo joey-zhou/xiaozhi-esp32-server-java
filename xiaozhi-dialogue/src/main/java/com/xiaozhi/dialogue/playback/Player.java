@@ -107,10 +107,12 @@ public abstract class Player {
      * 发送Opus帧数据
      */
     protected void sendOpusFrame( byte[] opusFrame)  {
-        messageService.sendBinaryMessage(session, opusFrame);
+        // 毫秒级时间戳（取低 32 位），随帧头下发；设备播放后在上行帧回显，用于 AEC 参考对齐
+        long timestamp = System.currentTimeMillis() & 0xFFFFFFFFL;
+        messageService.sendBinaryMessage(session, opusFrame, timestamp);
         // log.info("发送Opus帧数据: {}", opusFrame.length);
         if (opusRecorder != null) {
-            opusRecorder.onSendOpusFrame(opusFrame);
+            opusRecorder.onSendOpusFrame(opusFrame, timestamp);
         }
     }
 

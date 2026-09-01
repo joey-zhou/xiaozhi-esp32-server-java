@@ -144,6 +144,8 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
         var sessionId = session.getId();
         log.info("收到hello消息 - SessionId: {}, JsonNode: {}", sessionId, message);
 
+        messageHandler.applyAecCapability(sessionId, message);
+
         if (message.getAudioParams() != null) {
             log.info("客户端音频参数 - 格式: {}, 采样率: {}, 声道: {}, 帧时长: {}ms",
                     message.getAudioParams().getFormat(),

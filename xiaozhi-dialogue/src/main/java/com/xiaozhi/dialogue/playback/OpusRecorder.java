@@ -66,9 +66,9 @@ public class OpusRecorder {
         }
     }
 
-    public void onSendOpusFrame(byte[] opusFrame) {
-        if (aecService != null && aecService.isEnabled()) {
-            aecService.feedReference(session.getSessionId(), opusFrame);
+    public void onSendOpusFrame(byte[] opusFrame, long timestamp) {
+        if (aecService != null) {
+            aecService.feedReference(session.getSessionId(), opusFrame, timestamp);
         }
 
         if (opusFile == null && assistantMessageCreatedAt != null) {

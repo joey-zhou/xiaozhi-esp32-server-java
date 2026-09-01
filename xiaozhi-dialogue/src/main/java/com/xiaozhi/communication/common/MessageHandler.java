@@ -22,6 +22,7 @@ import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.ScheduledPlayer;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.enums.DeviceState;
+import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.enums.ListenState;
 import com.xiaozhi.event.ChatAbortedEvent;
 import com.xiaozhi.role.service.RoleService;
@@ -218,12 +219,20 @@ public class MessageHandler {
      * @param opusData
      */
     public void handleBinaryMessage(String sessionId, byte[] opusData) {
+        // v1 裸 opus 帧无时间戳
+        handleBinaryMessage(sessionId, opusData, 0);
+    }
+
+    /**
+     * @param timestamp 设备回显的下行帧时间戳，0 表示无；供服务端 AEC 对齐使用
+     */
+    public void handleBinaryMessage(String sessionId, byte[] opusData, long timestamp) {
         ChatSession chatSession = sessionManager.getSession(sessionId);
         if ((chatSession == null || !chatSession.isOpen()) && !vadService.isSessionInitialized(sessionId)) {
             return;
         }
         // 委托给DialogueService处理音频数据
-        dialogueService.processAudioData(chatSession, opusData);
+        dialogueService.processAudioData(chatSession, opusData, timestamp);
 
     }
 
@@ -352,6 +361,17 @@ public class MessageHandler {
         return false;
     }
 
+    /**
+     * 记录设备是否要求服务端做 AEC。features.aec 只在设备端 AEC 关闭时才出现，未出现表示设备自己已消回声。
+     */
+    public void applyAecCapability(String sessionId, HelloMessage message) {
+        if (aecService == null) {
+            return;
+        }
+        boolean required = message.getFeatures() != null && Boolean.TRUE.equals(message.getFeatures().getAec());
+        aecService.setServerAecRequired(sessionId, required);
+    }
+
     private void handleListenMessage(ChatSession chatSession, ListenMessage message) {
         String sessionId = chatSession.getSessionId();
         log.info("收到listen消息 - SessionId: {}, State: {}, Mode: {}", sessionId, message.getState(), message.getMode());
@@ -361,7 +381,10 @@ public class MessageHandler {
             return;
         }
 
-        chatSession.setMode(message.getMode());
+        // stop 消息不带 mode，无条件赋值会把本轮模式抹成 null
+        if (message.getMode() != null) {
+            chatSession.setMode(message.getMode());
+        }
 
         // 根据state处理不同的监听状态
         switch (message.getState()) {
@@ -371,23 +394,30 @@ public class MessageHandler {
 
                 chatSession.transitionTo(DeviceState.LISTENING);
 
-                // 初始化VAD会话
-                vadService.initSession(sessionId);
+                // manual 由客户端松手断句，服务端不做自动收句
+                vadService.initSession(sessionId, chatSession.getMode() != ListenMode.Manual);
                 // 初始化AEC会话
                 if (aecService != null) aecService.initSession(sessionId);
                 break;
 
             case ListenState.Stop:
                 // 停止监听
-                log.info("停止监听");
+                log.info("停止监听 - Mode: {}", chatSession.getMode());
 
-                // 关闭音频流，恢复到 IDLE
-                chatSession.completeAudioStream();
-                chatSession.closeAudioStream();
-                chatSession.transitionTo(DeviceState.IDLE);
-                // 重置VAD会话
-                vadService.resetSession(sessionId);
-                // 注意：不重置 AEC 会话，保留已收敛的滤波器状态供后续对话复用
+                // audioSinks 在上一轮结束后仍非空，只有 VAD 本轮状态是准确信号
+                if (chatSession.getMode() == ListenMode.Manual
+                        && chatSession.getDeviceState() == DeviceState.LISTENING
+                        && vadService.finishSegment(sessionId)) {
+                    // 松手收句。不能 closeAudioStream/resetSession，STT 虚拟线程之后还要读 pcmData
+                    dialogueService.completeSpeechSegment(chatSession);
+                } else {
+                    // 取消本次聆听，回到 IDLE
+                    chatSession.completeAudioStream();
+                    chatSession.closeAudioStream();
+                    chatSession.transitionTo(DeviceState.IDLE);
+                    vadService.resetSession(sessionId);
+                    // 不重置 AEC 会话，保留已收敛的滤波器状态供后续对话复用
+                }
                 break;
 
             case ListenState.Text:

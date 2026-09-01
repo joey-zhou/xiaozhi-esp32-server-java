@@ -102,12 +102,12 @@ public class MessageSender {
         }
     }
 
-    public void sendBinaryMessage(ChatSession chatSession, byte[] opusFrame) {
+    public void sendBinaryMessage(ChatSession chatSession, byte[] opusFrame, long timestamp) {
         try {
             if (chatSession == null || !chatSession.isOpen()) {
                 return;
             }
-            chatSession.sendBinaryMessage(opusFrame);
+            chatSession.sendBinaryMessage(opusFrame, timestamp);
         } catch (Exception e) {
             log.error("发送消息时发生异常 - SessionId: {}, Error: {}", chatSession.getSessionId(), e.getMessage());
             throw new RuntimeException("发送音频消息失败, 消息内容", e);

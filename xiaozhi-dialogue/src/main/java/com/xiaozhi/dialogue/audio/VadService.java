@@ -66,6 +66,9 @@ public class VadService {
     }
 
     private class VadState {
+        // 是否由服务端 VAD 自动断句。manual 模式为 false
+        private boolean autoSegment = true;
+
         private boolean speaking = false;
         private long silenceTime = 0;
 
@@ -185,15 +188,24 @@ public class VadService {
     }
 
     public void initSession(String sessionId) {
+        initSession(sessionId, true);
+    }
+
+    /**
+     * @param autoSegment 是否由服务端 VAD 断句。manual 传 false，仍做解码与 AEC，只是不跑断句状态机
+     */
+    public void initSession(String sessionId, boolean autoSegment) {
         Object lock = getLock(sessionId);
         synchronized (lock) {
             VadState state = states.get(sessionId);
             if (state == null) {
-                states.put(sessionId, new VadState());
+                state = new VadState();
+                states.put(sessionId, state);
             } else {
                 state.reset();
             }
-            log.info("VAD会话已初始化: {}", sessionId);
+            state.autoSegment = autoSegment;
+            log.info("VAD会话已初始化: {}, 自动断句: {}", sessionId, autoSegment);
         }
     }
 
@@ -209,6 +221,13 @@ public class VadService {
     }
 
     public VadResult processAudio(String sessionId, byte[] opusData) {
+        return processAudio(sessionId, opusData, 0);
+    }
+
+    /**
+     * @param echoTimestamp 设备回显的下行帧时间戳，0 表示无；透传给 AEC 做参考对齐
+     */
+    public VadResult processAudio(String sessionId, byte[] opusData, long echoTimestamp) {
         if (!isSessionInitialized(sessionId)) return null;
 
         Object lock = getLock(sessionId);
@@ -245,9 +264,21 @@ public class VadService {
                     return new VadResult(VadStatus.ERROR, null);
                 }
 
-                // AEC 处理：消除麦克风中的扬声器回声
-                if (aecService != null && aecService.isEnabled()) {
-                    pcmData = aecService.process(sessionId, pcmData);
+                // AEC 处理：消除麦克风中的扬声器回声。仅对声明了 features.aec 的设备生效
+                if (aecService != null) {
+                    pcmData = aecService.process(sessionId, pcmData, echoTimestamp);
+                }
+
+                // manual 模式跳过 Silero：首帧起流，其余持续喂流，收句由 listen/stop 触发
+                if (!state.autoSegment) {
+                    if (!state.isSpeaking()) {
+                        state.pcmData.clear();
+                        state.setSpeaking(true);
+                        state.addPcm(pcmData);
+                        return new VadResult(VadStatus.SPEECH_START, pcmData);
+                    }
+                    state.addPcm(pcmData);
+                    return new VadResult(VadStatus.SPEECH_CONTINUE, pcmData);
                 }
 
                 float[] samples = bytesToFloats(pcmData);
@@ -425,6 +456,23 @@ public class VadService {
             if (state != null) state.reset();
             states.remove(sessionId);
             locks.remove(sessionId);
+        }
+    }
+
+    /**
+     * 收句：标记本轮语音结束，供 manual 模式在 listen/stop 时调用。检查与清除是原子的。
+     *
+     * @return 本轮是否确有语音在进行中
+     */
+    public boolean finishSegment(String sessionId) {
+        Object lock = getLock(sessionId);
+        synchronized (lock) {
+            VadState state = states.get(sessionId);
+            if (state == null || !state.isSpeaking()) {
+                return false;
+            }
+            state.setSpeaking(false);
+            return true;
         }
     }
 

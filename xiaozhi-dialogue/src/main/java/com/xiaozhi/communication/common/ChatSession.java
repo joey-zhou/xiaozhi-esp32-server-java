@@ -228,7 +228,10 @@ public abstract class ChatSession {
 
     public abstract void sendTextMessage(String message);
 
-    public abstract void sendBinaryMessage(byte[] message);
+    /**
+     * @param timestamp 帧时间戳，随传输层帧头下发，设备会在上行帧中回显，用于服务端 AEC 对齐
+     */
+    public abstract void sendBinaryMessage(byte[] message, long timestamp);
 
     public boolean isTimeoutDisconnect()            { return timeoutDisconnect; }
     public void setTimeoutDisconnect(boolean flag)  { this.timeoutDisconnect = flag; }
