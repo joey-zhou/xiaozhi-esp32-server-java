@@ -3,13 +3,16 @@ package com.xiaozhi.userauth.service.impl;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.UserAuthBO;
 import com.xiaozhi.support.MybatisPlusTestHelper;
+import com.xiaozhi.userauth.convert.UserAuthConvert;
 import com.xiaozhi.userauth.dal.mysql.dataobject.UserAuthDO;
 import com.xiaozhi.userauth.dal.mysql.mapper.UserAuthMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +29,9 @@ class UserAuthServiceImplTest {
 
     @Mock
     private UserAuthMapper userAuthMapper;
+
+    @Spy
+    private UserAuthConvert userAuthConvert = Mappers.getMapper(UserAuthConvert.class);
 
     @InjectMocks
     private UserAuthServiceImpl userAuthService;
