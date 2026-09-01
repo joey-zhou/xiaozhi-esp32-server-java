@@ -4,8 +4,6 @@ import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
 import com.xiaozhi.role.domain.Role;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RoleConverterTest {
@@ -16,16 +14,16 @@ class RoleConverterTest {
     void preservesInactiveTimeoutAcrossDomainMappings() {
         RoleDO dataObject = roleDataObject(120);
 
-        Role role = converter.toDomain(dataObject, List.of());
+        Role role = converter.toDomain(dataObject);
 
         assertThat(role.getInactiveTimeoutSeconds()).isEqualTo(120);
         assertThat(converter.toDataObject(role).getInactiveTimeoutSeconds()).isEqualTo(120);
-        assertThat(converter.toBO(role, List.of()).getInactiveTimeoutSeconds()).isEqualTo(120);
+        assertThat(converter.toBO(role).getInactiveTimeoutSeconds()).isEqualTo(120);
     }
 
     @Test
     void defaultsInactiveTimeoutForLegacyRoleData() {
-        Role role = converter.toDomain(roleDataObject(null), List.of());
+        Role role = converter.toDomain(roleDataObject(null));
 
         assertThat(role.getInactiveTimeoutSeconds()).isEqualTo(Role.DEFAULT_INACTIVE_TIMEOUT_SECONDS);
     }
