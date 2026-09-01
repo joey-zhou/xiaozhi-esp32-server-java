@@ -65,9 +65,6 @@ public class MusicPlayer {
         String sessionId = session.getSessionId();
         try {
 
-            // 清理之前的音频文件（如果有）
-            AudioUtils.deleteFile(audioFile.toString());
-
             // 1. 获取音乐信息
             Map<String, String> musicInfo = getMusicInfo(song, artist);
             if (musicInfo == null) {
@@ -93,6 +90,11 @@ public class MusicPlayer {
         } catch (Exception e) {
             log.error("播放音乐时发生错误", e);
             session.getPersona().getSynthesizer().synthesize("播放音乐时发生错误");
+        } finally {
+            // 音频已全量读入内存后才入播放队列，此处可安全删除临时文件
+            if (audioFile != null) {
+                AudioUtils.deleteFile(audioFile.toString());
+            }
         }
 
     }
@@ -127,14 +129,18 @@ public class MusicPlayer {
             double durationSec = AudioUtils.getAudioDuration(audioPath);
             long sumMs = durationSec > 0 ? (long)(durationSec * 1000) : lines[1].timeMs() + lines[lines.length - 1].timeMs();
             // 平均每个毫秒的字节数
-            int avg = (int) ( audioData.length / sumMs);
+            int avg = sumMs > 0 ? (int) (audioData.length / sumMs) : 0;
+            if (avg <= 0) {
+                log.warn("无法估算音频时长，改为不带歌词播放");
+                session.getPlayer().play(song, audioPath);
+                return;
+            }
             int startIndex=0;
-            int endIndex=0;
             List<Speech> speeches = new ArrayList<>();
             for (int i=0;i<lines.length-1;i++) {
                 // 计算歌词对应的音频字节数组
                 int ms = lines[i+1].timeMs()-lines[i].timeMs();
-                endIndex = ms * avg;
+                int endIndex = startIndex + ms * avg;
                 if(endIndex>audioData.length){
 
                     log.warn("歌词超出音频长度，已截断");
@@ -146,7 +152,7 @@ public class MusicPlayer {
                 speeches.add(speech);
                 startIndex = endIndex;
             }
-            if(endIndex<audioData.length){
+            if(startIndex<audioData.length){
                 byte[] frameData = Arrays.copyOfRange(audioData, startIndex, audioData.length);
                 Speech speech = new Speech(frameData, lines[lines.length-1].text());
                 speeches.add(speech);
