@@ -32,6 +32,8 @@ public class TencentSttService implements SttService {
     private static final String PROVIDER_NAME = "tencent";
     private static final String API_URL = "https://asr.tencentcloudapi.com";
     private static final int QUEUE_TIMEOUT_MS = 100; // 队列等待超时时间
+    // 上游未终结音频流时的兜底上限，需远大于设备上行抖动，否则弱网会截断用户没说完的话
+    private static final long IDLE_TIMEOUT_MS = 5000;
     private static final long RECOGNITION_TIMEOUT_MS = 90000; // 识别超时时间（90秒）
 
     // 使用腾讯云SDK的默认URL
@@ -231,6 +233,7 @@ public class TencentSttService implements SttService {
             // 启动虚拟线程发送音频数据
             Thread.startVirtualThread(() -> {
                 try {
+                    long idleMs = 0;
                     while (!isCompleted.get() || !audioQueue.isEmpty()) {
                         byte[] audioChunk = null;
                         try {
@@ -240,14 +243,25 @@ public class TencentSttService implements SttService {
                             Thread.currentThread().interrupt(); // 重新设置中断标志
                             break;
                         }
-                        
-                        if (audioChunk != null && activeRecognizers.containsKey(voiceId)) {
-                            try {
-                                recognizer.write(audioChunk);
-                            } catch (Exception e) {
-                                log.error("发送音频数据时发生错误 - VoiceId: {}", voiceId, e);
+
+                        if (audioChunk == null) {
+                            idleMs += QUEUE_TIMEOUT_MS;
+                            // 上游未按预期终结音频流时的兜底，避免线程与识别器一直挂着
+                            if (idleMs >= IDLE_TIMEOUT_MS) {
+                                log.warn("音频流长时间无数据，主动结束识别 - VoiceId: {}", voiceId);
                                 break;
                             }
+                            continue;
+                        }
+                        idleMs = 0;
+                        if (!activeRecognizers.containsKey(voiceId)) {
+                            break;
+                        }
+                        try {
+                            recognizer.write(audioChunk);
+                        } catch (Exception e) {
+                            log.error("发送音频数据时发生错误 - VoiceId: {}", voiceId, e);
+                            break;
                         }
                     }
                     

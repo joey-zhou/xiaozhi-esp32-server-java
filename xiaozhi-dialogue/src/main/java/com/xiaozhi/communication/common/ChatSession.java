@@ -151,14 +151,9 @@ public abstract class ChatSession {
     }
 
     public void clearAudioSinks(){
-        // 清理音频流
-        Sinks.Many<byte[]> sink = getAudioSinks();
-        if (sink != null) {
-            sink.tryEmitComplete();
-        }
+        closeAudioStream();
         // 重置会话状态
         deviceState = DeviceState.IDLE;
-        setAudioSinks(null);
     }
 
     // ========== 音频流管理方法（从 SessionManager 迁入） ==========
@@ -190,10 +185,15 @@ public abstract class ChatSession {
     }
 
     /**
-     * 关闭音频流（释放引用）
+     * 关闭音频流（先终结再释放引用）。
+     * 只释放引用会让订阅该流的 STT 永远等不到结束信号，连接被服务端超时断开且发送线程泄漏。
      */
     public void closeAudioStream() {
+        Sinks.Many<byte[]> sink = this.audioSinks;
         this.audioSinks = null;
+        if (sink != null) {
+            sink.tryEmitComplete();
+        }
     }
 
     /**

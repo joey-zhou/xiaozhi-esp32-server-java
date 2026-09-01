@@ -34,6 +34,9 @@ import lombok.extern.slf4j.Slf4j;
 public class VoskSttService implements SttService {
 
     private static final String PROVIDER_NAME = "vosk";
+    private static final int QUEUE_TIMEOUT_MS = 100; // 队列等待超时时间
+    // 上游未终结音频流时的兜底上限，需远大于设备上行抖动，否则弱网会截断用户没说完的话
+    private static final long IDLE_TIMEOUT_MS = 5000;
 
     // 使用平台线程池执行 JNI native 识别任务，避免虚拟线程与 native 内存绑定冲突
     private static final ExecutorService recognizerExecutor =
@@ -168,10 +171,12 @@ public class VoskSttService implements SttService {
             try (Recognizer recognizer = new Recognizer(model, AudioUtils.SAMPLE_RATE)) {
                 // 已通知过的实时中间文本，避免同一段文本被反复回调
                 String lastPartial = "";
+                long idleMs = 0;
                 while (!isCompleted.get() || !audioQueue.isEmpty()) {
                     try {
-                        byte[] audioChunk = audioQueue.poll(100, TimeUnit.MILLISECONDS);
+                        byte[] audioChunk = audioQueue.poll(QUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
                         if (audioChunk != null) {
+                            idleMs = 0;
                             boolean hasResult = recognizer.acceptWaveForm(audioChunk, audioChunk.length);
                             if (hasResult) {
                                 // 提取部分识别结果中的文本
@@ -198,10 +203,15 @@ public class VoskSttService implements SttService {
                                     log.debug("Vosk中间结果解析失败，已忽略", e);
                                 }
                             }
+                        } else {
+                            idleMs += QUEUE_TIMEOUT_MS;
                         }
 
-                        // 如果已完成且队列为空，获取最终结果
-                        if (isCompleted.get() && audioQueue.isEmpty()) {
+                        // 已完成且队列为空时收尾；空闲超限是上游未终结音频流时的兜底
+                        if ((isCompleted.get() && audioQueue.isEmpty()) || idleMs >= IDLE_TIMEOUT_MS) {
+                            if (idleMs >= IDLE_TIMEOUT_MS) {
+                                log.warn("音频流长时间无数据，主动结束识别");
+                            }
                             String finalText = recognizer.getFinalResult();
                             JSONObject jsonFinal = new JSONObject(finalText);
                             if (jsonFinal.has("text")) {

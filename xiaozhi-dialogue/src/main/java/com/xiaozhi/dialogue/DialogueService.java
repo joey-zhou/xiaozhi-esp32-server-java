@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Sinks;
 
 import jakarta.annotation.Resource;
 
@@ -151,8 +152,11 @@ public class DialogueService{
      * auto/realtime 由服务端 VAD 的 SPEECH_END 触发，manual 由客户端的 listen/stop 触发。
      */
     public void completeSpeechSegment(ChatSession session) {
+        // 收句无条件终结音频流：用户开口后上一轮 TTS 才到达时状态会被改成 SPEAKING，
+        // 此时若跳过，STT 侧永远等不到流结束，本轮说的话会整句丢失
+        session.completeAudioStream();
+
         if (session.getDeviceState() == DeviceState.LISTENING) {
-            session.completeAudioStream();
             session.transitionTo(DeviceState.THINKING);
         }
     }
@@ -194,6 +198,7 @@ public class DialogueService{
         session.closeAudioStream();
         session.createAudioStream();
         session.transitionTo(DeviceState.LISTENING);
+        Sinks.Many<byte[]> turnSink = session.getAudioSinks();
 
         Thread.startVirtualThread(() -> {
             try {
@@ -202,7 +207,7 @@ public class DialogueService{
                     session.sendAudioData(initialAudio);
                 }
 
-                if (session.getAudioSinks() == null) {
+                if (turnSink == null) {
                     return;
                 }
 
@@ -213,8 +218,13 @@ public class DialogueService{
 
                 AtomicBoolean aborted = new AtomicBoolean(false);
                 var sttResult = persona.getSttService().stream(
-                        session.getAudioSinks().asFlux(),
+                        turnSink.asFlux(),
                         partialText -> onSttPartialText(session, partialText, aborted));
+
+                // 本轮已被新一轮或 abort 取代，结果作废，否则过期文本会触发一轮多余对话
+                if (session.getAudioSinks() != turnSink) {
+                    return;
+                }
 
                 if (sttResult == null || !StringUtils.hasText(sttResult.text())) {
                     return;

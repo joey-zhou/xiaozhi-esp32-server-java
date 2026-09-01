@@ -433,7 +433,6 @@ public class MessageHandler {
                     dialogueService.completeSpeechSegment(chatSession);
                 } else {
                     // 取消本次聆听，回到 IDLE
-                    chatSession.completeAudioStream();
                     chatSession.closeAudioStream();
                     chatSession.transitionTo(DeviceState.IDLE);
                     vadService.resetSession(sessionId);

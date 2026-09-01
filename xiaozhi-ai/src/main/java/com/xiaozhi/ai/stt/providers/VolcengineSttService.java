@@ -49,6 +49,9 @@ public class VolcengineSttService implements SttService {
     private static final long RECOGNITION_TIMEOUT_MS = 90000;
     // 队列等待超时时间
     private static final int QUEUE_TIMEOUT_MS = 100;
+    // 上游未终结音频流时的兜底上限。取值需远大于设备上行抖动（否则弱网会截断用户没说完的话），
+    // 又必须早于火山侧 8 秒无包断连（否则被踢掉连已识别文本都拿不回来）
+    private static final long IDLE_TIMEOUT_MS = 5000;
 
     // 协议常量
     private static final byte PROTOCOL_VERSION = 0b0001;
@@ -136,16 +139,26 @@ public class VolcengineSttService implements SttService {
                 // 启动虚拟线程发送音频数据
                 Thread.startVirtualThread(() -> {
                     try {
+                        long idleMs = 0;
                         while (!isCompleted.get() || !audioQueue.isEmpty()) {
                             byte[] audioChunk = audioQueue.poll(QUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-                            if (audioChunk != null && audioChunk.length > 0) {
-                                try {
-                                    byte[] audioRequest = buildAudioRequest(audioChunk, false);
-                                    webSocket.send(okio.ByteString.of(audioRequest));
-                                } catch (Exception e) {
-                                    log.error("发送音频数据时发生错误", e);
+                            if (audioChunk == null || audioChunk.length == 0) {
+                                idleMs += QUEUE_TIMEOUT_MS;
+                                if (idleMs >= IDLE_TIMEOUT_MS) {
+                                    log.warn("音频流长时间无数据，主动结束识别 - ConnectId: {}", connectId);
                                     break;
                                 }
+                                continue;
+                            }
+                            idleMs = 0;
+                            try {
+                                byte[] audioRequest = buildAudioRequest(audioChunk, false);
+                                if (!webSocket.send(okio.ByteString.of(audioRequest))) {
+                                    break;
+                                }
+                            } catch (Exception e) {
+                                log.error("发送音频数据时发生错误", e);
+                                break;
                             }
                         }
 

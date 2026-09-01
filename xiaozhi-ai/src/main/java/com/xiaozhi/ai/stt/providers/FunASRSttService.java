@@ -38,6 +38,8 @@ public class FunASRSttService implements SttService {
     private static final String SPEAKING_START = "{\"mode\":\"2pass\",\"wav_name\":\"voice.wav\",\"is_speaking\":true,\"wav_format\":\"pcm\",\"chunk_size\":[5,10,5],\"itn\":true}";
     private static final String SPEAKING_END = "{\"is_speaking\": false}";
     private static final int QUEUE_TIMEOUT_MS = 100; // 队列等待超时时间
+    // 上游未终结音频流时的兜底上限，需远大于设备上行抖动，否则弱网会截断用户没说完的话
+    private static final long IDLE_TIMEOUT_MS = 5000;
     private static final long RECOGNITION_TIMEOUT_MS = 90000; // 识别超时时间（90秒）
 
     private final String apiUrl;
@@ -102,6 +104,7 @@ public class FunASRSttService implements SttService {
                 // 启动虚拟线程发送音频数据
                 Thread.startVirtualThread(() -> {
                     try {
+                        long idleMs = 0;
                         while (!isCompleted.get() || !audioQueue.isEmpty()) {
                             byte[] audioChunk = null;
                             try {
@@ -111,10 +114,21 @@ public class FunASRSttService implements SttService {
                                 Thread.currentThread().interrupt(); // 重新设置中断标志
                                 break;
                             }
-                            
-                            if (audioChunk != null && isOpen()) {
-                                send(audioChunk);
+
+                            if (audioChunk == null) {
+                                idleMs += QUEUE_TIMEOUT_MS;
+                                // 上游未按预期终结音频流时的兜底，避免线程与连接一直挂着
+                                if (idleMs >= IDLE_TIMEOUT_MS) {
+                                    log.warn("音频流长时间无数据，主动结束识别");
+                                    break;
+                                }
+                                continue;
                             }
+                            idleMs = 0;
+                            if (!isOpen()) {
+                                break;
+                            }
+                            send(audioChunk);
                         }
                         
                         // 发送结束信号
