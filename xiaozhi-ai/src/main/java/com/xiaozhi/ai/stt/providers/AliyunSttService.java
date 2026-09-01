@@ -96,17 +96,20 @@ public class AliyunSttService implements SttService {
                     actualModel = "paraformer-realtime-v2";
                     log.info("未识别的模型类型: {}，使用默认模型: {}", model, actualModel);
                 }
-                // 8k 模型只接受 8000Hz，与设备上行的 16kHz 不匹配，会静默返回空结果
-                if (actualModel.toLowerCase().contains("8k")) {
-                    log.warn("模型 {} 要求8kHz音频，与设备上行的{}Hz不匹配，识别将失败，请改用16k模型",
-                            actualModel, AudioUtils.SAMPLE_RATE);
-                }
                 return streamRecognitionParaformer(audioSink, actualModel, onPartialText);
             }
         } catch (Exception e) {
             log.error("使用{}模型语音识别失败：", model, e);
             return SttResult.textOnly("");
         }
+    }
+
+    /**
+     * 模型要求的输入采样率：8k 系列固定 8000Hz，v1 固定 16000Hz，v2 支持任意采样率。
+     * 见 https://help.aliyun.com/zh/model-studio/paraformer-real-time-speech-recognition-java-sdk
+     */
+    static int requiredSampleRate(String modelName) {
+        return modelName.toLowerCase().contains("8k") ? 8000 : AudioUtils.SAMPLE_RATE;
     }
 
     /**
@@ -117,10 +120,16 @@ public class AliyunSttService implements SttService {
                                                   Consumer<String> onPartialText) {
         var recognizer = new Recognition();
 
+        // 8k 模型（唯一支持情感识别）只接受 8000Hz，设备上行是 16kHz，需降采样后再送
+        int modelSampleRate = requiredSampleRate(modelName);
+        Flux<byte[]> audioForModel = modelSampleRate == AudioUtils.SAMPLE_RATE
+                ? audioSink
+                : audioSink.map(pcm -> AudioUtils.resamplePcm(pcm, AudioUtils.SAMPLE_RATE, modelSampleRate));
+
         var param = RecognitionParam.builder()
                 .model(modelName)
                 .format("pcm")
-                .sampleRate(AudioUtils.SAMPLE_RATE)
+                .sampleRate(modelSampleRate)
                 .apiKey(apiKey)
                 .build();
 
@@ -128,7 +137,7 @@ public class AliyunSttService implements SttService {
         var recognition = Flux.<SttResult>create(sink -> {
             try {
                 recognizer.streamCall(param, Flowable.create(emitter -> {
-                            audioSink.subscribe(
+                            audioForModel.subscribe(
                                     chunk -> emitter.onNext(ByteBuffer.wrap(chunk)),
                                     emitter::onError,
                                     emitter::onComplete

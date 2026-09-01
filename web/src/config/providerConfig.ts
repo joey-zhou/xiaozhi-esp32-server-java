@@ -950,13 +950,17 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
         label: 'Aliyun (DashScope)',
         value: 'aliyun',
         key: '1',
-        // 设备上行固定 16kHz，8k 模型（paraformer-realtime-8k-* / fun-asr-flash-8k-*）参数不匹配，不提供
+        // 8k 系列服务端会自动降采样后再送；paraformer-realtime-8k-v2 是唯一支持情感识别的 Paraformer 模型
         configNameOptions: [
           'paraformer-realtime-v2',
           'paraformer-realtime-v1',
+          'paraformer-realtime-8k-v2',
+          'paraformer-realtime-8k-v1',
           'fun-asr-realtime',
           'fun-asr-realtime-2025-11-07',
           'fun-asr-realtime-2025-09-15',
+          'fun-asr-flash-8k-realtime',
+          'fun-asr-flash-8k-realtime-2026-01-28',
           'gummy-realtime-v1',
           'gummy-chat-v1',
           'qwen3-asr-flash-realtime',
