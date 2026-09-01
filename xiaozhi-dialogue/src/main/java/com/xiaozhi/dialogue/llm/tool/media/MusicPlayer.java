@@ -91,7 +91,7 @@ public class MusicPlayer {
             log.error("播放音乐时发生错误", e);
             session.getPersona().getSynthesizer().synthesize("播放音乐时发生错误");
         } finally {
-            // 音频已全量读入内存后才入播放队列，此处可安全删除临时文件
+            // 音频已全量读入内存，可安全删除临时文件
             if (audioFile != null) {
                 AudioUtils.deleteFile(audioFile.toString());
             }
