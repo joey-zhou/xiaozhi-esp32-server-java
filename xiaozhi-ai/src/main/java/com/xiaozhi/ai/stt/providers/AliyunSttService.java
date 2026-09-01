@@ -8,6 +8,7 @@ import com.alibaba.dashscope.audio.asr.translation.results.TranslationRecognizer
 import com.alibaba.dashscope.audio.omni.*;
 import com.alibaba.dashscope.common.ResultCallback;
 import com.alibaba.dashscope.exception.NoApiKeyException;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.ai.stt.SttResult;
@@ -25,6 +26,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -44,14 +46,47 @@ public class AliyunSttService implements SttService {
         return PROVIDER_NAME;
     }
 
+    /**
+     * 安全地把中间识别结果通知给上层：空文本不回调，回调异常不影响识别主流程。
+     */
+    private void notifyPartial(Consumer<String> onPartialText, String text) {
+        if (onPartialText == null || text == null || text.isEmpty()) {
+            return;
+        }
+        try {
+            onPartialText.accept(text);
+        } catch (Exception e) {
+            log.debug("中间识别结果回调异常，已忽略", e);
+        }
+    }
+
+    /**
+     * 增量转写载荷为 text（已确认前缀）+ stash（待确认后缀），拼接后即当前预览文本。
+     */
+    private String joinTranscriptPreview(JsonObject message) {
+        return optString(message, "text") + optString(message, "stash");
+    }
+
+    private String optString(JsonObject message, String field) {
+        JsonElement element = message.get(field);
+        return element == null || element.isJsonNull() ? "" : element.getAsString();
+    }
+
     @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
+        return stream(audioSink, text -> {
+        });
+    }
+
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
+    @Override
+    public SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText) {
         try {
             if (model.toLowerCase().contains("gummy")) {
-                return streamRecognitionGummy(audioSink);
+                return streamRecognitionGummy(audioSink, onPartialText);
             } else if (model.toLowerCase().contains("qwen") && model.toLowerCase().contains("realtime")) {
-                return streamRecognitionQwen(audioSink);
+                return streamRecognitionQwen(audioSink, onPartialText);
             } else {
                 // paraformer 逻辑
                 String actualModel = model;
@@ -61,7 +96,7 @@ public class AliyunSttService implements SttService {
                     actualModel = "paraformer-realtime-8k-v2";
                     log.info("未识别的模型类型: {}，使用默认模型: {}", model, actualModel);
                 }
-                return streamRecognitionParaformer(audioSink, actualModel);
+                return streamRecognitionParaformer(audioSink, actualModel, onPartialText);
             }
         } catch (Exception e) {
             log.error("使用{}模型语音识别失败：", model, e);
@@ -73,7 +108,8 @@ public class AliyunSttService implements SttService {
      * Paraformer 模型的流式识别。
      * 支持情感识别的模型（如 paraformer-realtime-8k-v2）会返回情感信息，其余模型情感字段为 null。
      */
-    private SttResult streamRecognitionParaformer(Flux<byte[]> audioSink, String modelName) {
+    private SttResult streamRecognitionParaformer(Flux<byte[]> audioSink, String modelName,
+                                                  Consumer<String> onPartialText) {
         var recognizer = new Recognition();
 
         var param = RecognitionParam.builder()
@@ -103,6 +139,11 @@ public class AliyunSttService implements SttService {
                                         log.info("语音识别结果({}): {} [情感: {}, 置信度: {}]",
                                                 modelName, text, emoTag, emoConfidence);
                                         sink.next(sttResult);
+                                        // 单句结束相对整轮识别（可能多句）仍属中间结果，一并通知上层
+                                        notifyPartial(onPartialText, text);
+                                    } else {
+                                        // 句中的增量识别结果，仅作旁路通知，不参与最终结果拼装
+                                        notifyPartial(onPartialText, result.getSentence().getText());
                                     }
                                 },
                                 error -> {
@@ -162,7 +203,7 @@ public class AliyunSttService implements SttService {
     /**
      * Gummy 模型的流式识别（支持实时翻译）
      */
-    private SttResult streamRecognitionGummy(Flux<byte[]> audioSink) {
+    private SttResult streamRecognitionGummy(Flux<byte[]> audioSink, Consumer<String> onPartialText) {
         StringBuilder result = new StringBuilder();
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean hasError = new AtomicBoolean(false);
@@ -191,6 +232,11 @@ public class AliyunSttService implements SttService {
                                     synchronized (result) {
                                         result.append(text);
                                     }
+                                    // 单句结束相对整轮识别（可能多句）仍属中间结果，一并通知上层
+                                    notifyPartial(onPartialText, text);
+                                } else {
+                                    // 句中的增量识别结果，仅作旁路通知，不参与最终结果拼装
+                                    notifyPartial(onPartialText, recognizerResult.getTranscriptionResult().getText());
                                 }
                             }
                         } catch (Exception e) {
@@ -267,7 +313,7 @@ public class AliyunSttService implements SttService {
     /**
      * Qwen 模型的流式识别（qwen3-asr-flash-realtime）
      */
-    private SttResult streamRecognitionQwen(Flux<byte[]> audioSink) {
+    private SttResult streamRecognitionQwen(Flux<byte[]> audioSink, Consumer<String> onPartialText) {
         StringBuilder result = new StringBuilder();
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean hasError = new AtomicBoolean(false);
@@ -292,12 +338,18 @@ public class AliyunSttService implements SttService {
                     switch(type) {
                         case "session.created":
                             break;
+                        // 增量转写。事件名按模型族分两套：asr-realtime 用 .text，omni-realtime 用 .delta
+                        case "conversation.item.input_audio_transcription.text":
+                        case "conversation.item.input_audio_transcription.delta":
+                            notifyPartial(onPartialText, joinTranscriptPreview(message));
+                            break;
                         case "conversation.item.input_audio_transcription.completed":
                             String transcript = message.get("transcript").getAsString();
                             log.info("语音识别结果({}): {}", model, transcript);
                             synchronized (result) {
                                 result.append(transcript);
                             }
+                            notifyPartial(onPartialText, transcript);
                             // 收到识别结果后关闭连接
                             if (conversationRef.get() != null && !isCompleted.get()) {
                                 try {
@@ -321,6 +373,7 @@ public class AliyunSttService implements SttService {
                             }
                             break;
                         default:
+                            log.debug("未处理的realtime事件({}): {}", model, type);
                             break;
                     }
                 }

@@ -16,6 +16,7 @@ import okhttp3.*;
 import reactor.core.publisher.Flux;
 
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -73,9 +74,15 @@ public class TencentSttService implements SttService {
         return PROVIDER_NAME;
     }
 
-    @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
+        return stream(audioSink, text -> {
+        });
+    }
+
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
+    @Override
+    public SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText) {
         // 检查配置是否已设置
         if (secretId == null || secretKey == null || appId == null) {
             log.error("腾讯云语音识别配置未设置，无法进行识别");
@@ -114,7 +121,16 @@ public class TencentSttService implements SttService {
             // 创建识别监听器
             SpeechRecognizerListener listener = new SpeechRecognizerListener() {
                 private final StringBuilder textBuilder = new StringBuilder();
-                
+
+                /** 旁路通知中间结果，异常不得影响识别主流程 */
+                private void notifyPartial(String text) {
+                    try {
+                        onPartialText.accept(text);
+                    } catch (Exception e) {
+                        log.debug("中间识别结果回调异常 - VoiceId: {}", voiceId, e);
+                    }
+                }
+
                 @Override
                 public void onRecognitionStart(SpeechRecognizerResponse response) {
                     log.debug("腾讯云识别开始 - VoiceId: {}", voiceId);
@@ -136,6 +152,7 @@ public class TencentSttService implements SttService {
                                 textBuilder.setLength(0);
                                 textBuilder.append(text);
                             }
+                            notifyPartial(text);
                         }
                     }
                 }
@@ -152,6 +169,7 @@ public class TencentSttService implements SttService {
                                 textBuilder.append(text);
                             }
                             finalResult.set(text);
+                            notifyPartial(text);
                         }
                     }
                 }

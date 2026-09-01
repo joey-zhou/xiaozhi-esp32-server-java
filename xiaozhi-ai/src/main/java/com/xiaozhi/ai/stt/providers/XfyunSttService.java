@@ -29,6 +29,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import static cn.xfyun.util.StringUtils.gson;
 
@@ -128,9 +129,29 @@ public class XfyunSttService implements SttService {
                 .toString();
     }
 
-    @MonitoredOperation(name = "xiaozhi.stt.stream")
+    /**
+     * 中间结果旁路通知：只传非空文本，且回调异常绝不影响识别主流程
+     */
+    private void notifyPartialText(Consumer<String> onPartialText, String text) {
+        if (onPartialText == null || !StringUtils.hasText(text)) {
+            return;
+        }
+        try {
+            onPartialText.accept(text);
+        } catch (Exception e) {
+            log.debug("中间识别结果回调异常，已忽略", e);
+        }
+    }
+
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
+        return stream(audioSink, text -> {
+        });
+    }
+
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
+    @Override
+    public SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText) {
         // 检查配置是否已设置
         if (secretId == null || secretKey == null || appId == null) {
             log.error("讯飞云语音识别配置未设置，无法进行识别");
@@ -209,6 +230,8 @@ public class XfyunSttService implements SttService {
                 if (response.getData() != null && response.getData().getResult() != null) {
                     Text textObject = response.getData().getResult().getText();
                     handleResultText(textObject, resultSegments);
+                    // 旁路通知当前累计的中间识别文本（wpgs 已做过替换修正），不影响最终结果产出
+                    notifyPartialText(onPartialText, getFinalResult(resultSegments));
                 }
 
                 if (response.getData() != null && response.getData().getStatus() == 2) {

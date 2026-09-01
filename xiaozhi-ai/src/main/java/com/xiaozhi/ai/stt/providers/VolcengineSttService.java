@@ -18,6 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.GZIPInputStream;
 import java.io.ByteArrayInputStream;
@@ -77,6 +78,12 @@ public class VolcengineSttService implements SttService {
 
     @Override
     public SttResult stream(Flux<byte[]> audioFlux) {
+        return stream(audioFlux, text -> {});
+    }
+
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
+    @Override
+    public SttResult stream(Flux<byte[]> audioFlux, Consumer<String> onPartialText) {
         // 检查配置是否已设置
         if (apiKey == null || apiKey.isBlank()) {
             log.error("火山引擎语音识别配置未设置，无法进行识别");
@@ -158,7 +165,8 @@ public class VolcengineSttService implements SttService {
             @Override
             public void onMessage(WebSocket webSocket, okio.ByteString bytes) {
                 try {
-                    parseServerResponse(bytes.toByteArray(), textBuilder, finalResult, recognitionLatch, latchReleased, connectId);
+                    parseServerResponse(bytes.toByteArray(), textBuilder, finalResult, recognitionLatch, latchReleased, connectId,
+                            onPartialText);
                 } catch (Exception e) {
                     log.error("解析服务器响应失败", e);
                 }
@@ -292,7 +300,7 @@ public class VolcengineSttService implements SttService {
      */
     private void parseServerResponse(byte[] data, StringBuilder textBuilder,
             AtomicReference<SttResult> finalResult, CountDownLatch latch, AtomicBoolean latchReleased,
-            String connectId) throws Exception {
+            String connectId, Consumer<String> onPartialText) throws Exception {
         if (data.length < 4) {
             log.warn("响应数据过短");
             return;
@@ -377,6 +385,9 @@ public class VolcengineSttService implements SttService {
                         textBuilder.setLength(0);
                         textBuilder.append(text);
                     }
+                    // 中间结果旁路通知：双向流式模式下每次结果变化都会下发一包，
+                    // 这里的 text 即当前已识别文本，用于上层判断用户是否真的开口。
+                    notifyPartialText(onPartialText, text);
                     // 从 utterances 中提取情感（取 definite=true 的分句里的情感）
                     String topEmotion = null;
                     Double topEmotionScore = null;
@@ -425,6 +436,20 @@ public class VolcengineSttService implements SttService {
             if (latchReleased.compareAndSet(false, true)) {
                 latch.countDown();
             }
+        }
+    }
+
+    /**
+     * 通知中间识别结果。空文本不回调；回调抛异常不影响识别主流程。
+     */
+    private void notifyPartialText(Consumer<String> onPartialText, String text) {
+        if (onPartialText == null || text == null || text.isEmpty()) {
+            return;
+        }
+        try {
+            onPartialText.accept(text);
+        } catch (Exception e) {
+            log.debug("中间识别结果回调异常，已忽略", e);
         }
     }
 

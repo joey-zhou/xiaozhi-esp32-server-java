@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -118,9 +119,30 @@ public class AliyunNlsSttService implements SttService {
         return PROVIDER_NAME;
     }
 
+    /**
+     * 安全地把中间识别结果通知给上层：空文本不回调，回调异常不影响识别主流程。
+     */
+    private void notifyPartial(Consumer<String> onPartialText, String text) {
+        if (onPartialText == null || text == null || text.isEmpty()) {
+            return;
+        }
+        try {
+            onPartialText.accept(text);
+        } catch (Exception e) {
+            log.debug("中间识别结果回调异常，已忽略", e);
+        }
+    }
+
     @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
+        return stream(audioSink, text -> {
+        });
+    }
+
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
+    @Override
+    public SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText) {
         if (audioSink == null) {
             log.error("音频数据流为空");
             return SttResult.textOnly("");
@@ -162,10 +184,14 @@ public class AliyunNlsSttService implements SttService {
                             resultBuilder.append(text);
                         }
                     }
+                    // 单句结束相对整轮识别仍属中间结果，一并通知上层
+                    notifyPartial(onPartialText, text);
                 }
 
                 @Override
                 public void onTranscriptionResultChange(SpeechTranscriberResponse response) {
+                    // 中间识别结果（已开启 setEnableIntermediateResult），仅作旁路通知，不参与最终结果拼装
+                    notifyPartial(onPartialText, response.getTransSentenceText());
                 }
 
                 @Override

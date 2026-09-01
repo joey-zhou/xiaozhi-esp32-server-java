@@ -18,6 +18,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -50,9 +51,29 @@ public class FunASRSttService implements SttService {
         return PROVIDER_NAME;
     }
 
-    @MonitoredOperation(name = "xiaozhi.stt.stream")
+    /**
+     * 中间结果旁路通知：只传非空文本，且回调异常绝不影响识别主流程
+     */
+    private void notifyPartialText(Consumer<String> onPartialText, String text) {
+        if (onPartialText == null || text == null || text.isBlank()) {
+            return;
+        }
+        try {
+            onPartialText.accept(text);
+        } catch (Exception e) {
+            log.debug("中间识别结果回调异常，已忽略", e);
+        }
+    }
+
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
+        return stream(audioSink, text -> {
+        });
+    }
+
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
+    @Override
+    public SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText) {
         // 使用阻塞队列存储音频数据
         BlockingQueue<byte[]> audioQueue = new LinkedBlockingQueue<>();
         AtomicBoolean isCompleted = new AtomicBoolean(false);
@@ -113,6 +134,9 @@ public class FunASRSttService implements SttService {
                     boolean isFinal = Boolean.TRUE.equals(jsonObject.getBoolean("is_final"));
                     String mode = jsonObject.getString("mode");
                     String text = jsonObject.getString("text");
+                    // 中间结果旁路：2pass-online为实时增量文本，2pass-offline为分段离线修正文本，
+                    // 两者都早于连接关闭到达，任意非空文本都说明用户确实开口说话了
+                    notifyPartialText(onPartialText, text);
                     // 2pass模式：拼接每个离线修正片段（VAD可能将一句话分为多段）
                     if (isFinal && "2pass-offline".equals(mode)) {
                         if (text != null && !text.isEmpty()) {
