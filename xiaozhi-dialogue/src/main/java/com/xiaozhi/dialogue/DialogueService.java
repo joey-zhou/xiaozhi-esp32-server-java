@@ -22,6 +22,7 @@ import com.xiaozhi.event.SpeechRecognizedEvent;
 
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.OpusProcessor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -51,6 +52,8 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class DialogueService{
     private static final String ABORT_REASON_ASR = "检测到用户说话";
+    /** 唤醒词音频的文件名标记，与 user/assistant 区分开 */
+    private static final String WAKE_WORD_AUDIO_TAG = "wakeword";
 
     @Resource
     private PersonaFactory personaFactory;
@@ -114,8 +117,12 @@ public class DialogueService{
 
             // 处理VAD
             VadService.VadResult vadResult = vadService.processAudio(sessionId, opusData, echoTimestamp);
-            if (vadResult == null || vadResult.getStatus() == VadStatus.ERROR
-                    || vadResult.getProcessedData() == null) {
+            if (vadResult == null) {
+                // VAD 未初始化，即设备在 listen/start 之前补发的唤醒词音频，只采集不送识别
+                session.addWakeWordAudio(opusData);
+                return;
+            }
+            if (vadResult.getStatus() == VadStatus.ERROR || vadResult.getProcessedData() == null) {
                 return;
             }
 
@@ -265,6 +272,7 @@ public class DialogueService{
                 return;
             }
 
+            saveWakeWordAudio(session);
             personaFactory.buildPersona(session).chat(text, false);
         } catch (Exception e) {
             log.error("处理唤醒词失败: {}", e.getMessage(), e);
@@ -403,6 +411,35 @@ public class DialogueService{
     /**
      * 保存用户音频数据为WAV文件
      */
+    /**
+     * 落盘唤醒词前置音频。解码与上传都不能拖慢问候语，整段放虚拟线程。
+     */
+    private void saveWakeWordAudio(ChatSession session) {
+        List<byte[]> opusFrames = session.drainWakeWordAudio();
+        if (opusFrames.isEmpty()) {
+            return;
+        }
+        Thread.startVirtualThread(() -> {
+            try {
+                OpusProcessor decoder = new OpusProcessor();
+                List<byte[]> pcmFrames = new ArrayList<>(opusFrames.size());
+                for (byte[] frame : opusFrames) {
+                    pcmFrames.add(decoder.opusToPcm(frame));
+                }
+                byte[] pcm = AudioUtils.joinPcmFrames(pcmFrames);
+                if (pcm.length == 0) {
+                    return;
+                }
+                Path path = session.getAudioPath(WAKE_WORD_AUDIO_TAG, Instant.now());
+                AudioUtils.saveAsWav(path, pcm);
+                storageServiceFactory.getStorageService().upload(path, path.toString());
+                log.debug("唤醒词音频已采集: {}", path);
+            } catch (Exception e) {
+                log.warn("采集唤醒词音频失败: {}", e.getMessage());
+            }
+        });
+    }
+
     private void saveUserAudio(ChatSession session, Path path) {
         List<byte[]> pcmFrames = vadService.getPcmData(session.getSessionId());
         byte[] fullPcmData = AudioUtils.joinPcmFrames(pcmFrames);

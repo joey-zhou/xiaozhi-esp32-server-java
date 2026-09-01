@@ -13,7 +13,9 @@ import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.dialogue.runtime.Persona;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
 import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Sinks;
 
@@ -23,6 +25,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -96,6 +99,14 @@ public abstract class ChatSession {
      * 移入 Persona 会增加 null 判断复杂度而无收益。
      */
     protected volatile Sinks.Many<byte[]> audioSinks;
+    /** 唤醒词只有一小段，超过这个帧数说明是异常流量 */
+    private static final int MAX_WAKE_WORD_FRAMES = 100;
+    /**
+     * 唤醒词前置音频：设备在 listen/start 之前补发的 Opus 包，此时 VAD 尚未初始化。
+     * 仅做采集，不进识别链路——送进去会被识别成唤醒词再触发一轮多余对话。
+     */
+    @Getter(AccessLevel.NONE)
+    private final List<byte[]> wakeWordAudio = new ArrayList<>();
     /**
      * 会话的最后有效活动时间
      */
@@ -197,6 +208,32 @@ public abstract class ChatSession {
     }
 
     /**
+     * 采集唤醒词前置音频。设备只补发唤醒词那一小段，超出上限说明是异常流量，丢弃。
+     */
+    public void addWakeWordAudio(byte[] opusData) {
+        synchronized (wakeWordAudio) {
+            if (wakeWordAudio.size() >= MAX_WAKE_WORD_FRAMES) {
+                return;
+            }
+            wakeWordAudio.add(opusData);
+        }
+    }
+
+    /**
+     * 取出并清空唤醒词前置音频
+     */
+    public List<byte[]> drainWakeWordAudio() {
+        synchronized (wakeWordAudio) {
+            if (wakeWordAudio.isEmpty()) {
+                return List.of();
+            }
+            List<byte[]> frames = new ArrayList<>(wakeWordAudio);
+            wakeWordAudio.clear();
+            return frames;
+        }
+    }
+
+    /**
      * 音频文件约定路径为：audio/{date}/{device-id}/{role-id}/{timestamp}-{who}.wav|ogg
      * 按日期分目录，便于批量清理过期数据（直接删整个日期目录）
      *
@@ -215,7 +252,8 @@ public abstract class ChatSession {
         // 判断设备ID是否有不适合路径的特殊字符，它很可能是mac地址需要转换。
         String deviceId = device.getDeviceId().replace(":", "-");
         String roleId = device.getRoleId().toString();
-        String extension = MessageBO.SENDER_USER.equals(who) ? "wav" : "ogg";
+        // assistant 是 TTS 的 opus 流直接落盘，其余是上行音频解码后的 PCM
+        String extension = MessageBO.SENDER_ASSISTANT.equals(who) ? "ogg" : "wav";
         String filename = "%s-%s.%s".formatted(datetime, who, extension);
         return Path.of(AudioUtils.AUDIO_PATH, date, deviceId, roleId, filename);
     }
