@@ -10,6 +10,7 @@ import lombok.experimental.Accessors;
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class HelloMessageResp {
     private String type = "hello";
+    private Integer version;
     private String transport;
     private String sessionId;
     private AudioParams audioParams;

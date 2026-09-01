@@ -71,6 +71,13 @@ public class DeviceAppService {
     @Resource
     private DeviceAuthService deviceAuthService;
 
+    /**
+     * 下发给设备的 WebSocket 二进制帧版本：v2 带时间戳，是服务端 AEC 回声对齐的前提
+     */
+    @Value("${xiaozhi.communication.websocket-protocol-version:2}")
+    private int websocketProtocolVersion;
+
+
     public PageResp<DeviceResp> page(DevicePageReq req, Integer userId) {
         DevicePageReq r = req == null ? new DevicePageReq() : req;
         return deviceService.page(r.getPageNo(), r.getPageSize(),
@@ -303,12 +310,14 @@ public class DeviceAppService {
             Map<String, Object> websocketData = new HashMap<>();
             websocketData.put("url", websocketAddress);
             websocketData.put("token", deviceAuthService.generateDeviceToken(deviceId));
+            websocketData.put("version", websocketProtocolVersion);
             otaResponse.put("websocket", websocketData);
         } else {
             // --- 已绑定设备：返回通信地址 ---
             Map<String, Object> websocketData = new HashMap<>();
             websocketData.put("url", websocketAddress);
             websocketData.put("token", deviceAuthService.generateDeviceToken(deviceId));
+            websocketData.put("version", websocketProtocolVersion);
             otaResponse.put("websocket", websocketData);
 
             // --- 同步设备信息 ---

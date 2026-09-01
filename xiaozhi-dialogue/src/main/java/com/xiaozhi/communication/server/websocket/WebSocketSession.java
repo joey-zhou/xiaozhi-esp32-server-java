@@ -65,9 +65,9 @@ public class WebSocketSession extends ChatSession {
 
     @Override
     public void sendBinaryMessage(byte[] message, long timestamp) {
-        // 当前只按 v1 裸 opus 帧发送，无帧头，时间戳无处承载
         try {
-            session.sendMessage(new BinaryMessage(message));
+            session.sendMessage(new BinaryMessage(
+                    BinaryProtocolCodec.encode(protocolVersion, message, timestamp)));
         } catch (IOException e) {
             log.error("发送Binary消息失败", e);
         }

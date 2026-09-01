@@ -10,6 +10,10 @@ public final class HelloMessage extends Message {
         super("hello");
     }
 
+    /**
+     * 设备声明的二进制帧版本(1/2/3)，缺省按 v1 裸帧
+     */
+    private Integer version;
     private HelloFeatures features;
     private AudioParams audioParams;
 }

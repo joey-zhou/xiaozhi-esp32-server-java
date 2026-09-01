@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -65,14 +66,16 @@ class DeviceAppServiceTest {
     }
 
     @Test
-    void handleOtaIssuesWebsocketToken() {
+    void handleOtaIssuesWebsocketTokenAndProtocolVersion() {
         when(deviceAuthService.generateDeviceToken(DEVICE_ID)).thenReturn("sig.123");
+        ReflectionTestUtils.setField(deviceAppService, "websocketProtocolVersion", 2);
 
         Map<String, Object> response = deviceAppService.handleOta(otaRequest());
 
         @SuppressWarnings("unchecked")
         Map<String, Object> websocket = (Map<String, Object>) response.get("websocket");
-        assertThat(websocket).containsEntry("token", "sig.123");
+        assertThat(websocket).containsEntry("token", "sig.123")
+                .containsEntry("version", 2);
     }
 
     @Test
