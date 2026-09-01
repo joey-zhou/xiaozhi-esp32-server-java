@@ -171,20 +171,14 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
             }
         }
 
-        if (message.getAudioParams() != null) {
-            log.info("客户端音频参数 - 格式: {}, 采样率: {}, 声道: {}, 帧时长: {}ms",
-                    message.getAudioParams().getFormat(),
-                    message.getAudioParams().getSampleRate(),
-                    message.getAudioParams().getChannels(),
-                    message.getAudioParams().getFrameDuration());
-        }
+        messageHandler.applyAudioParams(sessionId, message.getAudioParams());
 
         // 回复hello消息
         var resp = new HelloMessageResp()
                 .setVersion(protocolVersion)
                 .setTransport("websocket")
                 .setSessionId(sessionId)
-                .setAudioParams(AudioParams.Opus);
+                .setAudioParams(AudioParams.serverCapability());
 
         try {
             session.sendMessage(new TextMessage(JsonUtil.toJson(resp)));

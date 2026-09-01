@@ -372,6 +372,27 @@ public class MessageHandler {
         aecService.setServerAecRequired(sessionId, required);
     }
 
+    /**
+     * 记录设备声明的音频参数，与服务端固定的处理格式不一致时告警。
+     * 服务端不按设备参数重配链路（Opus 编解码采样率无关，设备侧会自行重采样到硬件采样率）。
+     */
+    public void applyAudioParams(String sessionId, AudioParams deviceParams) {
+        if (deviceParams == null) {
+            return;
+        }
+        ChatSession chatSession = sessionManager.getSession(sessionId);
+        if (chatSession != null) {
+            chatSession.setDeviceAudioParams(deviceParams);
+        }
+        log.info("客户端音频参数 - 格式: {}, 采样率: {}, 声道: {}, 帧时长: {}ms",
+                deviceParams.getFormat(), deviceParams.getSampleRate(),
+                deviceParams.getChannels(), deviceParams.getFrameDuration());
+        String mismatch = deviceParams.mismatchAgainstServer();
+        if (mismatch != null) {
+            log.warn("设备音频参数与服务端不一致，可能影响识别或播放 - SessionId: {}, {}", sessionId, mismatch);
+        }
+    }
+
     private void handleListenMessage(ChatSession chatSession, ListenMessage message) {
         String sessionId = chatSession.getSessionId();
         log.info("收到listen消息 - SessionId: {}, State: {}, Mode: {}", sessionId, message.getState(), message.getMode());

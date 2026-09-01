@@ -1,5 +1,6 @@
 package com.xiaozhi.communication.common;
 
+import com.xiaozhi.communication.domain.AudioParams;
 import com.xiaozhi.communication.domain.iot.IotDescriptor;
 import com.xiaozhi.communication.server.websocket.BinaryProtocolCodec;
 import com.xiaozhi.common.model.bo.DeviceBO;
@@ -83,6 +84,10 @@ public abstract class ChatSession {
      * WebSocket 二进制帧版本(1/2/3)，由设备 hello 声明，收发共用；其他传输忽略。
      */
     protected volatile int protocolVersion = BinaryProtocolCodec.VERSION_V1;
+    /**
+     * 设备 hello 声明的音频参数，仅作诊断记录，不改变服务端处理格式。
+     */
+    protected volatile AudioParams deviceAudioParams;
     /**
      * 会话的音频数据流。
      * 保留在 ChatSession 而非 Persona：audioSinks 是 VAD 驱动的音频输入缓冲，
