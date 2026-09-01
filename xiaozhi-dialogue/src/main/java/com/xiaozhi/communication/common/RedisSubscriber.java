@@ -3,6 +3,7 @@ package com.xiaozhi.communication.common;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
+import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.ai.stt.SttServiceFactory;
@@ -59,6 +60,9 @@ public class RedisSubscriber {
 
     @Resource
     private PersonaFactory personaFactory;
+
+    @Resource
+    private ChatModelFactory chatModelFactory;
 
     @Resource
     private RoleService roleService;
@@ -201,6 +205,7 @@ public class RedisSubscriber {
                     ttsServiceFactory.removeCache(config);
                 } else if ("llm".equals(configType)) {
                     personaFactory.clearPersonasByModelId(configId);
+                    chatModelFactory.removeCache(configId);
                 }
                 // Token 缓存（Coze OAuth、阿里云 Token 等）与 configType 无关，统一清除
                 tokenService.removeCache(config);
