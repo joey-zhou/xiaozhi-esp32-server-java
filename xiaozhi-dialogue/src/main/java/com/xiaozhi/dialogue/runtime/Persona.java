@@ -21,11 +21,14 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +63,12 @@ public class Persona {
      * XiaoZhiToolCallingManager 负责通过 SessionManager 还原为 ChatSession 再传给 Function。
      */
     public static final String TOOL_CONTEXT_SESSION_ID_KEY = "sessionId";
+
+    private static final List<String> ERROR_FALLBACK_MESSAGES = List.of(
+            "抱歉，我刚刚走神了，你能再说一遍吗？",
+            "哎呀，我这会儿没反应过来，再说一次好吗？",
+            "不好意思，刚才没听清，麻烦你再讲一遍。");
+    private static final Random FALLBACK_RANDOM = new Random();
 
     private final SessionManager sessionManager;
     
@@ -225,7 +234,27 @@ public class Persona {
         Flux<ChatResponse> chatResponseFlux = chatStream(now, userMessage, useFunctionCall);
         Flux<ChatToken> tokenFlux = convert(chatResponseFlux);
         // 设备对话管道：过滤掉思考内容，只将正式回复传给语音合成
-        synthesizer.synthesize(tokenFlux.filter(ChatToken::isContent).map(ChatToken::text));
+        Flux<String> speechFlux = tokenFlux.filter(ChatToken::isContent).map(ChatToken::text);
+        synthesizer.synthesize(withErrorFallback(speechFlux));
+    }
+
+    /**
+     * LLM 一个字都没返回就失败时补一句口播，避免设备完全静默让用户干等。
+     * 已经开口再失败则直接收尾——中途插一句道歉比沉默更突兀。
+     */
+    static Flux<String> withErrorFallback(Flux<String> speechFlux) {
+        AtomicBoolean answered = new AtomicBoolean(false);
+        return speechFlux
+                .doOnNext(text -> {
+                    if (StringUtils.hasText(text)) {
+                        answered.set(true);
+                    }
+                })
+                .onErrorResume(error -> answered.get() ? Flux.empty() : Flux.just(errorFallbackMessage()));
+    }
+
+    static String errorFallbackMessage() {
+        return ERROR_FALLBACK_MESSAGES.get(FALLBACK_RANDOM.nextInt(ERROR_FALLBACK_MESSAGES.size()));
     }
 
     /**
