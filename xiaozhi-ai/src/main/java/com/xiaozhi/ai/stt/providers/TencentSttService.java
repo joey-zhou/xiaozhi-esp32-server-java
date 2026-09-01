@@ -6,6 +6,7 @@ import com.tencent.asrv2.SpeechRecognizerRequest;
 import com.tencent.asrv2.SpeechRecognizerResponse;
 import com.tencent.core.ws.Credential;
 import com.tencent.core.ws.SpeechClient;
+import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -72,6 +73,7 @@ public class TencentSttService implements SttService {
         return PROVIDER_NAME;
     }
 
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
         // 检查配置是否已设置

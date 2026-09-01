@@ -6,6 +6,7 @@ import com.alibaba.nls.client.protocol.SampleRateEnum;
 import com.alibaba.nls.client.protocol.asr.SpeechTranscriber;
 import com.alibaba.nls.client.protocol.asr.SpeechTranscriberListener;
 import com.alibaba.nls.client.protocol.asr.SpeechTranscriberResponse;
+import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.port.TokenResolver;
@@ -117,6 +118,7 @@ public class AliyunNlsSttService implements SttService {
         return PROVIDER_NAME;
     }
 
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
         if (audioSink == null) {

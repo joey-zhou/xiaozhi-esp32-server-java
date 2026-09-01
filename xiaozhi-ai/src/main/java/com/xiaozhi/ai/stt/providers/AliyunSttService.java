@@ -9,6 +9,7 @@ import com.alibaba.dashscope.audio.omni.*;
 import com.alibaba.dashscope.common.ResultCallback;
 import com.alibaba.dashscope.exception.NoApiKeyException;
 import com.google.gson.JsonObject;
+import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -43,6 +44,7 @@ public class AliyunSttService implements SttService {
         return PROVIDER_NAME;
     }
 
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
         try {

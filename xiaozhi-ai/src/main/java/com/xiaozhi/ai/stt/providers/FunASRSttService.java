@@ -2,6 +2,7 @@ package com.xiaozhi.ai.stt.providers;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -49,6 +50,7 @@ public class FunASRSttService implements SttService {
         return PROVIDER_NAME;
     }
 
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
         // 使用阻塞队列存储音频数据

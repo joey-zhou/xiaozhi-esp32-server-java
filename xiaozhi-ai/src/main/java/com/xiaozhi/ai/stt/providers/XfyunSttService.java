@@ -3,6 +3,7 @@ package com.xiaozhi.ai.stt.providers;
 import cn.xfyun.model.response.iat.IatResponse;
 import cn.xfyun.model.response.iat.Text;
 import com.google.gson.JsonObject;
+import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -127,6 +128,7 @@ public class XfyunSttService implements SttService {
                 .toString();
     }
 
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
         // 检查配置是否已设置

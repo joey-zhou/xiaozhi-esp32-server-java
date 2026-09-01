@@ -1,6 +1,7 @@
 package com.xiaozhi.userauth.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.UserAuthBO;
 import com.xiaozhi.userauth.convert.UserAuthConvert;
@@ -46,6 +47,7 @@ public class UserAuthServiceImpl implements UserAuthService {
     }
 
     @Override
+    @MonitoredOperation(name = "xiaozhi.auth.login")
     @Transactional
     public UserAuthBO create(UserAuthBO userAuth) {
         if (userAuth == null || userAuth.getUserId() == null || !StringUtils.hasText(userAuth.getOpenId())

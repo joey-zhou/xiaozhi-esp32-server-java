@@ -1,5 +1,6 @@
 package com.xiaozhi.ai.stt.providers;
 
+import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.utils.AudioUtils;
@@ -116,6 +117,7 @@ public class VoskSttService implements SttService {
         return PROVIDER_NAME;
     }
 
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioSink) {
         if (!isModelLoaded()) {

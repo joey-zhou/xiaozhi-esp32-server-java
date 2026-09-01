@@ -1,6 +1,7 @@
 package com.xiaozhi.ai.tts.providers;
 
 import com.k2fsa.sherpa.onnx.*;
+import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.XiaozhiTtsOptions;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -77,6 +78,7 @@ public class SherpaOnnxTtsService implements TtsService {
         return options;
     }
 
+    @MonitoredOperation(name = "xiaozhi.tts")
     @Override
     public Path textToSpeech(String text) throws Exception {
         try {
