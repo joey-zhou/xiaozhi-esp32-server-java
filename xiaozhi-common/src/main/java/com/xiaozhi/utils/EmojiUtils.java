@@ -41,6 +41,15 @@ public class EmojiUtils {
     private static final Pattern HTML_TAG_PATTERN = Pattern.compile("<[^>]+>");
     private static final Pattern SPECIAL_CHARS_PATTERN = Pattern.compile("[@#№$%&*]");
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
+
+    // Markdown 结构标记，念出来全是噪音。链接只保留可读文字，URL 丢掉
+    private static final Pattern MD_DIVIDER_PATTERN = Pattern.compile("(?m)^\\s*([-*_])\\1{2,}\\s*$");
+    private static final Pattern MD_CODE_FENCE_PATTERN = Pattern.compile("```[a-zA-Z0-9_+-]*");
+    private static final Pattern MD_IMAGE_PATTERN = Pattern.compile("!\\[[^\\]]*\\]\\([^)]*\\)");
+    private static final Pattern MD_LINK_PATTERN = Pattern.compile("\\[([^\\]]*)\\]\\([^)]*\\)");
+    private static final Pattern MD_INLINE_CODE_PATTERN = Pattern.compile("`([^`]*)`");
+    private static final Pattern MD_LINE_PREFIX_PATTERN = Pattern.compile("(?m)^\\s*([>*+-]|\\d+\\.)\\s+");
+    private static final Pattern MD_EMPHASIS_PATTERN = Pattern.compile("[~_]");
     
     // 颜文字模式 - 匹配常见的颜文字组合
     private static final Pattern KAOMOJI_PATTERN = Pattern.compile(
@@ -126,8 +135,14 @@ public class EmojiUtils {
      * @return 清理后的文本
      */
     public static String cleanText(String text) {
+        // 必须先于移除换行：列表与引用前缀靠行首定位
+        text = stripMarkdown(text);
+
+        // 换行转空格而不是直接删：多行列表被拼成一句会连着念，没有停顿
+        text = text.replaceAll("[\\n\\r]", " ");
+
         // 移除控制字符
-        text = text.replaceAll("[\\t\\n\\r\b\\f]", "");
+        text = text.replaceAll("[\\t\b\\f]", "");
 
         // 移除HTML标签
         text = HTML_TAG_PATTERN.matcher(text).replaceAll("");
@@ -140,6 +155,20 @@ public class EmojiUtils {
 
         // 去除首尾空格
         return text.trim();
+    }
+
+    /**
+     * 去掉 Markdown 结构标记，保留可读内容。
+     * 流式输出下标记可能跨句被切断，此时该句按原样发音。
+     */
+    private static String stripMarkdown(String text) {
+        text = MD_DIVIDER_PATTERN.matcher(text).replaceAll("");
+        text = MD_CODE_FENCE_PATTERN.matcher(text).replaceAll("");
+        text = MD_IMAGE_PATTERN.matcher(text).replaceAll("");
+        text = MD_LINK_PATTERN.matcher(text).replaceAll("$1");
+        text = MD_INLINE_CODE_PATTERN.matcher(text).replaceAll("$1");
+        text = MD_LINE_PREFIX_PATTERN.matcher(text).replaceAll("");
+        return MD_EMPHASIS_PATTERN.matcher(text).replaceAll("");
     }
 
     /**
