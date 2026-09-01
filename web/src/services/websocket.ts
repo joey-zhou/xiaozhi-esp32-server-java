@@ -647,6 +647,21 @@ export function sendTextMessage(text: string): boolean {
   }
 }
 
+/** 发送一帧上行音频，帧内容与设备端一致（Opus） */
+export function sendBinaryFrame(frame: Uint8Array): boolean {
+  if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+    return false
+  }
+
+  try {
+    webSocket.send(frame)
+    return true
+  } catch (error) {
+    log(`发送音频帧失败: ${error}`, 'error')
+    return false
+  }
+}
+
 export async function startDirectRecording(): Promise<boolean> {
   if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
     throw new Error('WebSocket未连接')
@@ -654,8 +669,9 @@ export async function startDirectRecording(): Promise<boolean> {
 
   try {
     const startMessage = {
-      type: 'stt',
-      state: 'start'
+      type: 'listen',
+      state: 'start',
+      mode: 'manual'
     }
 
     sendJsonMessage(startMessage)
@@ -675,7 +691,7 @@ export async function stopDirectRecording(): Promise<boolean> {
 
   try {
     const stopMessage = {
-      type: 'stt',
+      type: 'listen',
       state: 'stop'
     }
 

@@ -319,6 +319,53 @@ export function loadOpusLibrary(): Promise<boolean> {
 }
 
 // =============================
+// Opus 编码器模块
+// =============================
+
+export interface OpusEncoderModule {
+  _opus_encoder_get_size: (channels: number) => number
+  _opus_encoder_init: (
+    encoder: number,
+    sampleRate: number,
+    channels: number,
+    application: number
+  ) => number
+  _opus_encode: (
+    encoder: number,
+    pcm: number,
+    frameSize: number,
+    data: number,
+    maxDataBytes: number
+  ) => number
+  _malloc: (size: number) => number
+  _free: (ptr: number) => void
+  HEAPU8: Uint8Array
+  HEAP16: Int16Array
+}
+
+/**
+ * 取出已加载的 Opus wasm 模块用于编码。调用前需先 await loadOpusLibrary()。
+ * 解码路径缓存的 ModuleInstance 可能是只含解码函数的裁剪对象，因此这里逐个候选检查编码符号。
+ */
+export function getOpusEncoderModule(): OpusEncoderModule | null {
+  const candidates = [window.Module?.instance, window.Module, window.ModuleInstance]
+
+  for (const candidate of candidates) {
+    const mod = candidate as unknown as OpusEncoderModule | undefined
+    if (
+      mod &&
+      typeof mod._opus_encode === 'function' &&
+      typeof mod._opus_encoder_init === 'function' &&
+      typeof mod._opus_encoder_get_size === 'function'
+    ) {
+      return mod
+    }
+  }
+
+  return null
+}
+
+// =============================
 // Opus 解码器
 // =============================
 

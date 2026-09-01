@@ -13,6 +13,7 @@ import {
   registerStatusChangeCallback,
   unregisterStatusChangeCallback,
   registerBinaryHandler,
+  sendBinaryFrame,
   messages,
   clearMessages,
   type WebSocketConfig,
@@ -20,6 +21,7 @@ import {
   type ConnectionStatus
 } from '@/services/websocket'
 import { initAudio, handleBinaryAudioMessage } from '@/services/audio'
+import { startMicrophoneCapture, stopMicrophoneCapture } from '@/services/audioRecorder'
 
 export function useWebSocket() {
   // 连接状态
@@ -42,6 +44,8 @@ export function useWebSocket() {
   // 组件卸载时清理
   onBeforeUnmount(() => {
     unregisterStatusChangeCallback(handleStatusChange)
+    // 录音中卸载时释放麦克风，否则浏览器录音标识会一直亮着
+    void stopMicrophoneCapture()
   })
 
   // 连接到服务器
@@ -72,11 +76,41 @@ export function useWebSocket() {
     return sendTextMessage(text)
   }
 
+  // 是否已通知服务端进入聆听状态。未进入时采集到的帧直接丢弃，
+  // 避免音频早于 listen/start 到达导致服务端 VAD 尚未初始化而丢包。
+  let listening = false
+  // 用于作废「启动尚未完成就已松手」的录音请求
+  let startToken = 0
+
   // 开始录音
   const startRecording = async (): Promise<boolean> => {
+    const token = ++startToken
+
     try {
-      return await startDirectRecording()
+      // 先取得麦克风权限再通知服务端，避免用户拒绝授权后服务端空等
+      await startMicrophoneCapture(frame => {
+        if (listening) {
+          sendBinaryFrame(frame)
+        }
+      })
+
+      // 授权期间用户已松手，直接回收麦克风
+      if (token !== startToken) {
+        await stopMicrophoneCapture()
+        return false
+      }
+
+      const started = await startDirectRecording()
+      if (!started) {
+        await stopMicrophoneCapture()
+        return false
+      }
+
+      listening = true
+      return true
     } catch (error) {
+      listening = false
+      await stopMicrophoneCapture()
       console.error('开始录音失败:', error)
       throw error
     }
@@ -84,8 +118,15 @@ export function useWebSocket() {
 
   // 停止录音
   const stopRecording = async (): Promise<boolean> => {
+    // 作废可能仍在进行中的启动流程
+    startToken++
+    const wasListening = listening
+    listening = false
+
     try {
-      return await stopDirectRecording()
+      await stopMicrophoneCapture()
+      // 从未通知过服务端进入聆听，就不必发结束消息
+      return wasListening ? await stopDirectRecording() : true
     } catch (error) {
       console.error('停止录音失败:', error)
       throw error
