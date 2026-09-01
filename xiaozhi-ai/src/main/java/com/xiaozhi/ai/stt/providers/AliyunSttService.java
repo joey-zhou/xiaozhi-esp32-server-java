@@ -93,8 +93,13 @@ public class AliyunSttService implements SttService {
                 // 兼容以前的数据，如果不包含已知模型类型，则使用默认模型
                 if (!model.toLowerCase().contains("paraformer")
                         && !model.toLowerCase().contains("fun-asr")) {
-                    actualModel = "paraformer-realtime-8k-v2";
+                    actualModel = "paraformer-realtime-v2";
                     log.info("未识别的模型类型: {}，使用默认模型: {}", model, actualModel);
+                }
+                // 8k 模型只接受 8000Hz，与设备上行的 16kHz 不匹配，会静默返回空结果
+                if (actualModel.toLowerCase().contains("8k")) {
+                    log.warn("模型 {} 要求8kHz音频，与设备上行的{}Hz不匹配，识别将失败，请改用16k模型",
+                            actualModel, AudioUtils.SAMPLE_RATE);
                 }
                 return streamRecognitionParaformer(audioSink, actualModel, onPartialText);
             }

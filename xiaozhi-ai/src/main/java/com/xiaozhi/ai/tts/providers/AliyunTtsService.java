@@ -300,9 +300,8 @@ public class AliyunTtsService implements TtsService {
                         while ((bytesRead = in.read(buffer)) != -1) {
                             baos.write(buffer, 0, bytesRead);
                         }
-                        byte[] pcm24k = AudioUtils.wavToPcm(baos.toByteArray());
-                        byte[] pcm16k = AudioUtils.resamplePcm(pcm24k, 24000, 16000);
-                        AudioUtils.saveAsWav(outPath, pcm16k);
+                        // wavToPcm 按 WAV 头采样率自动重采样到服务端采样率
+                        AudioUtils.saveAsWav(outPath, AudioUtils.wavToPcm(baos.toByteArray()));
                         return true;
                     } catch (Exception e) {
                         return false;

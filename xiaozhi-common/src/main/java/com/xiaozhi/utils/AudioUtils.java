@@ -231,7 +231,27 @@ public class AudioUtils {
         int dataSize = wavData.length - dataOffset;
         byte[] pcmData = new byte[dataSize];
         System.arraycopy(wavData, dataOffset, pcmData, 0, dataSize);
+
+        int wavSampleRate = readWavSampleRate(wavData);
+        if (wavSampleRate > 0 && wavSampleRate != SAMPLE_RATE) {
+            log.warn("WAV采样率{}Hz与服务端{}Hz不一致，已重采样", wavSampleRate, SAMPLE_RATE);
+            return resamplePcm(pcmData, wavSampleRate, SAMPLE_RATE);
+        }
         return pcmData;
+    }
+
+    /**
+     * 读取 WAV 头 fmt 子块中的采样率，读不到返回 0
+     */
+    private static int readWavSampleRate(byte[] wavData) {
+        for (int i = 12; i + 16 <= wavData.length; i++) {
+            if (wavData[i] == 'f' && wavData[i + 1] == 'm' && wavData[i + 2] == 't' && wavData[i + 3] == ' ') {
+                int off = i + 12;
+                return (wavData[off] & 0xFF) | ((wavData[off + 1] & 0xFF) << 8)
+                        | ((wavData[off + 2] & 0xFF) << 16) | ((wavData[off + 3] & 0xFF) << 24);
+            }
+        }
+        return 0;
     }
 
     /**
@@ -241,40 +261,7 @@ public class AudioUtils {
      * @return PCM数据字节数组
      */
     public static byte[] wavToPcm(String wavPath) throws IOException {
-
-        byte[] wavData = Files.readAllBytes(Paths.get(wavPath));
-
-        if (wavData == null || wavData.length < 44) { // WAV头至少44字节
-            throw new IOException("无效的WAV数据");
-        }
-
-        // 检查WAV文件标识
-        if (wavData[0] != 'R' || wavData[1] != 'I' || wavData[2] != 'F' || wavData[3] != 'F' ||
-                wavData[8] != 'W' || wavData[9] != 'A' || wavData[10] != 'V' || wavData[11] != 'E') {
-            throw new IOException("不是有效的WAV文件格式");
-        }
-
-        // 查找data子块
-        int dataOffset = -1;
-        for (int i = 12; i < wavData.length - 4; i++) {
-            if (wavData[i] == 'd' && wavData[i + 1] == 'a' && wavData[i + 2] == 't' && wavData[i + 3] == 'a') {
-                dataOffset = i + 8; // 跳过"data"和数据大小字段
-                break;
-            }
-        }
-
-        if (dataOffset == -1) {
-            throw new IOException("在WAV文件中找不到data子块");
-        }
-
-        // 计算PCM数据大小
-        int dataSize = wavData.length - dataOffset;
-
-        // 提取PCM数据
-        byte[] pcmData = new byte[dataSize];
-        System.arraycopy(wavData, dataOffset, pcmData, 0, dataSize);
-
-        return pcmData;
+        return wavToPcm(Files.readAllBytes(Paths.get(wavPath)));
     }
 
     /**

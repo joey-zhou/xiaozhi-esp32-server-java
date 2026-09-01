@@ -62,7 +62,8 @@ public class TencentTtsService implements TtsService {
 
     @Override
     public String audioFormat() {
-        return "mp3";
+        // textToSpeech 产出的是 WAV，后缀必须一致，否则播放端按后缀分派会解码失败
+        return "wav";
     }
 
     private Flux<byte[]> stream(String text) throws Exception {
