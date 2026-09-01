@@ -25,6 +25,9 @@ public class WebSocketConfig implements WebSocketConfigurer {
     private WebSocketHandler webSocketHandler;
 
     @Resource
+    private DeviceAuthHandshakeInterceptor deviceAuthHandshakeInterceptor;
+
+    @Resource
     private ServerAddressProvider serverAddressProvider;
 
     @Value("${websocket.max-text-message-buffer-size:65536}")
@@ -42,6 +45,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(webSocketHandler, WS_PATH)
+                .addInterceptors(deviceAuthHandshakeInterceptor)
                 .setAllowedOrigins("*");
 
         log.info("==========================================================");

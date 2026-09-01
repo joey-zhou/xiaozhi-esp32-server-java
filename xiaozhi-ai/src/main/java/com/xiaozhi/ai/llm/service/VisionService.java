@@ -7,6 +7,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.content.Media;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
+import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
@@ -37,7 +38,9 @@ public class VisionService {
             throw new IllegalStateException("无可用的视觉模型");
         }
 
-        MimeType mimeType = MimeType.valueOf(file.getContentType());
+        String contentType = file.getContentType();
+        MimeType mimeType = contentType != null && !contentType.isBlank()
+                ? MimeType.valueOf(contentType) : MimeTypeUtils.IMAGE_JPEG;
         Media media = Media.builder()
                 .mimeType(mimeType)
                 .data(file.getResource())

@@ -1,6 +1,7 @@
 package com.xiaozhi.communication.controller;
 
 import cn.dev33.satoken.annotation.SaIgnore;
+import com.xiaozhi.communication.auth.DeviceAuthService;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.ai.llm.service.VisionService;
 
@@ -18,7 +19,7 @@ import java.util.*;
 import lombok.extern.slf4j.Slf4j;
 /**
  * 视觉对话（MCP 识图接口）
- * 由设备 MCP 客户端调用，Bearer token 为 sessionId。
+ * 由设备 MCP 客户端调用，Bearer token 为 MCP initialize 时下发的会话签名 token。
  */
 @Slf4j
 @RestController
@@ -31,6 +32,12 @@ public class VLChatController {
 
     @Resource
     private SessionManager sessionManager;
+
+    @Resource
+    private DeviceAuthService deviceAuthService;
+
+    @Resource
+    private ImageValidator imageValidator;
 
     @SaIgnore
     @PostMapping(value = "/chat", produces = "application/json;charset=UTF-8")
@@ -51,10 +58,24 @@ public class VLChatController {
             return failure("缺少认证信息或格式错误");
         }
 
-        String sessionId = authorization.substring(7);
+        DeviceAuthService.VisionToken visionToken = deviceAuthService.verifyVisionToken(authorization.substring(7));
+        if (visionToken == null) {
+            return failure("认证信息无效或已过期");
+        }
+        String sessionId = visionToken.sessionId();
         var session = sessionManager.getSession(sessionId);
         if (session == null) {
             return failure("session不存在");
+        }
+        if (StringUtils.hasText(visionToken.deviceId()) && session.getDevice() != null
+                && session.getDevice().getDeviceId() != null
+                && !visionToken.deviceId().equalsIgnoreCase(session.getDevice().getDeviceId())) {
+            return failure("设备与会话不匹配");
+        }
+
+        String imageError = imageValidator.validate(file);
+        if (imageError != null) {
+            return failure(imageError);
         }
 
         try {

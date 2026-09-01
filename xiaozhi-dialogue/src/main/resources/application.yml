@@ -80,6 +80,11 @@ logging:
 # 小智扩展配置
 # ============================================================
 xiaozhi:
+  # 设备接入鉴权：与 server 模块同配置（token 由 OTA 签发、此处握手校验），配置 secret 即开启
+  device-auth:
+    secret:
+    expire-seconds: 2592000
+    allowed-devices:
   runtime:
     native-lib-dir: lib
     vosk-model-dir: models/vosk-model

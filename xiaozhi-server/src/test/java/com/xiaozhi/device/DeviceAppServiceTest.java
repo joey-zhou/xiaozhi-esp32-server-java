@@ -2,7 +2,11 @@ package com.xiaozhi.device;
 
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.req.DeviceScanBindReq;
+import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
+import com.xiaozhi.communication.ServerAddressProvider;
+import com.xiaozhi.communication.auth.DeviceAuthService;
+import com.xiaozhi.communication.registry.DialogueServerRegistry;
 import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
@@ -17,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Optional;
 
 import org.mockito.ArgumentCaptor;
@@ -42,6 +47,12 @@ class DeviceAppServiceTest {
     private DeviceConvert deviceConvert;
     @Mock
     private RoleService roleService;
+    @Mock
+    private ServerAddressProvider serverAddressProvider;
+    @Mock
+    private DialogueServerRegistry dialogueServerRegistry;
+    @Mock
+    private DeviceAuthService deviceAuthService;
 
     @InjectMocks
     private DeviceAppService deviceAppService;
@@ -51,6 +62,17 @@ class DeviceAppServiceTest {
         DeviceResp boundDevice = new DeviceResp();
         boundDevice.setDeviceId(DEVICE_ID);
         lenient().when(deviceService.get(DEVICE_ID)).thenReturn(boundDevice);
+    }
+
+    @Test
+    void handleOtaIssuesWebsocketToken() {
+        when(deviceAuthService.generateDeviceToken(DEVICE_ID)).thenReturn("sig.123");
+
+        Map<String, Object> response = deviceAppService.handleOta(otaRequest());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> websocket = (Map<String, Object>) response.get("websocket");
+        assertThat(websocket).containsEntry("token", "sig.123");
     }
 
     @Test
@@ -123,5 +145,11 @@ class DeviceAppServiceTest {
 
     private VerifyCode verifyCode(String type) {
         return new VerifyCode("123456", DEVICE_ID, null, type, null, LocalDateTime.now());
+    }
+
+    private OtaReq otaRequest() {
+        OtaReq req = new OtaReq();
+        req.setDeviceId(DEVICE_ID);
+        return req;
     }
 }

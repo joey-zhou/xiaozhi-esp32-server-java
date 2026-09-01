@@ -1,6 +1,7 @@
 package com.xiaozhi.dialogue.llm.tool.mcp.device;
 
 import com.xiaozhi.communication.ServerAddressProvider;
+import com.xiaozhi.communication.auth.DeviceAuthService;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.communication.domain.DeviceMcpMessage;
@@ -41,6 +42,9 @@ public class DeviceMcpService {
 
     @Resource
     private ServerAddressProvider serverAddressProvider;
+
+    @Resource
+    private DeviceAuthService deviceAuthService;
 
     @Resource
     private DeviceRepository deviceRepository;
@@ -141,7 +145,8 @@ public class DeviceMcpService {
 
         DeviceMcpVision vision = new DeviceMcpVision();
         vision.setUrl(serverAddressProvider.getServerAddress() + "/api/vl/chat");
-        vision.setToken(chatSession.getSessionId());
+        String deviceId = chatSession.getDevice() != null ? chatSession.getDevice().getDeviceId() : null;
+        vision.setToken(deviceAuthService.generateVisionToken(chatSession.getSessionId(), deviceId));
         initialize.setCapabilities(Map.of("vision", vision));
         return initialize;
     }

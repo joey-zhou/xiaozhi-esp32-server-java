@@ -13,6 +13,7 @@ import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.common.model.resp.PageResp;
 import com.xiaozhi.communication.ServerAddressProvider;
+import com.xiaozhi.communication.auth.DeviceAuthService;
 import com.xiaozhi.communication.registry.DialogueServerInfo;
 import com.xiaozhi.communication.registry.DialogueServerRegistry;
 import com.xiaozhi.device.convert.DeviceConvert;
@@ -67,6 +68,8 @@ public class DeviceAppService {
     @Resource
     private DialogueServerRegistry dialogueServerRegistry;
 
+    @Resource
+    private DeviceAuthService deviceAuthService;
 
     public PageResp<DeviceResp> page(DevicePageReq req, Integer userId) {
         DevicePageReq r = req == null ? new DevicePageReq() : req;
@@ -277,6 +280,14 @@ public class DeviceAppService {
             "timezone_offset", 480
         ));
 
+        DialogueServerInfo selectedServer = null;
+        try {
+            selectedServer = dialogueServerRegistry.selectServer();
+        } catch (RuntimeException e) {
+            log.warn("选择对话服务器失败，回退默认地址, deviceId={}", deviceId, e);
+        }
+        String websocketAddress = selectedServer != null ? selectedServer.getWebsocketAddress() : serverAddressProvider.getWebsocketAddress();
+
         if (boundDevice == null) {
             // --- 未绑定设备：生成验证码 ---
             DeviceResp codeResult = generateCode(deviceId, null, req.getType());
@@ -288,19 +299,16 @@ public class DeviceAppService {
                 "message", codeResult.getCode(),
                 "challenge", deviceId
             ));
-        } else {
-            // --- 已绑定设备：返回通信地址 ---
-            DialogueServerInfo selectedServer = null;
-            try {
-                selectedServer = dialogueServerRegistry.selectServer();
-            } catch (RuntimeException e) {
-                log.warn("选择对话服务器失败，回退默认地址, deviceId={}", deviceId, e);
-            }
-            String websocketAddress = selectedServer != null ? selectedServer.getWebsocketAddress() : serverAddressProvider.getWebsocketAddress();
-
+            // 语音验证码绑定需要未绑定设备也能接入 WS
             Map<String, Object> websocketData = new HashMap<>();
             websocketData.put("url", websocketAddress);
-            websocketData.put("token", "");
+            websocketData.put("token", deviceAuthService.generateDeviceToken(deviceId));
+            otaResponse.put("websocket", websocketData);
+        } else {
+            // --- 已绑定设备：返回通信地址 ---
+            Map<String, Object> websocketData = new HashMap<>();
+            websocketData.put("url", websocketAddress);
+            websocketData.put("token", deviceAuthService.generateDeviceToken(deviceId));
             otaResponse.put("websocket", websocketData);
 
             // --- 同步设备信息 ---

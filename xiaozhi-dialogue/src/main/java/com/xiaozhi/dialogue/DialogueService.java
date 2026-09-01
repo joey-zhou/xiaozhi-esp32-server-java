@@ -152,7 +152,6 @@ public class DialogueService{
      */
     public void completeSpeechSegment(ChatSession session) {
         if (session.getDeviceState() == DeviceState.LISTENING) {
-            session.setSpeechEndTime(Instant.now());
             session.completeAudioStream();
             session.transitionTo(DeviceState.THINKING);
         }
