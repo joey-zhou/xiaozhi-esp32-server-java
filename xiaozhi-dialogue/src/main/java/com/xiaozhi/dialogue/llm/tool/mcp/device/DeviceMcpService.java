@@ -31,12 +31,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
 public class DeviceMcpService {
+
+    /** 设备指令等待应答的上限（秒） */
+    private int mcpRequestTimeoutSeconds = 30;
     @Resource
     private Environment environment;
 
@@ -212,19 +216,20 @@ public class DeviceMcpService {
                         reqPayload.setParams(Map.of("name", name, "arguments", params));
                         req.setPayload(reqPayload);
 
-                        DeviceMcpMessage resp = sendMcpRequest(chatSession, req);
-                        if (resp == null) {
-                            return "操作失败";
+                        McpCallResult callOutcome = call(chatSession, req);
+                        if (callOutcome.failed()) {
+                            return callOutcome.failureReason();
                         }
+                        DeviceMcpMessage resp = callOutcome.response();
                         log.info("SessionId: {}, MCP function call response: {}", chatSession.getSessionId(), resp);
-                        if (resp.getPayload().getResult() == null) {
-                            return resp.getPayload().getError().get("message");
+                        Map<String, Object> callResult = resp.getPayload().getResult();
+                        if (callResult == null) {
+                            return deviceErrorMessage(resp);
                         }
-                        if ("false".equals(String.valueOf(resp.getPayload().getResult().get("isError")))) {
-                            return resp.getPayload().getResult().get("content");
-                        } else {
-                            return resp.getPayload().getError();
+                        if ("false".equals(String.valueOf(callResult.get("isError")))) {
+                            return callResult.get("content");
                         }
+                        return deviceErrorMessage(resp);
                     })
                     .toolMetadata(ToolMetadata.builder().returnDirect(false).build())
                     .description(funcDescription)
@@ -297,23 +302,60 @@ public class DeviceMcpService {
         return result;
     }
 
+    /**
+     * 设备指令的调用结果，失败时 failureReason 是给模型看的说明。
+     */
+    public record McpCallResult(DeviceMcpMessage response, String failureReason) {
+        public boolean failed() {
+            return response == null;
+        }
+    }
+
+    /**
+     * 设备回报错误时给模型的说明，设备没给出具体原因时用兜底话术。
+     */
+    private static String deviceErrorMessage(DeviceMcpMessage response) {
+        Map<String, Object> error = response.getPayload().getError();
+        Object message = error == null ? null : error.get("message");
+        if (message != null && StringUtils.hasText(message.toString())) {
+            return "设备执行失败：" + message;
+        }
+        return "设备执行失败，没有给出具体原因。请告诉用户这次没能完成";
+    }
+
     public DeviceMcpMessage sendMcpRequest(ChatSession chatSession, DeviceMcpMessage mcpMessage) {
+        return call(chatSession, mcpMessage).response();
+    }
+
+    public McpCallResult call(ChatSession chatSession, DeviceMcpMessage mcpMessage) {
         Long id = mcpMessage.getPayload().getId();
+        // 连接已断就不必等满超时，发送本身不抛异常，等下去只是白等
+        if (!chatSession.isOpen()) {
+            log.warn("SessionId: {}, 连接已关闭，设备指令未下发, id: {}", chatSession.getSessionId(), id);
+            return new McpCallResult(null, "设备连接不可用，指令没有下发成功。请告诉用户设备当前无法控制");
+        }
         CompletableFuture<DeviceMcpMessage> future = new CompletableFuture<>();
         Map<Long, CompletableFuture<DeviceMcpMessage>> pendingRequests =
                 chatSession.getDeviceMcpHolder().getMcpPendingRequests();
         // 先登记再发送，设备秒回时应答才有落点，否则会被丢弃并干等到超时
         pendingRequests.put(id, future);
 
-        DeviceMcpMessage response = null;
         try {
             chatSession.sendTextMessage(JsonUtil.toJson(mcpMessage));
-            response = future.get(30, TimeUnit.SECONDS);
+            return new McpCallResult(future.get(mcpRequestTimeoutSeconds, TimeUnit.SECONDS), null);
+        } catch (TimeoutException e) {
+            log.warn("SessionId: {}, 设备指令等待超时, id: {}", chatSession.getSessionId(), id);
+            return new McpCallResult(null,
+                    "设备在" + mcpRequestTimeoutSeconds + "秒内没有响应，可能不在线或正忙。可以稍后重试，或者告诉用户这次没能执行");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("SessionId: {}, 设备指令被中断, id: {}", chatSession.getSessionId(), id);
+            return new McpCallResult(null, "本次设备指令被中断，没有执行");
         } catch (Exception e) {
-            log.error("SessionId: {}, Error sending MCP request：{}", chatSession.getSessionId(), e);
+            log.error("SessionId: {}, 设备指令下发失败, id: {}", chatSession.getSessionId(), id, e);
+            return new McpCallResult(null, "设备连接不可用，指令没有下发成功。请告诉用户设备当前无法控制");
         } finally {
             pendingRequests.remove(id);
         }
-        return response;
     }
 }

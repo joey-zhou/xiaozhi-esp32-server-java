@@ -194,6 +194,39 @@ class DeviceMcpProtocolTest {
         assertThat(session.getDeviceMcpHolder().getMcpPendingRequests()).isEmpty();
     }
 
+    // 设备不应答时要让模型知道是超时而不是笼统的失败，否则模型无从判断该重试还是告诉用户
+    @Test
+    void timedOutCallTellsModelDeviceDidNotRespond() {
+        FakeDevice device = harness.connect(DEVICE_ID);
+        device.hello();
+        ChatSession session = device.session();
+        ReflectionTestUtils.setField(deviceMcpService, "mcpRequestTimeoutSeconds", 0);
+
+        DeviceMcpService.McpCallResult result =
+                deviceMcpService.call(session, toolCall(session, "self.get_status"));
+
+        assertThat(result.failed()).isTrue();
+        assertThat(result.failureReason()).contains("没有响应");
+        // 超时后不能在表里留下条目
+        assertThat(session.getDeviceMcpHolder().getMcpPendingRequests()).isEmpty();
+    }
+
+    // 连接已断时的失败原因要与超时区分开
+    @Test
+    void sendFailureTellsModelDeviceIsUnreachable() {
+        FakeDevice device = harness.connect(DEVICE_ID);
+        device.hello();
+        ChatSession session = device.session();
+        device.transport().breakConnection();
+
+        DeviceMcpService.McpCallResult result =
+                deviceMcpService.call(session, toolCall(session, "self.get_status"));
+
+        assertThat(result.failed()).isTrue();
+        assertThat(result.failureReason()).contains("连接不可用");
+        assertThat(session.getDeviceMcpHolder().getMcpPendingRequests()).isEmpty();
+    }
+
     @Test
     void mcpResponseWithUnknownIdIsIgnored() {
         FakeDevice device = harness.connect(DEVICE_ID);
