@@ -90,13 +90,9 @@ class GoodbyeAndReconnectProtocolTest {
     }
 
     /**
-     * 当前行为：设备主动 goodbye 之后，库里的状态永远停在「在线」。
-     * goodbye 走 closeSession 已把会话从注册表摘掉，容器随后回调 afterConnectionClosed 时
-     * 取不到会话直接 return，离线写库被整段跳过，设备管理页会长期显示假在线，
-     * 只能等下次服务启动的 bulk reset 纠正；服务端主动关闭（含超时关闭）同理。
-     * 正确行为：断链后应当写入一条 OFFLINE。
-     * 生产代码 xiaozhi-dialogue/src/main/java/com/xiaozhi/communication/common/MessageHandler.java:178-181
-     * （配合 SessionManager.java:233 的 goodbye 先摘会话）。
+     * 设备主动 goodbye 之后库里必须写入一条离线。goodbye 走 closeSession 已把会话摘出注册表，
+     * 容器随后回调 afterConnectionClosed 时取不到会话，写库只能由 closeSession 自己负责，
+     * 漏写会让设备管理页长期显示假在线，只能等下次服务启动的批量重置纠正。
      */
     @Test
     void goodbyeThenTransportCloseMarksDeviceOffline() {
@@ -109,16 +105,11 @@ class GoodbyeAndReconnectProtocolTest {
         // goodbye 里 closeSession 会真的关连接，容器随后回调 afterConnectionClosed
         device.disconnect();
 
-        // 反向断言的 settle：关一台无关设备并等它的离线写库落地，
-        // 本设备那条更早到达的关闭回调到此必已处理完
-        FakeDevice other = harness.connect(OTHER_DEVICE_ID);
-        other.hello();
-        other.disconnect();
-        AwaitHelper.until("无关设备的离线写库已落地",
-                () -> countState(OTHER_DEVICE_ID, DeviceBO.DEVICE_STATE_OFFLINE) == 1);
-
-        // 缺陷修复后应改为：countState(DEVICE_ID, OFFLINE) == 1
-        assertThat(countState(DEVICE_ID, DeviceBO.DEVICE_STATE_OFFLINE)).isZero();
+        AwaitHelper.until("离线写库已落地",
+                () -> countState(DEVICE_ID, DeviceBO.DEVICE_STATE_OFFLINE) == 1);
+        // 连接真正关闭时的回调取不到会话，不能再重复写一条
+        AwaitHelper.stayFalse("离线状态被重复写入", Duration.ofMillis(200),
+                () -> countState(DEVICE_ID, DeviceBO.DEVICE_STATE_OFFLINE) > 1);
         assertThat(countState(DEVICE_ID, DeviceBO.DEVICE_STATE_ONLINE)).isEqualTo(1);
     }
 

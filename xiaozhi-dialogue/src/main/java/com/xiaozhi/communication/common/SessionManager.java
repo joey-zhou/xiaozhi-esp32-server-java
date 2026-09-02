@@ -177,6 +177,32 @@ public class SessionManager {
 
     // ========== 会话关闭 ==========
 
+    /**
+     * 连接关闭时写入设备离线状态。服务关闭期间跳过，启动时会批量重置。
+     */
+    private void updateDeviceStateOnClose(ChatSession chatSession) {
+        DeviceBO device = chatSession.getDevice();
+        if (device == null || isShuttingDown()) {
+            return;
+        }
+        String sessionId = chatSession.getSessionId();
+        String deviceId = device.getDeviceId();
+        String newState = DeviceBO.DEVICE_STATE_OFFLINE;
+        Thread.startVirtualThread(() -> {
+            try {
+                // 设备已在新连接上重连时不覆盖新会话的状态
+                ChatSession currentSession = getSessionByDeviceId(deviceId);
+                if (currentSession != null && !sessionId.equals(currentSession.getSessionId())) {
+                    return;
+                }
+                deviceRepository.updateState(deviceId, newState);
+                log.info("连接已关闭 - SessionId: {}, DeviceId: {}, 新状态: {}", sessionId, deviceId, newState);
+            } catch (Exception e) {
+                log.error("更新设备状态失败", e);
+            }
+        });
+    }
+
     public void closeSession(String sessionId) {
         ChatSession chatSession = sessions.get(sessionId);
         if (chatSession != null) {
@@ -189,6 +215,9 @@ public class SessionManager {
             return;
         }
         try {
+            // 状态写库要赶在会话被摘出注册表之前，否则设备主动 goodbye、超时关闭、
+            // 退出意图这几条路径的连接回调都取不到会话，离线状态永远写不进去
+            updateDeviceStateOnClose(chatSession);
             if (chatSession instanceof WebSocketSession) {
                 removeSession(chatSession.getSessionId());
             }

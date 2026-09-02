@@ -177,33 +177,7 @@ public class MessageHandler {
         if (chatSession == null) {
             return;
         }
-        // 连接关闭时清理资源
-        DeviceBO device = chatSession.getDevice();
-        if (device != null) {
-            String deviceId = device.getDeviceId();
-
-            // 服务关闭期间跳过状态写库：启动时会 bulk reset 所有设备为离线，无需在关机时逐台写入
-            if (!sessionManager.isShuttingDown()) {
-                Thread.startVirtualThread(() -> {
-                    try {
-                        String newState = DeviceBO.DEVICE_STATE_OFFLINE;
-
-                        // 时序保护：检查设备是否已重连
-                        ChatSession currentSession = sessionManager.getSessionByDeviceId(deviceId);
-                        if (currentSession != null && !sessionId.equals(currentSession.getSessionId())) {
-                            return;
-                        }
-
-                        deviceRepository.updateState(deviceId, newState);
-                        log.info("连接已关闭 - SessionId: {}, DeviceId: {}, 新状态: {}",
-                                sessionId, deviceId, newState);
-                    } catch (Exception e) {
-                        log.error("更新设备状态失败", e);
-                    }
-                });
-            }
-        }
-        // 清理会话
+        // 清理会话，设备状态由 closeSession 统一写入
         sessionManager.closeSession(sessionId);
         // 清理VAD会话
         vadService.resetSession(sessionId);
