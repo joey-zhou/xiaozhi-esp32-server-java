@@ -197,19 +197,34 @@ public class SummaryConversation extends Conversation {
                     .setCreateTime(Instant.now());
             chatMemory.save(newSummary);
 
+            int removed;
             synchronized (summaryLock) {
-                // 5. 移除已处理的消息
-                messages.removeAll(needSummaryMessages);
+                // 5. 移除已处理的消息，按引用匹配，内容相同的其它消息不受影响
+                removed = removeByIdentity(needSummaryMessages);
                 this.lastSummary = newSummary;
                 summarizing = false;
             }
-            summarize();
+            // 一条都没移除时不再递归，避免同一批次反复摘要
+            if (removed > 0) {
+                summarize();
+            }
         } catch (Exception e) {
             log.error("{}对话摘要失败", getOwnerId(), e);
             synchronized (summaryLock) {
                 summarizing = false;
             }
         }
+    }
+
+    /**
+     * 按引用从历史中移除指定消息，返回实际移除的条数。
+     */
+    private int removeByIdentity(List<Message> targets) {
+        int before = messages.size();
+        for (Message target : targets) {
+            messages.removeIf(message -> message == target);
+        }
+        return before - messages.size();
     }
 
     public List<Message> messages(ConversationContext context) {

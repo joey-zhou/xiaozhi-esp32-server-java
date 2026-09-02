@@ -105,13 +105,10 @@ class SummaryConversationTest {
         assertThat(condition.getAsBoolean()).isTrue();
     }
 
-    // 摘要成功后 messages.removeAll(needSummaryMessages) 按 equals 删除：内容与元数据都相同的
-    // 两条消息（用户连说两次「嗯」）会被一并删掉，被删的那条既不在内存也没进摘要。
-    // 当前行为：第二条「嗯」跟着首批一起消失，历史只剩下最后一条助手消息
-    // 正确行为：只删掉本批 needSummaryMessages 里那几条（按对象身份删）
-    // 生产代码 xiaozhi-ai/src/main/java/com/xiaozhi/ai/llm/memory/SummaryConversation.java:220
+    // 摘要只移除本批消息，按对象身份匹配：用户连说两次「嗯」时，
+    // 后面那条内容相同的消息不能跟着首批一起消失，否则它既不在内存也没进摘要
     @Test
-    void summaryAlsoRemovesLaterMessageEqualToASummarizedOne() throws InterruptedException {
+    void summaryOnlyRemovesItsOwnBatchNotLaterEqualMessages() throws InterruptedException {
         when(chatModel.call(any(Prompt.class))).thenReturn(reply("用户在闲聊"));
         SummaryConversation conversation = conversation(4, 2);
 
@@ -120,8 +117,8 @@ class SummaryConversationTest {
         conversation.add(new UserMessage("嗯"));
         conversation.add(new AssistantMessage("好的"));
 
-        awaitUntil(() -> historyTexts(conversation).size() == 1);
-        assertThat(historyTexts(conversation)).containsExactly("好的");
+        awaitUntil(() -> historyTexts(conversation).size() == 2);
+        assertThat(historyTexts(conversation)).containsExactly("嗯", "好的");
         verify(chatMemory).save(any(SummaryBO.class));
     }
 
