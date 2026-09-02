@@ -81,6 +81,24 @@ class OpusProcessorStreamTest {
         assertThat(processor.flushLeftover()).isEmpty();
     }
 
+    // 打断时残留样本必须丢弃且不产生帧，否则上一轮未成帧的尾音会拼进下一轮首帧
+    @Test
+    void discardLeftoverDropsRemainderWithoutEmittingFrame() {
+        OpusProcessor processor = new OpusProcessor();
+        processor.pcmToOpus(pcm(FRAME_SIZE + 40), true);
+        assertThat(stateOf(processor).leftoverCount).isEqualTo(40);
+
+        processor.discardLeftover();
+
+        assertThat(stateOf(processor).leftoverCount).isZero();
+        assertThat(stateOf(processor).leftoverBuffer).containsOnly((short) 0);
+        // 丢弃之后再刷也不该有帧漏出
+        assertThat(processor.flushLeftover()).isEmpty();
+        // 下一轮首帧只包含新数据，不再被残留顶偏
+        assertThat(processor.pcmToOpus(pcm(FRAME_SIZE), true)).hasSize(1);
+        assertThat(stateOf(processor).leftoverCount).isZero();
+    }
+
     @Test
     void flushLeftoverWithoutRemainderReturnsNoFrame() {
         assertThat(new OpusProcessor().flushLeftover()).isEmpty();

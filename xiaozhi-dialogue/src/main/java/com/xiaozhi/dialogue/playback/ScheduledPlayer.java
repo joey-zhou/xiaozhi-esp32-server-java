@@ -605,6 +605,9 @@ public class ScheduledPlayer extends Player {
         startTimestamp = 0;
         playPosition = BURST_PREBUFFER_NS;
 
+        // 丢弃本轮未成帧的残留样本，不能拼进下一轮首帧
+        opusProcessor.discardLeftover();
+
         // 中断时主动关闭文件，避免产生损坏的 Opus 文件
         if (getOpusRecorder() != null) {
             getOpusRecorder().closeOpusFile();

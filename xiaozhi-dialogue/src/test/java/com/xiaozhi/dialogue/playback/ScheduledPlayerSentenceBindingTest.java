@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
@@ -140,6 +141,31 @@ class ScheduledPlayerSentenceBindingTest {
         assertThat(player.hasContent()).isFalse();
         assertThat(events).isEmpty();
         verify(sender, never()).sendTtsMessage(any(), eq("上一轮残句。"), eq("sentence_start"));
+    }
+
+    // 打断时编码器里未成帧的残留必须丢弃，否则下一轮首帧会带上被打断那句的尾音
+    @Test
+    void stopDiscardsEncoderLeftoverSoNextTurnStartsClean() {
+        OpusProcessor encoder = (OpusProcessor) ReflectionTestUtils.getField(player, "opusProcessor");
+        // 1.5 帧：编码出 1 帧，半帧留在编码器里
+        player.play(Flux.just(new Speech(pcm(FRAME_SAMPLES + FRAME_SAMPLES / 2), "被打断的一句。")), true);
+        OpusProcessor.LeftoverState state =
+                (OpusProcessor.LeftoverState) ReflectionTestUtils.getField(encoder, "leftoverStates");
+        awaitUntil(() -> state.leftoverCount > 0);
+
+        player.stop();
+
+        assertThat(state.leftoverCount).isZero();
+        assertThat(state.leftoverBuffer).containsOnly((short) 0);
+    }
+
+    /** 轮询等待条件成立，禁止用固定时长 sleep 做同步 */
+    private static void awaitUntil(java.util.function.BooleanSupplier condition) {
+        long deadline = System.currentTimeMillis() + 5000;
+        while (!condition.getAsBoolean() && System.currentTimeMillis() < deadline) {
+            Thread.onSpinWait();
+        }
+        assertThat(condition.getAsBoolean()).isTrue();
     }
 
     /** 下发事件流水，去掉与时刻相关的静音帧 */

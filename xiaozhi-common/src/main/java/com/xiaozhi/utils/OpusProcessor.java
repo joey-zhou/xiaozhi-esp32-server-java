@@ -63,6 +63,14 @@ public class OpusProcessor {
     }
 
     /**
+     * 丢弃流式编码的残留样本，不产生任何帧。
+     * 打断时调用，避免上一轮未成帧的尾音被拼进下一轮首帧。
+     */
+    public void discardLeftover() {
+        leftoverStates.clear();
+    }
+
+    /**
      * 刷新残留数据，生成最后一帧
      */
     public List<byte[]> flushLeftover() {
