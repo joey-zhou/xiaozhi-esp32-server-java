@@ -146,7 +146,8 @@ public class SessionManager {
     public void removeSession(String sessionId) {
         ChatSession removed = sessions.remove(sessionId);
         if (removed != null && removed.getDevice() != null) {
-            deviceIdToSessionId.remove(removed.getDevice().getDeviceId());
+            // 只清自己建立的映射，设备重连后旧连接关闭不能删掉新会话的映射
+            deviceIdToSessionId.remove(removed.getDevice().getDeviceId(), sessionId);
         }
     }
 
