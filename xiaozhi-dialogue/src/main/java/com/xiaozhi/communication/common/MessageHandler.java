@@ -1,6 +1,7 @@
 package com.xiaozhi.communication.common;
 
 import com.xiaozhi.communication.domain.*;
+import com.xiaozhi.communication.domain.mcp.device.initialize.DeviceMcpPayload;
 import com.xiaozhi.communication.server.websocket.WebSocketSession;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
@@ -483,11 +484,18 @@ public class MessageHandler {
     }
 
     private void handleDeviceMcpMessage(ChatSession chatSession, DeviceMcpMessage message) {
-        Long mcpRequestId = message.getPayload().getId();
-        CompletableFuture<DeviceMcpMessage> future = chatSession.getDeviceMcpHolder().getMcpPendingRequests().get(mcpRequestId);
-        if(future != null){
+        // 设备可能回来一条没有 payload 或没有 id 的 mcp 消息，取不到请求号就直接忽略
+        DeviceMcpPayload payload = message.getPayload();
+        Long mcpRequestId = payload == null ? null : payload.getId();
+        if (mcpRequestId == null) {
+            log.warn("收到缺少请求号的mcp消息 - SessionId: {}", chatSession.getSessionId());
+            return;
+        }
+        // 先摘再完成，避免同一请求被重复应答时二次分发
+        CompletableFuture<DeviceMcpMessage> future =
+                chatSession.getDeviceMcpHolder().getMcpPendingRequests().remove(mcpRequestId);
+        if (future != null) {
             future.complete(message);
-            chatSession.getDeviceMcpHolder().getMcpPendingRequests().remove(mcpRequestId);
         }
     }
 

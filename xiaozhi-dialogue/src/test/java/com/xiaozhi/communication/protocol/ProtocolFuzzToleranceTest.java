@@ -68,6 +68,27 @@ class ProtocolFuzzToleranceTest {
 
     // ========== 畸形上行的容错 ==========
 
+    // 设备回来的 mcp 消息可能没有 payload 或没有 id，取请求号不能抛异常打断消息处理
+    @Test
+    void mcpMessageWithoutPayloadIsIgnoredAndConnectionSurvives() {
+        FakeDevice device = harness.connect(BOUND_DEVICE_ID);
+        device.hello();
+        device.transport().awaitJson("hello");
+        device.transport().clearOutbound();
+
+        device.sendText("{\"type\":\"mcp\"}");
+        device.sendText("{\"type\":\"mcp\",\"payload\":{}}");
+
+        // 后置信号：紧接着的合法 listen/start 必须被正常处理
+        device.listenStart(ListenMode.Auto);
+        AwaitHelper.until("合法 listen/start 已初始化 VAD",
+                () -> Boolean.TRUE.equals(harness.vad().autoSegmentOf(device.sessionId())));
+
+        assertThat(device.transport().isOpen()).isTrue();
+        assertThat(device.transport().closeStatus()).isNull();
+        assertThat(harness.session(device.sessionId())).isNotNull();
+    }
+
     @Test
     void unknownMessageTypeIsIgnoredAndConnectionSurvives() {
         FakeDevice device = harness.connect(BOUND_DEVICE_ID);
