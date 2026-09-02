@@ -300,15 +300,19 @@ public class DeviceMcpService {
     public DeviceMcpMessage sendMcpRequest(ChatSession chatSession, DeviceMcpMessage mcpMessage) {
         Long id = mcpMessage.getPayload().getId();
         CompletableFuture<DeviceMcpMessage> future = new CompletableFuture<>();
-        chatSession.sendTextMessage(JsonUtil.toJson(mcpMessage));
-        chatSession.getDeviceMcpHolder().getMcpPendingRequests().put(id, future);
+        Map<Long, CompletableFuture<DeviceMcpMessage>> pendingRequests =
+                chatSession.getDeviceMcpHolder().getMcpPendingRequests();
+        // 先登记再发送，设备秒回时应答才有落点，否则会被丢弃并干等到超时
+        pendingRequests.put(id, future);
 
         DeviceMcpMessage response = null;
         try {
+            chatSession.sendTextMessage(JsonUtil.toJson(mcpMessage));
             response = future.get(30, TimeUnit.SECONDS);
         } catch (Exception e) {
             log.error("SessionId: {}, Error sending MCP request：{}", chatSession.getSessionId(), e);
-            chatSession.getDeviceMcpHolder().getMcpPendingRequests().remove(id);
+        } finally {
+            pendingRequests.remove(id);
         }
         return response;
     }

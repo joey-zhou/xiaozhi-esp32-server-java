@@ -3,9 +3,9 @@ package com.xiaozhi.dialogue.llm.tool.mcp.device;
 import com.xiaozhi.communication.domain.DeviceMcpMessage;
 import lombok.Data;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -24,7 +24,7 @@ public class DeviceMcpHolder {
     /**
      * mcp指令阻塞请求表
      */
-    private Map<Long, CompletableFuture<DeviceMcpMessage>> mcpPendingRequests = new HashMap<>();
+    private Map<Long, CompletableFuture<DeviceMcpMessage>> mcpPendingRequests = new ConcurrentHashMap<>();
     /**
      * mcp工具获取游标 用于分页，首次请求为空字符串
      */

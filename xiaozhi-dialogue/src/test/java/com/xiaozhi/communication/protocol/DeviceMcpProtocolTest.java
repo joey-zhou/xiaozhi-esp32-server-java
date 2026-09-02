@@ -155,12 +155,8 @@ class DeviceMcpProtocolTest {
     }
 
     /**
-     * 当前行为：MCP 请求先出站、后登记 pending 表，发送那一刻表里还没有本次 id。
-     * 设备秒回时 handleDeviceMcpMessage 会在 put 之前查表，future 为 null 直接丢弃应答，
-     * 调用方随后干等 30 秒超时。
-     * 正确行为：先 put 再发，发送那一刻 pending 表必须已含本次 id。
-     * 生产代码 xiaozhi-dialogue/src/main/java/com/xiaozhi/dialogue/llm/tool/mcp/device/DeviceMcpService.java:310-311
-     * （同处 DeviceMcpHolder.java:27 的 mcpPendingRequests 是普通 HashMap，跨线程读写也无同步）。
+     * MCP 请求必须先登记 pending 表再出站。反过来的话设备秒回时应答落进空表被直接丢弃，
+     * 调用方干等 30 秒超时。
      */
     @Test
     void pendingRequestIsRegisteredBeforeMessageIsSent() {
@@ -193,8 +189,9 @@ class DeviceMcpProtocolTest {
         AwaitHelper.until("在途请求已收到应答", () -> response.get() != null);
         assertThat(response.get().getPayload().getResult()).containsEntry("content", "ok");
 
-        // 缺陷修复后应改回 isTrue()：登记必须发生在发送之前，否则秒回的应答会落进空表
-        assertThat(registeredAtSendTime.get()).isFalse();
+        assertThat(registeredAtSendTime.get()).isTrue();
+        // 请求结束后表里不能留下条目
+        assertThat(session.getDeviceMcpHolder().getMcpPendingRequests()).isEmpty();
     }
 
     @Test
