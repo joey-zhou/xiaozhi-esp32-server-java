@@ -82,6 +82,15 @@ public class OpusRecorder {
         }
     }
 
+    /**
+     * 静音帧只作为 AEC 参考，不写入录音
+     */
+    public void onSendSilenceFrame(byte[] opusFrame, long timestamp) {
+        if (aecService != null) {
+            aecService.feedReference(session.getSessionId(), opusFrame, timestamp);
+        }
+    }
+
     public void onSendStop() {
         closeOpusFile();
     }

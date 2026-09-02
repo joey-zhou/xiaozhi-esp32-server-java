@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 public class IntentService {
 
     private final ExitKeywordDetector exitKeywordDetector = new ExitKeywordDetector();
+    private final BackchannelDetector backchannelDetector = new BackchannelDetector();
 
     /**
      * 确定性意图枚举。未来可扩展：HELP、RESET、SWITCH_ROLE 等。
@@ -45,5 +46,12 @@ public class IntentService {
         // 未来可在此扩展更多意图检测
 
         return Intent.NONE;
+    }
+
+    /**
+     * 设备说话时插进来的这句是不是附和（嗯、对的、好的、哈哈……），是则不算打断
+     */
+    public boolean isBackchannel(String userText) {
+        return backchannelDetector.isBackchannel(userText);
     }
 }

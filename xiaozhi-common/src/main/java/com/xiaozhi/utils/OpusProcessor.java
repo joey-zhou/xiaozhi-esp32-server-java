@@ -51,6 +51,17 @@ public class OpusProcessor {
         }
     }
 
+    private static final class SilenceFrameHolder {
+        static final byte[] FRAME = new OpusProcessor().pcmToOpus(new byte[FRAME_SIZE * 2], false).get(0);
+    }
+
+    /**
+     * 一帧（60ms）静音的 Opus 编码，由独立编码器一次性生成，调用方不得修改返回的数组
+     */
+    public static byte[] silenceFrame() {
+        return SilenceFrameHolder.FRAME;
+    }
+
     /**
      * 刷新残留数据，生成最后一帧
      */

@@ -19,17 +19,24 @@ import lombok.extern.slf4j.Slf4j;
  * 使不带硬件 AEC 的设备也能正常打断和对话。
  *
  * 核心设计：
- * - render/capture 严格 1:1：每处理一块麦克风前先喂一块参考，无真参考用静音块，
+ * - render/capture 以采集块为节拍：每处理一块麦克风前先喂参考，常态一块，无真参考用静音块，
  *   保证 AEC3 的延迟估计不因 underrun/overrun 被清空。
- * - 参考到帧即喂（受 1:1 限速），喂早了由 AEC3 延迟估计器吸收（约 612ms 窗口）；
+ * - 参考侧保留两帧积压吸收上行抖动，播放器预缓冲三帧让设备端队列更深，参考仍领先设备播放点约一帧；
  *   喂晚（非因果）AEC3 完全失效，实测死状为 ERLE≈0.2dB 且 delay 估成假值。
- * - 设备回显时间戳只用于识别并丢弃陈旧参考帧（打断残留等）。
+ * - 设备回显时间戳用于丢弃陈旧参考帧，以及参考落后回显点时追赶。
+ * - 播放器在句间、暂停、断流期间持续下发静音帧，设备播放时间轴整轮连续，对齐不随句子重建。
+ *
+ * @see ReferenceFeed
  */
 @Slf4j
 @Service
 public class AecService {
     @Value("${aec.noise.suppression.level:MODERATE}")
     private String noiseSuppressionLevel;
+
+    // 参考侧保留的积压帧数，吸收上行抖动；须小于播放器的预缓冲帧数，参考才能领先设备播放点
+    @Value("${aec.reference.backlog.frames:2}")
+    private int referenceBacklogFrames;
 
     // 每会话 AEC 状态
     private final ConcurrentHashMap<String, AecState> states = new ConcurrentHashMap<>();
@@ -42,17 +49,7 @@ public class AecService {
     private volatile boolean nativeUnavailable = false;
 
     // 10ms 帧参数 (16kHz mono, 16-bit)
-    private static final int FRAME_BYTES_10MS = 320;      // bytes
-
-    // 参考帧缓冲上限（60ms/帧，约 5 秒）
-    private static final int MAX_REF_BUFFER_FRAMES = 84;
-    // 落后回显点超过此值的参考帧直接丢弃：AEC3 延迟估计范围本身只有约 612ms，更旧的参考无用且有害
-    private static final long STALE_REF_MS = 600;
-    // 静音参考块，无真参考可喂时用它保持 render/capture 1:1 节奏
-    private static final byte[] SILENCE_10MS = new byte[FRAME_BYTES_10MS];
-
-    /** 已发送待喂入的参考帧：下发时间戳 + 解码后的 PCM */
-    private record RefFrame(long timestamp, byte[] pcm) {}
+    private static final int FRAME_BYTES_10MS = ReferenceFeed.BLOCK_BYTES;
 
     /**
      * 确保会话的 AEC 状态已初始化。
@@ -106,7 +103,7 @@ public class AecService {
     }
 
     /**
-     * 缓存参考信号（TTS 发给设备的 Opus 帧），由 process() 按 1:1 节奏喂给 AEC3。
+     * 缓存参考信号（下发给设备的 Opus 帧，含静音帧），由 process() 按采集节拍喂给 AEC3。
      */
     public void feedReference(String sessionId, byte[] opusFrame, long timestamp) {
         AecState state = states.get(sessionId);
@@ -119,11 +116,7 @@ public class AecService {
 
             synchronized (state.apmLock) {
                 if (state.disposed) return;
-                state.refBuffer.addLast(new RefFrame(timestamp, pcm));
-                // 积压超限说明设备长时间没有上行帧消费，丢最旧的
-                while (state.refBuffer.size() > MAX_REF_BUFFER_FRAMES) {
-                    state.refBuffer.pollFirst();
-                }
+                state.feed.add(timestamp, pcm);
             }
         } catch (Exception e) {
             log.warn("AEC feedReference 失败 - SessionId: {}: {}", sessionId, e.getMessage());
@@ -149,15 +142,17 @@ public class AecService {
             synchronized (state.apmLock) {
                 if (state.disposed) return micPcm;
 
-                onEchoTimestamp(state, echoTimestamp);
+                if (state.feed.onEchoTimestamp(echoTimestamp)) {
+                    log.info("AEC 进入时间戳对齐模式");
+                }
 
-                // 严格 1:1 交替：每处理一块麦克风前先喂一块参考（真参考不足用静音块补），
-                // render/capture 节奏恒定，AEC3 的延迟估计既不会因 underrun 被清空，
-                // 也不会因批量灌入 overrun 复位
+                // 每处理一块麦克风前先喂参考，render/capture 节拍恒定，
+                // AEC3 的延迟估计既不会因 underrun 被清空，也不会因批量灌入 overrun 复位
                 while (offset + FRAME_BYTES_10MS <= totalBytes) {
-                    byte[] refBlock = nextRenderBlock(state);
-                    byte[] refOutput = new byte[FRAME_BYTES_10MS];
-                    state.apm.processReverseStream(refBlock, state.streamConfig, state.streamConfig, refOutput);
+                    for (byte[] refBlock : state.feed.blocksForCaptureBlock()) {
+                        byte[] refOutput = new byte[FRAME_BYTES_10MS];
+                        state.apm.processReverseStream(refBlock, state.streamConfig, state.streamConfig, refOutput);
+                    }
 
                     byte[] micSubFrame = new byte[FRAME_BYTES_10MS];
                     System.arraycopy(micPcm, offset, micSubFrame, 0, FRAME_BYTES_10MS);
@@ -185,68 +180,31 @@ public class AecService {
 
     /**
      * 有真参考被喂入时约每 5 秒记一次统计。须在 apmLock 内调用。
-     * 健康：erle 两位数、delay 稳定在 0~500ms；病态：erle≈0.2 且 delay≈8ms 假值（非因果/超范围）。
+     * 健康：erle 上升至数 dB（AEC3 该指标封顶 6dB）、delay 稳定；病态：erle≈0.2 且 delay≈8ms 假值（非因果/超范围）。
      */
     private void logStatsPeriodically(AecState state, String sessionId) {
         state.framesSinceStatsLog++;
-        if (!state.realRefFedSinceLog || state.framesSinceStatsLog < 84) {
+        if (state.framesSinceStatsLog < 84) {
+            return;
+        }
+        if (!state.feed.takeRealFedSinceStat()) {
             return;
         }
         state.framesSinceStatsLog = 0;
-        state.realRefFedSinceLog = false;
         try {
             AudioProcessingStats stats = state.apm.getStatistics();
-            log.info("AEC统计 - SessionId: {}, erl={}dB, erle={}dB, delay={}ms, 待喂参考={}帧",
+            ReferenceFeed feed = state.feed;
+            // lead：最近喂入的参考帧相对设备回显点的提前量，负数即非因果
+            Long lead = feed.leadMs();
+            log.info("AEC统计 - SessionId: {}, erl={}dB, erle={}dB, delay={}ms, 待喂参考={}帧, lead={}, 真参考块={}, 静音块={}, 追赶块={}, 积压峰值={}帧",
                     sessionId, String.format("%.1f", stats.echoReturnLoss),
                     String.format("%.1f", stats.echoReturnLossEnhancement),
-                    stats.delayMs, state.refBuffer.size());
+                    stats.delayMs, feed.queuedFrames(), lead == null ? "n/a" : lead + "ms",
+                    feed.realBlocks(), feed.silenceBlocks(), feed.catchUpBlocks(), feed.maxBacklogFrames());
+            feed.resetStats();
         } catch (Exception e) {
             log.debug("读取AEC统计失败", e);
         }
-    }
-
-    private void onEchoTimestamp(AecState state, long echoTimestamp) {
-        if (echoTimestamp <= 0) {
-            return;
-        }
-        if (!state.echoTimestampSeen) {
-            state.echoTimestampSeen = true;
-            log.info("AEC 进入时间戳对齐模式");
-        }
-        state.lastEchoTimestamp = echoTimestamp;
-    }
-
-    /**
-     * 取下一块 10ms 参考：有真参考帧用真的，没有用静音块。须在 apmLock 内调用。
-     */
-    private byte[] nextRenderBlock(AecState state) {
-        // 当前参考帧还有剩余块
-        if (state.currentRefPcm != null && state.currentRefOffset + FRAME_BYTES_10MS <= state.currentRefPcm.length) {
-            byte[] block = new byte[FRAME_BYTES_10MS];
-            System.arraycopy(state.currentRefPcm, state.currentRefOffset, block, 0, FRAME_BYTES_10MS);
-            state.currentRefOffset += FRAME_BYTES_10MS;
-            return block;
-        }
-        state.currentRefPcm = null;
-
-        // 参考到帧即喂（1:1 限速）：喂早了由 AEC3 延迟估计器吸收，喂晚（非因果）它会完全失效
-        // （实测 ERLE 0.18dB 且 delay 估成假值 8ms）。回显时间戳只用于清理陈旧帧
-        RefFrame head;
-        while ((head = state.refBuffer.peekFirst()) != null) {
-            if (state.echoTimestampSeen
-                    && head.timestamp() < state.lastEchoTimestamp - STALE_REF_MS) {
-                // 陈旧帧（打断残留等），对应回声早已过去，丢弃不喂
-                state.refBuffer.pollFirst();
-                continue;
-            }
-            state.refBuffer.pollFirst();
-            state.currentRefPcm = head.pcm();
-            state.currentRefOffset = 0;
-            state.realRefFedSinceLog = true;
-            return nextRenderBlock(state);
-        }
-
-        return SILENCE_10MS.clone();
     }
 
     /**
@@ -264,8 +222,7 @@ public class AecService {
         AecState state = states.get(sessionId);
         if (state == null) return;
         synchronized (state.apmLock) {
-            state.refBuffer.clear();
-            state.currentRefPcm = null;
+            state.feed.clear();
         }
     }
 
@@ -279,18 +236,10 @@ public class AecService {
         final Object apmLock = new Object();  // feedReference 和 process 共用同一把锁，保证 APM 调用线程安全
         volatile boolean disposed = false;     // dispose 标志，在 apmLock 内设置和检查
 
-        // 已发送待喂入的参考帧队列，在 apmLock 内访问
-        final java.util.ArrayDeque<RefFrame> refBuffer = new java.util.ArrayDeque<>();
-        // 该会话是否出现过设备回显时间戳；出现后参考帧只按回显时刻喂入
-        boolean echoTimestampSeen = false;
-        // 最近一次回显时间戳
-        long lastEchoTimestamp = 0;
-        // 正在按块消费中的参考帧
-        byte[] currentRefPcm;
-        int currentRefOffset;
+        // 参考帧调度，在 apmLock 内访问
+        final ReferenceFeed feed = new ReferenceFeed(referenceBacklogFrames);
         // 统计日志节流
         int framesSinceStatsLog = 0;
-        boolean realRefFedSinceLog = false;
 
         AecState() {
             apm = new AudioProcessing();

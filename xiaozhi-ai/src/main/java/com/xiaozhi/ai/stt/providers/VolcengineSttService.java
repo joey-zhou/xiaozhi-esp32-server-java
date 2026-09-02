@@ -1,5 +1,6 @@
 package com.xiaozhi.ai.stt.providers;
 
+import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;

@@ -14,7 +14,10 @@ import reactor.core.publisher.Flux;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Deque;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -80,6 +83,16 @@ public abstract class Player {
     @Getter(AccessLevel.NONE)
     @Setter(AccessLevel.NONE)
     private final List<String> spokenSentences = new CopyOnWriteArrayList<>();
+    /**
+     * 最近下发过的所有句子（含问候语、推送、工具提示）及下发时刻，用于识别设备拾回自己声音形成的回声
+     */
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    private final Deque<RecentSentence> recentSentences = new ConcurrentLinkedDeque<>();
+    private static final long RECENT_SENTENCE_WINDOW_MS = 10_000;
+    private static final int RECENT_SENTENCE_LIMIT = 20;
+
+    private record RecentSentence(String normalized, long sentAtMillis) {}
 
     /**
      * 音频播放器构造方法
@@ -119,7 +132,79 @@ public abstract class Player {
         if (reply) {
             spokenSentences.add(text);
         }
+        recentSentences.addLast(new RecentSentence(normalize(text), System.currentTimeMillis()));
+        while (recentSentences.size() > RECENT_SENTENCE_LIMIT) {
+            recentSentences.pollFirst();
+        }
         messageService.sendTtsMessage(session, text, "sentence_start");
+    }
+
+    /**
+     * 识别文本是否就是设备拾回的自己的声音。
+     * 最近 10 秒内下发过的句子：去标点空白后相等，或不少于 5 字且被包含。
+     * 正在播放时再放宽：最近 6 秒内下发的句子，识别文本至少 3 字且几乎全部按顺序出现在句中
+     */
+    public boolean recentlySpoke(String text) {
+        String normalized = normalize(text);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        long since = now - RECENT_SENTENCE_WINDOW_MS;
+        long playingSince = now - PLAYING_SENTENCE_WINDOW_MS;
+        int length = normalized.codePointCount(0, normalized.length());
+        for (RecentSentence recent : recentSentences) {
+            if (recent.sentAtMillis() < since) {
+                continue;
+            }
+            if (recent.normalized().equals(normalized)
+                    || (length >= 5 && recent.normalized().contains(normalized))) {
+                return true;
+            }
+            if (isPlaying && recent.sentAtMillis() >= playingSince && length >= 3
+                    && subsequenceLength(normalized, recent.normalized()) * 1.0 / length > FUZZY_ECHO_RATIO) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final long PLAYING_SENTENCE_WINDOW_MS = 6_000;
+    private static final double FUZZY_ECHO_RATIO = 0.8;
+
+    /** 语气词的同音写法折成一个字，识别结果与合成文本用字常不一致 */
+    private static final Map<Character, Character> INTERJECTION_VARIANTS = Map.ofEntries(
+            Map.entry('欸', '哎'), Map.entry('诶', '哎'), Map.entry('唉', '哎'), Map.entry('嗳', '哎'), Map.entry('嘿', '哎'),
+            Map.entry('唔', '嗯'), Map.entry('恩', '嗯'),
+            Map.entry('噢', '哦'), Map.entry('喔', '哦'),
+            Map.entry('呀', '啊'), Map.entry('呐', '啊'));
+
+    private static String normalize(String text) {
+        if (text == null) {
+            return "";
+        }
+        String stripped = text.replaceAll("[\\p{P}\\p{S}\\s]", "").toLowerCase();
+        StringBuilder folded = new StringBuilder(stripped.length());
+        for (int i = 0; i < stripped.length(); i++) {
+            char c = stripped.charAt(i);
+            folded.append(INTERJECTION_VARIANTS.getOrDefault(c, c));
+        }
+        return folded.toString();
+    }
+
+    /** 最长公共子序列长度 */
+    static int subsequenceLength(String a, String b) {
+        int[] prev = new int[b.length() + 1];
+        int[] cur = new int[b.length() + 1];
+        for (int i = 1; i <= a.length(); i++) {
+            for (int j = 1; j <= b.length(); j++) {
+                cur[j] = a.charAt(i - 1) == b.charAt(j - 1) ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+            }
+            int[] swap = prev;
+            prev = cur;
+            cur = swap;
+        }
+        return prev[b.length()];
     }
 
     /**
@@ -153,6 +238,18 @@ public abstract class Player {
         // log.info("发送Opus帧数据: {}", opusFrame.length);
         if (opusRecorder != null) {
             opusRecorder.onSendOpusFrame(opusFrame, timestamp);
+        }
+    }
+
+    /**
+     * 下发一帧静音，保持设备播放时间轴连续。只作为 AEC 参考，不计入录音，不触发首帧回调
+     */
+    protected void sendSilenceFrame() {
+        long timestamp = System.currentTimeMillis() & 0xFFFFFFFFL;
+        byte[] frame = OpusProcessor.silenceFrame();
+        messageService.sendBinaryMessage(session, frame, timestamp);
+        if (opusRecorder != null) {
+            opusRecorder.onSendSilenceFrame(frame, timestamp);
         }
     }
 
@@ -238,6 +335,19 @@ public abstract class Player {
      */
     public boolean isDrained() {
         return true;
+    }
+
+    /**
+     * 暂停下发，尚未开始的播放也不会开始；超过 maxMillis 未 resume 则自动恢复
+     */
+    public void pause(long maxMillis) {
+    }
+
+    public void resume() {
+    }
+
+    public boolean isPaused() {
+        return false;
     }
 
     /**

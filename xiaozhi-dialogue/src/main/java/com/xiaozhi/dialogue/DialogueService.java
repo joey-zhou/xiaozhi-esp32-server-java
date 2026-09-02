@@ -52,6 +52,8 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class DialogueService{
     private static final String ABORT_REASON_ASR = "检测到用户说话";
+    /** 用户开口后播放最多暂停这么久，识别终稿迟迟不来就自动续播 */
+    private static final long BARGE_IN_PAUSE_MAX_MS = 5000;
     /** 唤醒词音频的文件名标记，与 user/assistant 区分开 */
     private static final String WAKE_WORD_AUDIO_TAG = "wakeword";
 
@@ -169,27 +171,79 @@ public class DialogueService{
     }
 
     /**
-     * ASR 首次识别出文本时打断当前回答。在 STT provider 的识别线程上执行。
+     * ASR 首次识别出文本时暂停当前播放，真打断还是误打断由终稿决定。在 STT provider 的识别线程上执行。
      *
-     * @param aborted 本轮是否已打断过，保证一轮只打断一次
+     * @param bargeIn 本轮是否已暂停过，保证一轮只暂停一次
      */
-    private void onSttPartialText(ChatSession session, String partialText, AtomicBoolean aborted) {
-        if (!StringUtils.hasText(partialText) || aborted.get()) {
+    private void onSttPartialText(ChatSession session, String partialText, AtomicBoolean bargeIn) {
+        if (!StringUtils.hasText(partialText)) {
+            return;
+        }
+        Player player = session.getPlayer();
+
+        // 每个中间结果都刷新暂停期限
+        if (bargeIn.get()) {
+            if (player != null) {
+                player.pause(BARGE_IN_PAUSE_MAX_MS);
+            }
             return;
         }
 
-        // isActive() 覆盖 LLM/TTS/Player 任一层活跃
+        // isActive() 覆盖待处理/LLM/TTS/Player 任一层活跃
         Persona persona = session.getPersona();
         if (persona == null || !persona.isActive()) {
             return;
         }
 
-        if (aborted.compareAndSet(false, true)) {
-            // 代次在识别回调里同步递增，不能留到异步 abort 里
-            persona.markInterrupted();
-            // 切出识别线程，避免 abort 的耗时动作阻塞后续 ASR 包
-            Thread.startVirtualThread(() -> abortDialogue(session, ABORT_REASON_ASR));
+        if (bargeIn.compareAndSet(false, true) && player != null) {
+            log.info("用户开口，暂停播放 - SessionId: {}, partial: {}", session.getSessionId(), partialText);
+            player.pause(BARGE_IN_PAUSE_MAX_MS);
         }
+    }
+
+    /**
+     * 首字暂停后拿到终稿：附和或空则续播并丢弃本次识别，否则确认打断。
+     *
+     * @return 是否继续把本句当作新一轮对话处理
+     */
+    boolean resolveBargeIn(ChatSession session, Persona persona, String text) {
+        Player player = session.getPlayer();
+        if (isEcho(session, text)) {
+            log.info("识别到的是设备自己的回声，续播 - SessionId: {}, text: {}", session.getSessionId(), text);
+            if (player != null) {
+                player.resume();
+            }
+            return false;
+        }
+        // 正在播的那句是问句时，"好的""对"是回答不是附和
+        boolean answeringQuestion = player != null && endsWithQuestion(player.spokenSentences());
+        if (!StringUtils.hasText(text) || (!answeringQuestion && intentService.isBackchannel(text))) {
+            log.info("误打断，续播 - SessionId: {}, text: {}", session.getSessionId(), text);
+            if (player != null) {
+                player.resume();
+            }
+            return false;
+        }
+        log.info("确认打断 - SessionId: {}, text: {}", session.getSessionId(), text);
+        persona.markInterrupted();
+        abortDialogue(session, ABORT_REASON_ASR);
+        return true;
+    }
+
+    /**
+     * 识别文本与刚下发的句子相同：设备拾回了自己的声音
+     */
+    private static boolean isEcho(ChatSession session, String text) {
+        Player player = session.getPlayer();
+        return player != null && StringUtils.hasText(text) && player.recentlySpoke(text);
+    }
+
+    private static boolean endsWithQuestion(List<String> spokenSentences) {
+        if (spokenSentences.isEmpty()) {
+            return false;
+        }
+        String last = spokenSentences.get(spokenSentences.size() - 1).trim();
+        return last.endsWith("？") || last.endsWith("?");
     }
 
     /**
@@ -225,17 +279,30 @@ public class DialogueService{
                     return;
                 }
 
-                AtomicBoolean aborted = new AtomicBoolean(false);
+                AtomicBoolean bargeIn = new AtomicBoolean(false);
                 var sttResult = persona.getSttService().stream(
                         turnSink.asFlux(),
-                        partialText -> onSttPartialText(session, partialText, aborted));
+                        partialText -> onSttPartialText(session, partialText, bargeIn));
 
-                // 本轮已被新一轮或 abort 取代，结果作废，否则过期文本会触发一轮多余对话
+                // 本轮已被新一轮或 abort 取代，结果作废，否则过期文本会触发一轮多余对话；
+                // 暂停的播放仍由本轮终稿决定去留
                 if (session.getAudioSinks() != turnSink) {
+                    if (bargeIn.get()) {
+                        resolveBargeIn(session, persona, sttResult != null ? sttResult.text() : null);
+                    }
                     return;
                 }
 
-                if (sttResult == null || !StringUtils.hasText(sttResult.text())) {
+                String text = sttResult != null ? sttResult.text() : null;
+                if (bargeIn.get() && !resolveBargeIn(session, persona, text)) {
+                    return;
+                }
+                if (!StringUtils.hasText(text)) {
+                    return;
+                }
+                // 播放刚结束时拾回的尾音也会被识别成一句话
+                if (isEcho(session, text)) {
+                    log.info("识别到的是设备自己的回声，忽略 - SessionId: {}, text: {}", sessionId, text);
                     return;
                 }
 
@@ -262,6 +329,10 @@ public class DialogueService{
 
             } catch (Exception e) {
                 log.error("流式识别错误: {}", e.getMessage(), e);
+                Player player = session.getPlayer();
+                if (player != null && player.isPaused()) {
+                    player.resume();
+                }
             }
         });
     }

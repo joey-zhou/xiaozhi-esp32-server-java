@@ -62,6 +62,49 @@ class PlayerSpokenTextTest {
     }
 
     @Test
+    void recentlySpokeMatchesEchoOfOwnSentence() {
+        Player player = newPlayer();
+        player.sendSentenceStart("等我一下哈", false);
+        player.sendSentenceStart("要不要再来一个？", true);
+
+        assertThat(player.recentlySpoke("等我一下哈。")).isTrue();
+        assertThat(player.recentlySpoke("要不要再来一个")).isTrue();
+        // 短句被包含不算回声，用户可能只是复述了半句来回答
+        assertThat(player.recentlySpoke("再来一个")).isFalse();
+        assertThat(player.recentlySpoke("给我换一个")).isFalse();
+        assertThat(player.recentlySpoke("")).isFalse();
+    }
+
+    @Test
+    void whilePlayingGarbledEchoIsMatchedBySubsequence() {
+        Player player = newPlayer();
+        player.setPlaying(true);
+        player.sendSentenceStart("欸～听好啰，讲个冷到结冰的：", true);
+        player.sendSentenceStart("欸～刚才是不是有哪里不对？", true);
+
+        assertThat(player.recentlySpoke("讲个结冰的。")).isTrue();
+        assertThat(player.recentlySpoke("哎，刚才是")).isTrue();
+        // 少于 3 字或匹配不足八成不算
+        assertThat(player.recentlySpoke("刚才")).isFalse();
+        assertThat(player.recentlySpoke("哪里不对，我没听懂")).isFalse();
+    }
+
+    @Test
+    void subsequenceRuleOnlyAppliesWhilePlaying() {
+        Player player = newPlayer();
+        player.sendSentenceStart("欸～听好啰，讲个冷到结冰的：", true);
+
+        assertThat(player.recentlySpoke("讲个结冰的。")).isFalse();
+    }
+
+    @Test
+    void subsequenceLengthCountsInOrderMatches() {
+        assertThat(Player.subsequenceLength("讲个结冰的", "欸听好啰讲个冷到结冰的")).isEqualTo(5);
+        assertThat(Player.subsequenceLength("哎刚才是", "哎刚才是不是有哪里不对")).isEqualTo(4);
+        assertThat(Player.subsequenceLength("abc", "")).isZero();
+    }
+
+    @Test
     void stopCallbackFiresOnSendStop() {
         Player player = newPlayer();
         AtomicBoolean stopped = new AtomicBoolean(false);
