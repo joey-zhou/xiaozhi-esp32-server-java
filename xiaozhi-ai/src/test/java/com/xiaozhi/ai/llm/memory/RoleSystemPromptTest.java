@@ -41,12 +41,13 @@ class RoleSystemPromptTest {
         assertThat(text).contains("报价固定 $100 {含税}，<不议价>");
     }
 
+    // 系统提示词会话内必须保持不变，逐轮变化的元数据（时间戳等）只能进 UserMessage 前缀。
+    // 模板里只允许出现格式说明 [yyyy-MM-ddTHH:mm:ss]，不能渲染出真实时间戳。
     @Test
-    void sameContextRendersIdenticalPromptAcrossTurns() {
-        Conversation conversation = new Conversation("device", 1, "session", "角色", 1);
-        ConversationContext context = new ConversationContext("上海");
+    void promptCarriesNoRenderedTimestamp() {
+        String text = prompt("你是小智，一个爱讲冷笑话的助手。", "北京市海淀区").getText();
 
-        assertThat(conversation.roleSystemMessage(context).getText())
-                .isEqualTo(conversation.roleSystemMessage(context).getText());
+        assertThat(text).doesNotContainPattern("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}");
+        assertThat(text).contains("[yyyy-MM-ddTHH:mm:ss]");
     }
 }

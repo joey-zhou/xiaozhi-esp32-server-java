@@ -24,6 +24,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * 钉住归属校验切面在无 Web 请求上下文时也能工作：用户ID 只从 Sa-Token 取，
+ * loginId 不是数字时必须直接拒绝而不是放行。
+ */
 @ExtendWith(MockitoExtension.class)
 class OwnershipAspectTest {
 
@@ -45,7 +49,7 @@ class OwnershipAspectTest {
     }
 
     @Test
-    void checkOwnerShouldReadUserIdFromSaTokenWithoutRequestContext() throws Exception {
+    void checkOwnerReadsUserIdFromSaTokenWithoutRequestContext() throws Exception {
         Method method = TestMethods.class.getDeclaredMethod("updateRole", Integer.class);
 
         when(ownershipChecker.getResource()).thenReturn("role");
@@ -66,7 +70,7 @@ class OwnershipAspectTest {
     }
 
     @Test
-    void checkOwnerShouldRejectInvalidLoginId() throws Exception {
+    void checkOwnerRejectsInvalidLoginId() throws Exception {
         Method method = TestMethods.class.getDeclaredMethod("updateRole", Integer.class);
 
         when(ownershipChecker.getResource()).thenReturn("role");

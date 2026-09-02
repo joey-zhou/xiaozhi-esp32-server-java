@@ -16,6 +16,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,6 +26,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * 钉住会话摘要的入参防御、默认值补齐与删除条件：
+ * summaryId 是毫秒时间戳，删除时必须转成 createTime 等值条件，不传则不加该条件。
+ */
 @ExtendWith(MockitoExtension.class)
 class SummaryServiceImplTest {
 
@@ -116,7 +122,33 @@ class SummaryServiceImplTest {
         int result = summaryService.delete(1, "device-1", summaryId);
 
         assertThat(result).isEqualTo(1);
-        verify(summaryMapper).delete(any(LambdaQueryWrapper.class));
+
+        ArgumentCaptor<LambdaQueryWrapper<SummaryDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(summaryMapper).delete(captor.capture());
+        assertThat(captor.getValue().getTargetSql())
+            .contains("roleId =")
+            .contains("deviceId =")
+            .contains("createTime =");
+        // summaryId 是毫秒时间戳，转出的 createTime 必须能原样还原回该毫秒值
+        LocalDateTime createTimeFilter = captor.getValue().getParamNameValuePairs().values().stream()
+            .filter(LocalDateTime.class::isInstance)
+            .map(LocalDateTime.class::cast)
+            .findFirst()
+            .orElseThrow();
+        assertThat(createTimeFilter.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
+            .isEqualTo(summaryId);
+    }
+
+    @Test
+    void deleteOmitsCreateTimeFilterWhenSummaryIdMissing() {
+        when(summaryMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(3);
+
+        assertThat(summaryService.delete(1, "device-1", null)).isEqualTo(3);
+
+        ArgumentCaptor<LambdaQueryWrapper<SummaryDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(summaryMapper).delete(captor.capture());
+        assertThat(captor.getValue().getTargetSql()).doesNotContain("createTime");
+        assertThat(captor.getValue().getParamNameValuePairs().values()).containsExactlyInAnyOrder(1, "device-1");
     }
 
     @Test

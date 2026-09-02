@@ -10,54 +10,31 @@ import org.junit.jupiter.api.Test;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * Architecture guard tests that enforce DDD Phase 1 conventions:
- * Service interfaces and implementations must not depend on *Req DTOs.
+ * 分层约束：Service 接口与实现不得依赖 *Req DTO，*Req 只允许出现在 Controller，
+ * 进入 Service 之前必须先拆成独立入参或转成 BO。
  * <p>
- * Controllers are the only layer allowed to reference Req objects; they must
- * unwrap / convert them before calling Service methods.
+ * 扫描范围是整个 com.xiaozhi，新增业务模块自动纳管，不再维护包白名单（旧白名单漏掉过 11 个 service 包）。
+ * 依赖只在 xiaozhi-server 声明的 archunit，且要一次扫全部业务模块的编译产物，所以留在 server 模块。
  */
 class ServiceLayerArchTest {
 
-    private static JavaClasses serviceClasses;
+    private static JavaClasses xiaozhiClasses;
 
     @BeforeAll
     static void importClasses() {
-        serviceClasses = new ClassFileImporter()
+        xiaozhiClasses = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages(
-                "com.xiaozhi.agent.service",
-                "com.xiaozhi.authrole.service",
-                "com.xiaozhi.config.service",
-                "com.xiaozhi.device.service",
-                "com.xiaozhi.message.service",
-                "com.xiaozhi.role.service",
-                "com.xiaozhi.template.service",
-                "com.xiaozhi.user.service",
-                "com.xiaozhi.summary.service"
-            );
+            .importPackages("com.xiaozhi");
     }
 
     @Test
-    void serviceLayerShouldNotDependOnCommonReqPackage() {
+    void serviceLayerDoesNotDependOnReqDtoPackage() {
         ArchRule rule = noClasses()
-            .that().resideInAnyPackage("..service..", "..service.impl..")
-            .should().dependOnClassesThat()
-            .resideInAPackage("com.xiaozhi.common.model.req..")
-            .because("Service layer must not depend on common *Req DTOs — " +
-                "controllers should unwrap Req objects into individual params or BOs");
-
-        rule.check(serviceClasses);
-    }
-
-    @Test
-    void serviceLayerShouldNotDependOnDomainLocalReqPackage() {
-        ArchRule rule = noClasses()
-            .that().resideInAnyPackage("..service..", "..service.impl..")
+            .that().resideInAPackage("..service..")
             .should().dependOnClassesThat()
             .resideInAPackage("..model.req..")
-            .because("Service layer must not depend on domain-local *Req DTOs — " +
-                "controllers should unwrap Req objects into individual params or BOs");
+            .because("Service 层不得依赖 *Req DTO，Controller 应先把 Req 拆成独立入参或 BO");
 
-        rule.check(serviceClasses);
+        rule.check(xiaozhiClasses);
     }
 }

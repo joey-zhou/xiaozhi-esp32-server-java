@@ -20,6 +20,10 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * 钉住建号时的默认值补齐（启用状态、非管理员、后台权限角色）与唯一性校验：
+ * sys_user.authRoleId 存的是后台权限角色，不是对话 persona。
+ */
 @ExtendWith(MockitoExtension.class)
 class UserServiceImplTest {
 
@@ -38,7 +42,7 @@ class UserServiceImplTest {
     private UserServiceImpl userService;
 
     @Test
-    void createWithBOPersistsUserAndReturnsBO() {
+    void createPersistsUserAndReturnsBO() {
         UserBO draft = new UserBO();
         draft.setUsername("alice");
         draft.setPassword("encoded");
@@ -67,10 +71,14 @@ class UserServiceImplTest {
 
         assertThat(result).isSameAs(persistedBO);
         verify(userMapper).insert(createdDO);
+        // createdDO 由生产代码就地补默认值：启用、非管理员、后台权限角色 2
+        assertThat(createdDO.getState()).isEqualTo(UserBO.STATE_ENABLED);
+        assertThat(createdDO.getIsAdmin()).isEqualTo(UserBO.ADMIN_NO);
+        assertThat(createdDO.getAuthRoleId()).isEqualTo(2);
     }
 
     @Test
-    void createWithBOThrowsWhenUsernameAlreadyExists() {
+    void createThrowsWhenUsernameAlreadyExists() {
         UserBO draft = new UserBO();
         draft.setUsername("alice");
         draft.setPassword("encoded");

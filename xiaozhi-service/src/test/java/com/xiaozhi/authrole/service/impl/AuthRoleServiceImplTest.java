@@ -12,6 +12,7 @@ import com.xiaozhi.common.model.resp.PermissionResp;
 import com.xiaozhi.common.model.resp.PermissionTreeResp;
 import com.xiaozhi.permission.service.PermissionService;
 import com.xiaozhi.support.MybatisPlusTestHelper;
+import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,10 +27,13 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * 钉住后台权限角色的授权配置装配：角色字段要原样搬进配置响应，
+ * 授权保存要过滤空 ID 并清掉权限缓存。
+ */
 @ExtendWith(MockitoExtension.class)
 class AuthRoleServiceImplTest {
 
@@ -42,7 +46,7 @@ class AuthRoleServiceImplTest {
     private AuthRoleMapper authRoleMapper;
 
     @Mock
-    private com.xiaozhi.user.dal.mysql.mapper.UserMapper userMapper;
+    private UserMapper userMapper;
 
     @Mock
     private AuthRolePermissionMapper authRolePermissionMapper;
@@ -71,6 +75,8 @@ class AuthRoleServiceImplTest {
         authRoleResp.setAuthRoleId(1);
         authRoleResp.setAuthRoleName("管理员");
         authRoleResp.setRoleKey("admin");
+        authRoleResp.setDescription("拥有全部后台权限");
+        authRoleResp.setStatus("1");
         PermissionTreeResp tree = new PermissionTreeResp();
         tree.setPermissionId(10);
 
@@ -82,6 +88,10 @@ class AuthRoleServiceImplTest {
         AuthRolePermissionConfigResp result = authRoleService.getPermissionConfig(1);
 
         assertThat(result.getAuthRoleId()).isEqualTo(1);
+        assertThat(result.getAuthRoleName()).isEqualTo("管理员");
+        assertThat(result.getRoleKey()).isEqualTo("admin");
+        assertThat(result.getDescription()).isEqualTo("拥有全部后台权限");
+        assertThat(result.getStatus()).isEqualTo("1");
         assertThat(result.getPermissionTree()).containsExactly(tree);
         assertThat(result.getCheckedPermissionIds()).containsExactly(10, 20);
     }

@@ -15,8 +15,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,7 +51,7 @@ class CozeModelProviderTest {
 
         ChatModel chatModel = cozeModelProvider.createChatModel(modelConfig, new RoleBO());
 
-        assertInstanceOf(CozeChatModel.class, chatModel);
+        assertThat(chatModel).isInstanceOf(CozeChatModel.class);
         verify(tokenResolver).getToken(agentConfig);
     }
 
@@ -64,6 +64,7 @@ class CozeModelProviderTest {
         when(configLookup.listConfigs(9, "agent", "coze", null, null, ConfigBO.STATE_ENABLED))
                 .thenReturn(List.of());
 
-        assertThrows(IllegalStateException.class, () -> cozeModelProvider.createChatModel(modelConfig, new RoleBO()));
+        assertThatThrownBy(() -> cozeModelProvider.createChatModel(modelConfig, new RoleBO()))
+                .isInstanceOf(IllegalStateException.class);
     }
 }

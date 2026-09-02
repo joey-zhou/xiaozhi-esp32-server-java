@@ -10,6 +10,7 @@ import com.xiaozhi.support.MybatisPlusTestHelper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -26,6 +27,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * 钉住配置查询的条件拼装与默认配置的缓存回源：
+ * state 缺省要兜底为启用，provider 缺省要排除智能体类 provider（coze/dify/xingchen），
+ * getDefaultBO 必须先查缓存再回源并把结果写回缓存。
+ */
 @ExtendWith(MockitoExtension.class)
 class ConfigServiceImplTest {
 
@@ -53,7 +59,7 @@ class ConfigServiceImplTest {
     private ConfigServiceImpl configService;
 
     @Test
-    void listBOReturnsMappedConfigs() {
+    void listBOAppliesEveryNonBlankFilter() {
         ConfigDO configDO = new ConfigDO();
         configDO.setConfigId(1);
         ConfigBO configBO = new ConfigBO();
@@ -62,11 +68,37 @@ class ConfigServiceImplTest {
         when(configMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(configDO));
         when(configConvert.toBO(configDO)).thenReturn(configBO);
 
-        List<ConfigBO> result = configService.listBO(1, "llm", "openai", "chat", null, ConfigBO.STATE_ENABLED);
+        List<ConfigBO> result = configService.listBO(1, "llm", "openai", "chat", null, ConfigBO.STATE_DISABLED);
 
         assertThat(result).containsExactly(configBO);
-        verify(configMapper).selectList(any(LambdaQueryWrapper.class));
-        verify(configConvert).toBO(configDO);
+
+        ArgumentCaptor<LambdaQueryWrapper<ConfigDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(configMapper).selectList(captor.capture());
+        assertThat(captor.getValue().getTargetSql())
+            .contains("userId =")
+            .contains("state =")
+            .contains("configType =")
+            .contains("modelType =")
+            .contains("provider =")
+            .doesNotContain("isDefault =")
+            .doesNotContain("NOT IN");
+        assertThat(captor.getValue().getParamNameValuePairs().values())
+            .containsExactlyInAnyOrder(1, ConfigBO.STATE_DISABLED, "llm", "chat", "openai");
+    }
+
+    @Test
+    void listBODefaultsToEnabledStateAndExcludesAgentProviders() {
+        when(configMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+
+        assertThat(configService.listBO(1, "llm", null, null, null, " ")).isEmpty();
+
+        ArgumentCaptor<LambdaQueryWrapper<ConfigDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(configMapper).selectList(captor.capture());
+        assertThat(captor.getValue().getTargetSql())
+            .contains("state =")
+            .contains("provider NOT IN");
+        assertThat(captor.getValue().getParamNameValuePairs().values())
+            .containsExactlyInAnyOrder(1, ConfigBO.STATE_ENABLED, "llm", "coze", "dify", "xingchen");
     }
 
     @Test

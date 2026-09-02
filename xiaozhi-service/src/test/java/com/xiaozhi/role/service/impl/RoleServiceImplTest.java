@@ -11,26 +11,30 @@ import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
 import com.xiaozhi.role.dal.mysql.mapper.RoleMapper;
 import com.xiaozhi.support.MybatisPlusTestHelper;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.CacheManager;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * 钉住角色查询与「复制默认角色」的不变量：
+ * 列表查询必须带 userId + 启用状态 + LIMIT，复制前先把目标用户原有的默认角色降级。
+ */
 @ExtendWith(MockitoExtension.class)
 class RoleServiceImplTest {
 
@@ -54,13 +58,6 @@ class RoleServiceImplTest {
     @InjectMocks
     private RoleServiceImpl roleService;
 
-    @SuppressWarnings("unchecked")
-    @BeforeEach
-    void setUp() {
-        lenient().when(cacheHelper.getWithLock(any(), any(), any()))
-            .thenAnswer(inv -> ((java.util.function.Supplier<?>) inv.getArgument(2)).get());
-    }
-
     @Test
     void listBOReturnsEmptyWhenInputInvalid() {
         assertThat(roleService.listBO(null, 5)).isEmpty();
@@ -70,11 +67,9 @@ class RoleServiceImplTest {
     }
 
     @Test
-    void listBOReturnsMappedRolesWhenInputValid() {
-        RoleDO roleDO = new RoleDO();
-        roleDO.setRoleId(1);
-        RoleBO roleBO = new RoleBO();
-        roleBO.setRoleId(1);
+    void listBOQueriesEnabledRolesOfUserWithLimit() {
+        RoleDO roleDO = newRoleDO(1);
+        RoleBO roleBO = newRoleBO(1);
 
         when(roleMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(roleDO));
         when(roleConvert.toBO(roleDO)).thenReturn(roleBO);
@@ -82,8 +77,14 @@ class RoleServiceImplTest {
         List<RoleBO> result = roleService.listBO(7, 3);
 
         assertThat(result).containsExactly(roleBO);
-        verify(roleMapper).selectList(any(LambdaQueryWrapper.class));
-        verify(roleConvert).toBO(roleDO);
+
+        ArgumentCaptor<LambdaQueryWrapper<RoleDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(roleMapper).selectList(captor.capture());
+        assertThat(captor.getValue().getTargetSql())
+            .contains("userId =")
+            .contains("state =")
+            .contains("LIMIT 3");
+        assertThat(captor.getValue().getParamNameValuePairs().values()).containsExactlyInAnyOrder(7, "1");
     }
 
     @Test
@@ -107,10 +108,8 @@ class RoleServiceImplTest {
 
     @Test
     void getDefaultOrFirstBOReturnsMappedRole() {
-        RoleDO roleDO = new RoleDO();
-        roleDO.setRoleId(9);
-        RoleBO roleBO = new RoleBO();
-        roleBO.setRoleId(9);
+        RoleDO roleDO = newRoleDO(9);
+        RoleBO roleBO = newRoleBO(9);
 
         when(roleMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(roleDO);
         when(roleConvert.toBO(roleDO)).thenReturn(roleBO);
@@ -122,36 +121,35 @@ class RoleServiceImplTest {
 
     @Test
     void copyDefaultRoleCopiesSourceRoleForTargetUser() {
-        RoleDO sourceRole = new RoleDO();
-        sourceRole.setRoleId(1);
-        sourceRole.setUserId(10);
-        sourceRole.setIsDefault("1");
-
-        RoleDO copiedRole = new RoleDO();
-        copiedRole.setRoleId(22);
-
-        RoleBO copiedRoleBO = new RoleBO();
-        copiedRoleBO.setRoleId(22);
+        RoleDO sourceRole = newRoleDO(1);
+        RoleDO copiedRole = newRoleDO(22);
+        RoleBO copiedRoleBO = newRoleBO(22);
 
         when(roleMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(sourceRole);
         when(roleConvert.copy(sourceRole)).thenReturn(copiedRole);
         when(roleMapper.insert(copiedRole)).thenReturn(1);
         when(roleMapper.selectById(22)).thenReturn(copiedRole);
         when(roleConvert.toBO(copiedRole)).thenReturn(copiedRoleBO);
+        stubCacheHelperLoadingFromDb();
 
         Integer result = roleService.copyDefaultRole(10, 20);
 
         assertThat(result).isEqualTo(22);
         assertThat(copiedRole.getUserId()).isEqualTo(20);
         assertThat(copiedRole.getIsDefault()).isEqualTo("1");
-        verify(roleMapper).update(isNull(), any(LambdaUpdateWrapper.class));
         verify(roleMapper).insert(copiedRole);
+        // 复制前必须先把目标用户原有的默认角色降级，避免出现两个默认角色
+        ArgumentCaptor<LambdaUpdateWrapper<RoleDO>> resetCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(roleMapper).update(isNull(), resetCaptor.capture());
+        assertThat(resetCaptor.getValue().getSqlSet()).contains("isDefault=");
+        assertThat(resetCaptor.getValue().getTargetSql()).contains("userId =");
+        assertThat(resetCaptor.getValue().getParamNameValuePairs().values()).containsExactlyInAnyOrder(20, "0");
     }
 
     @Test
     void copyDefaultRoleThrowsWhenInsertFails() {
-        RoleDO sourceRole = new RoleDO();
-        RoleDO copiedRole = new RoleDO();
+        RoleDO sourceRole = newRoleDO(1);
+        RoleDO copiedRole = newRoleDO(22);
 
         when(roleMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(sourceRole);
         when(roleConvert.copy(sourceRole)).thenReturn(copiedRole);
@@ -173,20 +171,35 @@ class RoleServiceImplTest {
 
     @Test
     void copyDefaultRoleThrowsWhenCopiedRoleCannotBeLoaded() {
-        RoleDO sourceRole = new RoleDO();
-        sourceRole.setRoleId(1);
-
-        RoleDO copiedRole = new RoleDO();
-        copiedRole.setRoleId(22);
+        RoleDO sourceRole = newRoleDO(1);
+        RoleDO copiedRole = newRoleDO(22);
 
         when(roleMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(sourceRole);
         when(roleConvert.copy(sourceRole)).thenReturn(copiedRole);
         when(roleMapper.insert(copiedRole)).thenReturn(1);
         when(roleMapper.selectById(22)).thenReturn(null);
+        stubCacheHelperLoadingFromDb();
 
         assertThatThrownBy(() -> roleService.copyDefaultRole(10, 20))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("复制默认角色失败");
     }
 
+    /** getBO 走缓存包装，测试里让它直接执行回源逻辑。 */
+    private void stubCacheHelperLoadingFromDb() {
+        when(cacheHelper.getWithLock(any(), any(), any()))
+            .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(2)).get());
+    }
+
+    private static RoleDO newRoleDO(Integer roleId) {
+        RoleDO roleDO = new RoleDO();
+        roleDO.setRoleId(roleId);
+        return roleDO;
+    }
+
+    private static RoleBO newRoleBO(Integer roleId) {
+        RoleBO roleBO = new RoleBO();
+        roleBO.setRoleId(roleId);
+        return roleBO;
+    }
 }
