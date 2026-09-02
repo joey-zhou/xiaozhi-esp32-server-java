@@ -265,16 +265,9 @@ class WebSocketHandshakeProtocolTest {
     }
 
     /**
-     * 补充用例：hello 里的 audio_params 必须落到会话上，
-     * 否则 MessageHandler#applyAudioParams 的参数不一致告警永远不会触发，设备声明形同虚设。
-     * <p>
-     * 当前行为：设备上报的 audio_params 绑不上 HelloMessage#audioParams，恒为 null，
-     * applyAudioParams 永远走 deviceParams == null 的早返回，setDeviceAudioParams 从不执行。
-     * 正确行为：audio_params 应绑定成功，会话上记录设备声明的 24000/2/20。
-     * 生产代码 xiaozhi-dialogue/src/main/java/com/xiaozhi/communication/domain/HelloMessage.java:8
-     * 缺 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)（同包 AudioParams、HelloMessageResp 都有），
-     * 而 JsonUtil 的 ObjectMapper 是默认命名策略，ACCEPT_CASE_INSENSITIVE_PROPERTIES 不覆盖下划线。
-     * version 与 features 是单词字段，绑定正常，所以这处缺陷只吞掉 audio_params 一项。
+     * hello 里的 audio_params 是下划线命名，必须落到会话上，
+     * 绑不上的话 MessageHandler#applyAudioParams 永远走 deviceParams == null 的早返回，
+     * 参数不一致告警成为死代码，设备声明形同虚设。
      */
     @Test
     void helloAudioParamsAreRecordedOnSession() {
@@ -283,13 +276,33 @@ class WebSocketHandshakeProtocolTest {
         device.sendText(HELLO_V2_WITH_FOREIGN_AUDIO_PARAMS);
         device.transport().awaitJson("hello");
 
-        // 缺陷修复后应改回：recorded 非空且三项等于设备声明的 24000/2/20
-        assertThat(device.session().getDeviceAudioParams()).isNull();
-        // 同一条 hello 里的单词字段绑定正常，证明失败原因是命名策略而不是整条报文没解析
+        AudioParams recorded = device.session().getDeviceAudioParams();
+        assertThat(recorded).isNotNull();
+        assertThat(recorded.getFormat()).isEqualTo("opus");
+        assertThat(recorded.getSampleRate()).isEqualTo(24000);
+        assertThat(recorded.getChannels()).isEqualTo(2);
+        assertThat(recorded.getFrameDuration()).isEqualTo(20);
+        // 设备声明与服务端处理格式不一致时要能报出差异
+        assertThat(recorded.mismatchAgainstServer()).isNotNull();
+        // 同一条 hello 里的单词字段绑定不受命名策略影响
         assertThat(device.session().getProtocolVersion()).isEqualTo(2);
-        // 服务端能力回显不受影响
+        // 服务端能力回显仍是服务端自己的参数
         assertThat(device.transport().awaitJson("hello").path("audio_params").path("sample_rate").asInt())
                 .isEqualTo(AudioParams.SERVER_SAMPLE_RATE);
+    }
+
+    // 设备声明与服务端一致时不该报差异
+    @Test
+    void helloWithServerMatchingAudioParamsReportsNoMismatch() {
+        FakeDevice device = harness.connect(DEVICE_ID);
+
+        device.sendText(HELLO_WITHOUT_FEATURES);
+        device.transport().awaitJson("hello");
+
+        AudioParams recorded = device.session().getDeviceAudioParams();
+        assertThat(recorded).isNotNull();
+        assertThat(recorded.getSampleRate()).isEqualTo(AudioParams.SERVER_SAMPLE_RATE);
+        assertThat(recorded.mismatchAgainstServer()).isNull();
     }
 
     // ========== 驱动与断言辅助 ==========
