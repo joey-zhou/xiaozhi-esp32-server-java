@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Arrays;
@@ -103,9 +105,19 @@ public class DeviceAuthService {
 
     public String generateVisionToken(String sessionId, String deviceId) {
         long exp = System.currentTimeMillis() / 1000 + expireSeconds;
-        String payload = sessionId + "|" + (deviceId == null ? "" : normalize(deviceId)) + "|" + exp;
+        // 字段逐个转义再拼接，会话号或设备号里含分隔符时载荷不会被切错段
+        String payload = encodeField(sessionId) + "|"
+                + encodeField(deviceId == null ? "" : normalize(deviceId)) + "|" + exp;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes(StandardCharsets.UTF_8))
                 + "." + sign(payload, visionSecret);
+    }
+
+    private static String encodeField(String value) {
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
+    private static String decodeField(String value) {
+        return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
     /** 校验通过返回载荷，否则返回 null */
@@ -137,7 +149,11 @@ public class DeviceAuthService {
         } catch (NumberFormatException e) {
             return null;
         }
-        return new VisionToken(parts[0], parts[1]);
+        try {
+            return new VisionToken(decodeField(parts[0]), decodeField(parts[1]));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public record VisionToken(String sessionId, String deviceId) {

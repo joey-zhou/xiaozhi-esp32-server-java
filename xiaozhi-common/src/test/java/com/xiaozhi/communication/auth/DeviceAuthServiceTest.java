@@ -1,6 +1,9 @@
 package com.xiaozhi.communication.auth;
 
 import org.junit.jupiter.api.Test;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -8,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 钉住两种无状态 token 的签发校验闭环：设备 token 为 {@code base64url(hmac(deviceId|ts)).ts}，
  * deviceId 大小写不敏感、未配 secret 时整体停用；视觉 token 为
- * {@code base64url(sessionId|deviceId|exp).base64url(hmac(payload))}，不依赖 secret 开关且畸形载荷一律返回 null。
+ * 视觉 token 的载荷字段逐个转义后再用 '|' 拼接，不依赖 secret 开关且畸形载荷一律返回 null。
  */
 class DeviceAuthServiceTest {
 
@@ -130,11 +133,26 @@ class DeviceAuthServiceTest {
         assertThat(service.verifyVisionToken("!!!.whatever")).isNull();
     }
 
+    // 载荷用 '|' 分段，字段本身含 '|' 时必须靠转义还原，不能被切错段
+    @Test
+    void visionTokenKeepsFieldsContainingSeparator() {
+        DeviceAuthService service = service("");
+
+        DeviceAuthService.VisionToken parsed =
+                service.verifyVisionToken(service.generateVisionToken("session|1", DEVICE_ID));
+
+        assertThat(parsed).isNotNull();
+        assertThat(parsed.sessionId()).isEqualTo("session|1");
+        assertThat(parsed.deviceId()).isEqualTo(DEVICE_ID);
+    }
+
+    // 段数不足三段的载荷一律判失败
     @Test
     void visionTokenRejectsPayloadWithoutExactlyThreeSegments() {
         DeviceAuthService service = service("");
+        String payload = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("session|device".getBytes(StandardCharsets.UTF_8));
 
-        // 载荷用 '|' 分隔且不转义：sessionId 自带 '|' 会切出 4 段，签名有效也必须判失败
-        assertThat(service.verifyVisionToken(service.generateVisionToken("session|1", DEVICE_ID))).isNull();
+        assertThat(service.verifyVisionToken(payload + ".anything")).isNull();
     }
 }
