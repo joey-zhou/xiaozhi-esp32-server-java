@@ -40,6 +40,9 @@ public class ChatModelFactory {
     /** key 见 cacheKey()，配置或角色参数变更时失效 */
     private final Map<String, ChatModel> chatModelCache = new ConcurrentHashMap<>();
 
+    /** key 为 configId，配置变更时失效 */
+    private final Map<Integer, EmbeddingModel> embeddingModelCache = new ConcurrentHashMap<>();
+
     @Autowired
     private ObservationRegistry registry;
     /**
@@ -79,6 +82,7 @@ public class ChatModelFactory {
             return;
         }
         chatModelCache.keySet().removeIf(key -> key.startsWith(configId + ":"));
+        embeddingModelCache.remove(configId);
     }
 
     public ChatModel getVisionModel() {
@@ -95,9 +99,11 @@ public class ChatModelFactory {
 
     public EmbeddingModel getEmbeddingModel(Integer configId) {
         Assert.notNull(configId, "配置ID不能为空");
-        ConfigBO config = configLookup.getConfig(configId);
-        Assert.notNull(config, "未找到配置, configId=" + configId);
-        return getEmbeddingModel(config);
+        return embeddingModelCache.computeIfAbsent(configId, id -> {
+            ConfigBO config = configLookup.getConfig(id);
+            Assert.notNull(config, "未找到配置, configId=" + id);
+            return getEmbeddingModel(config);
+        });
     }
 
     public EmbeddingModel getEmbeddingModel(ConfigBO config) {

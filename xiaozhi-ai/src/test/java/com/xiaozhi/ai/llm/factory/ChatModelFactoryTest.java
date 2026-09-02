@@ -8,12 +8,15 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +38,12 @@ class ChatModelFactoryTest {
 
     @Mock
     private ChatModel fallbackModel;
+
+    @Mock
+    private EmbeddingModel embeddingModel;
+
+    @Mock
+    private EmbeddingModel rebuiltEmbeddingModel;
 
     private ChatModelFactory chatModelFactory;
 
@@ -74,6 +83,36 @@ class ChatModelFactoryTest {
 
         assertSame(fallbackModel, result);
         verify(openAiProvider).createChatModel(config, role);
+    }
+
+    @Test
+    void getEmbeddingModelIsCachedByConfigId() {
+        ConfigBO config = new ConfigBO().setConfigId(33).setProvider("stub");
+        when(configLookup.getConfig(33)).thenReturn(config);
+        when(stubProvider.createEmbeddingModel(config)).thenReturn(embeddingModel);
+
+        EmbeddingModel first = chatModelFactory.getEmbeddingModel(33);
+        EmbeddingModel second = chatModelFactory.getEmbeddingModel(33);
+
+        assertSame(embeddingModel, first);
+        assertSame(first, second);
+        verify(configLookup, times(1)).getConfig(33);
+        verify(stubProvider, times(1)).createEmbeddingModel(config);
+    }
+
+    @Test
+    void removeCacheRebuildsEmbeddingModel() {
+        ConfigBO config = new ConfigBO().setConfigId(44).setProvider("stub");
+        when(configLookup.getConfig(44)).thenReturn(config);
+        when(stubProvider.createEmbeddingModel(config)).thenReturn(embeddingModel, rebuiltEmbeddingModel);
+
+        EmbeddingModel before = chatModelFactory.getEmbeddingModel(44);
+        chatModelFactory.removeCache(44);
+        EmbeddingModel after = chatModelFactory.getEmbeddingModel(44);
+
+        assertSame(embeddingModel, before);
+        assertSame(rebuiltEmbeddingModel, after);
+        assertNotSame(before, after);
     }
 
     @Test
