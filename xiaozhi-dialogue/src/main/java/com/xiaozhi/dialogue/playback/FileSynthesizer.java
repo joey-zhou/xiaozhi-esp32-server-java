@@ -49,6 +49,13 @@ public class FileSynthesizer extends Synthesizer {
      */
     @Override
     public void synthesize(Flux<String> stringFlux) {
+        synthesize(stringFlux, true);
+    }
+
+    /**
+     * @param reply 是否本轮 LLM 回复，决定播放器是否把句子计入打断截断
+     */
+    private void synthesize(Flux<String> stringFlux, boolean reply) {
         llmDisposable = new SentenceHelper().convert(stringFlux).subscribe(result -> {
             String text = result.text();
             String mood = result.mood();
@@ -70,7 +77,7 @@ public class FileSynthesizer extends Synthesizer {
                 }
                 sink.complete();
             });
-            player.play(lazyTtsFlux);
+            player.play(lazyTtsFlux, reply);
         });
     }
 
@@ -81,7 +88,7 @@ public class FileSynthesizer extends Synthesizer {
     @Override
     public void synthesize(String text) {
         // 委托给 synthesize(Flux) 处理，缓存指标在那里统一记录
-        synthesize(Flux.just(text));
+        synthesize(Flux.just(text), false);
     }
 
 }

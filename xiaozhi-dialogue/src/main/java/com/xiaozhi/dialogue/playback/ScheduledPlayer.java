@@ -53,7 +53,13 @@ public class ScheduledPlayer extends Player {
     private static final long SENTENCE_GAP_NS = OPUS_FRAME_SEND_INTERVAL_NS * 5;
 
     // 句子间隔标记（空帧），发送线程遇到时跳过发送并增加playPosition间隔
-    private static final Speech SENTENCE_GAP_MARKER = new Speech(new byte[0]);
+    private static final Frame SENTENCE_GAP_MARKER = new Frame(new Speech(new byte[0]), false);
+
+    /** 队列里的一帧，带来源标记：是否本轮 LLM 回复 */
+    private record Frame(Speech speech, boolean reply) {}
+
+    /** 排队等待订阅的音频流，带来源标记 */
+    private record QueuedFlux(Flux<Speech> flux, boolean reply) {}
 
     // 允许的最大播放滞后阈值。
     // 绝对时间调度依赖 startTimestamp + playPosition 推算每帧的应发时刻，但 playPosition 只在实际发帧时推进。
@@ -68,10 +74,10 @@ public class ScheduledPlayer extends Player {
     private long playPosition = BURST_PREBUFFER_NS;  // 当前播放位置（纳秒），初始为-120ms实现预缓冲
 
     // 音频帧队列
-    private Queue<Speech> allOpusFrames = new ConcurrentLinkedQueue<>();
+    private Queue<Frame> allOpusFrames = new ConcurrentLinkedQueue<>();
 
     // Flux队列（用于排队多个TTS任务）
-    private Queue<Flux<Speech>> fluxQueue = new ConcurrentLinkedQueue<>();
+    private Queue<QueuedFlux> fluxQueue = new ConcurrentLinkedQueue<>();
 
     // 当前正在订阅的Flux
     private AtomicReference<Disposable> fluxDisposable = new AtomicReference<>(null);
@@ -93,14 +99,16 @@ public class ScheduledPlayer extends Player {
     /**
      * 播放音频流
      * @param speechFlux TTS生成的音频流
+     * @param reply 是否本轮 LLM 回复
      */
-    public void play(Flux<Speech> speechFlux) {
+    @Override
+    public void play(Flux<Speech> speechFlux, boolean reply) {
         Assert.notNull(speechFlux, "speechFlux 不能为空");
 
         synchronized (fluxDisposable) {
             // 如果当前没有TTS在工作，直接订阅
             if (fluxDisposable.get() == null) {
-                subscribe(speechFlux);
+                subscribe(speechFlux, reply);
 
                 // 启动发送线程（只启动一次）
                 if (!running) {
@@ -112,7 +120,7 @@ public class ScheduledPlayer extends Player {
                 }
             } else {
                 // 当前已有TTS在工作，加入队列排队
-                fluxQueue.offer(speechFlux);
+                fluxQueue.offer(new QueuedFlux(speechFlux, reply));
             }
         }
     }
@@ -120,7 +128,7 @@ public class ScheduledPlayer extends Player {
     /**
      * 订阅音频流
      */
-    private void subscribe(Flux<Speech> speechFlux) {
+    private void subscribe(Flux<Speech> speechFlux, boolean reply) {
         Assert.notNull(speechFlux, "speechFlux 不能为空");
 
         // 捕获当轮播放代次。若在本 Flux 存活期间发生过 stop()（打断），代次会递增，
@@ -146,7 +154,7 @@ public class ScheduledPlayer extends Player {
 
                         // 预编码的 Opus 帧（来自缓存直读），直接入队无需转换
                         if (speech.isOpusEncoded()) {
-                            allOpusFrames.add(speech);
+                            allOpusFrames.add(new Frame(speech, reply));
                             return;
                         }
 
@@ -171,7 +179,7 @@ public class ScheduledPlayer extends Player {
                                     Speech firstTail = tailList.remove(0);
                                     tailList.add(0, new Speech(firstTail.getOutput(), carriedText));
                                 }
-                                allOpusFrames.addAll(tailList);
+                                allOpusFrames.addAll(frames(tailList, reply));
                             }
                         }
 
@@ -195,7 +203,7 @@ public class ScheduledPlayer extends Player {
                                 pendingText.set(null);
                             }
 
-                            allOpusFrames.addAll(speechList);
+                            allOpusFrames.addAll(frames(speechList, reply));
                         } else if (StringUtils.hasText(text)) {
                             // PCM不足一个Opus帧（已进入编码器内部缓冲），暂存文本等待下一帧
                             pendingText.set(text);
@@ -229,7 +237,7 @@ public class ScheduledPlayer extends Player {
                                 speechList.add(0, new Speech(firstSpeech.getOutput(), pt));
                             }
 
-                            allOpusFrames.addAll(speechList);
+                            allOpusFrames.addAll(frames(speechList, reply));
                         }
 
                         // 添加句子间隔标记，避免句子粘连
@@ -243,14 +251,22 @@ public class ScheduledPlayer extends Player {
         fluxDisposable.set(disposable);
     }
 
+    private static List<Frame> frames(List<Speech> speeches, boolean reply) {
+        List<Frame> frames = new ArrayList<>(speeches.size());
+        for (Speech speech : speeches) {
+            frames.add(new Frame(speech, reply));
+        }
+        return frames;
+    }
+
     /**
      * 订阅队列中的下一个Flux
      */
     private void subscribeNext() {
         synchronized (fluxDisposable) {
-            Flux<Speech> nextFlux = fluxQueue.poll();
-            if (nextFlux != null) {
-                subscribe(nextFlux);
+            QueuedFlux next = fluxQueue.poll();
+            if (next != null) {
+                subscribe(next.flux(), next.reply());
             } else {
                 fluxDisposable.set(null);
             }
@@ -268,16 +284,16 @@ public class ScheduledPlayer extends Player {
      */
     private void sendFramesLoop() {
         while (running) {
-            Speech speech = allOpusFrames.poll();
+            Frame frame = allOpusFrames.poll();
 
-            if (speech != null) {
-                if (speech == SENTENCE_GAP_MARKER) {
+            if (frame != null) {
+                if (frame == SENTENCE_GAP_MARKER) {
                     // 句子间隔：推进playPosition，不发送音频
                     playPosition += SENTENCE_GAP_NS;
                     continue;
                 }
                 // 有数据，发送音频帧
-                sendSpeechWithBurstMode(speech);
+                sendSpeechWithBurstMode(frame);
             } else {
                 // 队列为空，检查是否播放结束
                 if (fluxDisposable.get() == null && !isToolCalling()) {
@@ -321,7 +337,8 @@ public class ScheduledPlayer extends Player {
      * - 第4帧：playPosition = 60ms   → 等待到startTimestamp+60ms后发送
      * - ...
      */
-    private void sendSpeechWithBurstMode(Speech speech) {
+    private void sendSpeechWithBurstMode(Frame queued) {
+        Speech speech = queued.speech();
         byte[] frame = speech.getOutput();
 
         // 更新活跃时间
@@ -378,7 +395,7 @@ public class ScheduledPlayer extends Player {
         if (StringUtils.hasText(text)) {
             String mood = speech.getMood();
             sendEmotion(StringUtils.hasText(mood) ? mood : EmojiUtils.getRandomEmotion());
-            sendSentenceStart(text);
+            sendSentenceStart(text, queued.reply());
         }
 
         // 发送音频帧
@@ -434,5 +451,10 @@ public class ScheduledPlayer extends Player {
      */
     public boolean hasContent() {
         return isPlaying() || !fluxQueue.isEmpty() || !allOpusFrames.isEmpty() || fluxDisposable.get() != null;
+    }
+
+    @Override
+    public boolean isDrained() {
+        return fluxQueue.isEmpty() && allOpusFrames.isEmpty() && fluxDisposable.get() == null;
     }
 }

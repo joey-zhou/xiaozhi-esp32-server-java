@@ -246,4 +246,32 @@ public class MessageServiceImpl implements MessageService {
         }
     }
 
+    @Override
+    @Transactional
+    public void truncateAssistant(String deviceId, Integer roleId, LocalDateTime createTime, String spokenText) {
+        if (!StringUtils.hasText(deviceId) || roleId == null || createTime == null) {
+            return;
+        }
+        LambdaQueryWrapper<MessageDO> query = new LambdaQueryWrapper<MessageDO>()
+            .eq(MessageDO::getDeviceId, deviceId)
+            .eq(MessageDO::getRoleId, roleId)
+            .eq(MessageDO::getSender, MessageBO.SENDER_ASSISTANT)
+            .eq(MessageDO::getMessageType, MessageBO.MESSAGE_TYPE_NORMAL)
+            .eq(MessageDO::getCreateTime, createTime)
+            .select(MessageDO::getMessageId);
+        MessageDO messageDO = messageMapper.selectOne(query);
+        if (messageDO == null) {
+            return;
+        }
+        if (!StringUtils.hasText(spokenText)) {
+            messageMapper.deleteById(messageDO.getMessageId());
+            return;
+        }
+        LambdaUpdateWrapper<MessageDO> update = new LambdaUpdateWrapper<MessageDO>()
+            .eq(MessageDO::getMessageId, messageDO.getMessageId())
+            .set(MessageDO::getMessage, spokenText)
+            .set(MessageDO::getUpdateTime, LocalDateTime.now());
+        messageMapper.update(null, update);
+    }
+
 }

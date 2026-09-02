@@ -1,5 +1,9 @@
 package com.xiaozhi.dialogue.runtime;
 
+import com.xiaozhi.ai.llm.memory.Conversation;
+
+import java.time.Instant;
+
 /**
  * Persona 生命周期回调接口（领域层，无框架依赖）。
  * <p>
@@ -22,6 +26,16 @@ public interface PersonaListener {
      * @param turn 本轮对话的完整信息
      */
     void onDialogueTurn(DialogueTurn turn);
+
+    /**
+     * 已落库的一轮在播放途中被打断：助手消息截到用户听到的位置。
+     * spokenText 为空表示一个字都没播出，实现方应把该条助手消息删掉。
+     *
+     * @param conversation              所属会话
+     * @param assistantMessageCreatedAt 落库时的助手消息创建时间，用于定位记录
+     * @param spokenText                用户实际听到的文本
+     */
+    void onDialogueTurnTruncated(Conversation conversation, Instant assistantMessageCreatedAt, String spokenText);
 
     /**
      * LLM 调用出错时回调。

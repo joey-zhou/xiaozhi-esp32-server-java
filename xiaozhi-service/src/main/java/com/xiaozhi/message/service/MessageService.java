@@ -47,4 +47,9 @@ public interface MessageService {
     void updateAssistantAudio(String deviceId, Integer roleId,
                               LocalDateTime createTime, String audioPath,
                               java.math.BigDecimal ttsDuration);
+
+    /**
+     * 把播放途中被打断的 assistant 消息截到用户听到的文本；spokenText 为空则连同 metrics 一起删除。
+     */
+    void truncateAssistant(String deviceId, Integer roleId, LocalDateTime createTime, String spokenText);
 }

@@ -5,14 +5,17 @@ import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.memory.ConversationContext;
+import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.ai.stt.SttService;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -29,6 +32,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import lombok.extern.slf4j.Slf4j;
@@ -107,6 +112,24 @@ public class Persona {
     private List<ToolCallback> toolCallbacks = new ArrayList<>();
 
 
+    /** 当前轮次运行态，打断收尾与播完判定都从这里取 */
+    @Builder.Default
+    private final AtomicReference<Turn> currentTurn = new AtomicReference<>();
+
+    /** 打断代次：每次打断递增，用于识别"STT 出结果后、chat 接管前"被打断的轮次 */
+    @Builder.Default
+    private final AtomicLong interruptEpoch = new AtomicLong();
+
+    /** STT 已出结果、chat 尚未接管的轮次数，期间也算活跃 */
+    @Builder.Default
+    private final AtomicInteger pendingTurns = new AtomicInteger();
+
+    /** 打断触发那一刻的当前轮次与已听到的文本，异步收尾时以它为准 */
+    @Builder.Default
+    private final AtomicReference<InterruptTarget> interruptTarget = new AtomicReference<>();
+
+    private record InterruptTarget(Turn turn, String spokenText) {}
+
     // PersonaListener 回调实现了核心与辅助的分离：Persona 只通知"发生了什么"，持久化和监控由外部实现。
 
     /**
@@ -117,25 +140,43 @@ public class Persona {
     }
 
     /**
-     * 处理用户查询（流式方式）
-     * @param userMessage         用户消息
+     * 一轮对话在内存里的运行态，从 chat 入口建立，到完成回调、播完、出错或打断收尾。
+     */
+    private static final class Turn {
+        private final long turnId;
+        private final UserMessage userMessage;
+        private final Instant startedAt;
+        private final String userSpeechStoredPath;
+        private final double sttDuration;
+        /** 首 token 时刻，也是助手消息的创建时间 */
+        private final AtomicReference<Instant> ttft = new AtomicReference<>(null);
+        private final AtomicReference<Phase> phase = new AtomicReference<>(Phase.PREPARING);
+        /** 完成回调落库的那一轮，播放途中被打断时据此截断 */
+        private volatile DialogueTurn completedTurn;
+
+        private Turn(long turnId, UserMessage userMessage, Instant startedAt,
+                     String userSpeechStoredPath, double sttDuration) {
+            this.turnId = turnId;
+            this.userMessage = userMessage;
+            this.startedAt = startedAt;
+            this.userSpeechStoredPath = userSpeechStoredPath;
+            this.sttDuration = sttDuration;
+        }
+    }
+
+    /**
+     * PREPARING：已进 chat，尚未开始生成；GENERATING：LLM 出 token 中；
+     * COMPLETED：LLM 完成并已落库，但可能还在播；CLOSED：完整播出或出错收尾，之后的打断与本轮无关；
+     * INTERRUPTED：被打断并已收尾
+     */
+    private enum Phase { PREPARING, GENERATING, COMPLETED, CLOSED, INTERRUPTED }
+
+    /**
+     * 处理用户查询（流式方式）。在 synthesize 订阅时才执行，准备期间被打断则不再调 LLM。
      * @param useFunctionCall 是否使用函数调用
      */
-    private Flux<ChatResponse> chatStream(Instant now, UserMessage userMessage, boolean useFunctionCall) {
-        long turnId = now.toEpochMilli();
-        conversation.discardIncompleteTurn();
-        getSession().getDialogueContext().startTurn(turnId);
-
-        // 用户音频的持久化路径与时长从 session 获取（在保存音频时已备好），避免参数层层穿透。
-        // 用 storedPath 字符串而非 Path：云存储 storedPath 是完整 URL，Path 会破坏其双斜杠。
-        String userSpeechStoredPath = getSession().getUserAudioStoredPath();
-        double sttDuration = getSession().getSttDuration();
-
-        // time to first token，同时也应该是实质上的AssistantMessage createdAt 时间戳。
-        // 在ChatModel生成完成时，语音合成器、播放器已经在工作了。但在第一个Token生成前，语音合成器与播放器还没有开始工作。
-        // 播放器生成文件时也需要用到一个关联到AssistantMessage的ID，不能在sendStart时创建磁盘音频文件。
-        AtomicReference<Instant> ttft = new AtomicReference<>(null);
-
+    private Flux<ChatResponse> chatStream(Turn turn, boolean useFunctionCall) {
+        UserMessage userMessage = turn.userMessage;
         String ownerId = conversation.getOwnerId();
 
         // 从 ToolsSessionHolder 获取实时工具列表（包含后注册的设备 MCP 工具）
@@ -148,10 +189,13 @@ public class Persona {
                 .toolCallbacks(effectiveTools)
                 .toolContext(TOOL_CONTEXT_SESSION_ID_KEY, sessionId)
                 .toolContext("deviceId", ownerId)
-                .toolContext("conversationTimestamp", turnId)
+                .toolContext("conversationTimestamp", turn.turnId)
                 .build();
 
-        conversation.add(userMessage);
+        // 准备期间被打断：用户消息已由打断收尾记入历史，这里不再生成
+        if (!turn.phase.compareAndSet(Phase.PREPARING, Phase.GENERATING)) {
+            return Flux.empty();
+        }
 
         // 构建运行时上下文
         ChatSession currentSession = getSession();
@@ -163,50 +207,209 @@ public class Persona {
         Flux<ChatResponse> chatFlux = chatModel.stream(prompt)
             .doOnError(error -> {
                 listener.onError(error);
+                failTurn(turn);
             });
         chatFlux = chatFlux.doOnNext(chatResponse -> {
+            // 首 token 时刻即助手消息创建时间；播放器落盘音频文件也以此关联到助手消息
             Instant assistantMessageCreatedAt = Instant.now();
-            boolean isFirst = ttft.compareAndSet(null, assistantMessageCreatedAt);
-            if (isFirst) {
-                if (player.getOpusRecorder() != null) {
-                    player.getOpusRecorder().setAssistantMessageCreatedAt(assistantMessageCreatedAt);
-                }
+            boolean isFirst = turn.ttft.compareAndSet(null, assistantMessageCreatedAt);
+            if (isFirst && player.getOpusRecorder() != null) {
+                player.getOpusRecorder().setAssistantMessageCreatedAt(assistantMessageCreatedAt);
             }
         });
-        return new MessageAggregator().aggregate(chatFlux, chatResponse -> {
-            DialogueContext dialogueContext = getSession().getDialogueContext();
-            DialogueContext.ToolCallSnapshot toolCallSnapshot = dialogueContext.snapshotToolCalls(turnId);
-            if (toolCallSnapshot == null) {
+        return new MessageAggregator().aggregate(chatFlux, chatResponse -> completeTurn(turn, chatResponse));
+    }
+
+    /**
+     * LLM 正常完成：落库并写入历史。与打断收尾互斥，谁先切走阶段谁负责。
+     */
+    private void completeTurn(Turn turn, ChatResponse chatResponse) {
+        synchronized (turn) {
+            if (!turn.phase.compareAndSet(Phase.GENERATING, Phase.COMPLETED)) {
                 return;
             }
-            var toolCallDetails = toolCallSnapshot.details();
-            // 模型本轮真实调用的工具链（一轮 tool loop 可能有多次，按顺序累积）
-            List<ToolChainPair> modelChains = toolCallSnapshot.chains();
-
-            // 合并本轮所有 tool chain：模型真实调用链（顺序即持久化顺序）
-            List<ToolChainPair> allChains = new ArrayList<>(modelChains);
-
-            DialogueTurn dialogueTurn = DialogueTurn.builder()
-                    .userMessage(userMessage)
-                    .chatResponse(chatResponse)
-                    .conversation(conversation)
-                    .userMessageCreatedAt(now)
-                    .userSpeechStoredPath(userSpeechStoredPath)
-                    .sttDuration(sttDuration)
-                    .assistantMessageCreatedAt(ttft.get())
-                    .toolCallDetails(toolCallDetails)
-                    .toolChains(allChains)
-                    .build();
-            // UserMessage 的时间戳应在 DialogueTurn 中注入，与 Conversation 持有的是同一个 UserMessage。
-            dialogueTurn.injectInstants();
-            listener.onDialogueTurn(dialogueTurn);
-
-            for (ToolChainPair chain : modelChains) {
-                conversation.addToolCallChain(chain.toolCallMessage(), chain.toolResponseMessage());
+            DialogueContext.ToolCallSnapshot snapshot = getSession().getDialogueContext().snapshotToolCalls(turn.turnId);
+            if (snapshot == null) {
+                return;
             }
-            // 不能再从 ChatResponse 里取 AssistantMessage，因为已注入时间戳
-            conversation.add(dialogueTurn.getAssistantMessage());
-        });
+            AssistantMessage assistant = chatResponse.getResult().getOutput();
+            Usage usage = chatResponse.getMetadata() != null ? chatResponse.getMetadata().getUsage() : null;
+            DialogueTurn dialogueTurn = buildTurn(turn, assistant, usage, snapshot, false);
+            commitTurn(turn, dialogueTurn, snapshot.chains());
+            turn.completedTurn = dialogueTurn;
+        }
+    }
+
+    /**
+     * LLM 出错：轮次到此为止，只记用户消息。之后兜底口播被打断也与本轮无关。
+     */
+    private void failTurn(Turn turn) {
+        synchronized (turn) {
+            if (!turn.phase.compareAndSet(Phase.GENERATING, Phase.CLOSED)) {
+                return;
+            }
+            DialogueContext.ToolCallSnapshot snapshot = getSession().getDialogueContext().snapshotToolCalls(turn.turnId);
+            DialogueTurn dialogueTurn = buildTurn(turn, null, null, snapshot, false);
+            commitTurn(turn, dialogueTurn, snapshot != null ? snapshot.chains() : List.of());
+        }
+    }
+
+    private DialogueTurn buildTurn(Turn turn, AssistantMessage assistant, Usage usage,
+                                   DialogueContext.ToolCallSnapshot snapshot, boolean interrupted) {
+        // 本轮模型真实调用的工具链，顺序即持久化顺序
+        List<ToolChainPair> allChains = new ArrayList<>();
+        if (snapshot != null) {
+            allChains.addAll(snapshot.chains());
+        }
+        Instant assistantCreatedAt = null;
+        if (assistant != null) {
+            assistantCreatedAt = turn.ttft.get() != null ? turn.ttft.get() : Instant.now();
+        }
+        return DialogueTurn.builder()
+                .userMessage(turn.userMessage)
+                .assistantMessage(assistant)
+                .usage(usage)
+                .conversation(conversation)
+                .userMessageCreatedAt(turn.startedAt)
+                .userSpeechStoredPath(turn.userSpeechStoredPath)
+                .sttDuration(turn.sttDuration)
+                .assistantMessageCreatedAt(assistantCreatedAt)
+                .toolCallDetails(snapshot != null ? snapshot.details() : List.of())
+                .toolChains(allChains)
+                .interrupted(interrupted)
+                .build();
+    }
+
+    /**
+     * 落库并写入内存历史：先模型工具链后助手消息，与持久化顺序一致。
+     */
+    private void commitTurn(Turn turn, DialogueTurn dialogueTurn, List<ToolChainPair> modelChains) {
+        // UserMessage 的时间戳应在 DialogueTurn 中注入，与 Conversation 持有的是同一个 UserMessage。
+        dialogueTurn.injectInstants();
+        listener.onDialogueTurn(dialogueTurn);
+        List<Message> tail = new ArrayList<>();
+        for (ToolChainPair chain : modelChains) {
+            tail.add(chain.toolCallMessage());
+            tail.add(chain.toolResponseMessage());
+        }
+        if (dialogueTurn.getAssistantMessage() != null) {
+            tail.add(dialogueTurn.getAssistantMessage());
+        }
+        if (currentTurn.get() == turn) {
+            tail.forEach(conversation::add);
+        } else {
+            // 迟到的收尾：新一轮已开始，插回本轮用户消息之后
+            conversation.insertAfterTurn(turn.userMessage, tail);
+        }
+    }
+
+    /**
+     * 播放器发完 tts stop：LLM 已完成、合成器也已把全部音频交给播放器的轮次到此才算完整播出，
+     * 之后的打断（问候语、推送）与本轮无关。
+     * 句间断流、工具提示播完、双向 TTS 首帧未到时的 stop 都不算结束：合成器仍活跃。
+     */
+    private void onPlaybackStopped() {
+        Turn turn = currentTurn.get();
+        if (turn != null && !synthesizerActive()) {
+            turn.phase.compareAndSet(Phase.COMPLETED, Phase.CLOSED);
+        }
+    }
+
+    private boolean synthesizerActive() {
+        return synthesizer != null && synthesizer.isActive();
+    }
+
+    /**
+     * 打断发生时立刻调用（同步于触发线程）：记下要收尾的轮次并递增代次。
+     * 之后再 prepareTurn 的轮次不受影响，之前 prepareTurn 还没进 chat 的轮次会被判为"还没开口就被打断"。
+     */
+    public void markInterrupted() {
+        Turn turn = currentTurn.get();
+        // 听到的文本也在此刻定格
+        interruptTarget.set(new InterruptTarget(turn, player.spokenText()));
+        interruptEpoch.incrementAndGet();
+    }
+
+    /**
+     * 用户打断后的历史收尾。必须在 synthesizer.cancel() 之后、player.stop() 之前调用，
+     * 此时播放器还记着本轮下发到了哪句。
+     * 准备中或生成中被打断：听到的部分作为助手消息落库并写入历史，一个字没听到就只留用户消息；
+     * 已生成完但没播完：把已落库的助手消息截到听到的位置。
+     */
+    public void onInterrupted() {
+        // 优先收尾打断触发那一刻的轮次；没有记录（从未标记）则取当前轮
+        InterruptTarget target = interruptTarget.getAndSet(null);
+        Turn turn = target != null ? target.turn() : currentTurn.get();
+        if (turn == null || getSession() == null) {
+            return;
+        }
+        String spokenText = target != null ? target.spokenText() : player.spokenText();
+        interruptTurn(turn, spokenText);
+    }
+
+    private void interruptTurn(Turn turn, String spokenText) {
+        synchronized (turn) {
+            Phase previous = turn.phase.getAndSet(Phase.INTERRUPTED);
+            switch (previous) {
+                case PREPARING, GENERATING -> {
+                    finishInterruptedTurn(turn, spokenText);
+                    // 句柄可能在 abort 的 cancel 之后才交给合成器，这里再 cancel 一次
+                    if (synthesizer != null && currentTurn.get() == turn) {
+                        synthesizer.cancel();
+                    }
+                }
+                case COMPLETED -> truncateCompletedTurn(turn, spokenText);
+                default -> turn.phase.set(previous);
+            }
+        }
+    }
+
+    private void finishInterruptedTurn(Turn turn, String spokenText) {
+        DialogueContext.ToolCallSnapshot snapshot = getSession().getDialogueContext().snapshotToolCalls(turn.turnId);
+        AssistantMessage assistant = StringUtils.hasText(spokenText) ? new AssistantMessage(spokenText) : null;
+        DialogueTurn dialogueTurn = buildTurn(turn, assistant, null, snapshot, true);
+        commitTurn(turn, dialogueTurn, snapshot != null ? snapshot.chains() : List.of());
+    }
+
+    /**
+     * 阶段还是 COMPLETED 就说明没播完（播完会经 onPlaybackStopped 切到 CLOSED），
+     * 直接按听到的文本截断，一个字没听到就删掉那条助手消息。
+     */
+    private void truncateCompletedTurn(Turn turn, String spokenText) {
+        DialogueTurn completed = turn.completedTurn;
+        if (completed == null || completed.getAssistantMessage() == null) {
+            return;
+        }
+        // 合成器已空闲且播放器队列已全部下发：用户听到了完整回复
+        if (!synthesizerActive() && player.isDrained()) {
+            turn.phase.set(Phase.CLOSED);
+            return;
+        }
+        AssistantMessage original = completed.getAssistantMessage();
+        if (StringUtils.hasText(spokenText)) {
+            AssistantMessage truncated = AssistantMessage.builder()
+                    .content(spokenText)
+                    .properties(original.getMetadata())
+                    .build();
+            conversation.replace(original, truncated);
+        } else {
+            conversation.remove(original);
+        }
+        listener.onDialogueTurnTruncated(conversation, completed.getAssistantMessageCreatedAt(), spokenText);
+    }
+
+    /**
+     * STT 出结果到 chat 接管之间本轮也算活跃，连说的第二句才能打断第一句。
+     * 返回当时的打断代次，chat 时校验：期间被打断过的轮次不再生成，只把用户消息记入历史。
+     * 与 {@link #releaseTurn()} 成对调用。
+     */
+    public long prepareTurn() {
+        pendingTurns.incrementAndGet();
+        return interruptEpoch.get();
+    }
+
+    public void releaseTurn() {
+        pendingTurns.decrementAndGet();
     }
 
     /**
@@ -224,18 +427,45 @@ public class Persona {
         chat(new UserMessage(userMessage), useFunctionCall);
     }
 
+    public void chat(UserMessage userMessage, boolean useFunctionCall){
+        chat(userMessage, useFunctionCall, interruptEpoch.get());
+    }
+
     /**
      * 主入口：带元数据（time/speaker/emotion 等在 UserMessage.metadata 里）的对话。
+     * 入口就建立轮次并写入用户消息，之后任何时刻的打断都能正确收尾。
      * @param userMessage 已构造好的 Spring AI UserMessage，可附带 metadata
      * @param useFunctionCall 是否启用工具调用
+     * @param epoch {@link #prepareTurn()} 返回的打断代次，不一致说明还没开口就被下一句打断
      */
-    public void chat(UserMessage userMessage, boolean useFunctionCall){
+    public void chat(UserMessage userMessage, boolean useFunctionCall, long epoch){
+        ChatSession session = getSession();
         Instant now = Instant.now();
-        Flux<ChatResponse> chatResponseFlux = chatStream(now, userMessage, useFunctionCall);
+        // 用户消息时间取 STT 出结果那一刻（构造时已写入）
+        Turn turn = new Turn(now.toEpochMilli(), userMessage, MessageTimeMetadata.getTimeMillis(userMessage),
+                session.getUserAudioStoredPath(), session.getSttDuration());
+        session.getDialogueContext().startTurn(turn.turnId);
+        player.resetSpokenSentences();
+        player.setOnPlaybackStopped(this::onPlaybackStopped);
+        conversation.add(userMessage);
+        currentTurn.set(turn);
+
+        // 还没开口就被下一句打断：只记用户消息，留给下一轮一并回答
+        if (epoch != interruptEpoch.get()) {
+            interruptTurn(turn, "");
+            return;
+        }
+
+        // 工具路由、RAG 召回都在订阅时才执行，准备期间被打断就不再调 LLM
+        Flux<ChatResponse> chatResponseFlux = Flux.defer(() -> chatStream(turn, useFunctionCall));
         Flux<ChatToken> tokenFlux = convert(chatResponseFlux);
         // 设备对话管道：过滤掉思考内容，只将正式回复传给语音合成
         Flux<String> speechFlux = tokenFlux.filter(ChatToken::isContent).map(ChatToken::text);
         synthesizer.synthesize(withErrorFallback(speechFlux));
+        // 订阅期间被打断时句柄尚未交给合成器，这里补一次 cancel
+        if (turn.phase.get() == Phase.INTERRUPTED) {
+            synthesizer.cancel();
+        }
     }
 
     /**
@@ -258,10 +488,13 @@ public class Persona {
     }
 
     /**
-     * 检查当前Persona是否处于活跃状态（LLM生成中、TTS合成中、音频播放中等）。
+     * 检查当前Persona是否处于活跃状态（STT 已出结果待处理、LLM生成中、TTS合成中、音频播放中等）。
      * 用于打断判断：只要管道中任何一层仍在工作，就应该被打断。
      */
     public boolean isActive() {
+        if (pendingTurns.get() > 0) {
+            return true;
+        }
         if (synthesizer != null && synthesizer.isActive()) {
             return true;
         }

@@ -139,20 +139,40 @@ public class Conversation extends ConversationIdentifier {
     }
 
     /**
-     * 丢弃上轮被打断后留下的不完整消息，只保留到最后一条最终 AssistantMessage。
+     * 用截断后的消息替换原消息（按对象身份定位），原消息不在列表里则不做任何事
      */
-    public synchronized void discardIncompleteTurn() {
-        int lastCompletedIndex = -1;
+    public synchronized void replace(Message original, Message replacement) {
         for (int i = messages.size() - 1; i >= 0; i--) {
-            if (messages.get(i) instanceof AssistantMessage assistant
-                    && (assistant.getToolCalls() == null || assistant.getToolCalls().isEmpty())) {
-                lastCompletedIndex = i;
+            if (messages.get(i) == original) {
+                messages.set(i, replacement);
+                return;
+            }
+        }
+    }
+
+    /**
+     * 把消息插到 anchor 所在轮次的末尾（下一条 UserMessage 之前）；anchor 不在列表里则追加到末尾。
+     * 用于迟到的打断收尾：该轮的用户消息之后可能已经有了新一轮消息。
+     */
+    public synchronized void insertAfterTurn(Message anchor, List<Message> toInsert) {
+        int index = messages.size();
+        for (int i = 0; i < messages.size(); i++) {
+            if (messages.get(i) == anchor) {
+                index = i + 1;
+                while (index < messages.size() && !(messages.get(index) instanceof UserMessage)) {
+                    index++;
+                }
                 break;
             }
         }
-        if (lastCompletedIndex < messages.size() - 1) {
-            messages.subList(lastCompletedIndex + 1, messages.size()).clear();
-        }
+        messages.addAll(index, toInsert);
+    }
+
+    /**
+     * 按对象身份移除消息
+     */
+    public synchronized void remove(Message message) {
+        messages.removeIf(m -> m == message);
     }
 
 }

@@ -185,6 +185,8 @@ public class DialogueService{
         }
 
         if (aborted.compareAndSet(false, true)) {
+            // 代次在识别回调里同步递增，不能留到异步 abort 里
+            persona.markInterrupted();
             // 切出识别线程，避免 abort 的耗时动作阻塞后续 ASR 包
             Thread.startVirtualThread(() -> abortDialogue(session, ABORT_REASON_ASR));
         }
@@ -240,17 +242,23 @@ public class DialogueService{
                 // 发送STT识别结果到设备
                 persona.getPlayer().sendStt(sttResult.text());
 
-                // 发布语音识别完成事件
-                eventPublisher.publishEvent(new SpeechRecognizedEvent(this, sessionId, sttResult.text(),
-                        sttResult.hasEmotion() ? sttResult.emotion() : null));
+                // 从这里到 chat 接管之间本轮也算活跃，紧接着的第二句才能打断本句
+                long epoch = persona.prepareTurn();
+                try {
+                    // 发布语音识别完成事件
+                    eventPublisher.publishEvent(new SpeechRecognizedEvent(this, sessionId, sttResult.text(),
+                            sttResult.hasEmotion() ? sttResult.emotion() : null));
 
-                // 音频保存
-                Instant userInstant = Instant.now();
-                Path userAudioPath = session.getAudioPath(MessageBO.SENDER_USER, userInstant);
-                session.setUserAudioPath(userAudioPath);
-                saveUserAudio(session, userAudioPath);
+                    // 音频保存
+                    Instant userInstant = Instant.now();
+                    Path userAudioPath = session.getAudioPath(MessageBO.SENDER_USER, userInstant);
+                    session.setUserAudioPath(userAudioPath);
+                    saveUserAudio(session, userAudioPath);
 
-                handleText(session, sttResult);
+                    handleText(session, sttResult, epoch);
+                } finally {
+                    persona.releaseTurn();
+                }
 
             } catch (Exception e) {
                 log.error("流式识别错误: {}", e.getMessage(), e);
@@ -286,6 +294,13 @@ public class DialogueService{
      * @param sttResult STT结果（纯文本使用 SttResult.textOnly() 包装）
      */
     public void handleText(ChatSession session, SttResult sttResult) {
+        handleText(session, sttResult, null);
+    }
+
+    /**
+     * @param epoch {@link Persona#prepareTurn()} 返回的打断代次，为 null 表示不校验
+     */
+    private void handleText(ChatSession session, SttResult sttResult, Long epoch) {
         try {
             Persona persona = session.getPersona();
 
@@ -301,7 +316,11 @@ public class DialogueService{
 
             // LLM+TTS
             try {
-                persona.chat(userMessage, true);
+                if (epoch != null) {
+                    persona.chat(userMessage, true, epoch);
+                } else {
+                    persona.chat(userMessage, true);
+                }
             } catch (Exception e) {
                 log.error("LLM对话处理失败: {}", e.getMessage(), e);
             }
@@ -376,6 +395,19 @@ public class DialogueService{
             Persona persona = session.getPersona();
             if (persona != null && persona.getSynthesizer() != null) {
                 persona.getSynthesizer().cancel();
+            }
+
+            // 历史截到用户听到的位置。要在 player.stop() 之前，此时播放器还记着下发到了哪句
+            if (persona != null) {
+                try {
+                    // ASR 触发的打断已在识别回调里同步递增过代次
+                    if (!ABORT_REASON_ASR.equals(reason)) {
+                        persona.markInterrupted();
+                    }
+                    persona.onInterrupted();
+                } catch (Exception e) {
+                    log.error("打断后收尾对话历史失败: {}", e.getMessage(), e);
+                }
             }
 
             // 再终止音频播放，清空播放队列

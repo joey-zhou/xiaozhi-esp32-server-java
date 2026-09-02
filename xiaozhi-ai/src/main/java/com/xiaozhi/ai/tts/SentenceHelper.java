@@ -2,6 +2,7 @@ package com.xiaozhi.ai.tts;
 
 import com.xiaozhi.utils.EmojiUtils;
 import org.springframework.util.StringUtils;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
@@ -194,11 +195,14 @@ public class SentenceHelper implements ChatConverter {
     }
 
     public Flux<SentenceResult> convert(Flux<String> stringFlux) {
-        return Flux.create(sink ->
-                stringFlux.subscribe(
-                        token -> this.onToken(token, sink),
-                        sink::error,
-                        () -> this.onComplete(sink)));
+        return Flux.create(sink -> {
+            // 内部订阅挂到 sink 上，下游 dispose 时一并取消 LLM 流
+            Disposable upstream = stringFlux.subscribe(
+                    token -> this.onToken(token, sink),
+                    sink::error,
+                    () -> this.onComplete(sink));
+            sink.onDispose(upstream);
+        });
     }
 
     private boolean containsSubstantialContent(String text) {

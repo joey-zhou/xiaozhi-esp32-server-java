@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue.llm.handler;
 
+import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.dialogue.runtime.DialogueTurn;
 import com.xiaozhi.dialogue.runtime.PersonaListener;
 import com.xiaozhi.dialogue.runtime.convert.DialogueTurnConverter;
@@ -7,6 +8,10 @@ import com.xiaozhi.message.service.MessageService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -29,6 +34,16 @@ public class DialogueListener implements PersonaListener {
             messageService.saveAll(dialogueTurnConverter.toMessages(turn));
         } catch (Exception e) {
             log.error("对话持久化失败", e);
+        }
+    }
+
+    @Override
+    public void onDialogueTurnTruncated(Conversation conversation, Instant assistantMessageCreatedAt, String spokenText) {
+        try {
+            messageService.truncateAssistant(conversation.getOwnerId(), conversation.getRoleId(),
+                    LocalDateTime.ofInstant(assistantMessageCreatedAt, ZoneId.systemDefault()), spokenText);
+        } catch (Exception e) {
+            log.error("截断被打断的助手消息失败", e);
         }
     }
 
