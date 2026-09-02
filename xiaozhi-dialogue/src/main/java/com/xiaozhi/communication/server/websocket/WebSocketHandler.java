@@ -223,8 +223,8 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
     }
 
     private Map<String, String> getHeadersFromSession(WebSocketSession session) {
-        // 尝试从请求头获取设备ID
-        String[] deviceKeys = { "device-id", "mac_address", "uuid", "Authorization" };
+        // 设备标识只认 device-id，与握手鉴权拦截器保持一致
+        String[] deviceKeys = { "device-id", "Authorization" };
 
         Map<String, String> headers = new HashMap<>();
 

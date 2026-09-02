@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
  *   <li>hello 是幂等的补充声明而不是会话重置——重复 hello 不换会话、不停播放；</li>
  *   <li>features.aec 的取值每次 hello 都会重新落到 AEC 会话上（拆除也算生效）；</li>
  *   <li>没有可用的设备标识就必须以 BAD_DATA 关闭，不能建出无主会话；</li>
- *   <li>设备标识允许从 URI query 取，与握手鉴权拦截器接受的来源保持一致；</li>
+ *   <li>设备标识只认 device-id 一个键，允许从 URI query 取，与握手鉴权拦截器认定一致；</li>
  *   <li>本项目不强制 hello 前置，listen 先到也照常进入聆听（与 Go 版实现不同）；</li>
  *   <li>设备曾绑定在别的实例时，连接建立要广播清理旧实例上的幽灵会话，且不误伤本实例。</li>
  * </ul>
@@ -174,23 +174,18 @@ class WebSocketHandshakeProtocolTest {
     }
 
     /**
-     * 当前行为：只带 mac_address 的连接通过了握手鉴权，却在 afterConnectionEstablished 被以
-     * BAD_DATA(设备ID为空) 关掉，会话不会建立。
-     * 正确行为：设备标识应按 device-id → mac_address → uuid 取首个非空，
-     * 与 DeviceAuthHandshakeInterceptor.java:40-41 的认定保持一致，连接应当建立成功。
-     * 生产代码 xiaozhi-dialogue/src/main/java/com/xiaozhi/communication/server/websocket/WebSocketHandler.java:47
-     * （getHeadersFromSession 同文件 :236-264 已经把 mac_address / uuid 收集进来，但从不使用）。
+     * 设备标识只认 device-id 这一个键，握手鉴权与连接建立两层的认定必须一致。
+     * mac_address 是历史遗留写法，官方固件按 device-id 上报，这里不接受，
+     * 避免出现「鉴权放行了但连接建立又判空关掉」的不一致。
      */
     @Test
-    void deviceIdFromQueryParamWhenHeaderAbsent() {
+    void macAddressQueryParamIsNotAcceptedAsDeviceId() {
         harness.withBoundDevice(DEVICE_ID, 1);
-        // 浏览器无法设握手头，设备标识只能走 query，握手鉴权拦截器接受 mac_address 作为标识
         FakeWebSocketTransport transport = harness.newTransport()
                 .withUri("ws://example.com/ws/xiaozhi/v1/?mac_address=" + DEVICE_ID + "&token=t");
 
         FakeDevice device = harness.connect(DEVICE_ID, transport);
 
-        // 缺陷修复后这三条应改回：closeStatus 为 null、会话可按设备号查到、getBO 被调用
         assertThat(transport.closeStatus()).isNotNull();
         assertThat(transport.closeStatus().getCode()).isEqualTo(CloseStatus.BAD_DATA.getCode());
         assertThat(harness.sessionManager().getSessionByDeviceId(DEVICE_ID)).isNull();
@@ -199,8 +194,8 @@ class WebSocketHandshakeProtocolTest {
     }
 
     /**
-     * 补充用例：query 里用 device-id 这个键时链路是通的，
-     * 与上一条对照可以把失败定位到「只认 device-id 一个键」而不是「query 解析本身坏了」。
+     * 浏览器无法设握手头，device-id 走 query 必须能建立连接，
+     * 与上一条对照说明被拒的原因是键名而不是 query 解析本身。
      */
     @Test
     void deviceIdKeyInQueryParamRegistersSessionWithoutHeader() {

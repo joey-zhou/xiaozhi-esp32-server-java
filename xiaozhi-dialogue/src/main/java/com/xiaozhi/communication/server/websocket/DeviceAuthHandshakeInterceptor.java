@@ -38,7 +38,7 @@ public class DeviceAuthHandshakeInterceptor implements HandshakeInterceptor {
         }
         Map<String, String> params = parseQuery(request.getURI().getRawQuery());
         String deviceId = firstNonBlank(request.getHeaders().getFirst("device-id"),
-                params.get("device-id"), params.get("mac_address"));
+                params.get("device-id"));
         String token = stripBearer(request.getHeaders().getFirst("Authorization"));
         if (!StringUtils.hasText(token)) {
             token = stripBearer(firstNonBlank(params.get("token"), params.get("Authorization")));
