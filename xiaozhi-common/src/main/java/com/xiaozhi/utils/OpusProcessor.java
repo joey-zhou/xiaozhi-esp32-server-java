@@ -38,7 +38,6 @@ public class OpusProcessor {
     public static class LeftoverState {
         public short[] leftoverBuffer;
         public int leftoverCount;
-        public boolean isFirst = true;
 
         public LeftoverState() {
             leftoverBuffer = new short[FRAME_SIZE]; // 预分配一个帧大小的缓冲区
@@ -174,16 +173,11 @@ public class OpusProcessor {
         short[] shortBuf = new short[frameSize];
         byte[] opusBuf = new byte[MAX_SIZE];
 
-        if (isStream) {
-            if (state.leftoverCount > 0 || !state.isFirst) {
-                combined = new short[state.leftoverCount + totalInputSamples];
-                System.arraycopy(state.leftoverBuffer, 0, combined, 0, state.leftoverCount);
-                inputShorts.get(combined, state.leftoverCount, totalInputSamples);
-            } else {
-                combined = new short[totalInputSamples];
-                inputShorts.get(combined);
-                state.isFirst = false;
-            }
+        if (isStream && state.leftoverCount > 0) {
+            // 流式路径把上一次不足一帧的残留拼在本次输入之前
+            combined = new short[state.leftoverCount + totalInputSamples];
+            System.arraycopy(state.leftoverBuffer, 0, combined, 0, state.leftoverCount);
+            inputShorts.get(combined, state.leftoverCount, totalInputSamples);
         } else {
             combined = new short[totalInputSamples];
             inputShorts.get(combined);
@@ -193,53 +187,17 @@ public class OpusProcessor {
         int frameCount = availableSamples / frameSize;
         int remainingSamples = availableSamples % frameSize;
 
-        // 处理第一帧 - 如果是新的音频段，应用淡入效果
-        if (frameCount > 0 && state.isFirst) {
-            System.arraycopy(combined, 0, shortBuf, 0, frameSize);
-
-            // 应用淡入效果 - 前20毫秒（大约320个样本）
-            int fadeInSamples = Math.min(320, frameSize);
-            for (int i = 0; i < fadeInSamples; i++) {
-                // 线性淡入
-                float gain = (float) i / fadeInSamples;
-                shortBuf[i] = (short) (shortBuf[i] * gain);
-            }
-
+        // 逐帧编码
+        for (int i = 0; i < frameCount; i++) {
+            int start = i * frameSize;
+            System.arraycopy(combined, start, shortBuf, 0, frameSize);
             try {
                 int opusLen = encoder.encode(shortBuf, 0, frameSize, opusBuf, 0, opusBuf.length);
                 if (opusLen > 0) {
                     frames.add(Arrays.copyOf(opusBuf, opusLen));
                 }
             } catch (Exception | AssertionError e) {
-                log.warn("淡入帧编码失败: {}", e.getMessage());
-            }
-
-            // 处理剩余的完整帧
-            for (int i = 1; i < frameCount; i++) {
-                int start = i * frameSize;
-                System.arraycopy(combined, start, shortBuf, 0, frameSize);
-                try {
-                    int opusLen = encoder.encode(shortBuf, 0, frameSize, opusBuf, 0, opusBuf.length);
-                    if (opusLen > 0) {
-                        frames.add(Arrays.copyOf(opusBuf, opusLen));
-                    }
-                } catch (Exception | AssertionError e) {
-                    log.warn("帧 #{} 编码失败: {}", i, e.getMessage());
-                }
-            }
-        } else {
-            // 处理所有完整帧
-            for (int i = 0; i < frameCount; i++) {
-                int start = i * frameSize;
-                System.arraycopy(combined, start, shortBuf, 0, frameSize);
-                try {
-                    int opusLen = encoder.encode(shortBuf, 0, frameSize, opusBuf, 0, opusBuf.length);
-                    if (opusLen > 0) {
-                        frames.add(Arrays.copyOf(opusBuf, opusLen));
-                    }
-                } catch (Exception | AssertionError e) {
-                    log.warn("帧 #{} 编码失败: {}", i, e.getMessage());
-                }
+                log.warn("帧 #{} 编码失败: {}", i, e.getMessage());
             }
         }
 

@@ -11,13 +11,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 钉住流式编码的帧长不变量：下行音频、服务端 AEC 参考帧、句子边界补帧都按 60ms/960 样本一帧对齐，
  * 残留样本必须跨调用拼接而不是丢弃或补零，否则参考帧与设备播放点会错位。
- * 同时钉住淡入判定的当前真实行为——流式路径下淡入永不生效、非流式路径每次生效，与注释描述相反。
+ * 同时钉住流式与非流式对同一段 PCM 必须编出相同的帧。
  */
 class OpusProcessorStreamTest {
 
     private static final int FRAME_SIZE = AudioUtils.FRAME_SIZE;
 
-    /** 生成指定样本数的16bit小端单声道PCM，幅度恒定以便淡入衰减可观测 */
+    /** 生成指定样本数的16bit小端单声道PCM */
     private static byte[] pcm(int samples) {
         byte[] pcm = new byte[samples * 2];
         for (int i = 0; i < samples; i++) {
@@ -104,41 +104,31 @@ class OpusProcessorStreamTest {
         assertThat(new OpusProcessor().flushLeftover()).isEmpty();
     }
 
-    // 当前行为：flushLeftover 只清残留样本，不复位 isFirst，收句后的下一段仍按"非首段"处理
-    // 正确行为：flushLeftover 表示一段音频结束，应复位 isFirst 让下一段重新淡入
-    // 生产代码 xiaozhi-common/src/main/java/com/xiaozhi/utils/OpusProcessor.java:100
+    // 流式与非流式对同一段 PCM 必须编出完全相同的帧：
+    // 两者不一致时，同一句话现场合成版与缓存命中版的起音会不一样
     @Test
-    void flushLeftoverDoesNotResetFirstSegmentFlag() {
-        OpusProcessor processor = new OpusProcessor();
-        processor.pcmToOpus(pcm(FRAME_SIZE + 40), true);
+    void streamingAndBatchEncodingProduceIdenticalFrames() {
+        byte[] pcm = pcm(FRAME_SIZE * 2);
 
-        processor.flushLeftover();
+        List<byte[]> streamed = new OpusProcessor().pcmToOpus(pcm, true);
+        List<byte[]> batched = new OpusProcessor().pcmToOpus(pcm, false);
 
-        assertThat(stateOf(processor).isFirst).isFalse();
+        assertThat(streamed).hasSize(2);
+        assertThat(batched).hasSize(2);
+        assertThat(streamed.get(0)).isEqualTo(batched.get(0));
+        assertThat(streamed.get(1)).isEqualTo(batched.get(1));
     }
 
-    // 当前行为：流式首次调用在淡入判定之前就把 isFirst 置 false，淡入分支在流式路径永不生效；
-    //          非流式路径从不置 false，于是每一次调用的首帧都被重新淡入
-    // 正确行为：淡入只应在每段音频的第一帧生效，且流式与非流式一致
-    // 生产代码 xiaozhi-common/src/main/java/com/xiaozhi/utils/OpusProcessor.java:177
+    // 同一个编码器连续编两段相同 PCM，第二段不能因为段序不同而与第一段不同
     @Test
-    void fadeInIsSkippedWhenStreamingButReappliedOnEveryNonStreamCall() {
-        byte[] pcm = pcm(FRAME_SIZE);
-        OpusProcessor streaming = new OpusProcessor();
-        OpusProcessor batch = new OpusProcessor();
+    void repeatedBatchCallsOnSameProcessorStayConsistent() {
+        OpusProcessor processor = new OpusProcessor();
 
-        List<byte[]> streamed = streaming.pcmToOpus(pcm, true);
-        List<byte[]> batched = batch.pcmToOpus(pcm, false);
+        List<byte[]> first = processor.pcmToOpus(pcm(FRAME_SIZE), false);
+        List<byte[]> second = processor.pcmToOpus(pcm(FRAME_SIZE), false);
 
-        assertThat(streamed).hasSize(1);
-        assertThat(batched).hasSize(1);
-        // 同样的 PCM、同样设置的全新编码器，首帧不同只可能来自淡入
-        assertThat(streamed.get(0)).isNotEqualTo(batched.get(0));
-        assertThat(stateOf(streaming).isFirst).isFalse();
-        assertThat(stateOf(batch).isFirst).isTrue();
-
-        batch.pcmToOpus(pcm, false);
-        assertThat(stateOf(batch).isFirst).isTrue();
+        assertThat(first).hasSize(1);
+        assertThat(second).hasSize(1);
     }
 
     @Test
