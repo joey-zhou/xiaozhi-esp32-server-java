@@ -13,10 +13,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 /**
- * 钉住消息窗口的按组裁剪。裁剪只看 messages.get(1) 判断是不是工具对话组，是就一次删 4 条，否则删 2 条。
+ * 钉住消息窗口的按组裁剪。一组从队首到下一条 UserMessage 之前，工具链不论多长都整组进出。
  * 裁剪后队首必须落在 UserMessage 上：留下孤儿 ToolResponseMessage 或孤儿 tool_call 时，
  * 历史送给 OpenAI / DeepSeek / 通义会直接 400，整轮对话报错、设备静默。
- * 串联多次工具调用、以及工具链还没收到最终回答这两种真实场景当前都会留下孤儿，用例按当前行为钉住。
+ * 只剩最后一组时不裁，宁可超出窗口也不送出残缺的工具链。
  */
 class MessageWindowTrimTest {
 
@@ -99,42 +99,69 @@ class MessageWindowTrimTest {
         assertThat(conversation.rawMessages()).containsExactly(nextUser, nextReply);
     }
 
-    // 串联两次工具调用的一组有 6 条，裁剪固定只删 4 条，队首落在第二次调用的 ToolResponseMessage 上。
-    // 当前行为：裁剪后历史以孤儿 ToolResponseMessage 打头
-    // 正确行为：按 tool_call 与 ToolResponseMessage 的配对关系整组删到下一条 UserMessage 为止
-    // 生产代码 xiaozhi-ai/src/main/java/com/xiaozhi/ai/llm/memory/MessageWindowConversation.java:52-58
+    // 串联两次工具调用的一组有 6 条，后面还有别的组时整组删掉，队首回到 UserMessage
     @Test
-    void chainedToolCallsLeaveOrphanToolResponseAtHead() {
+    void chainedToolCallGroupIsTrimmedAsAWhole() {
         MessageWindowConversation conversation = conversation(2);
-        ToolResponseMessage secondToolResponse = toolResponse("call-2", "getWeather");
-        AssistantMessage finalReply = new AssistantMessage("北京今天晴");
+        UserMessage nextUser = new UserMessage("谢谢");
+        AssistantMessage nextReply = new AssistantMessage("不客气");
         addAll(conversation,
                 new UserMessage("我这儿天气怎么样"), toolCall("call-1", "getCity"),
                 toolResponse("call-1", "getCity"), toolCall("call-2", "getWeather"),
-                secondToolResponse, finalReply);
+                toolResponse("call-2", "getWeather"), new AssistantMessage("北京今天晴"),
+                nextUser, nextReply);
 
         conversation.messages();
 
-        assertThat(conversation.rawMessages()).containsExactly(secondToolResponse, finalReply);
-        assertThat(conversation.rawMessages().get(0)).isInstanceOf(ToolResponseMessage.class);
+        assertThat(conversation.rawMessages()).containsExactly(nextUser, nextReply);
     }
 
-    // 工具链还没收到最终回答时只有 [User, Assistant(toolCall), Tool] 三条，不满 4 条，
-    // 裁剪退回简单组一次删 2 条，把 tool_call 删掉、只留下 ToolResponseMessage。
-    // 这一状态在串联工具调用的中途取 messages() 时真实存在。
-    // 当前行为：留下没有对应 tool_call 的孤儿 ToolResponseMessage
-    // 正确行为：未完成的工具链要么整组删掉要么整组保留
-    // 生产代码 xiaozhi-ai/src/main/java/com/xiaozhi/ai/llm/memory/MessageWindowConversation.java:54,59-65
+    // 串联工具调用的一组超出窗口但它是仅剩的一组，整组保留而不是删成孤儿
     @Test
-    void unfinishedToolChainIsCutInHalfWhenShorterThanFourMessages() {
-        MessageWindowConversation conversation = conversation(1);
-        ToolResponseMessage orphan = toolResponse("call-1", "getWeather");
-        addAll(conversation,
-                new UserMessage("今天天气怎么样"), toolCall("call-1", "getWeather"), orphan);
+    void onlyRemainingChainedToolGroupIsKeptWhole() {
+        MessageWindowConversation conversation = conversation(2);
+        UserMessage user = new UserMessage("我这儿天气怎么样");
+        AssistantMessage firstCall = toolCall("call-1", "getCity");
+        ToolResponseMessage firstResponse = toolResponse("call-1", "getCity");
+        AssistantMessage secondCall = toolCall("call-2", "getWeather");
+        ToolResponseMessage secondResponse = toolResponse("call-2", "getWeather");
+        AssistantMessage finalReply = new AssistantMessage("北京今天晴");
+        addAll(conversation, user, firstCall, firstResponse, secondCall, secondResponse, finalReply);
 
         conversation.messages();
 
-        assertThat(conversation.rawMessages()).containsExactly(orphan);
+        assertThat(conversation.rawMessages())
+                .containsExactly(user, firstCall, firstResponse, secondCall, secondResponse, finalReply);
+    }
+
+    // 工具链还没收到最终回答时只有 [User, Assistant(toolCall), Tool] 三条，
+    // 这一状态在串联工具调用的中途取 messages() 时真实存在，整组保留而不是删掉 tool_call
+    @Test
+    void unfinishedToolChainIsKeptWholeInsteadOfCutInHalf() {
+        MessageWindowConversation conversation = conversation(1);
+        UserMessage user = new UserMessage("今天天气怎么样");
+        AssistantMessage call = toolCall("call-1", "getWeather");
+        ToolResponseMessage response = toolResponse("call-1", "getWeather");
+        addAll(conversation, user, call, response);
+
+        conversation.messages();
+
+        assertThat(conversation.rawMessages()).containsExactly(user, call, response);
+    }
+
+    // 未完成的工具链后面又来了新一轮时整组删掉，不留孤儿
+    @Test
+    void unfinishedToolChainIsTrimmedAsAWholeWhenNewerTurnArrives() {
+        MessageWindowConversation conversation = conversation(1);
+        UserMessage nextUser = new UserMessage("算了");
+        AssistantMessage nextReply = new AssistantMessage("好的");
+        addAll(conversation,
+                new UserMessage("今天天气怎么样"), toolCall("call-1", "getWeather"),
+                toolResponse("call-1", "getWeather"), nextUser, nextReply);
+
+        conversation.messages();
+
+        assertThat(conversation.rawMessages()).containsExactly(nextUser, nextReply);
     }
 
     @Test
