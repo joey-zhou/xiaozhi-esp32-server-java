@@ -66,10 +66,7 @@ public class MessageWindowConversation extends Conversation {
         }
         // 新消息列表对象，避免使用过程中污染原始列表对象
         List<Message> historyMessages = new ArrayList<>();
-        var roleSystemMessage = roleSystemMessage(context);
-        if(roleSystemMessage.isPresent()){
-            historyMessages.add(roleSystemMessage.get());
-        }
+        historyMessages.add(roleSystemMessage(context));
         historyMessages.addAll(messages);
         // UserMessage 按 metadata 装配带前缀的副本供 LLM 使用
         return historyMessages.stream().map(UserMessageAssembler::assemble).toList();

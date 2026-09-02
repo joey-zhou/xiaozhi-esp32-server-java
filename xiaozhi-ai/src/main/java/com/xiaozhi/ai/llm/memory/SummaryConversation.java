@@ -221,10 +221,7 @@ public class SummaryConversation extends Conversation {
         }
         // 新消息列表对象，避免使用过程中污染原始列表对象
         List<Message> historyMessages = new ArrayList<>();
-        var roleSystemMessage = roleSystemMessage(context);
-        if(roleSystemMessage.isPresent()){
-            historyMessages.add(roleSystemMessage.get());
-        }
+        historyMessages.add(roleSystemMessage(context));
         if(summarySnapshot != null && StringUtils.hasText(summarySnapshot.getSummary())){
             // 多条SystemMessage在主流模型（OpenAI、Qwen、DeepSeek）中均已验证可用
             historyMessages.add(new SystemMessage("下面是你与用户最近聊天内容的摘要：\n" + summarySnapshot.getSummary()));
