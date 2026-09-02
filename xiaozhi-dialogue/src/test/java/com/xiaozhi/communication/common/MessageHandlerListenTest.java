@@ -21,7 +21,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.inOrder;
@@ -35,7 +34,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>协议链路层面的 listen 状态机由 communication/protocol/ListenStateMachineTest 覆盖，
  * 本类补的是那边跑不到的分支：stop 不带 mode 时不能把本轮模式抹成 null（MessageHandler:440）、
- * 非 LISTENING 或非 manual 的 stop 一律走取消聆听、以及 Player 尚未创建时的空指针。
+ * 非 LISTENING 或非 manual 的 stop 一律走取消聆听、以及 Player 为空时不能中断消息处理。
  */
 @ExtendWith(MockitoExtension.class)
 class MessageHandlerListenTest {
@@ -139,17 +138,29 @@ class MessageHandlerListenTest {
         verify(vadService, never()).initSession(any(), anyBoolean());
     }
 
-    // 当前行为：Player 尚未创建（设备未绑定或 MQTT 早到的 listen）时整条消息抛 NPE，打爆消息处理线程。
-    // 正确行为：player 为空视同没有待执行回调，继续按 state 处理。
-    // 生产代码 xiaozhi-dialogue/src/main/java/com/xiaozhi/communication/common/MessageHandler.java:435
+    // Player 尚未创建（设备未绑定、MQTT 早到的 listen）或已被告别流程清空时，
+    // 视同没有待执行回调继续按 state 处理，不能抛异常打爆消息处理线程
     @Test
-    void listenBeforePlayerCreatedThrowsNullPointer() {
+    void listenBeforePlayerCreatedStillStartsListening() {
         session.setPlayer(null);
 
-        assertThatThrownBy(() -> messageHandler.handleMessage(listen(ListenState.Start, ListenMode.Auto), SESSION_ID))
-                .isInstanceOf(NullPointerException.class);
+        messageHandler.handleMessage(listen(ListenState.Start, ListenMode.Auto), SESSION_ID);
 
-        verify(vadService, never()).initSession(any(), anyBoolean());
+        assertThat(session.getDeviceState()).isEqualTo(DeviceState.LISTENING);
+        assertThat(session.getMode()).isEqualTo(ListenMode.Auto);
+        verify(vadService).initSession(SESSION_ID, true);
+    }
+
+    // 告别语播完清空 player 之后设备再唤醒，唤醒词要照常送进对话链路
+    @Test
+    void wakeWordAfterGoodbyeClearedPlayerIsStillHandled() {
+        session.setPlayer(null);
+        ListenMessage message = listen(ListenState.Detect, null);
+        message.setText("小智小智");
+
+        messageHandler.handleMessage(message, SESSION_ID);
+
+        verify(dialogueService).handleWakeWord(session, "小智小智");
     }
 
     @Test

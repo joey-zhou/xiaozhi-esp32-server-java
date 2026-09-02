@@ -397,8 +397,9 @@ public class MessageHandler {
         String sessionId = chatSession.getSessionId();
         log.info("收到listen消息 - SessionId: {}, State: {}, Mode: {}", sessionId, message.getState(), message.getMode());
 
-        // 如果会话标记为即将关闭，忽略listen消息
-        if (chatSession.getPlayer().getFunctionAfterChat()!= null) {
+        // 会话标记为即将关闭时忽略listen消息；player 已被告别流程清空时按没有待执行回调处理
+        Player player = chatSession.getPlayer();
+        if (player != null && player.getFunctionAfterChat() != null) {
             return;
         }
 
@@ -443,7 +444,6 @@ public class MessageHandler {
             case ListenState.Text:
                 // 检测聊天文本输入 — 确保 AEC 在 TTS 开始前已初始化
                 if (aecService != null) aecService.initSession(sessionId);
-                Player player = chatSession.getPlayer();
                 if (player != null ) {
                     String modeValue = message.getMode() != null ? message.getMode().getValue() : null;
                     String abortDeviceId = chatSession.getDevice() != null ? chatSession.getDevice().getDeviceId() : null;

@@ -225,33 +225,23 @@ class GoodbyeAndReconnectProtocolTest {
     }
 
     /**
-     * 当前行为：告别流程清空 player 之后，会话若仍留在注册表里，再收到 listen 必定 NPE，
-     * 异常被 WebSocketHandler 的 catch 吞掉，表现是设备再也唤不醒而日志之外毫无迹象
-     * （唤醒不重建 Persona，设备状态停在 IDLE）。
-     * 正确行为：getPlayer() 为空时应跳过 functionAfterChat 检查，唤醒词照常走重建流程。
-     * 生产代码 xiaozhi-dialogue/src/main/java/com/xiaozhi/communication/common/MessageHandler.java:435
-     * `chatSession.getPlayer().getFunctionAfterChat() != null` 无空判；
-     * 清空动作在 Persona.java:583-584。
+     * 告别流程清空 player 之后会话仍留在注册表里，设备随时可能再发唤醒词。
+     * player 为空要视同没有待执行回调，唤醒词照常走 Persona 重建，否则设备再也唤不醒。
      */
     @Test
-    void listenAfterInactivityGoodbyeMustNotNpeWhenPlayerCleared() {
+    void listenAfterInactivityGoodbyeRebuildsPersonaWhenPlayerCleared() {
         FakeDevice device = harness.connect(DEVICE_ID);
         device.hello();
         ChatSession session = device.session();
         assertThat(session.getPlayer()).isNotNull();
 
-        // 超时告别语播完后 functionAfterChat 会清掉 persona 与 player，
-        // 而会话本身仍留在注册表里（MQTT 待机语义），设备随时可能再发唤醒词
         clearPlaybackRuntime(session);
 
         device.listenDetect("你好小智");
 
-        // 会话和连接都还在：NPE 被上游 catch 吞掉，没有波及连接本身
         assertThat(harness.sessionManager().getSession(device.sessionId())).isSameAs(session);
         assertThat(device.transport().isOpen()).isTrue();
-        // 缺陷修复后这两条应改回：buildPersona(session) 被调用、状态进入 SPEAKING
-        verify(harness.personaFactory(), never()).buildPersona(session);
-        assertThat(session.getDeviceState()).isEqualTo(DeviceState.IDLE);
+        verify(harness.personaFactory()).buildPersona(session);
     }
 
     /** 等价于告别语播放完成后 functionAfterChat 执行完的会话状态 */
