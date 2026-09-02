@@ -9,6 +9,8 @@ import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.ai.stt.SttService;
+import com.xiaozhi.ai.tts.SpeechTokenFilter;
+import com.xiaozhi.utils.EmojiUtils;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -232,12 +234,32 @@ public class Persona {
             if (snapshot == null) {
                 return;
             }
-            AssistantMessage assistant = chatResponse.getResult().getOutput();
+            AssistantMessage assistant = stripMetaTags(chatResponse.getResult().getOutput());
             Usage usage = chatResponse.getMetadata() != null ? chatResponse.getMetadata().getUsage() : null;
             DialogueTurn dialogueTurn = buildTurn(turn, assistant, usage, snapshot, false);
             commitTurn(turn, dialogueTurn, snapshot.chains());
             turn.completedTurn = dialogueTurn;
         }
+    }
+
+    /**
+     * 方括号元数据标签不进历史
+     */
+    static AssistantMessage stripMetaTags(AssistantMessage message) {
+        String text = message.getText();
+        if (text == null) {
+            return message;
+        }
+        String cleaned = EmojiUtils.stripMetaTags(text);
+        if (cleaned.equals(text)) {
+            return message;
+        }
+        return AssistantMessage.builder()
+                .content(cleaned)
+                .properties(message.getMetadata())
+                .toolCalls(message.getToolCalls())
+                .media(message.getMedia())
+                .build();
     }
 
     /**
@@ -459,8 +481,8 @@ public class Persona {
         // 工具路由、RAG 召回都在订阅时才执行，准备期间被打断就不再调 LLM
         Flux<ChatResponse> chatResponseFlux = Flux.defer(() -> chatStream(turn, useFunctionCall));
         Flux<ChatToken> tokenFlux = convert(chatResponseFlux);
-        // 设备对话管道：过滤掉思考内容，只将正式回复传给语音合成
-        Flux<String> speechFlux = tokenFlux.filter(ChatToken::isContent).map(ChatToken::text);
+        // 设备对话管道：过滤掉思考内容，只将正式回复传给语音合成，括号舞台指示与元数据标签整组去掉
+        Flux<String> speechFlux = SpeechTokenFilter.apply(tokenFlux.filter(ChatToken::isContent).map(ChatToken::text));
         synthesizer.synthesize(withErrorFallback(speechFlux));
         // 订阅期间被打断时句柄尚未交给合成器，这里补一次 cancel
         if (turn.phase.get() == Phase.INTERRUPTED) {

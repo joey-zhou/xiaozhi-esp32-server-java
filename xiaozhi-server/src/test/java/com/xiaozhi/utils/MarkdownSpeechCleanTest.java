@@ -60,6 +60,31 @@ class MarkdownSpeechCleanTest {
     }
 
     @Test
+    void parenthesesAreRemovedRegardlessOfLength() {
+        assertThat(speech("（她眨了眨眼睛，语气变得温柔起来，仿佛在安慰一个受伤的小动物）你别难过啦"))
+                .isEqualTo("你别难过啦");
+        assertThat(speech("因为它们都台了啊（台=呆，谐音梗）")).isEqualTo("因为它们都台了啊");
+        assertThat(speech("这是英文 (aside) 括号")).isEqualTo("这是英文 括号");
+    }
+
+    @Test
+    void unclosedParenthesisIsKept() {
+        assertThat(speech("（指尖划过空气，")).isEqualTo("（指尖划过空气，");
+    }
+
+    @Test
+    void metaTagsAreRemoved() {
+        assertThat(speech("[neutral] 你刚刚在说什么？")).isEqualTo("你刚刚在说什么？");
+        assertThat(speech("[2026-09-02T13:51:42][说话人:张三][happy] 今天真开心")).isEqualTo("今天真开心");
+    }
+
+    @Test
+    void ordinaryBracketsAreKept() {
+        assertThat(speech("[1] 第一点")).isEqualTo("[1] 第一点");
+        assertThat(speech("[API] 接口说明")).isEqualTo("[API] 接口说明");
+    }
+
+    @Test
     void emojiStillExtractedAsMood() {
         List<String> moods = new ArrayList<>();
         String result = EmojiUtils.processSentence("**太好了**😀", moods);
