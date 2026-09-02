@@ -196,14 +196,9 @@ class GoodbyeAndReconnectProtocolTest {
     }
 
     /**
-     * 当前行为：设备在新连接上重连成功后，旧连接的收尾仍会无条件解除设备-实例绑定，
-     * 把新会话刚 bind 的 device→instance 映射删掉。后果是新会话存续期间 Redis 查不到这台设备，
-     * refreshDeviceRegistry 的 expire 对不存在的 key 是空操作救不回来，
-     * getOwnDeviceIds 漏掉它，重启时不会被本实例重置状态，跨实例幽灵会话清理也定位不到。
-     * 正确行为：与 SessionManager.removeSession 一样按 sessionId 匹配，
-     * 只有 getSessionByDeviceId(deviceId) 就是自己时才 unbind。
-     * 生产代码 xiaozhi-dialogue/src/main/java/com/xiaozhi/communication/common/SessionManager.java:242
-     * （同一方法里 :233 调用的 removeSession 已按 sessionId 匹配，unbind 这条分支漏了）。
+     * 设备在新连接上重连后，旧连接的收尾不能解除设备-实例绑定。
+     * 解错了新会话存续期间 Redis 就查不到这台设备：refreshDeviceRegistry 的 expire 对不存在的 key
+     * 是空操作救不回来，getOwnDeviceIds 漏掉它，跨实例幽灵会话清理也定位不到。
      */
     @Test
     void reconnectRaceKeepsDeviceBoundToInstance() {
@@ -220,7 +215,21 @@ class GoodbyeAndReconnectProtocolTest {
                 () -> harness.sessionManager().getSession(stale.sessionId()) == null);
         // 设备自始至终在线，只是换了连接
         assertThat(harness.sessionManager().getSession(freshSessionId)).isNotNull();
-        // 缺陷修复后应改回：verify(harness.deviceRegistry(), never()).unbind(DEVICE_ID)
+        assertThat(harness.sessionManager().getSessionByDeviceId(DEVICE_ID).getSessionId())
+                .isEqualTo(freshSessionId);
+        verify(harness.deviceRegistry(), never()).unbind(DEVICE_ID);
+    }
+
+    /** 没有重连时旧连接关闭要正常解绑，否则实例上会留下查得到却已不存在的设备 */
+    @Test
+    void closingTheOnlySessionUnbindsDevice() {
+        FakeDevice device = harness.connect(DEVICE_ID);
+        device.hello();
+
+        device.disconnect();
+
+        AwaitHelper.until("会话已注销",
+                () -> harness.sessionManager().getSession(device.sessionId()) == null);
         verify(harness.deviceRegistry()).unbind(DEVICE_ID);
     }
 

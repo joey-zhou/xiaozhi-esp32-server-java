@@ -194,7 +194,12 @@ public class SessionManager {
             }
             // 解除设备-实例绑定
             if (chatSession.getDevice() != null) {
-                deviceRegistry.unbind(chatSession.getDevice().getDeviceId());
+                String deviceId = chatSession.getDevice().getDeviceId();
+                ChatSession bound = getSessionByDeviceId(deviceId);
+                // 设备已在新连接上重连时绑定归新会话，旧连接收尾不能解掉
+                if (bound == null || bound.getSessionId().equals(chatSession.getSessionId())) {
+                    deviceRegistry.unbind(deviceId);
+                }
             }
             if (chatSession.isAudioChannelOpen()) {
                 chatSession.close();
