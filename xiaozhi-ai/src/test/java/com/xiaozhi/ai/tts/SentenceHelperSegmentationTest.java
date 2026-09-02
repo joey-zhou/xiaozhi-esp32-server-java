@@ -105,31 +105,58 @@ class SentenceHelperSegmentationTest {
         assertThat(sentences.get(0).mood()).isEqualTo("happy");
     }
 
-    // 当前行为：句末标点集合是 [。！？!?]，不含英文句号，小数点保护分支永远进不去，
-    //          英文句号也从不切句，整段英文回复只能靠流结束时的 take() 一次性刷出
-    // 正确行为：'.' 应作为句末标点参与切句，并由小数点保护把 3.14 这类数字排除
-    // 生产代码 xiaozhi-ai/src/main/java/com/xiaozhi/ai/tts/SentenceHelper.java:29
+    // 英文句点参与切句，否则整段英文只能等流结束一次性刷出，首句延迟等于整段生成时间
     @Test
-    void periodNeverSplitsSoDecimalGuardIsUnreachable() {
-        SentenceHelper chinese = new SentenceHelper();
-        SentenceHelper english = new SentenceHelper();
-
-        assertThat(chinese.take("圆周率大约等于3.14159这个值")).isEmpty();
-        assertThat(english.take("This is a fairly long sentence.")).isEmpty();
-
-        assertThat(chinese.take().text()).isEqualTo("圆周率大约等于3.14159这个值");
-    }
-
-    // 当前行为：缓冲里只有空白且长度够触发切句时，trim 后的空串送进 EmojiUtils.processSentence
-    //          被 Assert.hasText 拒绝，IllegalArgumentException 直接抛出 take，打断整条 TTS 流
-    // 正确行为：trim 后为空应视为无实质内容，静默丢弃缓冲继续累计
-    // 生产代码 xiaozhi-ai/src/main/java/com/xiaozhi/ai/tts/SentenceHelper.java:159
-    @Test
-    void whitespaceOnlyBufferThrowsOnFlush() {
+    void englishPeriodFollowedBySpaceSplitsSentence() {
         SentenceHelper helper = new SentenceHelper();
 
-        assertThatThrownBy(() -> helper.take("        \n"))
-                .isInstanceOf(IllegalArgumentException.class);
+        List<SentenceHelper.SentenceResult> sentences =
+                helper.take("This is a fairly long sentence. And here comes the next one.");
+
+        assertThat(sentences).hasSize(1);
+        assertThat(sentences.get(0).text()).isEqualTo("This is a fairly long sentence.");
+        assertThat(helper.take().text()).isEqualTo("And here comes the next one.");
+    }
+
+    // 句点后面还接着内容时不切句：小数、域名、缩写都不能被拆开
+    @Test
+    void periodInsideNumberOrDomainDoesNotSplit() {
+        SentenceHelper decimal = new SentenceHelper();
+        SentenceHelper domain = new SentenceHelper();
+        SentenceHelper abbreviation = new SentenceHelper();
+
+        assertThat(decimal.take("圆周率大约等于3.14159这个值")).isEmpty();
+        assertThat(domain.take("请访问 example.com 查看详情")).isEmpty();
+        assertThat(abbreviation.take("他来自 U.S.A 这个国家")).isEmpty();
+
+        assertThat(decimal.take().text()).isEqualTo("圆周率大约等于3.14159这个值");
+        assertThat(domain.take().text()).isEqualTo("请访问 example.com 查看详情");
+    }
+
+    // 句点跨 token 到达时状态要保持，下一个 token 的首字符才决定切不切
+    @Test
+    void periodAtTokenBoundaryIsConfirmedByNextToken() {
+        SentenceHelper split = new SentenceHelper();
+        SentenceHelper joined = new SentenceHelper();
+
+        assertThat(split.take("This is a fairly long sentence.")).isEmpty();
+        assertThat(split.take(" Next.")).hasSize(1);
+
+        assertThat(joined.take("Version is 1.")).isEmpty();
+        assertThat(joined.take("2.3 released")).isEmpty();
+    }
+
+    // 纯空白缓冲不能送进文本清洗，否则 Assert.hasText 抛异常打断整条合成流
+    @Test
+    void whitespaceOnlyBufferIsDiscardedWithoutThrowing() {
+        SentenceHelper helper = new SentenceHelper();
+
+        assertThat(helper.take("        \n")).isEmpty();
+        assertThat(helper.take().text()).isEmpty();
+
+        // 空白已被丢弃，不会残留到下一句
+        helper.take("接着说正经内容。");
+        assertThat(helper.take().text()).isEqualTo("接着说正经内容。");
     }
 
     @Test

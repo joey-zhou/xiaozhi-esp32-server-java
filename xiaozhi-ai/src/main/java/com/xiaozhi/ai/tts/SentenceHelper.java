@@ -26,7 +26,7 @@ public class SentenceHelper implements ChatConverter {
      */
     public record SentenceResult(String text, String mood) {}
     // 句子结束标点符号模式（中英文句号、感叹号、问号）
-    private static final Pattern SENTENCE_END_PATTERN = Pattern.compile("[。！？!?]");
+    private static final Pattern SENTENCE_END_PATTERN = Pattern.compile("[。．.！？!?]");
 
     // 逗号、分号等停顿标点
     private static final Pattern PAUSE_PATTERN = Pattern.compile("[，、；,;]");
@@ -59,6 +59,10 @@ public class SentenceHelper implements ChatConverter {
     // 该状态跨 take(token) 调用保持，因收尾符号可能在下一个 token 才到达。
     private boolean awaitingClosing = false;
 
+    // 待确认的切句由英文句点触发：只有下一个字符是空白或收尾符号才真的切句，
+    // 接着字母数字时按缩写、域名、版本号处理，不切。
+    private boolean awaitingPeriodConfirm = false;
+
     public SentenceHelper() {
     }
 
@@ -79,13 +83,17 @@ public class SentenceHelper implements ChatConverter {
             // 处理"等待收尾符号"状态：上一字符是句末标点(。！？)并已触发切句，
             // 此处根据当前字符决定右引号/右括号是否并入本句。
             if (awaitingClosing) {
+                boolean needsConfirm = awaitingPeriodConfirm;
                 awaitingClosing = false;
+                awaitingPeriodConfirm = false;
                 if (CLOSING_MARK_PATTERN.matcher(charStr).find()) {
                     // 收尾符号并入本句后一起切出，避免引号被甩到下一句开头
                     appendToBuffers(charStr);
                     flushSentence(sentences);
                     i += Character.charCount(codePoint);
                     continue;
+                } else if (needsConfirm && !Character.isWhitespace(codePoint)) {
+                    // 英文句点后面还接着内容，按缩写、域名、小数处理，不切句
                 } else {
                     // 当前字符不是收尾符号：先把已累计的句子切出，再照常处理当前字符
                     flushSentence(sentences);
@@ -126,6 +134,7 @@ public class SentenceHelper implements ChatConverter {
                 // 换行/停顿/表情等触发的切句无需等待收尾符号，直接切出。
                 if (isEndMark) {
                     awaitingClosing = true;
+                    awaitingPeriodConfirm = charStr.equals(".") || charStr.equals("．");
                 } else {
                     flushSentence(sentences);
                 }
@@ -157,6 +166,11 @@ public class SentenceHelper implements ChatConverter {
             return;
         }
         String rawSentence = currentSentence.toString().trim();
+        if (rawSentence.isEmpty()) {
+            // 纯空白不成句，直接丢弃，不能送进文本清洗
+            currentSentence.setLength(0);
+            return;
+        }
         List<String> moods = new ArrayList<>();
         String cleanSentence = EmojiUtils.processSentence(rawSentence, moods);
         if (containsSubstantialContent(cleanSentence)) {
