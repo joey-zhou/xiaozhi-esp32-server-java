@@ -152,7 +152,7 @@ public class SummaryConversation extends Conversation {
             needSummaryMessages = new ArrayList<>(messages.subList(0, actualBatchSize));
             summarizing = true;
         }
-        log.info("current conversation message size:{}, batch size to summary:{}", size, actualBatchSize);
+        log.info("{}的对话累计{}条，取前{}条提取长期记忆", getOwnerId(), size, actualBatchSize);
         Thread.startVirtualThread(() -> summaryMessages(needSummaryMessages));
     }
 
@@ -180,13 +180,13 @@ public class SummaryConversation extends Conversation {
 
         try {
             // 3. Call the model.
-            log.info("调用大模型进行摘要：{}", factExtractPrompt);
+            log.debug("长期记忆提取提示词：{}", factExtractPrompt);
 
             String factExtract = chatClient.prompt()
                     .user(factExtractPrompt)
                     .call()
                     .content();
-            log.info("大模型从对话里提取用户重要备忘: {}", factExtract);
+            log.info("{}的长期记忆提取结果: {}", getOwnerId(), factExtract);
 
             // 4. 入库存储。
             SummaryBO newSummary = new SummaryBO()
