@@ -146,26 +146,56 @@ public class AiConfig {
     public void update(String configName, String configDesc, String modelType, String provider,
                        String appId, String apiKey, String apiSecret, String ak, String sk,
                        String apiUrl, Boolean enableThinking, Boolean isDefault) {
-        if (configName != null) this.configName = configName;
-        if (configDesc != null) this.configDesc = configDesc;
-        if (modelType  != null) this.modelType  = modelType;
-        if (provider   != null) this.provider   = provider;
-        if (appId      != null) this.appId      = appId;
-        if (apiKey     != null) this.apiKey     = apiKey;
-        if (apiSecret  != null) this.apiSecret  = apiSecret;
-        if (ak         != null) this.ak         = ak;
-        if (sk         != null) this.sk         = sk;
-        if (apiUrl     != null) this.apiUrl     = apiUrl;
-        if (enableThinking != null) this.enableThinking = enableThinking;
-        if (isDefault  != null) {
-            if (isDefault && !this.isDefault) {
-                this.isDefault = true;
-                signals.add(DomainSignal.DEFAULT_CHANGED);
-            } else if (!isDefault) {
-                this.isDefault = false;
-            }
+        this.configName = merge(configName, this.configName);
+        this.configDesc = merge(configDesc, this.configDesc);
+        this.modelType  = merge(modelType,  this.modelType);
+        this.provider   = merge(provider,   this.provider);
+        this.appId      = merge(appId,      this.appId);
+        this.apiKey     = merge(apiKey,     this.apiKey);
+        this.apiSecret  = merge(apiSecret,  this.apiSecret);
+        this.ak         = merge(ak,         this.ak);
+        this.sk         = merge(sk,         this.sk);
+        this.apiUrl     = merge(apiUrl,     this.apiUrl);
+        this.enableThinking = merge(enableThinking, this.enableThinking);
+        boolean mergedDefault = merge(isDefault, this.isDefault);
+        if (mergedDefault && !this.isDefault) {
+            signals.add(DomainSignal.DEFAULT_CHANGED);
         }
+        this.isDefault = mergedDefault;
         signals.add(DomainSignal.UPDATED);
+    }
+
+    /**
+     * 按 patch 覆盖自身字段并返回合并结果，patch 未提供的字段取自身当前值。
+     * <p>纯查询：不改变自身状态，不产生信号。
+     * <p>硬约束：判定「未提供」只认 null，空白串必须在 Req → BO 边界就规范成 null。
+     * <p>硬约束：身份（configId、userId）与时间戳恒取自身，patch 改不动。
+     */
+    public ConfigBO mergePatch(ConfigBO patch) {
+        return new ConfigBO()
+                .setConfigId(this.configId)
+                .setUserId(this.userId)
+                .setConfigName(merge(patch.getConfigName(), this.configName))
+                .setConfigDesc(merge(patch.getConfigDesc(), this.configDesc))
+                .setConfigType(merge(patch.getConfigType(), this.configType))
+                .setModelType(merge(patch.getModelType(), this.modelType))
+                .setProvider(merge(patch.getProvider(), this.provider))
+                .setAppId(merge(patch.getAppId(), this.appId))
+                .setApiKey(merge(patch.getApiKey(), this.apiKey))
+                .setApiSecret(merge(patch.getApiSecret(), this.apiSecret))
+                .setAk(merge(patch.getAk(), this.ak))
+                .setSk(merge(patch.getSk(), this.sk))
+                .setApiUrl(merge(patch.getApiUrl(), this.apiUrl))
+                .setState(merge(patch.getState(), this.state))
+                .setIsDefault(merge(patch.getIsDefault(), this.isDefault ? ConfigBO.DEFAULT_YES : ConfigBO.DEFAULT_NO))
+                .setEnableThinking(merge(patch.getEnableThinking(), this.enableThinking))
+                .setCreateTime(this.createTime)
+                .setUpdateTime(this.updateTime);
+    }
+
+    /** 合并单个字段：patch 提供了值就用 patch 的，否则保留当前值。 */
+    private static <T> T merge(T patchValue, T currentValue) {
+        return patchValue == null ? currentValue : patchValue;
     }
 
     /** 软删除：禁用并取消默认。 */

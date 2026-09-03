@@ -10,7 +10,9 @@ import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.Named;
 import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.springframework.util.StringUtils;
 
 @Mapper(componentModel = "spring")
 public interface ConfigConvert {
@@ -46,6 +48,10 @@ public interface ConfigConvert {
     @Mapping(target = "userId", ignore = true)
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
+    @Mapping(target = "apiKey", source = "apiKey", qualifiedByName = "blankToNull")
+    @Mapping(target = "apiSecret", source = "apiSecret", qualifiedByName = "blankToNull")
+    @Mapping(target = "ak", source = "ak", qualifiedByName = "blankToNull")
+    @Mapping(target = "sk", source = "sk", qualifiedByName = "blankToNull")
     ConfigBO toBO(ConfigCreateReq req);
 
     @Mapping(target = "configId", ignore = true)
@@ -59,10 +65,23 @@ public interface ConfigConvert {
     @Mapping(target = "userId", ignore = true)
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "apiKey", source = "apiKey", qualifiedByName = "blankToNull")
+    @Mapping(target = "apiSecret", source = "apiSecret", qualifiedByName = "blankToNull")
+    @Mapping(target = "ak", source = "ak", qualifiedByName = "blankToNull")
+    @Mapping(target = "sk", source = "sk", qualifiedByName = "blankToNull")
     ConfigBO toBO(ConfigUpdateReq req);
 
     ConfigResp toResp(ConfigBO configBO);
 
+    @Mapping(target = "apiKey", source = "apiKey", qualifiedByName = "blankToNull")
+    @Mapping(target = "apiSecret", source = "apiSecret", qualifiedByName = "blankToNull")
+    @Mapping(target = "ak", source = "ak", qualifiedByName = "blankToNull")
+    @Mapping(target = "sk", source = "sk", qualifiedByName = "blankToNull")
     ConfigBO toBO(ConfigTestReq req);
+
+    /** 密钥字段的空白串统一规范成 null，使「没填」在全仓只有 null 一种表示。 */
+    @Named("blankToNull")
+    static String blankToNull(String value) {
+        return StringUtils.hasText(value) ? value : null;
+    }
 }
