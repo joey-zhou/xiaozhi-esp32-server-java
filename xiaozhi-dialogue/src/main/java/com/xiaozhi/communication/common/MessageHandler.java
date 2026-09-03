@@ -165,7 +165,6 @@ public class MessageHandler {
                 log.warn("更新设备在线状态失败 - DeviceId: {}, State: {}", deviceId, newState, e);
             }
         });
-
     }
 
     /**
@@ -174,17 +173,9 @@ public class MessageHandler {
      * @param sessionId
      */
     public void afterConnectionClosed(String sessionId) {
-        ChatSession chatSession = sessionManager.getSession(sessionId);
-        if (chatSession == null) {
-            return;
-        }
-        // 清理会话，设备状态由 closeSession 统一写入
+        // VAD/AEC 由 closeSession 统一释放：会话可能已被 goodbye、超时告别等路径提前摘除，
+        // 这里再按 sessionId 取一次会取到 null
         sessionManager.closeSession(sessionId);
-        // 清理VAD会话
-        vadService.resetSession(sessionId);
-        // 清理AEC会话
-        if (aecService != null) aecService.resetSession(sessionId);
-
     }
 
     /**
@@ -471,12 +462,7 @@ public class MessageHandler {
             return;
         }
 
-        // 先清理VAD和AEC会话，防止后续的listen消息重新初始化
-        String sessionId = session.getSessionId();
-        vadService.resetSession(sessionId);
-        if (aecService != null) aecService.resetSession(sessionId);
-
-        // 中止正在进行的对话，停止TTS和音频发送
+        // 中止正在进行的对话，停止TTS和音频发送。VAD/AEC 由随后的 closeSession 统一清理
         String goodbyeDeviceId = session.getDevice() != null ? session.getDevice().getDeviceId() : null;
         applicationContext.publishEvent(new ChatAbortedEvent(this, session.getSessionId(), goodbyeDeviceId, "设备主动退出"));
 

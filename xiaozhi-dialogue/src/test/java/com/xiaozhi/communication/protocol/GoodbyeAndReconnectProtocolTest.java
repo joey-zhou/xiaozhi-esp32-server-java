@@ -113,6 +113,29 @@ class GoodbyeAndReconnectProtocolTest {
         assertThat(countState(DEVICE_ID, DeviceBO.DEVICE_STATE_ONLINE)).isEqualTo(1);
     }
 
+    /**
+     * 超时告别、退出意图这些路径先把会话摘出注册表再关连接，容器随后的回调取不到会话。
+     * 清理若留在回调里就永远跑不到：VAD 状态和 AEC 持有的原生 APM 会按会话一直堆积。
+     */
+    @Test
+    void serverSideCloseReleasesVadAndAec() {
+        FakeDevice device = harness.connect(DEVICE_ID);
+        device.hello();
+        device.listenStart(ListenMode.Auto);
+        String sessionId = device.sessionId();
+        ChatSession session = device.session();
+        assertThat(harness.vad().autoSegmentOf(sessionId)).isTrue();
+        assertThat(harness.aec().initCalls()).contains(sessionId);
+
+        // 服务端主动关闭会话，不经过设备的 goodbye
+        harness.sessionManager().closeSession(session);
+        // 连接真正断开时会话已经不在注册表里
+        device.disconnect();
+
+        assertThat(harness.vad().autoSegmentOf(sessionId)).isNull();
+        assertThat(harness.aec().resetCalls()).containsExactly(sessionId);
+    }
+
     @Test
     void reconnectAfterGoodbyeGetsFreshSessionAndWorks() {
         FakeDevice first = harness.connect(DEVICE_ID);

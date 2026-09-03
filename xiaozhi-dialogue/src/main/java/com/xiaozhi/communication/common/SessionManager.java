@@ -4,6 +4,8 @@ import com.xiaozhi.communication.server.websocket.WebSocketSession;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
+import com.xiaozhi.dialogue.audio.AecService;
+import com.xiaozhi.dialogue.audio.VadService;
 import com.xiaozhi.event.ChatAudioOpenedEvent;
 import com.xiaozhi.event.ChatSessionClosedEvent;
 import com.xiaozhi.event.DeviceOnlineEvent;
@@ -60,6 +62,15 @@ public class SessionManager {
 
     @Resource
     private DeviceRegistry deviceRegistry;
+
+    // 音频服务反向依赖会话注册表，这里按需取代理避免构造期成环
+    @Resource
+    @Lazy
+    private VadService vadService;
+
+    @Resource
+    @Lazy
+    private AecService aecService;
 
     @Resource
     private InstanceIdHolder instanceIdHolder;
@@ -218,6 +229,11 @@ public class SessionManager {
             // 状态写库要赶在会话被摘出注册表之前，否则设备主动 goodbye、超时关闭、
             // 退出意图这几条路径的连接回调都取不到会话，离线状态永远写不进去
             updateDeviceStateOnClose(chatSession);
+            // VAD 状态与 AEC 的原生 APM 每条关闭路径都要释放：
+            // WebSocket 的连接回调取不到已摘除的会话，留在回调里会漏掉超时告别、退出意图这些路径
+            vadService.resetSession(chatSession.getSessionId());
+            aecService.resetSession(chatSession.getSessionId());
+
             if (chatSession instanceof WebSocketSession) {
                 removeSession(chatSession.getSessionId());
             }

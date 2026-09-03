@@ -138,7 +138,9 @@ class ProtocolTestHarness {
                 "applicationContext", eventBus.applicationContext(),
                 "deviceRepository", deviceRepository,
                 "deviceRegistry", deviceRegistry,
-                "instanceIdHolder", instanceIdHolder);
+                "instanceIdHolder", instanceIdHolder,
+                "vadService", vadService,
+                "aecService", aecService);
 
         inject(dialogueService,
                 "personaFactory", personaFactory,
