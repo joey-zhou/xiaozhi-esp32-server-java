@@ -10,7 +10,10 @@ import org.springframework.ai.chat.messages.UserMessage;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 钉住消息窗口的按组裁剪。一组从队首到下一条 UserMessage 之前，工具链不论多长都整组进出。
@@ -174,6 +177,23 @@ class MessageWindowTrimTest {
         conversation.messages();
 
         assertThat(conversation.rawMessages()).containsExactly(lastUser, lastReply);
+    }
+
+    // 按条数取最后 N 条可能正好从工具链中间开始，此时历史长度未超窗口、裁剪循环根本不执行，
+    // 新会话的第一次请求就以孤儿 ToolResponseMessage 打头被 provider 拒绝
+    @Test
+    void historyLoadedFromTheMiddleOfAToolChainDropsTheOrphanPrefix() {
+        UserMessage user = new UserMessage("再讲一个");
+        AssistantMessage reply = new AssistantMessage("好的");
+        ChatMemory chatMemory = mock(ChatMemory.class);
+        when(chatMemory.find(anyString(), anyInt(), anyInt())).thenReturn(List.of(
+                toolResponse("call-1", "getWeather"), new AssistantMessage("今天晴"), user, reply));
+
+        MessageWindowConversation conversation = MessageWindowConversation.builder()
+                .ownerId("device-1").roleId(1).sessionId("session-1").roleDesc("测试角色").userId(1)
+                .maxMessages(4).chatMemory(chatMemory).sessionScoped(false).build();
+
+        assertThat(conversation.rawMessages()).containsExactly(user, reply);
     }
 
     // 系统提示词由 messages() 每次现拼，不能被塞进历史

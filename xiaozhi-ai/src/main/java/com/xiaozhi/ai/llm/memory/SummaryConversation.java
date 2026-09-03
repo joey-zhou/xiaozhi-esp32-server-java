@@ -90,6 +90,7 @@ public class SummaryConversation extends Conversation {
             log.info("当前{}还没有历史summary,加载{}条普通消息进入对话上下文", getOwnerId(), history.size());
             synchronized (summaryLock) {
                 super.messages.addAll(history);
+                dropLeadingOrphans();
             }
             // 如果最后一条消息距今超过1小时且消息数足够，则生成summary以压缩上下文
             if (history.size() >= 2) {
@@ -104,12 +105,25 @@ public class SummaryConversation extends Conversation {
             log.info("加载{}的{}条未被摘要的消息作为对话历史", getOwnerId(), history.size());
             synchronized (summaryLock) {
                 super.messages.addAll(history);
+                dropLeadingOrphans();
             }
             if (Duration.between(lastSummary.getLastMessageTimestamp(), Instant.now()).toHours() >= CONVERSATION_INTERVAL_HOURS
                     && history.size() >= 2) {
                 log.info("{}的last summary已超过1小时，但还有一些剩余消息没有summarize,重新生成summary", getOwnerId());
                 summarize(true);
             }
+        }
+    }
+
+    /**
+     * 丢掉队首那段没有用户提问的消息。按条数取最后 N 条可能正好从工具链中间开始，
+     * 带孤儿 ToolResponseMessage 的历史会被 provider 直接拒绝。
+     */
+    private void dropLeadingOrphans() {
+        int orphans = MessageGroups.leadingOrphanSize(messages);
+        if (orphans > 0) {
+            log.info("{}加载的历史从对话组中间开始，丢弃开头{}条无主消息", getOwnerId(), orphans);
+            messages.subList(0, orphans).clear();
         }
     }
 
@@ -145,7 +159,9 @@ public class SummaryConversation extends Conversation {
             if (size == 0 || (!force && size < maxMessages)) {
                 return;
             }
-            actualBatchSize = Math.min(batchSize, size);
+            // 批次补齐到对话组边界，工具链整组摘要，不能留下孤儿 tool 消息
+            actualBatchSize = MessageGroups.alignedPrefixSize(messages, Math.min(batchSize, size));
+            // 当前这轮还没收尾时凑不出完整的一组，等收尾后再摘
             if (actualBatchSize <= 0) {
                 return;
             }

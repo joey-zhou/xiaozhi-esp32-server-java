@@ -32,6 +32,19 @@ public class MessageWindowConversation extends Conversation {
         log.info("加载对话历史: sessionScoped={}, ownerId={}, sessionId={}, size={}",
                 sessionScoped, ownerId, sessionId, history.size());
         super.messages.addAll(history);
+        dropLeadingOrphans();
+    }
+
+    /**
+     * 丢掉队首那段没有用户提问的消息。按条数取最后 N 条可能正好从工具链中间开始，
+     * 此时历史长度未超窗口、裁剪循环不会执行，请求就会以孤儿 ToolResponseMessage 开头被 provider 拒绝。
+     */
+    private void dropLeadingOrphans() {
+        int orphans = MessageGroups.leadingOrphanSize(messages);
+        if (orphans > 0) {
+            log.info("加载的历史从对话组中间开始，丢弃开头{}条无主消息", orphans);
+            messages.subList(0, orphans).clear();
+        }
     }
 
     @Override
@@ -50,7 +63,7 @@ public class MessageWindowConversation extends Conversation {
         // 按对话组裁剪：一组从队首到下一条 UserMessage 之前，工具链不论多长都整组进出，
         // 队首必须始终落在 UserMessage 上，不能留下孤儿 tool_call 或孤儿 ToolResponseMessage
         while (messages.size() > maxMessages + 1) {
-            int groupSize = firstGroupSize();
+            int groupSize = MessageGroups.firstGroupSize(messages);
             // 只剩最后一组时保留整组，宁可超出窗口也不送出残缺的工具链
             if (groupSize >= messages.size()) {
                 break;
@@ -65,18 +78,6 @@ public class MessageWindowConversation extends Conversation {
         historyMessages.addAll(messages);
         // UserMessage 按 metadata 装配带前缀的副本供 LLM 使用
         return historyMessages.stream().map(UserMessageAssembler::assemble).toList();
-    }
-
-    /**
-     * 队首对话组的长度：从队首起到下一条 UserMessage 之前，没有下一条时为剩余全部。
-     */
-    private int firstGroupSize() {
-        for (int i = 1; i < messages.size(); i++) {
-            if (messages.get(i) instanceof UserMessage) {
-                return i;
-            }
-        }
-        return messages.size();
     }
 
     @Override
