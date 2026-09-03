@@ -65,6 +65,13 @@ class SpeechTokenFilterTest {
         assertThat(join("这句话（没有闭合")).isEqualTo("这句话（没有闭合");
     }
 
+    // 方括号刚闭合时只看方括号，会漏掉更靠前那个还没闭合的圆括号，
+    // 舞台指示于是被原样念出来；去掉方括号反而正确，正是这条不对称暴露了漏扫
+    @Test
+    void unclosedParenthesisBeforeAClosedBracketIsStillHeld() {
+        assertThat(join("小明（他的同学[注1]", "很调皮）说你好")).isEqualTo("小明说你好");
+    }
+
     @Test
     void emptyTokensProduceNothing() {
         List<String> out = SpeechTokenFilter.apply(Flux.just("", "（笑）")).collectList().block();

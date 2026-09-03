@@ -60,14 +60,25 @@ public final class SpeechTokenFilter {
 
     /** 需要暂存的起点：未闭合的最后一个开括号，或刚闭合的方括号组；无需暂存返回 -1 */
     private static int holdFrom(String text) {
-        if (text.endsWith("]")) {
-            return bracketStart(text, text.lastIndexOf('['));
+        int unclosed = unclosedStart(text);
+        if (!text.endsWith("]")) {
+            return unclosed;
         }
+        int closedBracket = bracketStart(text, text.lastIndexOf('['));
+        if (closedBracket < 0) {
+            return unclosed;
+        }
+        // 刚闭合的方括号后面可能跟 (url)，但更靠前的未闭合括号也要一起暂存，取更靠前的起点
+        return unclosed >= 0 ? Math.min(unclosed, closedBracket) : closedBracket;
+    }
+
+    /** 最后一个未闭合的开括号位置，已闭合的括号跳过继续往前找；没有则返回 -1 */
+    private static int unclosedStart(String text) {
         for (int i = text.length() - 1; i >= 0; i--) {
             char c = text.charAt(i);
             if (c == '(' || c == '（') {
                 if (hasCloserAfter(text, i, ")）")) {
-                    return -1;
+                    continue;
                 }
                 if (i > 0 && text.charAt(i - 1) == ']') {
                     int bracket = text.lastIndexOf('[', i);
@@ -75,8 +86,8 @@ public final class SpeechTokenFilter {
                 }
                 return i;
             }
-            if (c == '[') {
-                return hasCloserAfter(text, i, "]") ? -1 : bracketStart(text, i);
+            if (c == '[' && !hasCloserAfter(text, i, "]")) {
+                return bracketStart(text, i);
             }
         }
         return -1;
