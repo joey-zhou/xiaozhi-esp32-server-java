@@ -1,7 +1,18 @@
 package com.xiaozhi.operationlog.aspect;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.BeanDescription;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationConfig;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
+import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import com.xiaozhi.common.annotation.AuditLog;
+import com.xiaozhi.common.annotation.Sensitive;
 import com.xiaozhi.common.model.bo.OperationLogBO;
 import com.xiaozhi.operationlog.service.OperationLogService;
 import com.xiaozhi.utils.JsonUtil;
@@ -18,12 +29,27 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Aspect
 @Component
 public class AuditLogAspect {
+
+    static final String MASK = "***";
+
+    private static final JsonSerializer<Object> MASK_SERIALIZER = new JsonSerializer<>() {
+        @Override
+        public void serialize(Object value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeString(MASK);
+        }
+    };
+
+    /** 打码模块只能挂在副本上，不能挂到 {@link JsonUtil#OBJECT_MAPPER}。 */
+    private static final ObjectMapper AUDIT_MAPPER = createAuditMapper();
 
     @Resource
     private OperationLogService operationLogService;
@@ -116,10 +142,44 @@ public class AuditLogAspect {
         if (filtered.isEmpty()) {
             return null;
         }
-        String json = JsonUtil.toJson(filtered.size() == 1 ? filtered.get(0) : filtered);
+        String json = writeMasked(filtered.size() == 1 ? filtered.get(0) : filtered);
         if (json != null && json.length() > 2000) {
             json = json.substring(0, 2000) + "...(truncated)";
         }
         return json;
     }
+
+    /** 序列化失败必须返回 null，不能回退到未打码序列化。 */
+    private static String writeMasked(Object value) {
+        try {
+            return AUDIT_MAPPER.writeValueAsString(value);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static ObjectMapper createAuditMapper() {
+        SimpleModule module = new SimpleModule();
+        module.setSerializerModifier(new BeanSerializerModifier() {
+            @Override
+            public List<BeanPropertyWriter> changeProperties(SerializationConfig config,
+                    BeanDescription beanDesc, List<BeanPropertyWriter> properties) {
+                Set<String> masked = new HashSet<>();
+                for (BeanPropertyDefinition property : beanDesc.findProperties()) {
+                    // Sensitive 注解只打在字段上，必须查字段而非 getter
+                    if (property.hasField() && property.getField().getAnnotation(Sensitive.class) != null) {
+                        masked.add(property.getName());
+                    }
+                }
+                for (BeanPropertyWriter writer : properties) {
+                    if (masked.contains(writer.getName())) {
+                        writer.assignSerializer(MASK_SERIALIZER);
+                    }
+                }
+                return properties;
+            }
+        });
+        return JsonUtil.OBJECT_MAPPER.copy().registerModule(module);
+    }
+
 }

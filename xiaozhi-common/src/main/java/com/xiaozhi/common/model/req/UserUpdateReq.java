@@ -1,5 +1,6 @@
 package com.xiaozhi.common.model.req;
 
+import com.xiaozhi.common.annotation.Sensitive;
 import com.xiaozhi.common.annotation.SignedFileUrl;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
@@ -21,6 +22,7 @@ public class UserUpdateReq {
 
     @Schema(description = "新密码")
     @Size(min = 6, max = 20, message = "密码长度必须在6-20个字符之间")
+    @Sensitive
     private String password;
 
     @Schema(description = "新姓名/昵称")

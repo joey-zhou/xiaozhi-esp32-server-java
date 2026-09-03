@@ -1,5 +1,6 @@
 package com.xiaozhi.common.model.req;
 
+import com.xiaozhi.common.annotation.Sensitive;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -26,15 +27,19 @@ public class ConfigUpdateReq {
     private String appId;
 
     @Schema(description = "服务提供商分配的ApiKey")
+    @Sensitive
     private String apiKey;
 
     @Schema(description = "服务提供商分配的ApiSecret")
+    @Sensitive
     private String apiSecret;
 
     @Schema(description = "服务提供商分配的Access Key")
+    @Sensitive
     private String ak;
 
     @Schema(description = "服务提供商分配的Secret Key")
+    @Sensitive
     private String sk;
 
     @Schema(description = "服务提供商的API地址")

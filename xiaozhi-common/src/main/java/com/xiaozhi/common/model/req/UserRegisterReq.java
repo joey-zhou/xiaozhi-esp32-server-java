@@ -1,5 +1,6 @@
 package com.xiaozhi.common.model.req;
 
+import com.xiaozhi.common.annotation.Sensitive;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
@@ -21,6 +22,7 @@ public class UserRegisterReq {
     @Schema(description = "密码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "密码不能为空")
     @Size(min = 6, max = 20, message = "密码长度必须在6-20个字符之间")
+    @Sensitive
     private String password;
 
     @Schema(description = "姓名/昵称")
@@ -38,6 +40,7 @@ public class UserRegisterReq {
     @Schema(description = "验证码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "验证码不能为空")
     @Pattern(regexp = "^\\d{6}$", message = "验证码格式不正确")
+    @Sensitive
     private String code;
 
     @AssertTrue(message = "邮箱或手机号至少填写一个")

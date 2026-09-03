@@ -1,5 +1,6 @@
 package com.xiaozhi.common.model.req;
 
+import com.xiaozhi.common.annotation.Sensitive;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -10,6 +11,7 @@ public class UserWechatLoginReq {
 
     @Schema(description = "微信登录 code", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "微信登录code不能为空")
+    @Sensitive
     private String code;
 
     @Schema(description = "邀请人ID")

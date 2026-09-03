@@ -1,5 +1,6 @@
 package com.xiaozhi.common.model.req;
 
+import com.xiaozhi.common.annotation.Sensitive;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -17,5 +18,6 @@ public class UserTelLoginReq {
     @Schema(description = "验证码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "验证码不能为空")
     @Pattern(regexp = "^\\d{6}$", message = "验证码格式不正确")
+    @Sensitive
     private String code;
 }
