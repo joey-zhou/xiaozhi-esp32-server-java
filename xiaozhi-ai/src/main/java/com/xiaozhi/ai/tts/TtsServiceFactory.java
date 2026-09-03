@@ -99,6 +99,12 @@ public class TtsServiceFactory {
         if (!dir.exists()) dir.mkdirs();
     }
 
+    /**
+     * 清除指定配置的服务实例缓存。
+     * <p>
+     * 硬约束：不清理 sherpa-onnx 的本地模型缓存。模型实例只由音色里的模型目录决定，与配置无关；
+     * 且释放模型会 delete native 指针，与正在执行的合成并发即 use-after-free 崩进程。
+     */
     public void removeCache(ConfigBO config) {
         if (config == null) {
             return;
@@ -110,11 +116,6 @@ public class TtsServiceFactory {
         // 如果是阿里云NLS，需要额外清理NlsClient缓存
         if ("aliyun-nls".equals(provider)) {
             AliyunNlsTtsService.clearClientCache(configId);
-        }
-
-        // 如果是sherpa-onnx，需要额外清理模型缓存
-        if ("sherpa-onnx".equals(provider) && config.getApiUrl() != null) {
-            SherpaOnnxTtsService.clearModelCache(config.getApiUrl());
         }
 
         // 遍历缓存的所有键，找到匹配的键并移除

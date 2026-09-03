@@ -26,7 +26,11 @@ import lombok.extern.slf4j.Slf4j;
 public class SherpaOnnxTtsService implements TtsService {
     private static final String PROVIDER_NAME = "sherpa-onnx";
 
-    // 缓存 OfflineTts 实例，避免重复加载模型（key = modelPath）
+    // 缓存 OfflineTts 实例，避免重复加载模型（key = modelPath:modelType），进程内长期持有
+    // 硬约束：实例一旦放入就不再移除、不调用 release()。release() 会 delete native 指针，
+    // 与正在执行的 generate 并发即 use-after-free，直接 SIGSEGV 崩掉整个 JVM
+    // 硬约束：实例只能经由本 Map 发布，由 ConcurrentHashMap 保证 native 指针对其他线程可见
+    // 模型文件被替换后需重启进程才生效
     private static final Map<String, OfflineTts> ttsCache = new ConcurrentHashMap<>();
 
     private final XiaozhiTtsOptions options;
@@ -263,22 +267,5 @@ public class SherpaOnnxTtsService implements TtsService {
             sb.append(files[i].getAbsolutePath());
         }
         return sb.toString();
-    }
-
-    /**
-     * 清除指定模型路径的缓存
-     */
-    public static void clearModelCache(String modelPath) {
-        ttsCache.entrySet().removeIf(entry -> {
-            if (entry.getKey().startsWith(modelPath)) {
-                try {
-                    entry.getValue().release();
-                } catch (Exception e) {
-                    // ignore
-                }
-                return true;
-            }
-            return false;
-        });
     }
 }
