@@ -6,8 +6,7 @@ import com.xiaozhi.communication.server.websocket.WebSocketSession;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
-import com.xiaozhi.device.domain.Device;
-import com.xiaozhi.device.domain.repository.DeviceRepository;
+import com.xiaozhi.common.port.DeviceWriter;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.dialogue.DialogueService;
@@ -48,7 +47,7 @@ public class MessageHandler {
     private DeviceService deviceService;
 
     @Resource
-    private DeviceRepository deviceRepository;
+    private DeviceWriter deviceWriter;
 
     @Resource
     private VadService vadService;
@@ -159,7 +158,7 @@ public class MessageHandler {
         String newState = DeviceBO.DEVICE_STATE_ONLINE;
         Thread.startVirtualThread(() -> {
             try {
-                deviceRepository.updateState(deviceId, newState);
+                deviceWriter.updateState(deviceId, newState);
             } catch (Exception e) {
                 // 仅记录告警，不关闭会话：状态写库失败不影响设备正常通信
                 log.warn("更新设备在线状态失败 - DeviceId: {}, State: {}", deviceId, newState, e);
@@ -227,32 +226,26 @@ public class MessageHandler {
                 
                 if (defaultRoleId != null) {
                     // 创建虚拟设备并绑定到默认角色
-                    Device createdDevice = Device.newDevice(
-                            deviceId, "小助手", "web", userId, defaultRoleId);
-                    deviceRepository.save(createdDevice);
-                    if (createdDevice.getDeviceId() != null) {
-                        log.info("虚拟设备 {} 自动绑定成功，角色ID: {}", deviceId, defaultRoleId);
+                    deviceWriter.register(deviceId, "小助手", "web", userId, defaultRoleId);
+                    log.info("虚拟设备 {} 自动绑定成功，角色ID: {}", deviceId, defaultRoleId);
+                    
+                    // 重新查询设备信息
+                    DeviceBO boundDevice = deviceService.getBO(deviceId);
+                    if (boundDevice != null) {
+                        // 更新会话中的设备信息
+                        boundDevice.setSessionId(sessionId);
+                        sessionManager.registerDevice(sessionId, boundDevice);
                         
-                        // 重新查询设备信息
-                        DeviceBO boundDevice = deviceService.getBO(deviceId);
-                        if (boundDevice != null) {
-                            // 更新会话中的设备信息
-                            boundDevice.setSessionId(sessionId);
-                            sessionManager.registerDevice(sessionId, boundDevice);
-                            
-                            // 获取会话对象
-                            ChatSession chatSession = sessionManager.getSession(sessionId);
-                            if (chatSession != null && chatSession.isOpen()) {
-                                // 初始化设备会话（与afterConnection中的逻辑一致）
-                                initializeBoundDevice(chatSession, boundDevice);
-                                log.info("虚拟设备 {} 初始化完成，可以开始对话", deviceId);
-                            }
-                            
-                            // 设备已绑定并初始化完成，返回true表示可以继续处理消息
-                            return true;
+                        // 获取会话对象
+                        ChatSession chatSession = sessionManager.getSession(sessionId);
+                        if (chatSession != null && chatSession.isOpen()) {
+                            // 初始化设备会话（与afterConnection中的逻辑一致）
+                            initializeBoundDevice(chatSession, boundDevice);
+                            log.info("虚拟设备 {} 初始化完成，可以开始对话", deviceId);
                         }
-                    } else {
-                        log.warn("虚拟设备 {} 自动绑定失败", deviceId);
+                        
+                        // 设备已绑定并初始化完成，返回true表示可以继续处理消息
+                        return true;
                     }
                 } else {
                     log.warn("用户 {} 没有可用的角色，无法自动绑定虚拟设备", userId);

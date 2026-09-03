@@ -9,9 +9,12 @@ import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.template.convert.TemplateConvert;
 import com.xiaozhi.template.dal.mysql.dataobject.TemplateDO;
 import com.xiaozhi.template.dal.mysql.mapper.TemplateMapper;
+import com.xiaozhi.template.domain.Template;
+import com.xiaozhi.template.domain.repository.TemplateRepository;
 import com.xiaozhi.template.service.TemplateService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -21,6 +24,9 @@ public class TemplateServiceImpl implements TemplateService {
 
     @Resource
     private TemplateMapper templateMapper;
+
+    @Resource
+    private TemplateRepository templateRepository;
 
     @Resource
     private TemplateConvert templateConvert;
@@ -77,6 +83,15 @@ public class TemplateServiceImpl implements TemplateService {
         return templateMapper.selectOne(new LambdaQueryWrapper<TemplateDO>()
             .eq(TemplateDO::getTemplateId, templateId)
             .eq(TemplateDO::getState, TemplateBO.STATE_ENABLED));
+    }
+
+
+    @Override
+    @Transactional
+    public void copyTemplates(Integer sourceUserId, Integer targetUserId) {
+        for (TemplateBO template : listBO(sourceUserId, null, null)) {
+            templateRepository.save(Template.newTemplate(targetUserId, template));
+        }
     }
 
 }

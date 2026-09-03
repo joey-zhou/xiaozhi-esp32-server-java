@@ -9,7 +9,7 @@ import com.xiaozhi.communication.domain.mcp.device.initialize.DeviceMcpClientInf
 import com.xiaozhi.communication.domain.mcp.device.initialize.DeviceMcpInitialize;
 import com.xiaozhi.communication.domain.mcp.device.initialize.DeviceMcpPayload;
 import com.xiaozhi.communication.domain.mcp.device.initialize.DeviceMcpVision;
-import com.xiaozhi.device.domain.repository.DeviceRepository;
+import com.xiaozhi.common.port.DeviceWriter;
 import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
@@ -52,7 +52,7 @@ public class DeviceMcpService {
     private DeviceAuthService deviceAuthService;
 
     @Resource
-    private DeviceRepository deviceRepository;
+    private DeviceWriter deviceWriter;
 
     @Resource
     private SessionManager sessionManager;
@@ -263,10 +263,7 @@ public class DeviceMcpService {
             return;
         }
         try {
-            deviceRepository.findById(deviceId).ifPresent(device -> {
-                device.updateMcpList(mcpList);
-                deviceRepository.save(device);
-            });
+            deviceWriter.updateMcpList(deviceId, mcpList);
             chatSession.getDevice().setMcpList(mcpList);
             log.info("DeviceId: {}, mcp_list updated: {}", deviceId, mcpList);
         } catch (Exception e) {

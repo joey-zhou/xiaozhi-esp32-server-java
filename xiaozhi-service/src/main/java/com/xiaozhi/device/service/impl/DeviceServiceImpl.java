@@ -11,6 +11,8 @@ import com.xiaozhi.common.model.resp.PageResp;
 import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
+import com.xiaozhi.device.domain.Device;
+import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.service.DeviceService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.CacheManager;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -26,6 +29,9 @@ public class DeviceServiceImpl implements DeviceService {
 
     @Resource
     private DeviceMapper deviceMapper;
+
+    @Resource
+    private DeviceRepository deviceRepository;
 
     @Resource
     private DeviceConvert deviceConvert;
@@ -113,6 +119,37 @@ public class DeviceServiceImpl implements DeviceService {
             return 0;
         }
         return deviceMapper.updateCodeAudioPath(deviceId, sessionId, code, audioPath);
+    }
+
+    @Override
+    public void updateState(String deviceId, String state) {
+        deviceRepository.updateState(deviceId, state);
+    }
+
+    @Override
+    public int batchUpdateState(Set<String> deviceIds, String state) {
+        return deviceRepository.batchUpdateState(deviceIds, state);
+    }
+
+    @Override
+    public void updateMcpList(String deviceId, String mcpList) {
+        deviceRepository.findById(deviceId).ifPresent(device -> {
+            device.updateMcpList(mcpList);
+            deviceRepository.save(device);
+        });
+    }
+
+    @Override
+    public void bindRole(String deviceId, Integer roleId) {
+        deviceRepository.findById(deviceId).ifPresent(device -> {
+            device.bindRole(roleId);
+            deviceRepository.save(device);
+        });
+    }
+
+    @Override
+    public void register(String deviceId, String deviceName, String type, Integer userId, Integer roleId) {
+        deviceRepository.save(Device.newDevice(deviceId, deviceName, type, userId, roleId));
     }
 
 }

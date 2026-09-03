@@ -4,7 +4,6 @@ import com.xiaozhi.authrole.service.AuthRoleService;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
 import com.xiaozhi.common.exception.UsernameNotFoundException;
-import com.xiaozhi.common.model.bo.TemplateBO;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.req.UserPageReq;
 import com.xiaozhi.common.model.req.UserRegisterReq;
@@ -15,14 +14,11 @@ import com.xiaozhi.common.model.resp.LoginResp;
 import com.xiaozhi.common.model.resp.PageResp;
 import com.xiaozhi.common.model.resp.PermissionTreeResp;
 import com.xiaozhi.common.model.resp.UserResp;
-import com.xiaozhi.device.domain.Device;
-import com.xiaozhi.device.domain.repository.DeviceRepository;
+import com.xiaozhi.common.port.DeviceWriter;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.permission.service.PermissionService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.security.AuthenticationService;
-import com.xiaozhi.template.domain.Template;
-import com.xiaozhi.template.domain.repository.TemplateRepository;
 import com.xiaozhi.template.service.TemplateService;
 import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.service.UserService;
@@ -65,13 +61,10 @@ public class UserAppService {
     private TemplateService templateService;
 
     @Resource
-    private TemplateRepository templateRepository;
-
-    @Resource
     private DeviceService deviceService;
 
     @Resource
-    private DeviceRepository deviceRepository;
+    private DeviceWriter deviceWriter;
 
     @Resource
     private AuthenticationService authenticationService;
@@ -122,14 +115,8 @@ public class UserAppService {
         Integer userId = created.getUserId();
 
         Integer defaultRoleId = roleService.copyDefaultRole(ADMIN_TEMPLATE_OWNER_ID, userId);
-        List<TemplateBO> templates = templateService.listBO(ADMIN_TEMPLATE_OWNER_ID, null, null);
-        for (TemplateBO template : templates) {
-            templateRepository.save(Template.newTemplate(userId, template));
-        }
-
-        Device virtualDevice = Device.newDevice(
-                "user_chat_" + userId, "网页聊天", "web", userId, defaultRoleId);
-        deviceRepository.save(virtualDevice);
+        templateService.copyTemplates(ADMIN_TEMPLATE_OWNER_ID, userId);
+        deviceWriter.register("user_chat_" + userId, "网页聊天", "web", userId, defaultRoleId);
 
         return created;
     }

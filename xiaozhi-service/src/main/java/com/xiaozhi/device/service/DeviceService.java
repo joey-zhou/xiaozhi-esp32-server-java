@@ -4,10 +4,11 @@ import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.port.DeviceWriter;
 
 import java.util.List;
 
-public interface DeviceService {
+public interface DeviceService extends DeviceWriter {
 
     /** 设备缓存名称（DeviceServiceImpl 读缓存、DeviceRepositoryImpl 写后失效均使用此常量） */
     String CACHE_NAME = "XiaoZhi:Device";

@@ -44,8 +44,7 @@ import static org.mockito.Mockito.mock;
 
 /**
  * 设备协议回归套件的装配器：把真实的 WebSocketHandler / MessageHandler / SessionManager /
- * DialogueService / MessageSender / ScheduledPlayer 与各路假体接成一张对象图，
- * 让用例作者只写「驱动 + 断言」，不用关心 17 个字段注入怎么塞。
+ * DialogueService / MessageSender / ScheduledPlayer 与各路假体接成一张对象图。
  *
  * <p>典型用法：
  * <pre>{@code
@@ -55,15 +54,14 @@ import static org.mockito.Mockito.mock;
  * assertThat(device.transport().jsonSignatures()).containsExactly("hello");
  * }</pre>
  *
- * <p>哪些是真的：状态机、消息编解码、会话注册表、音频流生命周期、播放调度、意图判定，
- * 这些正是协议回归要钉的东西，全部走生产代码。
+ * <p>哪些是真的（全部走生产代码）：状态机、消息编解码、会话注册表、音频流生命周期、播放调度、意图判定。
  *
  * <p>哪些是假体（对应盲区，用例不要在这些维度上断言）：
  * <ul>
  *   <li>{@link ScriptedVadService} —— 断句由帧首字节脚本决定，不测 VAD 算法质量；</li>
  *   <li>{@link RecordingAecService} —— 只记参考帧调度契约，不测 ERLE / 估计延迟；</li>
  *   <li>{@link ScriptedSttService} —— 识别结果预置，不测真实分段与标点；</li>
- *   <li>{@link RecordingDeviceRepository} —— 内存仓储，不测事务、缓存失效与领域事件；</li>
+ *   <li>{@link RecordingDeviceWriter} —— 内存写端口，不测事务、缓存失效与领域事件；</li>
  *   <li>{@link TestEventBus} —— 反射派发，保证监听器都被调到，但保证不了跨监听器顺序；</li>
  *   <li>{@link FakeWebSocketTransport} —— 同步发送，没有分片、背压与容器级的缓冲区上限；</li>
  *   <li>PersonaFactory / ChatModel / TTS 为 mock，LLM 与语音合成本身不在本套件范围内；</li>
@@ -101,7 +99,7 @@ class ProtocolTestHarness {
     private final ScriptedVadService vadService = new ScriptedVadService();
     private final RecordingAecService aecService = new RecordingAecService();
     private final ScriptedSttService sttService = new ScriptedSttService();
-    private final RecordingDeviceRepository deviceRepository = new RecordingDeviceRepository();
+    private final RecordingDeviceWriter deviceWriter = new RecordingDeviceWriter();
 
     // ===== mock 协作者 =====
     private final DeviceService deviceService = mock(DeviceService.class);
@@ -136,7 +134,7 @@ class ProtocolTestHarness {
     private void wire() {
         inject(sessionManager,
                 "applicationContext", eventBus.applicationContext(),
-                "deviceRepository", deviceRepository,
+                "deviceWriter", deviceWriter,
                 "deviceRegistry", deviceRegistry,
                 "instanceIdHolder", instanceIdHolder,
                 "vadService", vadService,
@@ -155,7 +153,7 @@ class ProtocolTestHarness {
 
         inject(messageHandler,
                 "deviceService", deviceService,
-                "deviceRepository", deviceRepository,
+                "deviceWriter", deviceWriter,
                 "vadService", vadService,
                 "sessionManager", sessionManager,
                 "dialogueService", dialogueService,
@@ -327,8 +325,8 @@ class ProtocolTestHarness {
         return sttService;
     }
 
-    RecordingDeviceRepository deviceRepository() {
-        return deviceRepository;
+    RecordingDeviceWriter deviceWriter() {
+        return deviceWriter;
     }
 
     TestEventBus events() {

@@ -94,7 +94,7 @@ class DeviceMcpProtocolTest {
         ReflectionTestUtils.setField(deviceMcpService, "environment", mock(Environment.class));
         ReflectionTestUtils.setField(deviceMcpService, "serverAddressProvider", addressProvider);
         ReflectionTestUtils.setField(deviceMcpService, "deviceAuthService", deviceAuthService);
-        ReflectionTestUtils.setField(deviceMcpService, "deviceRepository", harness.deviceRepository());
+        ReflectionTestUtils.setField(deviceMcpService, "deviceWriter", harness.deviceWriter());
         ReflectionTestUtils.setField(deviceMcpService, "sessionManager", harness.sessionManager());
         ReflectionTestUtils.setField(deviceMcpService, "maxToolsCount", 32);
         // 换掉脚手架注入的 mock，让 hello 触发的是真实握手

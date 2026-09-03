@@ -6,7 +6,6 @@ import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.communication.domain.iot.IotDescriptor;
 import com.xiaozhi.communication.domain.iot.IotState;
-import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.enums.ListenMode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -308,12 +307,12 @@ class ProtocolFuzzToleranceTest {
         device.listenText("今天天气怎么样");
 
         // 自动建档：web 类型、绑定到默认角色
-        AwaitHelper.until("虚拟设备已建档", () -> !harness.deviceRepository().savedDevices().isEmpty());
-        assertThat(harness.deviceRepository().savedDevices()).singleElement().satisfies(saved -> {
-            assertThat(saved.getDeviceId()).isEqualTo(VIRTUAL_DEVICE_ID);
-            assertThat(saved.getType()).isEqualTo("web");
-            assertThat(saved.getUserId()).isEqualTo(VIRTUAL_USER_ID);
-            assertThat(saved.getRoleId()).isEqualTo(1);
+        AwaitHelper.until("虚拟设备已建档", () -> !harness.deviceWriter().registrations().isEmpty());
+        assertThat(harness.deviceWriter().registrations()).singleElement().satisfies(registered -> {
+            assertThat(registered.deviceId()).isEqualTo(VIRTUAL_DEVICE_ID);
+            assertThat(registered.type()).isEqualTo("web");
+            assertThat(registered.userId()).isEqualTo(VIRTUAL_USER_ID);
+            assertThat(registered.roleId()).isEqualTo(1);
         });
 
         // 绑定后当前这条 listen/text 继续被处理，而不是像验证码分支那样被丢弃
@@ -376,7 +375,7 @@ class ProtocolFuzzToleranceTest {
         return path;
     }
 
-    /** user_chat_ 虚拟设备：建档前查不到角色，deviceRepository.save 之后才查得到绑定后的设备 */
+    /** user_chat_ 虚拟设备：建档前查不到角色，register 之后才查得到绑定后的设备 */
     private void stubVirtualDeviceBinding() {
         DeviceBO unbound = new DeviceBO();
         unbound.setDeviceId(VIRTUAL_DEVICE_ID);
@@ -394,16 +393,14 @@ class ProtocolFuzzToleranceTest {
         defaultRole.setUserId(VIRTUAL_USER_ID);
         defaultRole.setRoleName("协议测试角色");
 
-        doAnswer(invocation -> savedVirtualDevice() != null ? bound : unbound)
+        doAnswer(invocation -> virtualDeviceRegistered() ? bound : unbound)
                 .when(harness.deviceService()).getBO(VIRTUAL_DEVICE_ID);
         doAnswer(invocation -> defaultRole)
                 .when(harness.roleService()).getDefaultOrFirstBO(VIRTUAL_USER_ID);
     }
 
-    private Device savedVirtualDevice() {
-        return harness.deviceRepository().savedDevices().stream()
-                .filter(device -> VIRTUAL_DEVICE_ID.equals(device.getDeviceId()))
-                .findFirst()
-                .orElse(null);
+    private boolean virtualDeviceRegistered() {
+        return harness.deviceWriter().registrations().stream()
+                .anyMatch(registered -> VIRTUAL_DEVICE_ID.equals(registered.deviceId()));
     }
 }

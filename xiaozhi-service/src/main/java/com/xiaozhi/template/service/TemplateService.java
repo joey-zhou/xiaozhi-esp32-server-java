@@ -15,4 +15,6 @@ public interface TemplateService {
     TemplateBO getBO(Integer templateId);
 
     List<TemplateBO> listBO(Integer userId, String templateName, String category);
+
+    void copyTemplates(Integer sourceUserId, Integer targetUserId);
 }

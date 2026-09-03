@@ -3,7 +3,7 @@ package com.xiaozhi.communication.common;
 import com.xiaozhi.communication.server.websocket.WebSocketSession;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.ai.llm.memory.Conversation;
-import com.xiaozhi.device.domain.repository.DeviceRepository;
+import com.xiaozhi.common.port.DeviceWriter;
 import com.xiaozhi.dialogue.audio.AecService;
 import com.xiaozhi.dialogue.audio.VadService;
 import com.xiaozhi.event.ChatAudioOpenedEvent;
@@ -58,7 +58,7 @@ public class SessionManager {
 
     @Resource
     @Lazy
-    private DeviceRepository deviceRepository;
+    private DeviceWriter deviceWriter;
 
     @Resource
     private DeviceRegistry deviceRegistry;
@@ -82,7 +82,7 @@ public class SessionManager {
             try {
                 Set<String> ownDeviceIds = deviceRegistry.getOwnDeviceIds();
                 if (!ownDeviceIds.isEmpty()) {
-                    int updated = deviceRepository.batchUpdateState(ownDeviceIds, DeviceBO.DEVICE_STATE_OFFLINE);
+                    int updated = deviceWriter.batchUpdateState(ownDeviceIds, DeviceBO.DEVICE_STATE_OFFLINE);
                     log.info("项目启动，重置本实例 {} 个设备状态为离线", updated);
                     // 清理本实例旧的 Redis 映射
                     for (String deviceId : ownDeviceIds) {
@@ -206,7 +206,7 @@ public class SessionManager {
                 if (currentSession != null && !sessionId.equals(currentSession.getSessionId())) {
                     return;
                 }
-                deviceRepository.updateState(deviceId, newState);
+                deviceWriter.updateState(deviceId, newState);
                 log.info("连接已关闭 - SessionId: {}, DeviceId: {}, 新状态: {}", sessionId, deviceId, newState);
             } catch (Exception e) {
                 log.error("更新设备状态失败", e);

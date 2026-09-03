@@ -4,7 +4,7 @@ import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
-import com.xiaozhi.device.domain.repository.DeviceRepository;
+import com.xiaozhi.common.port.DeviceWriter;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
@@ -35,7 +35,7 @@ public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
     @Resource
     private RoleService roleService;
     @Resource
-    private DeviceRepository deviceRepository;
+    private DeviceWriter deviceWriter;
     @Resource
     @Lazy
     private PersonaFactory personaFactory;
@@ -63,10 +63,7 @@ public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
 
                             if(changedRole.isPresent()){
                                 RoleBO role = changedRole.get();
-                                deviceRepository.findById(device.getDeviceId()).ifPresent(d -> {
-                                    d.bindRole(role.getRoleId());
-                                    deviceRepository.save(d);
-                                });
+                                deviceWriter.bindRole(device.getDeviceId(), role.getRoleId());
                                 device.setRoleId(role.getRoleId());
                                 device.setRoleName(role.getRoleName());
                                 // 切换了角色，需要更换Conversation

@@ -276,7 +276,7 @@ class GoodbyeAndReconnectProtocolTest {
 
     /** 指定设备被写入指定状态的次数 */
     private int countState(String deviceId, String state) {
-        return (int) harness.deviceRepository().stateUpdates().stream()
+        return (int) harness.deviceWriter().stateUpdates().stream()
                 .filter(update -> deviceId.equals(update.deviceId()) && state.equals(update.state()))
                 .count();
     }
