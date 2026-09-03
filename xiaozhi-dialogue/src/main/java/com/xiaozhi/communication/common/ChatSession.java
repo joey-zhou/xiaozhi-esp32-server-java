@@ -99,6 +99,13 @@ public abstract class ChatSession {
      * 移入 Persona 会增加 null 判断复杂度而无收益。
      */
     protected volatile Sinks.Many<byte[]> audioSinks;
+    /**
+     * audioSinks 的写入锁。
+     * 硬约束：Reactor 的 tryEmit* 要求调用方自己保证串行，检测到并发就返回 FAIL_NON_SERIALIZED
+     * 把这次信号丢掉。收句的 complete 与 VAD 送帧分处两个线程，不串行化时收句会被丢，
+     * 订阅该流的 STT 永远等不到结束信号，这一轮说的话整句丢失、会话停在 THINKING。
+     */
+    private final Object audioSinkLock = new Object();
     /** 唤醒词只有一小段，超过这个帧数说明是异常流量 */
     private static final int MAX_WAKE_WORD_FRAMES = 100;
     /**
@@ -173,16 +180,19 @@ public abstract class ChatSession {
      * 创建新的音频数据流
      */
     public void createAudioStream() {
-        this.audioSinks = Sinks.many().multicast().onBackpressureBuffer();
+        synchronized (audioSinkLock) {
+            this.audioSinks = Sinks.many().multicast().onBackpressureBuffer();
+        }
     }
 
     /**
      * 发送音频数据到流
      */
     public void sendAudioData(byte[] data) {
-        Sinks.Many<byte[]> sink = audioSinks; // 局部变量避免 TOCTOU
-        if (sink != null) {
-            sink.tryEmitNext(data);
+        synchronized (audioSinkLock) {
+            if (audioSinks != null) {
+                audioSinks.tryEmitNext(data);
+            }
         }
     }
 
@@ -190,8 +200,10 @@ public abstract class ChatSession {
      * 完成音频流（通知下游数据发送完毕）
      */
     public void completeAudioStream() {
-        if (audioSinks != null) {
-            audioSinks.tryEmitComplete();
+        synchronized (audioSinkLock) {
+            if (audioSinks != null) {
+                audioSinks.tryEmitComplete();
+            }
         }
     }
 
@@ -200,10 +212,12 @@ public abstract class ChatSession {
      * 只释放引用会让订阅该流的 STT 永远等不到结束信号，连接被服务端超时断开且发送线程泄漏。
      */
     public void closeAudioStream() {
-        Sinks.Many<byte[]> sink = this.audioSinks;
-        this.audioSinks = null;
-        if (sink != null) {
-            sink.tryEmitComplete();
+        synchronized (audioSinkLock) {
+            Sinks.Many<byte[]> sink = this.audioSinks;
+            this.audioSinks = null;
+            if (sink != null) {
+                sink.tryEmitComplete();
+            }
         }
     }
 

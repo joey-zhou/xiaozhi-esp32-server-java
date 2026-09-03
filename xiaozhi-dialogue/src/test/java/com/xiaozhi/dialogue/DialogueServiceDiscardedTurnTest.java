@@ -70,11 +70,6 @@ class DialogueServiceDiscardedTurnTest {
     /** STT 出终稿那一刻的会话状态，用来确认用例确实覆盖到了目标场景 */
     private final AtomicReference<DeviceState> stateAtFinalText = new AtomicReference<>();
     private final CountDownLatch sttReturned = new CountDownLatch(1);
-    /**
-     * STT 已订阅音频流。收句必须等它落定：抢在订阅之前 complete，
-     * 订阅方就再也收不到结束信号，整轮挂到 STT 自己的超时。
-     */
-    private final CountDownLatch sttSubscribed = new CountDownLatch(1);
 
     @BeforeEach
     void setUp() {
@@ -134,7 +129,7 @@ class DialogueServiceDiscardedTurnTest {
     private void runDiscardedTurn(String finalText, Runnable beforeSpeechEnd) throws InterruptedException {
         when(sttService.stream(any(), any())).thenAnswer(invocation -> {
             Flux<byte[]> audio = invocation.getArgument(0);
-            audio.doOnSubscribe(subscription -> sttSubscribed.countDown()).blockLast(AWAIT_TIMEOUT);
+            audio.blockLast(AWAIT_TIMEOUT);
             stateAtFinalText.set(awaitSegmentEnded());
             sttReturned.countDown();
             return SttResult.textOnly(finalText);
@@ -144,7 +139,6 @@ class DialogueServiceDiscardedTurnTest {
                         vadResult(VadService.VadStatus.SPEECH_END));
 
         dialogueService.processAudioData(session, frame());
-        assertThat(sttSubscribed.await(AWAIT_TIMEOUT.toSeconds(), TimeUnit.SECONDS)).isTrue();
         beforeSpeechEnd.run();
         dialogueService.processAudioData(session, frame());
 
