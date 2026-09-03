@@ -8,4 +8,7 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 public interface TokenResolver {
 
     String getToken(ConfigBO config);
+
+    /** 丢弃该配置已缓存的 token，下次获取时重新换取。 */
+    void removeCache(ConfigBO config);
 }

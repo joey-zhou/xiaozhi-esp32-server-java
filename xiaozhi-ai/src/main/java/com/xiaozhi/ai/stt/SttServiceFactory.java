@@ -120,6 +120,17 @@ public class SttServiceFactory {
     }
 
     /**
+     * 按配置新建一个一次性的STT服务，既不读缓存也不写缓存，用完即弃。
+     * <p>
+     * 硬约束：仅供未保存的临时配置（如配置测试）使用。这类配置的 configId 不指向真实配置，
+     * 走 {@link #getSttService(ConfigBO)} 会把临时凭据留在缓存里，被后续真实会话取到。
+     * 本地 vosk 无凭据，仍返回共享实例。
+     */
+    public SttService createTransientSttService(@Nonnull ConfigBO config) {
+        return createApiService(config);
+    }
+
+    /**
      * 根据配置创建API类型的STT服务
      */
     private SttService createApiService(@Nonnull ConfigBO config) {

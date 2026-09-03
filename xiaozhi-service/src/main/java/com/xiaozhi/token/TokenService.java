@@ -94,6 +94,7 @@ public class TokenService implements TokenResolver {
         throw new IllegalStateException("获取Token失败，provider=" + config.getProvider() + ", configId=" + config.getConfigId());
     }
 
+    @Override
     public void removeCache(ConfigBO config) {
         if (config == null || !StringUtils.hasText(config.getProvider())) {
             return;

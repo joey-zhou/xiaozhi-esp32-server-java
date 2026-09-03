@@ -731,7 +731,7 @@ fetchData()
                 >
                   {{ editingConfigId ? t('config.update', { type: t(configTypeInfo.label) }) : t('config.create', { type: t(configTypeInfo.label) }) }}
                 </a-button>
-                <a-button v-if="props.configType === 'llm'" :loading="testing" @click="handleTest">
+                <a-button v-if="['llm', 'stt'].includes(props.configType)" :loading="testing" @click="handleTest">
                   {{ t('config.test') }}
                 </a-button>
                 <a-button @click="handleCancel">{{ t('common.cancel') }}</a-button>
