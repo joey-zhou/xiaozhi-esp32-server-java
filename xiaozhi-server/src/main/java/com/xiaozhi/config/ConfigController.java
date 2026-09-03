@@ -13,7 +13,6 @@ import com.xiaozhi.common.model.req.ConfigUpdateReq;
 import com.xiaozhi.common.model.resp.ConfigResp;
 import com.xiaozhi.common.model.resp.PageResp;
 import com.xiaozhi.common.web.ApiResponse;
-import com.xiaozhi.config.ConfigAppService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +35,9 @@ public class ConfigController extends BaseController {
 
     @Resource
     private ConfigAppService configAppService;
+
+    @Resource
+    private ConfigConnectionChecker configConnectionChecker;
 
     /**
      * 配置查询
@@ -91,9 +93,10 @@ public class ConfigController extends BaseController {
     @PostMapping("/test")
     @ResponseBody
     @SaCheckPermission("system:config:api:list")
+    @CheckOwner(resource = "config", id = "#req.configId")
     @Operation(summary = "测试配置", description = "使用当前表单参数测试模型配置是否可用")
     public ApiResponse<Void> test(@Valid @RequestBody ConfigTestReq req) {
-        return configAppService.test(req);
+        return configConnectionChecker.test(req, StpUtil.getLoginIdAsInt());
     }
 
     /**

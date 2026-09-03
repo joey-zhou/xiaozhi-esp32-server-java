@@ -3,9 +3,11 @@ package com.xiaozhi.config;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.req.ConfigCreateReq;
 import com.xiaozhi.common.model.req.ConfigPageReq;
+import com.xiaozhi.common.model.req.ConfigTestReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
 import com.xiaozhi.common.model.resp.ConfigResp;
 import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,7 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 钉住配置接口的分页参数绑定与按登录用户过滤。
+ * 钉住配置接口的分页参数绑定与按登录用户过滤，
+ * 以及试拨端点交给 ConfigConnectionChecker，并把当前登录用户带过去。
  */
 @ExtendWith(MockitoExtension.class)
 class ConfigControllerTest extends ControllerTestSupport {
@@ -44,12 +47,16 @@ class ConfigControllerTest extends ControllerTestSupport {
     @Mock
     private ConfigAppService configAppService;
 
+    @Mock
+    private ConfigConnectionChecker configConnectionChecker;
+
     private ConfigController configController;
 
     @BeforeEach
     void setUp() {
         configController = new ConfigController();
         ReflectionTestUtils.setField(configController, "configAppService", configAppService);
+        ReflectionTestUtils.setField(configController, "configConnectionChecker", configConnectionChecker);
         mockMvc = buildMockMvc(configController);
     }
 
@@ -104,6 +111,25 @@ class ConfigControllerTest extends ControllerTestSupport {
         }
     }
 
+    @Test
+    void testEndpointDelegatesToConnectionCheckerWithCurrentUser() throws Exception {
+        when(configConnectionChecker.test(any(ConfigTestReq.class), eq(7)))
+            .thenReturn(ApiResponse.success("连接成功"));
+
+        try (var ignored = mockLoginUser(7)) {
+            mockMvc.perform(post("/api/config/test")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(toJson(testReq())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(ResultStatus.SUCCESS))
+                .andExpect(jsonPath("$.message").value("连接成功"));
+        }
+
+        ArgumentCaptor<ConfigTestReq> captor = ArgumentCaptor.forClass(ConfigTestReq.class);
+        verify(configConnectionChecker).test(captor.capture(), eq(7));
+        assertThat(captor.getValue().getConfigId()).isEqualTo(11);
+    }
+
     // 异常文案由 GlobalExceptionHandlerTest 集中覆盖，这里只钉路由与路径变量绑定
     @Test
     void deleteReturnsNotFoundWhenConfigMissing() throws Exception {
@@ -113,6 +139,15 @@ class ConfigControllerTest extends ControllerTestSupport {
         mockMvc.perform(delete("/api/config/9"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value(ResultStatus.NOT_FOUND));
+    }
+
+    private static ConfigTestReq testReq() {
+        ConfigTestReq req = new ConfigTestReq();
+        req.setConfigId(11);
+        req.setConfigName("测试配置");
+        req.setConfigType("llm");
+        req.setProvider("openai");
+        return req;
     }
 
     private static PageResp<ConfigResp> singlePage() {
