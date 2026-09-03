@@ -28,6 +28,8 @@ import java.util.Optional;
  *   <li>"唯一默认角色"不变式维护（save 时 reset 同用户其他角色）</li>
  *   <li>缓存失效</li>
  * </ul>
+ * <p>
+ * resetDefault 不按 state 过滤，被禁用的角色仍占着该用户的默认位。
  */
 @Repository
 public class RoleRepositoryImpl implements RoleRepository {

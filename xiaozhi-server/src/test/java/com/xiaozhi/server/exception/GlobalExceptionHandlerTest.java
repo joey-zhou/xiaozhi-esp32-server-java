@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -73,6 +74,8 @@ class GlobalExceptionHandlerTest extends ControllerTestSupport {
             Arguments.of(new IllegalArgumentException(""), 400, "请求参数不合法"),
             Arguments.of(new IllegalStateException("MCP服务代码重复"), 409, "MCP服务代码重复"),
             Arguments.of(new IllegalStateException(""), 409, "当前状态不允许此操作"),
+            Arguments.of(new DuplicateKeyException("Duplicate entry '1:llm:chat' for key 'sys_config.uk_config_default'"),
+                409, "数据重复，操作未生效"),
             Arguments.of(new OperationFailedException("保存MCP工具排除配置失败"), 500, "保存MCP工具排除配置失败"),
             Arguments.of(new OperationFailedException(""), 500, "操作失败，请稍后重试"),
             // 未单独映射的运行时异常统一兜底，内部细节不外泄

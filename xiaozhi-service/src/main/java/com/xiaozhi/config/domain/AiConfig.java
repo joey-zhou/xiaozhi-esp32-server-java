@@ -123,19 +123,6 @@ public class AiConfig {
 
     // ── 行为方法 ──────────────────────────────────────────────────────────────
 
-    /** 将此配置设为默认（Repository.save 负责清除同类其他默认标记）。 */
-    public void setAsDefault() {
-        if (!this.isDefault) {
-            this.isDefault = true;
-            signals.add(DomainSignal.DEFAULT_CHANGED);
-        }
-    }
-
-    /** 由 Repository 在 resetDefault 流程中调用，不产生信号。 */
-    public void clearDefault() {
-        this.isDefault = false;
-    }
-
     public void update(ConfigBO bo) {
         update(bo.getConfigName(), bo.getConfigDesc(), bo.getModelType(), bo.getProvider(),
                 bo.getAppId(), bo.getApiKey(), bo.getApiSecret(), bo.getAk(), bo.getSk(),

@@ -88,17 +88,6 @@ public class Role {
 
     // ===================== 行为方法 =====================
 
-    /** 将此角色设为默认角色（Repository 负责重置同用户其他角色） */
-    public void setAsDefault() {
-        this.isDefault = true;
-        signals.add(DomainSignal.UPDATED);
-    }
-
-    /** 清除默认标记 */
-    public void clearDefault() {
-        this.isDefault = false;
-    }
-
     /** 更新可编辑字段及配置值对象 */
     public void update(String roleName, String roleDesc, String avatar,
                        LlmConfig llmConfig, VoiceConfig voiceConfig,

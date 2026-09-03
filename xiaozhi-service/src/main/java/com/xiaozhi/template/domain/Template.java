@@ -79,17 +79,6 @@ public class Template {
 
     // ── 行为方法 ──────────────────────────────────────────────────────────────
 
-    public void setAsDefault() {
-        if (!this.isDefault) {
-            this.isDefault = true;
-            signals.add(DomainSignal.DEFAULT_CHANGED);
-        }
-    }
-
-    public void clearDefault() {
-        this.isDefault = false;
-    }
-
     public void update(TemplateBO bo) {
         update(bo.getTemplateName(), bo.getTemplateDesc(), bo.getTemplateContent(),
                 bo.getCategory(), bo.getIsDefault() == null ? null : "1".equals(bo.getIsDefault()));

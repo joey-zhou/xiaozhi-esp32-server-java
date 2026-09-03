@@ -11,6 +11,7 @@ import com.xiaozhi.common.exception.UsernameNotFoundException;
 import com.xiaozhi.common.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.util.StringUtils;
@@ -185,6 +186,13 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleRuntimeException(RuntimeException e, WebRequest request) {
         log.error("业务异常: {}", e.getMessage(), e);
         return ApiResponse.serverError("服务器错误，请联系管理员");
+    }
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ApiResponse<Void> handleDuplicateKey(DuplicateKeyException e, WebRequest request) {
+        log.error("唯一约束冲突: {}", e.getMessage(), e);
+        return ApiResponse.conflict("数据重复，操作未生效");
     }
 
     @ExceptionHandler(Exception.class)

@@ -12,6 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+/**
+ * Template 聚合根仓储实现。
+ * <p>
+ * delete 是软删且不清 isDefault，唯一索引 {@code sys_template.uk_template_default} 的键因此带 state。
+ */
 @Repository
 public class TemplateRepositoryImpl implements TemplateRepository {
 

@@ -22,6 +22,8 @@ import java.util.Optional;
  * AiConfig 聚合根仓储实现。
  * <p>
  * 维护"唯一默认"不变式：save 时若检测到 DEFAULT_CHANGED 信号，先批量清除同类其他默认，再保存。
+ * <p>
+ * 唯一索引 {@code sys_config.uk_config_default} 不含 userId，同类默认全局只允许一条。
  */
 @Repository
 public class ConfigRepositoryImpl implements ConfigRepository {
