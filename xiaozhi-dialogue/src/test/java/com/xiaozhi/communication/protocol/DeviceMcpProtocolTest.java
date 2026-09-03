@@ -11,6 +11,7 @@ import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.core.env.Environment;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -261,7 +262,69 @@ class DeviceMcpProtocolTest {
         assertThat(pending).isEmpty();
     }
 
+    /**
+     * isError 在 MCP 规范里是可选字段，缺省即成功。当成失败会让模型告诉用户指令没执行，
+     * 而设备其实已经执行了。
+     */
+    @Test
+    void resultWithoutIsErrorIsTreatedAsSuccess() {
+        FakeDevice device = harness.connect(DEVICE_ID);
+        ChatSession session = completeHandshake(device);
+
+        String output = callTool(device, session, "self_get_status",
+                "{\"content\":[{\"type\":\"text\",\"text\":\"当前音量 60\"}]}");
+
+        assertThat(output).contains("当前音量 60");
+        assertThat(output).doesNotContain("失败");
+    }
+
+    /**
+     * 工具执行失败的原因按规范放在 result.content，payload.error 只用于协议级错误。
+     * 只读 error 会把设备给出的真实原因丢掉，模型只能对用户说一句笼统的没做成。
+     */
+    @Test
+    void deviceFailureReasonInContentIsPassedToTheModel() {
+        FakeDevice device = harness.connect(DEVICE_ID);
+        ChatSession session = completeHandshake(device);
+
+        String output = callTool(device, session, "self_audio_speaker_set_volume",
+                "{\"content\":[{\"type\":\"text\",\"text\":\"音量超出范围\"}],\"isError\":true}");
+
+        assertThat(output).contains("音量超出范围");
+    }
+
     // ========== 驱动与读取辅助 ==========
+
+    /** 跑完 initialize → tools/list 握手，返回已注册好设备工具的会话 */
+    private ChatSession completeHandshake(FakeDevice device) {
+        device.hello(1, true, false);
+        ChatSession session = device.session();
+
+        JsonNode initialize = awaitMcpRequest(device, "initialize");
+        replyAfterRegistered(device, session, requestIdOf(initialize), INITIALIZE_RESULT);
+
+        JsonNode toolsList = awaitMcpRequest(device, "tools/list");
+        replyAfterRegistered(device, session, requestIdOf(toolsList), TOOLS_LIST_RESULT);
+
+        AwaitHelper.until("MCP 握手跑完，工具已注册",
+                () -> session.getToolsSessionHolder().getFunction("self_get_status") != null);
+        return session;
+    }
+
+    /** 调用已注册的设备工具，按 resultJson 回包，返回交给模型的那段文本 */
+    private String callTool(FakeDevice device, ChatSession session, String functionName, String resultJson) {
+        ToolCallback callback = session.getToolsSessionHolder().getFunction(functionName);
+        AtomicReference<String> output = new AtomicReference<>();
+        Thread.startVirtualThread(() -> output.set(callback.call("{}")));
+
+        AwaitHelper.until("工具调用已登记进 pending 表",
+                () -> !session.getDeviceMcpHolder().getMcpPendingRequests().isEmpty());
+        long id = session.getDeviceMcpHolder().getMcpPendingRequests().keySet().iterator().next();
+        device.mcpReply(id, resultJson);
+
+        AwaitHelper.until("工具调用已拿到结果", () -> output.get() != null);
+        return output.get();
+    }
 
     /** 等待某个 method 的 MCP 请求出站并返回整条报文 */
     private static JsonNode awaitMcpRequest(FakeDevice device, String method) {

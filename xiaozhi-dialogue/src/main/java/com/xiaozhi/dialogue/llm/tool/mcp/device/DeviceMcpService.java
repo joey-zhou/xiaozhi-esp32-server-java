@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -223,13 +224,10 @@ public class DeviceMcpService {
                         DeviceMcpMessage resp = callOutcome.response();
                         log.info("SessionId: {}, MCP function call response: {}", chatSession.getSessionId(), resp);
                         Map<String, Object> callResult = resp.getPayload().getResult();
-                        if (callResult == null) {
+                        if (callResult == null || isError(callResult)) {
                             return deviceErrorMessage(resp);
                         }
-                        if ("false".equals(String.valueOf(callResult.get("isError")))) {
-                            return callResult.get("content");
-                        }
-                        return deviceErrorMessage(resp);
+                        return callResult.get("content");
                     })
                     .toolMetadata(ToolMetadata.builder().returnDirect(false).build())
                     .description(funcDescription)
@@ -312,15 +310,48 @@ public class DeviceMcpService {
     }
 
     /**
+     * 工具是否执行失败。isError 是可选字段，缺省即成功，不能当成失败。
+     */
+    private static boolean isError(Map<String, Object> callResult) {
+        Object isError = callResult.get("isError");
+        return isError != null && Boolean.parseBoolean(String.valueOf(isError));
+    }
+
+    /**
      * 设备回报错误时给模型的说明，设备没给出具体原因时用兜底话术。
+     * <p>
+     * 工具执行失败的原因按 MCP 规范放在 result.content，payload.error 只用于协议级错误，两处都要看。
      */
     private static String deviceErrorMessage(DeviceMcpMessage response) {
-        Map<String, Object> error = response.getPayload().getError();
-        Object message = error == null ? null : error.get("message");
-        if (message != null && StringUtils.hasText(message.toString())) {
-            return "设备执行失败：" + message;
+        String reason = contentText(response.getPayload().getResult());
+        if (!StringUtils.hasText(reason)) {
+            Map<String, Object> error = response.getPayload().getError();
+            Object message = error == null ? null : error.get("message");
+            reason = message == null ? null : message.toString();
+        }
+        if (StringUtils.hasText(reason)) {
+            return "设备执行失败：" + reason;
         }
         return "设备执行失败，没有给出具体原因。请告诉用户这次没能完成";
+    }
+
+    /**
+     * 取 result.content 里的文本内容，content 是 {type,text} 的列表，多段用换行拼接。
+     */
+    private static String contentText(Map<String, Object> callResult) {
+        Object content = callResult == null ? null : callResult.get("content");
+        if (content == null) {
+            return null;
+        }
+        if (!(content instanceof List<?> items)) {
+            return content.toString();
+        }
+        return items.stream()
+                .map(item -> item instanceof Map<?, ?> map ? map.get("text") : item)
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.joining("\n"));
     }
 
     public DeviceMcpMessage sendMcpRequest(ChatSession chatSession, DeviceMcpMessage mcpMessage) {
