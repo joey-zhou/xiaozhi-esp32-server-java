@@ -22,6 +22,7 @@ import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpService;
 import com.xiaozhi.dialogue.playback.OpusRecorder;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.ScheduledPlayer;
+import com.xiaozhi.dialogue.runtime.GoodbyeMessageSupplier;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
@@ -77,6 +78,9 @@ class ProtocolTestHarness {
 
     private static final String INSTANCE_ID = "harness-instance";
 
+    /** 告别语固定，用例断言下发的就是它 */
+    static final String GOODBYE_TEXT = "好的，拜拜~有需要随时叫我哦！";
+
     // ===== 真实对象 =====
     private final SessionManager sessionManager = new SessionManager();
     private final MessageHandler messageHandler = new MessageHandler();
@@ -84,6 +88,12 @@ class ProtocolTestHarness {
     private final WebSocketHandler webSocketHandler = new WebSocketHandler();
     private final IntentService intentService = new IntentService();
     private final InstanceIdHolder instanceIdHolder = new InstanceIdHolder(INSTANCE_ID);
+    private final GoodbyeMessageSupplier goodbyeMessages = new GoodbyeMessageSupplier() {
+        @Override
+        public String get() {
+            return GOODBYE_TEXT;
+        }
+    };
     private final TestEventBus eventBus = new TestEventBus();
     private final MessageSender messageSender = new MessageSender(eventBus.publisher());
 
@@ -137,6 +147,7 @@ class ProtocolTestHarness {
                 "aecService", aecService,
                 "sessionManager", sessionManager,
                 "intentService", intentService,
+                "goodbyeMessages", goodbyeMessages,
                 "eventPublisher", eventBus.publisher(),
                 "storageServiceFactory", storageServiceFactory);
 

@@ -5,6 +5,7 @@ import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
+import com.xiaozhi.dialogue.runtime.TimeoutMessageSupplier;
 import com.xiaozhi.enums.DeviceState;
 
 import java.time.Duration;
@@ -32,6 +33,10 @@ public class InactiveSessionChecker {
 
     @Resource
     private DeviceRegistry deviceRegistry;
+
+    /** 超时退出没人说过话，话术不能用应答式的告别语 */
+    @Resource
+    private TimeoutMessageSupplier timeoutMessages;
 
     @PostConstruct
     public void init() {
@@ -98,7 +103,7 @@ public class InactiveSessionChecker {
         var persona = session.getPersona();
         if (persona != null && session.isAudioChannelOpen()) {
             try {
-                persona.sendGoodbyeMessage();
+                persona.sendFarewell(timeoutMessages.get());
                 return;
             } catch (Exception e) {
                 log.warn("会话 {} 发送超时提示失败，直接关闭会话", session.getSessionId(), e);

@@ -91,7 +91,6 @@ public class Persona {
      * 与LLM Provider通信的具体实现类
      */
     private ChatModel chatModel;
-    private GoodbyeMessageSupplier goodbyeMessages;
 
     @Getter
     private Synthesizer synthesizer;
@@ -524,11 +523,11 @@ public class Persona {
     }
 
     /**
-     * 发送告别语并在播放完成后关闭会话
-     *
-     * @return 是否成功发送告别语
+     * 播放一句退出话术，播放完成后关闭会话。
+     * 话术由调用方给定：用户主动告别用告别语，服务端超时退出用超时提示语——
+     * 超时时没人说过话，应答式的告别语（"好的""收到"）在那个语境下不成立。
      */
-    public void sendGoodbyeMessage() {
+    public void sendFarewell(String farewell) {
         ChatSession session = getSession();
         if (session == null || !session.isAudioChannelOpen()){
             return ;
@@ -547,16 +546,8 @@ public class Persona {
                 session.close();
             }
         });
-        if(goodbyeMessages!=null){
-            // 随机选择一条告别语
-            String goodbyeMessage = goodbyeMessages.get();
-
-            // 直接处理告别语，不通过LLM
-            synthesizer.synthesize(goodbyeMessage);
-        }else{
-            chat("我有事先忙了，再见！",false);
-        }
-
+        // 直接合成，不过 LLM
+        synthesizer.synthesize(farewell);
     }
 
     /**

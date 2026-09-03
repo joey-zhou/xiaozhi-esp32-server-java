@@ -12,7 +12,6 @@ import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.ScheduledPlayer;
 import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.dialogue.playback.SynthesizerFactory;
-import com.xiaozhi.dialogue.runtime.GoodbyeMessageSupplier;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.ai.stt.SttService;
@@ -63,8 +62,6 @@ public class PersonaFactory {
     @Resource
     private AecService aecService;
 
-    @Resource
-    private GoodbyeMessageSupplier goodbyeMessages;
     @Resource
     private DialogueListener dialogueListener;
     @Resource
@@ -129,7 +126,6 @@ public class PersonaFactory {
                 .player(session.getPlayer())
                 .toolCallbacks(toolCallbacks)
                 .listener(dialogueListener)
-                .goodbyeMessages(goodbyeMessages)
                 .build();
         session.setPersona(persona);
         return persona;

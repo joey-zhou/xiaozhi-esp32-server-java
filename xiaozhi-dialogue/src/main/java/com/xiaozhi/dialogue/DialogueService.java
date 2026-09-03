@@ -15,6 +15,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import com.xiaozhi.dialogue.audio.VadService.VadStatus;
 import com.xiaozhi.dialogue.audio.AecService;
 import com.xiaozhi.dialogue.playback.Player;
+import com.xiaozhi.dialogue.runtime.GoodbyeMessageSupplier;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.event.ChatAbortedEvent;
@@ -74,6 +75,9 @@ public class DialogueService{
 
     @Resource
     private IntentService intentService;
+
+    @Resource
+    private GoodbyeMessageSupplier goodbyeMessages;
 
     @Resource
     private ApplicationEventPublisher eventPublisher;
@@ -453,8 +457,8 @@ public class DialogueService{
     }
 
     /**
-     * 发送告别语并在播放完成后关闭会话
-     * 委托给Persona处理告别流程
+     * 用户主动告别（退出意图）时发送告别语，播放完成后关闭会话，委托给 Persona 处理。
+     * 空闲超时的主动退出不走这里，见 InactiveSessionChecker，那条路径用超时提示语。
      *
      * @param session WebSocket会话
      */
@@ -464,7 +468,7 @@ public class DialogueService{
         }
         Persona persona = session.getPersona();
         if (persona != null) {
-            persona.sendGoodbyeMessage();
+            persona.sendFarewell(goodbyeMessages.get());
         } else {
             session.close();
         }

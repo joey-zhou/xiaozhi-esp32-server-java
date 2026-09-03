@@ -2,6 +2,7 @@ package com.xiaozhi.communication.common;
 
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.dialogue.runtime.Persona;
+import com.xiaozhi.dialogue.runtime.TimeoutMessageSupplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,7 +20,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 空闲断连按每个会话自己的角色超时算：超时的先说再见、播完才关，
+ * 空闲断连按每个会话自己的角色超时算：超时的先播一句超时提示语、播完才关，
  * 超时配 0 表示永不断连。设备注册表的刷新与断连判定互不牵连。
  */
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +32,15 @@ class InactiveSessionCheckerTest {
     @Mock
     private DeviceRegistry deviceRegistry;
 
+    private static final String TIMEOUT_TEXT = "你有一会儿没说话了，我先去充电啦~";
+
+    private final TimeoutMessageSupplier timeoutMessages = new TimeoutMessageSupplier() {
+        @Override
+        public String get() {
+            return TIMEOUT_TEXT;
+        }
+    };
+
     private InactiveSessionChecker checker;
 
     @BeforeEach
@@ -38,6 +48,7 @@ class InactiveSessionCheckerTest {
         checker = new InactiveSessionChecker();
         ReflectionTestUtils.setField(checker, "sessionManager", sessionManager);
         ReflectionTestUtils.setField(checker, "deviceRegistry", deviceRegistry);
+        ReflectionTestUtils.setField(checker, "timeoutMessages", timeoutMessages);
     }
 
     @Test
@@ -65,8 +76,8 @@ class InactiveSessionCheckerTest {
     }
 
     @Test
-    void sendsGoodbyeOnlyOnceAndWaitsForPlaybackToClose() {
-        ChatSession session = inactiveSession("goodbye", 10, 20);
+    void sendsTimeoutMessageOnlyOnceAndWaitsForPlaybackToClose() {
+        ChatSession session = inactiveSession("timeout", 10, 20);
         Persona persona = mock(Persona.class);
         when(session.getPersona()).thenReturn(persona);
         when(session.tryBeginInactiveClose()).thenReturn(true, false);
@@ -75,7 +86,8 @@ class InactiveSessionCheckerTest {
         checker.checkInactiveSessions();
         checker.checkInactiveSessions();
 
-        verify(persona).sendGoodbyeMessage();
+        // 超时是服务端主动退出，没人说过再见，话术只能取自注入的超时提示语并原样下发
+        verify(persona).sendFarewell(TIMEOUT_TEXT);
         verify(sessionManager, never()).closeSession(session);
     }
 

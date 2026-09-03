@@ -8,7 +8,6 @@ import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.ScheduledPlayer;
 import com.xiaozhi.dialogue.playback.Synthesizer;
-import com.xiaozhi.dialogue.runtime.GoodbyeMessageSupplier;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.dialogue.runtime.PersonaListener;
 import com.xiaozhi.enums.DeviceState;
@@ -62,7 +61,6 @@ import static org.mockito.Mockito.when;
 class MultiTurnDialogueProtocolTest {
 
     private static final String DEVICE_ID = "94:a9:90:2b:dd:18";
-    private static final String GOODBYE_TEXT = "好的，拜拜~有需要随时叫我哦！";
     /** 一句话下发几帧假 opus，只影响播放时长，不参与断言 */
     private static final int FRAMES_PER_SENTENCE = 3;
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -161,7 +159,8 @@ class MultiTurnDialogueProtocolTest {
         device.listenStart(ListenMode.Auto);
         speakOneSegment();
 
-        assertThat(device.transport().awaitJson("tts:sentence_start").path("text").asText()).isEqualTo(GOODBYE_TEXT);
+        assertThat(device.transport().awaitJson("tts:sentence_start").path("text").asText())
+                .isEqualTo(ProtocolTestHarness.GOODBYE_TEXT);
         // 退出意图走关键词快路径，一个字都不进 LLM
         verify(chatModel, never()).stream(any(Prompt.class));
         assertThat(session.getPlayer().getFunctionAfterChat()).isNotNull();
@@ -369,18 +368,9 @@ class MultiTurnDialogueProtocolTest {
                 .synthesizer(synthesizer)
                 .player(player)
                 .conversation(conversation)
-                .goodbyeMessages(new FixedGoodbyeMessages())
                 .build();
         chatSession.setPersona(persona);
         return persona;
-    }
-
-    /** 告别语固定，便于断言下发的就是它 */
-    private static final class FixedGoodbyeMessages extends GoodbyeMessageSupplier {
-        @Override
-        public String get() {
-            return GOODBYE_TEXT;
-        }
     }
 
     /**

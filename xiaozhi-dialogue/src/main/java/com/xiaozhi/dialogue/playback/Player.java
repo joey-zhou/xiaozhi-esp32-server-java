@@ -34,10 +34,10 @@ import lombok.extern.slf4j.Slf4j;
  *
  * setCloseAfterChat，只来源于两处，
  * @see com.xiaozhi.dialogue.llm.tool.function.SessionExitFunction
- * @see Persona#sendGoodbyeMessage()
+ * @see Persona#sendFarewell(String)
  * 在SessionExitFunction工作时，这个工具是找不到Player的，即使在ChatSession里也可能是没有被初始化的Player实例的。
  * SessionExitFunction 正常返回一个GoodbyeMessage给到 DialogueService, 然后由DialogueService处理语音合成及播放。
- * sendGoodbyeMessage方法是被 checkInactiveSessions 所设用。
+ * sendFarewell 有两个调用方：用户说再见走 DialogueService 的告别语，空闲超时走 checkInactiveSessions 的超时提示语。
  *
  * @see com.xiaozhi.event.ChatAbortedEvent
  * 用户真正关心的是从说完话到开始播音的时间间隔。不是TTS的生成时间。所以Player需要有一个Instant。

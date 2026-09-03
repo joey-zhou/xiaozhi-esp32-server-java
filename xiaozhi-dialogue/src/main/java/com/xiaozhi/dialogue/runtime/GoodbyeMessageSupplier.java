@@ -8,16 +8,17 @@ import java.util.Random;
 import java.util.function.Supplier;
 
 /**
- * Goodbye时，是否需要一些上下文信息？
- * 例如：用户名、用户ID、用户IP、用户设备信息、用户地理位置、用户行为轨迹、用户历史对话记录。
+ * 用户明确告别（说了再见、拜拜等）时的应答式告别语。
+ * 硬约束：每条都以应答词开头，只在用户刚开口告别时成立；
+ * 服务端超时主动退出用 {@link TimeoutMessageSupplier}。
  */
 @Component
 public class GoodbyeMessageSupplier implements Supplier<String> {
 
     private static final Random random = new Random();
 
-    // 添加告别语列表
-    private static final List<String> goodbyeMessages = Arrays.asList(
+    // 告别语列表
+    static final List<String> GOODBYE_MESSAGES = Arrays.asList(
             "好的，拜拜~有需要随时叫我哦！",
             "好哒，那我先走啦，拜拜~",
             "收到！我先退下啦，有需要再叫我~",
@@ -31,6 +32,6 @@ public class GoodbyeMessageSupplier implements Supplier<String> {
 
     @Override
     public String get() {
-        return goodbyeMessages.get(random.nextInt(goodbyeMessages.size()));
+        return GOODBYE_MESSAGES.get(random.nextInt(GOODBYE_MESSAGES.size()));
     }
 }
