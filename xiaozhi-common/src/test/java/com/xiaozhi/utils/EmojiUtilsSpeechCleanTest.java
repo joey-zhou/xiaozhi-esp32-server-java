@@ -84,6 +84,15 @@ class EmojiUtilsSpeechCleanTest {
         assertThat(speech("[API] 接口说明")).isEqualTo("[API] 接口说明");
     }
 
+    // 情绪标签只认已知的那批。放宽成任意小写词的话，模型回答里的 [apple]、arr[index] 会被静默删掉，
+    // 而且清洗后的文本还会入库，脏文本进入模型自己的历史
+    @Test
+    void bracketedOrdinaryWordsAreNotTreatedAsEmotionTags() {
+        assertThat(speech("列表 [apple] 和 [banana] 都不错")).isEqualTo("列表 [apple] 和 [banana] 都不错");
+        assertThat(speech("请用 arr[index] 取值")).isEqualTo("请用 arr[index] 取值");
+        assertThat(speech("[here] 是说明")).isEqualTo("[here] 是说明");
+    }
+
     @Test
     void emojiStillExtractedAsMood() {
         List<String> moods = new ArrayList<>();

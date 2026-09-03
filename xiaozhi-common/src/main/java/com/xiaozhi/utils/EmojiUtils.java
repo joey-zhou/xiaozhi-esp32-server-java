@@ -53,9 +53,18 @@ public class EmojiUtils {
     // 括号整组去掉：舞台指示、颜文字、补充说明，只匹配已闭合且不嵌套的括号
     private static final Pattern PARENTHESES_PATTERN = Pattern.compile("[(（][^()（）]*[)）]");
 
-    // 方括号元数据标签：[yyyy-MM-ddT..]、[说话人:..]、[neutral]，情绪词只认小写字母
+    /**
+     * 情绪单词到表情符号的映射，同时是「已知情绪标签」的唯一来源：
+     * {@link #META_TAG_PATTERN} 只认这里的标签，不能放宽成任意小写词
+     */
+    private static final Map<String, String[]> EMOTION_TO_EMOJIS = emotionToEmojis();
+
+    // 方括号元数据标签：[yyyy-MM-ddT..]、[说话人:..]、[neutral]。
+    // 情绪标签只认 EMOTION_TO_EMOJIS 里那批：写成任意小写词的话，
+    // 模型回答里的 [apple]、arr[index] 也会被静默删掉，而且清洗后的文本还会入库进模型自己的历史
     private static final Pattern META_TAG_PATTERN = Pattern.compile(
-        "\\[(?:\\d{4}-\\d{2}-\\d{2}T[^\\]]{0,20}|说话人[:：][^\\]]{0,30}|[a-z]{2,12})\\]\\s*");
+        "\\[(?:\\d{4}-\\d{2}-\\d{2}T[^\\]]{0,20}|说话人[:：][^\\]]{0,30}|"
+            + String.join("|", EMOTION_TO_EMOJIS.keySet()) + ")\\]\\s*");
 
     // 颜文字模式 - 匹配常见的颜文字组合
     private static final Pattern KAOMOJI_PATTERN = Pattern.compile(
@@ -75,10 +84,7 @@ public class EmojiUtils {
         initEmojiToEmotionMap();
     }
 
-    /**
-     * 初始化表情符号到情绪的映射
-     */
-    private static void initEmojiToEmotionMap() {
+    private static Map<String, String[]> emotionToEmojis() {
         Map<String, String[]> emotionToEmojis = new HashMap<>();
         // 中立
         emotionToEmojis.put("neutral", new String[] { "😐", "😶" });
@@ -122,9 +128,15 @@ public class EmojiUtils {
         emotionToEmojis.put("silly", new String[] { "😛", "😜", "😝" });
         // 困惑
         emotionToEmojis.put("confused", new String[] { "😕", "🙄" });
+        return emotionToEmojis;
+    }
 
+    /**
+     * 初始化表情符号到情绪的映射
+     */
+    private static void initEmojiToEmotionMap() {
         // 填充表情符号到情绪单词的映射
-        for (Map.Entry<String, String[]> entry : emotionToEmojis.entrySet()) {
+        for (Map.Entry<String, String[]> entry : EMOTION_TO_EMOJIS.entrySet()) {
             String emotion = entry.getKey();
             for (String emoji : entry.getValue()) {
                 // 将表情符号的字符逐个映射到情绪单词
