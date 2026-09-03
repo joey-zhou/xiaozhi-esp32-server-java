@@ -271,11 +271,13 @@ public class DialogueService{
                 }
 
                 if (turnSink == null) {
+                    releaseDiscardedTurn(session, turnSink);
                     return;
                 }
 
                 Persona persona = session.getPersona();
                 if (persona == null || persona.getSttService() == null) {
+                    releaseDiscardedTurn(session, turnSink);
                     return;
                 }
 
@@ -295,14 +297,17 @@ public class DialogueService{
 
                 String text = sttResult != null ? sttResult.text() : null;
                 if (bargeIn.get() && !resolveBargeIn(session, persona, text)) {
+                    releaseDiscardedTurn(session, turnSink);
                     return;
                 }
                 if (!StringUtils.hasText(text)) {
+                    releaseDiscardedTurn(session, turnSink);
                     return;
                 }
                 // 播放刚结束时拾回的尾音也会被识别成一句话
                 if (isEcho(session, text)) {
                     log.info("识别到的是设备自己的回声，忽略 - SessionId: {}, text: {}", sessionId, text);
+                    releaseDiscardedTurn(session, turnSink);
                     return;
                 }
 
@@ -333,9 +338,30 @@ public class DialogueService{
                 if (player != null && player.isPaused()) {
                     player.resume();
                 }
+                releaseDiscardedTurn(session, turnSink);
             }
         });
     }
+
+    /**
+     * 本轮识别没有产出对话（空结果、回声、误打断、识别异常）时放开会话状态。
+     * 本轮识别流已经终结，不复位会一直停在 THINKING，不活跃检查跳过该会话，
+     * 超时告别与自动关闭对这条连接永久失效。
+     * 置 IDLE 而不是 LISTENING：服务端此刻既没有识别流也没有播放，
+     * 且 IDLE 能挡住随后才到达的收句（收句只在 LISTENING 时进 THINKING），
+     * 下一次 SPEECH_START 会重新建流并回到 LISTENING。
+     * 硬约束：音频流已被新一轮换掉、或状态已被播放接管（SPEAKING）时不得覆盖。
+     */
+    private static void releaseDiscardedTurn(ChatSession session, Sinks.Many<byte[]> turnSink) {
+        if (session.getAudioSinks() != turnSink) {
+            return;
+        }
+        DeviceState state = session.getDeviceState();
+        if (state == DeviceState.LISTENING || state == DeviceState.THINKING) {
+            session.transitionTo(DeviceState.IDLE);
+        }
+    }
+
 
     /**
      * 处理语音唤醒

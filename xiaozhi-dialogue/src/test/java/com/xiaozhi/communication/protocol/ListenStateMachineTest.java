@@ -108,6 +108,8 @@ class ListenStateMachineTest {
 
     @Test
     void manualStopWithSpeechCompletesSegmentWithoutClosingStream() {
+        // 终稿闸住，收句后的 THINKING 才是稳定可断言的状态
+        harness.stt().hangUntilReleased();
         FakeDevice device = harness.connect(DEVICE_ID);
         device.hello();
 
@@ -121,14 +123,20 @@ class ListenStateMachineTest {
 
         device.listenStop();
 
+        AwaitHelper.until("松手收句后进入 THINKING",
+                () -> device.session().getDeviceState() == DeviceState.THINKING);
         // 收句只 completeAudioStream：订阅者收到结束信号，但流引用必须还在，
         // 否则 STT 虚拟线程之后取不到本轮 pcm
-        AwaitHelper.until("本轮识别收到音频流结束信号", () -> harness.stt().completedStreams() == 1);
         assertThat(device.session().getAudioSinks()).isSameAs(turnSink);
         assertThat(harness.stt().receivedFrames()).hasSize(2);
-        assertThat(device.session().getDeviceState()).isEqualTo(DeviceState.THINKING);
         // 松手收句不重置 VAD 会话
         assertThat(harness.vad().isSessionInitialized(device.sessionId())).isTrue();
+
+        harness.stt().release();
+
+        // 终稿为空，本轮不成对话：状态必须放开，否则不活跃检查永远跳过这条会话
+        AwaitHelper.until("本轮识别已返回终稿", () -> harness.stt().completedStreams() == 1);
+        AwaitHelper.until("空终稿后状态已放开", () -> device.session().getDeviceState() == DeviceState.IDLE);
     }
 
     @Test

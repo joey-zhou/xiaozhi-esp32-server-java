@@ -199,6 +199,9 @@ class MultiTurnDialogueProtocolTest {
 
         assertThat(conversation.rawMessages()).isEmpty();
         assertThat(device.transport().jsonSignatures()).doesNotContain("stt", "tts:start");
+        // 空识别不能把会话钉死在 THINKING：钉住了 InactiveSessionChecker 就永远跳过它，空闲断连失效
+        AwaitHelper.until("空识别后会话状态已放开",
+                () -> session.getDeviceState() == DeviceState.IDLE);
 
         runTurn("现在几点了", "刚过八点。");
 
