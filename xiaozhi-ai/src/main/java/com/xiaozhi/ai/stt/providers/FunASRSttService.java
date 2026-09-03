@@ -82,7 +82,10 @@ public class FunASRSttService implements SttService {
         // 拼接所有2pass-offline离线修正结果
         StringBuilder offlineResult = new StringBuilder();
         AtomicReference<String> finalResult = new AtomicReference<>("");
+        // 识别失败原因短码，成功为 null
+        AtomicReference<String> failureReason = new AtomicReference<>();
         CountDownLatch recognitionLatch = new CountDownLatch(1);
+        boolean timedOut = false;
         
         // 订阅Sink并将数据放入队列
         audioSink.subscribe(
@@ -174,6 +177,7 @@ public class FunASRSttService implements SttService {
             @Override
             public void onError(Exception ex) {
                 log.error("FunASR WS错误", ex);
+                failureReason.set(SttResult.FAILURE_UPSTREAM_ERROR);
                 // 先设置已有的结果，再释放锁，避免主线程读到空结果
                 finalResult.set(offlineResult.toString());
                 recognitionLatch.countDown();
@@ -189,9 +193,11 @@ public class FunASRSttService implements SttService {
             
             if (!recognized) {
                 log.warn("FunASR识别超时");
+                timedOut = true;
             }
         } catch (Exception e) {
             log.error("FunASR识别过程中发生错误", e);
+            failureReason.set(SttResult.FAILURE_UPSTREAM_ERROR);
         } finally {
             // 关闭WebSocket连接
             if (webSocketClient.isOpen()) {
@@ -199,6 +205,8 @@ public class FunASRSttService implements SttService {
             }
         }
         
-        return SttResult.textOnly(finalResult.get());
+        // 等到超时且一个字都没识别出来时是失败，不能当成"用户没说话"
+        SttResult result = SttResult.textOnly(finalResult.get()).withFailure(failureReason.get());
+        return timedOut ? result.withFailureIfEmpty(SttResult.FAILURE_TIMEOUT) : result;
     }
 }

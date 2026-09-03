@@ -100,7 +100,7 @@ public class AliyunSttService implements SttService {
             }
         } catch (Exception e) {
             log.error("使用{}模型语音识别失败：", model, e);
-            return SttResult.textOnly("");
+            return SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR);
         }
     }
 
@@ -119,6 +119,8 @@ public class AliyunSttService implements SttService {
     private SttResult streamRecognitionParaformer(Flux<byte[]> audioSink, String modelName,
                                                   Consumer<String> onPartialText) {
         var recognizer = new Recognition();
+        // 识别失败原因短码，成功为 null
+        AtomicReference<String> failureReason = new AtomicReference<>();
 
         // 8k 模型（唯一支持情感识别）只接受 8000Hz，设备上行是 16kHz，需降采样后再送
         int modelSampleRate = requiredSampleRate(modelName);
@@ -162,6 +164,7 @@ public class AliyunSttService implements SttService {
                                 },
                                 error -> {
                                     log.error("流式识别过程中发生错误({})", modelName, error);
+                                    failureReason.set(SttResult.FAILURE_UPSTREAM_ERROR);
                                     // 使用complete而非error，保留已识别的部分结果
                                     sink.complete();
                                 },
@@ -178,7 +181,8 @@ public class AliyunSttService implements SttService {
             return recognition.reduce(new SttResultAccumulator(), SttResultAccumulator::add)
                     .blockOptional()
                     .map(SttResultAccumulator::toSttResult)
-                    .orElse(SttResult.textOnly(""));
+                    .orElse(SttResult.textOnly(""))
+                    .withFailure(failureReason.get());
         } finally {
             // 主动关闭WebSocket连接，避免连接进入"无引用状态"后等待61秒才释放
             try {
@@ -318,7 +322,7 @@ public class AliyunSttService implements SttService {
         }
 
         if (hasError.get()) {
-            return SttResult.textOnly("");
+            return SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR);
         }
 
         return SttResult.textOnly(result.toString());
@@ -409,7 +413,7 @@ public class AliyunSttService implements SttService {
             } catch (NoApiKeyException e) {
                 log.error("API Key 无效", e);
                 hasError.set(true);
-                return SttResult.textOnly("");
+                return SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR);
             }
             // 配置转录参数
             OmniRealtimeTranscriptionParam transcriptionParam = new OmniRealtimeTranscriptionParam();
@@ -479,7 +483,7 @@ public class AliyunSttService implements SttService {
         }
 
         if (hasError.get()) {
-            return SttResult.textOnly("");
+            return SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR);
         }
 
         return SttResult.textOnly(result.toString());

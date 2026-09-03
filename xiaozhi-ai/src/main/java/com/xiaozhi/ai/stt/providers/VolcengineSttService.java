@@ -189,6 +189,7 @@ public class VolcengineSttService implements SttService {
             @Override
             public void onFailure(WebSocket webSocket, Throwable t, Response response) {
                 log.error("火山引擎识别失败", t);
+                finalResult.updateAndGet(current -> current.withFailure(SttResult.FAILURE_UPSTREAM_ERROR));
                 if (latchReleased.compareAndSet(false, true)) {
                     recognitionLatch.countDown();
                 }
@@ -207,10 +208,12 @@ public class VolcengineSttService implements SttService {
             boolean recognized = recognitionLatch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             if (!recognized) {
                 log.warn("火山引擎识别超时 - ConnectId: {}", connectId);
+                finalResult.updateAndGet(current -> current.withFailureIfEmpty(SttResult.FAILURE_TIMEOUT));
             }
         } catch (InterruptedException e) {
             log.error("等待识别结果时被中断", e);
             Thread.currentThread().interrupt();
+            finalResult.updateAndGet(current -> current.withFailureIfEmpty(SttResult.FAILURE_LOCAL_ERROR));
         } finally {
             // 确保关闭 WebSocket 连接
             WebSocket ws = webSocketRef.get();
@@ -353,6 +356,7 @@ public class VolcengineSttService implements SttService {
                     log.error("火山引擎识别错误 - Code: {}, Message: {}", errorCode, errorMsg);
                 }
             }
+            finalResult.updateAndGet(current -> current.withFailure(SttResult.FAILURE_UPSTREAM_ERROR));
             if (latchReleased.compareAndSet(false, true)) {
                 latch.countDown();
             }

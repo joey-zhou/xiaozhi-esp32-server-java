@@ -95,7 +95,10 @@ public class TencentSttService implements SttService {
         BlockingQueue<byte[]> audioQueue = new LinkedBlockingQueue<>();
         AtomicBoolean isCompleted = new AtomicBoolean(false);
         AtomicReference<String> finalResult = new AtomicReference<>("");
+        // 识别失败原因短码，成功为 null
+        AtomicReference<String> failureReason = new AtomicReference<>();
         CountDownLatch recognitionLatch = new CountDownLatch(1);
+        boolean timedOut = false;
         
         // 订阅Sink并将数据放入队列
         audioSink.subscribe(
@@ -204,7 +207,8 @@ public class TencentSttService implements SttService {
                 public void onFail(SpeechRecognizerResponse response) {
                     log.error("识别失败 - VoiceId: {}, 错误: {}", voiceId,
                             response.getMessage() != null ? response.getMessage() : "未知错误");
-                    
+                    failureReason.set(SttResult.FAILURE_UPSTREAM_ERROR);
+
                     // 释放锁，表示识别失败
                     recognitionLatch.countDown();
                     
@@ -282,6 +286,9 @@ public class TencentSttService implements SttService {
             boolean recognized = recognitionLatch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             
             if (!recognized) {
+                // 等到超时且一个字都没识别出来时是失败，不能当成"用户没说话"
+                log.warn("腾讯云识别超时 - VoiceId: {}", voiceId);
+                timedOut = true;
                 // 超时后清理资源
                 if (activeRecognizers.containsKey(voiceId)) {
                     try {
@@ -303,9 +310,11 @@ public class TencentSttService implements SttService {
 
         } catch (Exception e) {
             log.error("创建语音识别会话时发生错误", e);
+            failureReason.set(SttResult.FAILURE_UPSTREAM_ERROR);
         }
-        
-        return SttResult.textOnly(finalResult.get());
+
+        SttResult result = SttResult.textOnly(finalResult.get()).withFailure(failureReason.get());
+        return timedOut ? result.withFailureIfEmpty(SttResult.FAILURE_TIMEOUT) : result;
     }
 
     // 在服务关闭时释放资源

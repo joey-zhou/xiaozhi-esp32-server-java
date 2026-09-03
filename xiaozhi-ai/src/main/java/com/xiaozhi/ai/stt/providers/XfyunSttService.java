@@ -164,7 +164,7 @@ public class XfyunSttService implements SttService {
             authUrl = getAuthUrl(secretId, secretKey);
         } catch (Exception e) {
             log.error("构建鉴权URL时发生错误！", e);
-            return SttResult.textOnly("");
+            return SttResult.failure(SttResult.FAILURE_LOCAL_ERROR);
         }
 
         String wsUrl = authUrl.replace("http://", "ws://")
@@ -175,6 +175,8 @@ public class XfyunSttService implements SttService {
         BlockingQueue<JsonObject> frameQueue = new LinkedBlockingQueue<>();
         AtomicBoolean isClosed = new AtomicBoolean(false);
         AtomicBoolean latchReleased = new AtomicBoolean(false);
+        // 识别失败原因短码，成功为 null
+        AtomicReference<String> failureReason = new AtomicReference<>();
         CountDownLatch recognitionLatch = new CountDownLatch(1);
         List<Text> resultSegments = new ArrayList<>();
 
@@ -224,6 +226,9 @@ public class XfyunSttService implements SttService {
                 if (response.getCode() != 0) {
                     log.warn("code:{}, error:{}, sid:{}",
                             response.getCode(), response.getMessage(), response.getSid());
+                    // 服务端返回非 0 码即本次会话终止，必须就地收尾，否则只能等识别超时兜底
+                    failAndRelease(failureReason, SttResult.FAILURE_UPSTREAM_ERROR, latchReleased, recognitionLatch);
+                    wsClose(webSocketRef, isClosed);
                     return;
                 }
 
@@ -249,9 +254,7 @@ public class XfyunSttService implements SttService {
                 wsClose(webSocketRef, isClosed); // 显式关闭
                 isClosed.set(true);
                 webSocketRef.set(null);
-                if (latchReleased.compareAndSet(false, true)) {
-                    recognitionLatch.countDown();
-                }
+                failAndRelease(failureReason, SttResult.FAILURE_UPSTREAM_ERROR, latchReleased, recognitionLatch);
             }
 
             @Override
@@ -294,12 +297,27 @@ public class XfyunSttService implements SttService {
                 }
                 wsClose(webSocketRef, isClosed);
             }
-            return SttResult.textOnly(finalText);
+            // 等到超时且一个字都没识别出来时是失败，不能当成"用户没说话"
+            SttResult result = SttResult.textOnly(finalText).withFailure(failureReason.get());
+            return recognized ? result : result.withFailureIfEmpty(SttResult.FAILURE_TIMEOUT);
         } catch (Exception e) {
             log.error("创建语音识别会话时发生错误", e);
             wsClose(webSocketRef, isClosed);
             // 主动关闭会话
-            return SttResult.textOnly(getFinalResult(resultSegments));
+            return SttResult.textOnly(getFinalResult(resultSegments))
+                    .withFailure(failureReason.get())
+                    .withFailureIfEmpty(SttResult.FAILURE_LOCAL_ERROR);
+        }
+    }
+
+    /**
+     * 记录失败原因并释放识别等待，重复调用只释放一次。
+     */
+    static void failAndRelease(AtomicReference<String> failureReason, String reason,
+                               AtomicBoolean latchReleased, CountDownLatch latch) {
+        failureReason.set(reason);
+        if (latchReleased.compareAndSet(false, true)) {
+            latch.countDown();
         }
     }
 

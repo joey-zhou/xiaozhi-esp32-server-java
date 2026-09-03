@@ -23,6 +23,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import lombok.extern.slf4j.Slf4j;
@@ -155,6 +156,8 @@ public class VoskSttService implements SttService {
         AtomicBoolean isCompleted = new AtomicBoolean(false);
         List<String> recognizedText = new ArrayList<>();
         StringBuilder finalResult = new StringBuilder();
+        // 识别失败原因短码，成功为 null
+        AtomicReference<String> failureReason = new AtomicReference<>();
 
         // 订阅Sink并将数据放入队列
         audioSink.subscribe(
@@ -237,6 +240,7 @@ public class VoskSttService implements SttService {
 
             } catch (Exception e) {
                 log.error("Vosk流式识别过程中发生错误", e);
+                failureReason.set(SttResult.FAILURE_LOCAL_ERROR);
             }
         });
 
@@ -248,9 +252,10 @@ public class VoskSttService implements SttService {
             future.cancel(true);
         } catch (Exception e) {
             log.error("Vosk识别任务执行失败", e);
+            failureReason.set(SttResult.FAILURE_LOCAL_ERROR);
             future.cancel(true);
         }
 
-        return SttResult.textOnly(finalResult.toString());
+        return SttResult.textOnly(finalResult.toString()).withFailure(failureReason.get());
     }
 }

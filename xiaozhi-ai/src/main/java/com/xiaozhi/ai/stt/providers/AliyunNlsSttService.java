@@ -275,13 +275,13 @@ public class AliyunNlsSttService implements SttService {
             // 等待识别完成或超时
             if (!latch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
                 log.error("NLS实时识别超时");
-                return SttResult.textOnly("");
+                return SttResult.failure(SttResult.FAILURE_TIMEOUT);
             }
 
             // 检查识别是否失败
             if (recognitionFailed.get() || errorHolder[0].get()) {
                 log.error("识别过程中发生错误");
-                return SttResult.textOnly("");
+                return SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR);
             }
 
             // 返回识别结果
@@ -296,7 +296,7 @@ public class AliyunNlsSttService implements SttService {
             log.error("阿里云NLS实时识别失败", e);
             // 连接异常时清除缓存，下次调用时重建client
             globalClientCache.remove(config.getConfigId());
-            return SttResult.textOnly("");
+            return SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR);
         } finally {
             // 只关闭transcriber，client由缓存统一管理复用，不在此处shutdown
             if (transcriber != null) {
