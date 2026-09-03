@@ -7,7 +7,9 @@ import com.xiaozhi.event.ToolCallCompletedEvent;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.model.ToolContext;
@@ -43,6 +45,11 @@ import lombok.extern.slf4j.Slf4j;
  * 包含对流式工具调用分片合并的修复（Spring AI issue #4629, #4790）。
  * 该问题在 Spring AI 1.1.4 中仍未修复，mergeToolCalls 方法作为必要的修复保留。
  * <p>
+ * 同时承担工具调用的递归深度护栏：ChatModel 的 tool loop 是无上限自递归，
+ * 本类是 OpenAI / Ollama / 智谱三条 provider 的公共挂载点。
+ * 边界：{@code XingHuoChatModel} 与 {@code XingChenChatModel} 用的是 Spring AI 默认
+ * ToolCallingManager，不经过本护栏，但它们执行完工具直接返回、不递归，不会无界循环。
+ * <p>
  * TODO: [Spring AI 升级追踪] 持续关注后续版本是否修复分片问题，届时可移除 mergeToolCalls 方法。
  */
 @Slf4j
@@ -65,6 +72,15 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
             = DefaultToolExecutionExceptionProcessor.builder().build();
 
     // @formatter:on
+
+    /** 单轮对话内工具调用的递归层数上限，达到后不再向模型提供工具 */
+    private static final int MAX_TOOL_CALL_DEPTH = 5;
+
+    /** 达到递归上限时追加到对话历史末尾的收尾指令 */
+    static final String TOOL_DEPTH_LIMIT_INSTRUCTION =
+            "工具调用已达本轮上限，不要再调用任何工具。请根据已有的工具结果直接用自然语言回答用户；"
+                    + "信息不足就如实告诉用户当前无法完成，并给出下一步建议。";
+
     private final ObservationRegistry observationRegistry;
 
     private final ToolCallbackResolver toolCallbackResolver;
@@ -198,10 +214,47 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         List<Message> conversationHistory = buildPostToolHistory(prompt.getInstructions(),
                 assistantMessage, toolExecResult.toolResponseMessage());
 
+        // returnDirect 的结果直接返回给用户、不再回模型，护栏无从生效，且末尾必须留着工具结果消息
+        if (!toolExecResult.returnDirect() && toolCallDepth(prompt.getInstructions()) >= MAX_TOOL_CALL_DEPTH) {
+            log.warn("工具调用递归已达上限 {} 层，本轮不再提供工具", MAX_TOOL_CALL_DEPTH);
+            disableFurtherToolCalls(prompt);
+            conversationHistory.add(new SystemMessage(TOOL_DEPTH_LIMIT_INSTRUCTION));
+        }
+
         return ToolExecutionResult.builder()
                 .conversationHistory(conversationHistory)
                 .returnDirect(toolExecResult.returnDirect())
                 .build();
+    }
+
+    /**
+     * 本轮已递归的层数：最后一条 UserMessage 之后的 ToolResponseMessage 条数。
+     * ChatModel 每递归一层就往对话历史追加一条工具结果消息；更早轮次的工具链在上一条
+     * UserMessage 之前，不计入本轮。RAG 注入的伪造工具链在用户消息之后，会占用一层额度。
+     */
+    private static int toolCallDepth(List<Message> messages) {
+        int depth = 0;
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            Message message = messages.get(i);
+            if (message instanceof UserMessage) {
+                break;
+            }
+            if (message instanceof ToolResponseMessage) {
+                depth++;
+            }
+        }
+        return depth;
+    }
+
+    /**
+     * 清空本次请求可用的工具。ChatModel 每轮都从 options 重新解析工具定义，清空后下一轮即无工具可调；
+     * options 由 Persona 每轮对话新建，清空不会跨会话残留。
+     */
+    private static void disableFurtherToolCalls(Prompt prompt) {
+        if (prompt.getOptions() instanceof ToolCallingChatOptions toolCallingChatOptions) {
+            toolCallingChatOptions.setToolCallbacks(List.of());
+            toolCallingChatOptions.setToolNames(Set.of());
+        }
     }
 
     private static ToolContext buildToolContext(Prompt prompt, AssistantMessage assistantMessage) {
