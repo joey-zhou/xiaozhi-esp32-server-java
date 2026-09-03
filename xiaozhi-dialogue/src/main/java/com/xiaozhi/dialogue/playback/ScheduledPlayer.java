@@ -99,6 +99,11 @@ public class ScheduledPlayer extends Player {
     // subscribe() 捕获当轮代次，回调入队前校验代次未变，变了则丢弃残帧。
     private final AtomicInteger generation = new AtomicInteger(0);
 
+    // 编码与入队的互斥锁。stop() 递增代次、清队列、丢弃编码器残留样本这一串动作，
+    // 必须与订阅回调里的"代次校验 → 编码 → 入队"整体互斥：只校验代次挡不住已经进入回调体的慢帧，
+    // 它们会在清空之后把残帧和残留样本写回去，上一句尾音仍会拼进下一轮首帧。
+    private final Object encodeLock = new Object();
+
     public ScheduledPlayer(ChatSession session, MessageSender messageService) {
         super(session, messageService);
     }
@@ -151,68 +156,70 @@ public class ScheduledPlayer extends Player {
         Disposable disposable = speechFlux.subscribeOn(Schedulers.boundedElastic())
                 .subscribe(
                     speech -> {
-                        // 代次已变（本轮已被 stop 打断）：丢弃残帧，不再入队
-                        if (myGeneration != generation.get()) {
-                            return;
-                        }
-                        // 更新活跃时间
-                        session.setLastActivityTime(Instant.now());
+                        synchronized (encodeLock) {
+                            // 代次已变（本轮已被 stop 打断）：丢弃残帧，不再入队
+                            if (myGeneration != generation.get()) {
+                                return;
+                            }
+                            // 更新活跃时间
+                            session.setLastActivityTime(Instant.now());
 
-                        // 预编码的 Opus 帧（来自缓存直读），直接入队无需转换
-                        if (speech.isOpusEncoded()) {
-                            allOpusFrames.add(new Frame(speech, reply));
-                            return;
-                        }
+                            // 预编码的 Opus 帧（来自缓存直读），直接入队无需转换
+                            if (speech.isOpusEncoded()) {
+                                allOpusFrames.add(new Frame(speech, reply));
+                                return;
+                            }
 
-                        // 将PCM数据转换为Opus格式
-                        byte[] pcmData = speech.getOutput();
-                        String text = speech.getText();
+                            // 将PCM数据转换为Opus格式
+                            byte[] pcmData = speech.getOutput();
+                            String text = speech.getText();
 
-                        // 句子边界对齐：带文本表示新句开始。先把上一句残留在编码器里的
-                        // 不足一帧的 PCM flush 成独立帧，避免上一句尾音与本句首帧 PCM 拼接，
-                        // 导致本句文本被绑定到混有上一句尾音的帧上（字幕相对音频提前、末句字幕丢失）。
-                        if (StringUtils.hasText(text)) {
-                            List<byte[]> tailFrames = opusProcessor.flushLeftover();
-                            if (!CollectionUtils.isEmpty(tailFrames)) {
-                                // 上一句的收尾帧不带文本，归属上一句
-                                String carriedText = pendingText.getAndSet(null);
-                                List<Speech> tailList = tailFrames.stream()
+                            // 句子边界对齐：带文本表示新句开始。先把上一句残留在编码器里的
+                            // 不足一帧的 PCM flush 成独立帧，避免上一句尾音与本句首帧 PCM 拼接，
+                            // 导致本句文本被绑定到混有上一句尾音的帧上（字幕相对音频提前、末句字幕丢失）。
+                            if (StringUtils.hasText(text)) {
+                                List<byte[]> tailFrames = opusProcessor.flushLeftover();
+                                if (!CollectionUtils.isEmpty(tailFrames)) {
+                                    // 上一句的收尾帧不带文本，归属上一句
+                                    String carriedText = pendingText.getAndSet(null);
+                                    List<Speech> tailList = tailFrames.stream()
+                                            .map(Speech::new)
+                                            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+                                    // 若上一句因首帧 PCM 过小而暂存了文本却一直没凑够帧，
+                                    // 此刻补绑到其收尾帧，避免上一句字幕彻底丢失
+                                    if (StringUtils.hasText(carriedText)) {
+                                        Speech firstTail = tailList.remove(0);
+                                        tailList.add(0, new Speech(firstTail.getOutput(), carriedText));
+                                    }
+                                    allOpusFrames.addAll(frames(tailList, reply));
+                                }
+                            }
+
+                            // 当前帧无文本，尝试取上次因PCM不足一帧而未能附加的文本
+                            if (!StringUtils.hasText(text)) {
+                                text = pendingText.getAndSet(null);
+                            }
+
+                            List<byte[]> opusFrames = opusProcessor.pcmToOpus(pcmData, true);
+
+                            if (!CollectionUtils.isEmpty(opusFrames)) {
+                                // 创建Speech列表，第一帧附带文本
+                                List<Speech> speechList = opusFrames.stream()
                                         .map(Speech::new)
                                         .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-                                // 若上一句因首帧 PCM 过小而暂存了文本却一直没凑够帧，
-                                // 此刻补绑到其收尾帧，避免上一句字幕彻底丢失
-                                if (StringUtils.hasText(carriedText)) {
-                                    Speech firstTail = tailList.remove(0);
-                                    tailList.add(0, new Speech(firstTail.getOutput(), carriedText));
+
+                                if (StringUtils.hasText(text)) {
+                                    // 将第一帧替换为带文本的Speech
+                                    Speech firstSpeech = speechList.remove(0);
+                                    speechList.add(0, new Speech(firstSpeech.getOutput(), text));
+                                    pendingText.set(null);
                                 }
-                                allOpusFrames.addAll(frames(tailList, reply));
+
+                                allOpusFrames.addAll(frames(speechList, reply));
+                            } else if (StringUtils.hasText(text)) {
+                                // PCM不足一个Opus帧（已进入编码器内部缓冲），暂存文本等待下一帧
+                                pendingText.set(text);
                             }
-                        }
-
-                        // 当前帧无文本，尝试取上次因PCM不足一帧而未能附加的文本
-                        if (!StringUtils.hasText(text)) {
-                            text = pendingText.getAndSet(null);
-                        }
-
-                        List<byte[]> opusFrames = opusProcessor.pcmToOpus(pcmData, true);
-
-                        if (!CollectionUtils.isEmpty(opusFrames)) {
-                            // 创建Speech列表，第一帧附带文本
-                            List<Speech> speechList = opusFrames.stream()
-                                    .map(Speech::new)
-                                    .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-
-                            if (StringUtils.hasText(text)) {
-                                // 将第一帧替换为带文本的Speech
-                                Speech firstSpeech = speechList.remove(0);
-                                speechList.add(0, new Speech(firstSpeech.getOutput(), text));
-                                pendingText.set(null);
-                            }
-
-                            allOpusFrames.addAll(frames(speechList, reply));
-                        } else if (StringUtils.hasText(text)) {
-                            // PCM不足一个Opus帧（已进入编码器内部缓冲），暂存文本等待下一帧
-                            pendingText.set(text);
                         }
                     },
                     throwable -> {
@@ -225,29 +232,31 @@ public class ScheduledPlayer extends Player {
                         subscribeNext();
                     },
                     () -> {
-                        // 代次已变（本轮已被 stop 打断）：丢弃收尾数据，也不订阅下一个 Flux
-                        if (myGeneration != generation.get()) {
-                            return;
-                        }
-                        // 当前Flux完成，flush剩余数据
-                        List<byte[]> opusFrames = opusProcessor.flushLeftover();
-                        if (!CollectionUtils.isEmpty(opusFrames)) {
-                            List<Speech> speechList = opusFrames.stream()
-                                    .map(Speech::new)
-                                    .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+                        synchronized (encodeLock) {
+                            // 代次已变（本轮已被 stop 打断）：丢弃收尾数据，也不订阅下一个 Flux
+                            if (myGeneration != generation.get()) {
+                                return;
+                            }
+                            // 当前Flux完成，flush剩余数据
+                            List<byte[]> opusFrames = opusProcessor.flushLeftover();
+                            if (!CollectionUtils.isEmpty(opusFrames)) {
+                                List<Speech> speechList = opusFrames.stream()
+                                        .map(Speech::new)
+                                        .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
 
-                            // 若有暂存文本（最后一句的第一帧太小），附加到flush出来的第一帧
-                            String pt = pendingText.getAndSet(null);
-                            if (pt != null) {
-                                Speech firstSpeech = speechList.remove(0);
-                                speechList.add(0, new Speech(firstSpeech.getOutput(), pt));
+                                // 若有暂存文本（最后一句的第一帧太小），附加到flush出来的第一帧
+                                String pt = pendingText.getAndSet(null);
+                                if (pt != null) {
+                                    Speech firstSpeech = speechList.remove(0);
+                                    speechList.add(0, new Speech(firstSpeech.getOutput(), pt));
+                                }
+
+                                allOpusFrames.addAll(frames(speechList, reply));
                             }
 
-                            allOpusFrames.addAll(frames(speechList, reply));
+                            // 添加句子间隔标记，避免句子粘连
+                            allOpusFrames.add(SENTENCE_GAP_MARKER);
                         }
-
-                        // 添加句子间隔标记，避免句子粘连
-                        allOpusFrames.add(SENTENCE_GAP_MARKER);
 
                         // 尝试订阅下一个Flux
                         subscribeNext();
@@ -576,37 +585,40 @@ public class ScheduledPlayer extends Player {
         super.stop();
         running = false;
 
-        // 先递增代次：让此前订阅的 Flux 回调（可能仍在 TTS 回调线程上飞）立即失效，
-        // 之后它们的 add/addAll 会被 subscribe() 内的代次校验拦截，不会再污染队列。
-        // 必须在 clear() 之前递增，否则存在"clear 完成→慢回调 add 残帧→新一轮开始"的窗口。
-        generation.incrementAndGet();
+        // 整段与订阅回调互斥：先等在飞的回调跑完，再递增代次、清队列、丢残留样本。
+        // dispose() 不会等待正在执行的 onNext，只靠代次校验挡不住已经进入回调体的那一帧。
+        synchronized (encodeLock) {
+            // 先递增代次：让此前订阅的 Flux 回调（可能仍在 TTS 回调线程上飞）立即失效，
+            // 之后它们的 add/addAll 会被 subscribe() 内的代次校验拦截，不会再污染队列。
+            generation.incrementAndGet();
 
-        // 中断发送线程
-        if (senderThread != null) {
-            senderThread.interrupt();
-        }
+            // 中断发送线程
+            if (senderThread != null) {
+                senderThread.interrupt();
+            }
 
-        // 解除暂停并清空队列。与发送线程退帧回队头互斥
-        synchronized (pauseLock) {
-            paused = false;
-            gapFramesRemaining = 0;
-            fluxQueue.clear();
-            allOpusFrames.clear();
-            pauseLock.notifyAll();
-        }
+            // 解除暂停并清空队列。与发送线程退帧回队头互斥
+            synchronized (pauseLock) {
+                paused = false;
+                gapFramesRemaining = 0;
+                fluxQueue.clear();
+                allOpusFrames.clear();
+                pauseLock.notifyAll();
+            }
 
-        // 取消Flux订阅
-        Disposable disposable = fluxDisposable.getAndSet(null);
-        if (disposable != null && !disposable.isDisposed()) {
-            disposable.dispose();
+            // 取消Flux订阅
+            Disposable disposable = fluxDisposable.getAndSet(null);
+            if (disposable != null && !disposable.isDisposed()) {
+                disposable.dispose();
+            }
+
+            // 丢弃本轮未成帧的残留样本，不能拼进下一轮首帧
+            opusProcessor.discardLeftover();
         }
 
         // 重置Burst模式状态
         startTimestamp = 0;
         playPosition = BURST_PREBUFFER_NS;
-
-        // 丢弃本轮未成帧的残留样本，不能拼进下一轮首帧
-        opusProcessor.discardLeftover();
 
         // 中断时主动关闭文件，避免产生损坏的 Opus 文件
         if (getOpusRecorder() != null) {
