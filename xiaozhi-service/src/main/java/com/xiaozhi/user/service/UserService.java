@@ -2,14 +2,14 @@ package com.xiaozhi.user.service;
 
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.PageResult;
-import com.xiaozhi.common.model.resp.UserResp;
+import com.xiaozhi.user.model.UserProjection;
 
 public interface UserService {
 
     String CACHE_NAME = "XiaoZhi:User";
 
-    PageResult<UserResp> page(int pageNo, int pageSize, String name, String email,
-                            String tel, String isAdmin, Integer authRoleId);
+    PageResult<UserProjection> page(int pageNo, int pageSize, String name, String email,
+                                    String tel, String isAdmin, Integer authRoleId);
 
     UserBO getBO(Integer userId);
 

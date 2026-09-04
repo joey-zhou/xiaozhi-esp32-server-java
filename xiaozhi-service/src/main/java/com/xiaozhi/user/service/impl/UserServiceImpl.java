@@ -6,10 +6,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.PageResult;
-import com.xiaozhi.common.model.resp.UserResp;
 import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.dal.mysql.dataobject.UserDO;
 import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
+import com.xiaozhi.user.model.UserProjection;
 import com.xiaozhi.user.service.UserService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.annotation.CacheEvict;
@@ -32,10 +32,10 @@ public class UserServiceImpl implements UserService {
     private UserConvert userConvert;
 
     @Override
-    public PageResult<UserResp> page(int pageNo, int pageSize, String name, String email,
-                                   String tel, String isAdmin, Integer authRoleId) {
-        Page<UserResp> page = new Page<>(pageNo, pageSize);
-        IPage<UserResp> result = userMapper.selectPageResp(page, name, email, tel, isAdmin, authRoleId);
+    public PageResult<UserProjection> page(int pageNo, int pageSize, String name, String email,
+                                           String tel, String isAdmin, Integer authRoleId) {
+        Page<UserProjection> page = new Page<>(pageNo, pageSize);
+        IPage<UserProjection> result = userMapper.selectPage(page, name, email, tel, isAdmin, authRoleId);
         return new PageResult<>(
             result.getRecords(),
             result.getTotal(),

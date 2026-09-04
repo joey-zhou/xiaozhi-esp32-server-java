@@ -5,6 +5,7 @@ import com.xiaozhi.common.model.req.UserRegisterReq;
 import com.xiaozhi.common.model.req.UserUpdateReq;
 import com.xiaozhi.common.model.resp.UserResp;
 import com.xiaozhi.user.dal.mysql.dataobject.UserDO;
+import com.xiaozhi.user.model.UserProjection;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -16,29 +17,18 @@ public interface UserConvert {
 
     UserBO toBO(UserDO userDO);
 
-    UserResp toResp(UserDO userDO);
+    UserResp toResp(UserProjection projection);
 
+    @Mapping(target = "authRoleName", ignore = true)
+    @Mapping(target = "totalMessage", ignore = true)
+    @Mapping(target = "totalDevice", ignore = true)
+    @Mapping(target = "aliveNumber", ignore = true)
     UserResp toResp(UserBO userBO);
 
     @Mapping(target = "userId", ignore = true)
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
     UserDO toDO(UserBO userBO);
-
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "userId", ignore = true)
-    @Mapping(target = "username", ignore = true)
-    @Mapping(target = "password", ignore = true)
-    @Mapping(target = "authRoleId", ignore = true)
-    @Mapping(target = "isAdmin", ignore = true)
-    @Mapping(target = "state", ignore = true)
-    @Mapping(target = "wxOpenId", ignore = true)
-    @Mapping(target = "wxUnionId", ignore = true)
-    @Mapping(target = "loginIp", ignore = true)
-    @Mapping(target = "loginTime", ignore = true)
-    @Mapping(target = "createTime", ignore = true)
-    @Mapping(target = "updateTime", ignore = true)
-    void updateDO(UserUpdateReq req, @MappingTarget UserDO userDO);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "userId", ignore = true)

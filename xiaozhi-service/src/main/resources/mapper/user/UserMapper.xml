@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xiaozhi.user.dal.mysql.mapper.UserMapper">
 
-    <select id="selectPageResp" resultType="com.xiaozhi.common.model.resp.UserResp">
+    <select id="selectPage" resultType="com.xiaozhi.user.model.UserProjection">
         SELECT
             u.userId,
             u.username,

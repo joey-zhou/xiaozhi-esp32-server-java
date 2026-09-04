@@ -1,11 +1,14 @@
 package com.xiaozhi.user.service.impl;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.support.MybatisPlusTestHelper;
 import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.dal.mysql.dataobject.UserDO;
 import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
+import com.xiaozhi.user.model.UserProjection;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,9 +16,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,6 +47,27 @@ class UserServiceImplTest {
 
     @InjectMocks
     private UserServiceImpl userService;
+
+    @Test
+    void pageReturnsProjectionRecordsUntouched() {
+        UserProjection projection = new UserProjection();
+        projection.setUserId(10);
+        projection.setTel("138****1234");
+
+        Page<UserProjection> page = new Page<>(2, 5);
+        page.setRecords(List.of(projection));
+        page.setTotal(8);
+
+        when(userMapper.selectPage(any(Page.class), eq("ali"), isNull(), isNull(), isNull(), eq(2)))
+            .thenReturn(page);
+
+        PageResult<UserProjection> result = userService.page(2, 5, "ali", null, null, null, 2);
+
+        assertThat(result.getList()).containsExactly(projection);
+        assertThat(result.getTotal()).isEqualTo(8);
+        assertThat(result.getPageNo()).isEqualTo(2);
+        assertThat(result.getPageSize()).isEqualTo(5);
+    }
 
     @Test
     void createPersistsUserAndReturnsBO() {

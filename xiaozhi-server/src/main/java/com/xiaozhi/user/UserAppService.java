@@ -46,7 +46,6 @@ import java.util.List;
 @Service
 public class UserAppService {
 
-    private static final Integer DEFAULT_AUTH_ROLE_ID = 2;
     private static final Integer ADMIN_TEMPLATE_OWNER_ID = 1;
     private static final int TOKEN_EXPIRE_SECONDS = 2592000;
 
@@ -88,7 +87,8 @@ public class UserAppService {
     public PageResult<UserResp> page(UserPageReq req) {
         UserPageReq r = req == null ? new UserPageReq() : req;
         return userService.page(r.getPageNo(), r.getPageSize(),
-            r.getName(), r.getEmail(), r.getTel(), r.getIsAdmin(), r.getAuthRoleId());
+                r.getName(), r.getEmail(), r.getTel(), r.getIsAdmin(), r.getAuthRoleId())
+            .map(userConvert::toResp);
     }
 
     public UserResp get(Integer userId) {
