@@ -139,6 +139,16 @@ class ModuleBoundaryArchTest {
     }
 
     @Test
+    void serverModuleDoesNotDependOnDal() {
+        ArchRule rule = noClasses()
+            .should().dependOnClassesThat()
+            .resideInAPackage("..dal..")
+            .because("Mapper 与 DO 只归 service 模块用；server 层拿到它们就绕开了 Service 与 Convert，表结构直接泄到 web 层");
+
+        rule.check(serverClasses);
+    }
+
+    @Test
     void onlyWhitelistedPackagesHaveDomainLayer() {
         ArchRule rule = classes()
             .that().resideInAnyPackage("com.xiaozhi..domain..", "com.xiaozhi..infrastructure..")
