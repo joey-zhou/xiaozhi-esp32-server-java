@@ -87,7 +87,7 @@ public class UserAppService {
     public PageResult<UserResp> page(UserPageReq req) {
         UserPageReq r = req == null ? new UserPageReq() : req;
         return userService.page(r.getPageNo(), r.getPageSize(),
-                r.getName(), r.getEmail(), r.getTel(), r.getIsAdmin(), r.getAuthRoleId())
+            r.getName(), r.getEmail(), r.getTel(), r.getIsAdmin(), r.getAuthRoleId())
             .map(userConvert::toResp);
     }
 

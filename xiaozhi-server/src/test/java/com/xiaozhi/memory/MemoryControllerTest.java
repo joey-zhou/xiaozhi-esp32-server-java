@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 转换器用 MapStruct 生成的真实实现，只 mock Service，BO→Resp 的改名映射漏字段会让用例变红。 */
+/** 转换器用 MapStruct 生成的真实实现，只 mock Service。 */
 @ExtendWith(MockitoExtension.class)
 class MemoryControllerTest extends ControllerTestSupport {
 

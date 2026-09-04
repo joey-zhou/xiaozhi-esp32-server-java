@@ -59,6 +59,13 @@ class StpInterfaceImplTest {
     }
 
     @Test
+    void getRoleListKeepsAdminWhenAuthRoleIdMissing() {
+        when(userService.getBO(1)).thenReturn(user(UserBO.ADMIN_YES, null));
+
+        assertThat(stpInterface.getRoleList("1", "login")).containsExactly("admin");
+    }
+
+    @Test
     void getRoleListKeepsAdminWhenRoleKeyLookupFails() {
         when(userService.getBO(1)).thenReturn(user(UserBO.ADMIN_YES, 9));
         when(authRoleService.getRoleKey(9)).thenThrow(new IllegalStateException("db down"));
