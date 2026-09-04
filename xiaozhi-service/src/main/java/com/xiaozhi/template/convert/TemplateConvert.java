@@ -34,8 +34,16 @@ public interface TemplateConvert {
 
     TemplateBO toBO(TemplateDO templateDO);
 
+    @Mapping(target = "templateId", ignore = true)
+    @Mapping(target = "userId", ignore = true)
+    @Mapping(target = "createTime", ignore = true)
+    @Mapping(target = "updateTime", ignore = true)
     TemplateBO toBO(TemplateCreateReq req);
 
+    @Mapping(target = "templateId", ignore = true)
+    @Mapping(target = "userId", ignore = true)
+    @Mapping(target = "createTime", ignore = true)
+    @Mapping(target = "updateTime", ignore = true)
     TemplateBO toBO(TemplateUpdateReq req);
 
     TemplateResp toResp(TemplateDO templateDO);
