@@ -1,6 +1,7 @@
 package com.xiaozhi.template.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.model.bo.TemplateBO;
@@ -9,8 +10,6 @@ import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.template.convert.TemplateConvert;
 import com.xiaozhi.template.dal.mysql.dataobject.TemplateDO;
 import com.xiaozhi.template.dal.mysql.mapper.TemplateMapper;
-import com.xiaozhi.template.domain.Template;
-import com.xiaozhi.template.domain.repository.TemplateRepository;
 import com.xiaozhi.template.service.TemplateService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -22,11 +21,13 @@ import java.util.List;
 @Service
 public class TemplateServiceImpl implements TemplateService {
 
-    @Resource
-    private TemplateMapper templateMapper;
+    private static final String STATE_ENABLED = "1";
+    private static final String STATE_DISABLED = "0";
+    private static final String IS_DEFAULT = "1";
+    private static final String NOT_DEFAULT = "0";
 
     @Resource
-    private TemplateRepository templateRepository;
+    private TemplateMapper templateMapper;
 
     @Resource
     private TemplateConvert templateConvert;
@@ -90,8 +91,57 @@ public class TemplateServiceImpl implements TemplateService {
     @Transactional
     public void copyTemplates(Integer sourceUserId, Integer targetUserId) {
         for (TemplateBO template : listBO(sourceUserId, null, null)) {
-            templateRepository.save(Template.newTemplate(targetUserId, template));
+            create(targetUserId, template);
         }
     }
 
+    @Override
+    @Transactional
+    public TemplateBO create(Integer userId, TemplateBO bo) {
+        TemplateDO d = templateConvert.toDO(bo);
+        d.setUserId(userId);
+        d.setState(STATE_ENABLED);
+        if (d.getIsDefault() == null) {
+            d.setIsDefault(NOT_DEFAULT);
+        }
+        if (IS_DEFAULT.equals(d.getIsDefault())) {
+            resetDefault(userId, null);
+        }
+        templateMapper.insert(d);
+        return templateConvert.toBO(d);
+    }
+
+    @Override
+    @Transactional
+    public TemplateBO update(Integer templateId, TemplateBO bo) {
+        TemplateDO d = getTemplate(templateId);
+        boolean turningDefault = IS_DEFAULT.equals(bo.getIsDefault()) && !IS_DEFAULT.equals(d.getIsDefault());
+        templateConvert.updateDO(bo, d);
+        if (turningDefault) {
+            resetDefault(d.getUserId(), templateId);
+        }
+        templateMapper.updateById(d);
+        return templateConvert.toBO(d);
+    }
+
+    @Override
+    @Transactional
+    public void delete(Integer templateId) {
+        templateMapper.update(null, new LambdaUpdateWrapper<TemplateDO>()
+            .eq(TemplateDO::getTemplateId, templateId)
+            .eq(TemplateDO::getState, STATE_ENABLED)
+            .set(TemplateDO::getState, STATE_DISABLED));
+    }
+
+    private void resetDefault(Integer userId, Integer excludeTemplateId) {
+        LambdaUpdateWrapper<TemplateDO> w = new LambdaUpdateWrapper<TemplateDO>()
+            .eq(TemplateDO::getUserId, userId)
+            .eq(TemplateDO::getState, STATE_ENABLED)
+            .eq(TemplateDO::getIsDefault, IS_DEFAULT)
+            .set(TemplateDO::getIsDefault, NOT_DEFAULT);
+        if (excludeTemplateId != null) {
+            w.ne(TemplateDO::getTemplateId, excludeTemplateId);
+        }
+        templateMapper.update(null, w);
+    }
 }

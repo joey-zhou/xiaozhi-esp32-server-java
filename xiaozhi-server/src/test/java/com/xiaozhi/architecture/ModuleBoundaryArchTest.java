@@ -49,6 +49,15 @@ class ModuleBoundaryArchTest {
     private static final ImportOption ONLY_SERVICE_MODULE =
         location -> location.contains("/xiaozhi-service/target/classes/");
 
+    private static final String[] PACKAGES_ALLOWED_DOMAIN = {
+        "com.xiaozhi.config..", "com.xiaozhi.device..", "com.xiaozhi.role.."
+    };
+
+    /** common.domain 是领域事件基类型，communication.domain 是协议报文，都不是业务聚合根 */
+    private static final String[] NOT_BUSINESS_PACKAGES = {
+        "com.xiaozhi.common..", "com.xiaozhi.communication.."
+    };
+
     private static JavaClasses xiaozhiClasses;
     private static JavaClasses serverClasses;
     private static JavaClasses serviceClasses;
@@ -127,6 +136,17 @@ class ModuleBoundaryArchTest {
             .because("Provider SDK 只归 xiaozhi-ai 用；server 层拿到 SDK 说明编排里混进了模型/云服务细节");
 
         rule.check(serverClasses);
+    }
+
+    @Test
+    void onlyWhitelistedPackagesHaveDomainLayer() {
+        ArchRule rule = classes()
+            .that().resideInAnyPackage("com.xiaozhi..domain..", "com.xiaozhi..infrastructure..")
+            .and().resideOutsideOfPackages(NOT_BUSINESS_PACKAGES)
+            .should().resideInAnyPackage(PACKAGES_ALLOWED_DOMAIN)
+            .because("domain/ + infrastructure/ 要同时满足「有跨字段不变量」与「写入口不止一个」，不命中即禁止新建");
+
+        rule.check(xiaozhiClasses);
     }
 
     @Test

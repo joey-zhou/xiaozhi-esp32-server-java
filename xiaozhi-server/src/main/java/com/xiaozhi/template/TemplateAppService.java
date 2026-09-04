@@ -5,10 +5,7 @@ import com.xiaozhi.common.model.req.TemplatePageReq;
 import com.xiaozhi.common.model.req.TemplateUpdateReq;
 import com.xiaozhi.common.model.resp.PageResp;
 import com.xiaozhi.common.model.resp.TemplateResp;
-import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.template.convert.TemplateConvert;
-import com.xiaozhi.template.domain.Template;
-import com.xiaozhi.template.domain.repository.TemplateRepository;
 import com.xiaozhi.template.service.TemplateService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -31,29 +28,20 @@ public class TemplateAppService {
     @Resource
     private TemplateConvert templateConvert;
 
-    @Resource
-    private TemplateRepository templateRepository;
-
     public PageResp<TemplateResp> page(TemplatePageReq req, Integer userId) {
         TemplatePageReq r = req == null ? new TemplatePageReq() : req;
         return templateService.page(r.getPageNo(), r.getPageSize(), r.getTemplateName(), r.getCategory(), userId);
     }
 
     public TemplateResp create(TemplateCreateReq req, Integer userId) {
-        Template template = Template.newTemplate(userId, templateConvert.toBO(req));
-        templateRepository.save(template);
-        return templateConvert.toResp(templateService.getBO(template.getTemplateId()));
+        return templateConvert.toResp(templateService.create(userId, templateConvert.toBO(req)));
     }
 
     public TemplateResp update(Integer templateId, TemplateUpdateReq req) {
-        Template template = templateRepository.findById(templateId)
-                .orElseThrow(() -> new ResourceNotFoundException("模板不存在或无权访问"));
-        template.update(templateConvert.toBO(req));
-        templateRepository.save(template);
-        return templateConvert.toResp(templateService.getBO(templateId));
+        return templateConvert.toResp(templateService.update(templateId, templateConvert.toBO(req)));
     }
 
     public void delete(Integer templateId) {
-        templateRepository.delete(templateId);
+        templateService.delete(templateId);
     }
 }
