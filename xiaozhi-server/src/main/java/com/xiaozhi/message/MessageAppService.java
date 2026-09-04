@@ -5,6 +5,7 @@ import com.xiaozhi.common.model.req.MessagePageReq;
 import com.xiaozhi.common.model.resp.ConversationResp;
 import com.xiaozhi.common.model.resp.MessageResp;
 import com.xiaozhi.common.model.PageResult;
+import com.xiaozhi.message.convert.MessageConvert;
 import com.xiaozhi.message.service.MessageService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -28,16 +29,21 @@ public class MessageAppService {
     @Resource
     private MessageService messageService;
 
+    @Resource
+    private MessageConvert messageConvert;
+
     public PageResult<MessageResp> page(MessagePageReq req, Integer userId) {
         MessagePageReq r = req == null ? new MessagePageReq() : req;
         return messageService.page(r.getPageNo(), r.getPageSize(), r.getDeviceId(), r.getDeviceName(),
                 r.getSender(), r.getMessageType(), r.getRoleId(), r.getStartTime(), r.getEndTime(),
-                userId, r.getSessionId(), r.getSource());
+                userId, r.getSessionId(), r.getSource())
+            .map(messageConvert::toResp);
     }
 
     public PageResult<ConversationResp> conversationPage(ConversationPageReq req, Integer userId) {
         ConversationPageReq r = req == null ? new ConversationPageReq() : req;
-        return messageService.conversationPage(r.getPageNo(), r.getPageSize(), userId, r.getRoleId(), r.getSource());
+        return messageService.conversationPage(r.getPageNo(), r.getPageSize(), userId, r.getRoleId(), r.getSource())
+            .map(messageConvert::toResp);
     }
 
     public void delete(Integer messageId) {

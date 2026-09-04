@@ -2,8 +2,11 @@ package com.xiaozhi.message.convert;
 
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.MessageMetadataBO;
+import com.xiaozhi.common.model.resp.ConversationResp;
 import com.xiaozhi.common.model.resp.MessageResp;
 import com.xiaozhi.message.dal.mysql.dataobject.MessageDO;
+import com.xiaozhi.message.model.ConversationProjection;
+import com.xiaozhi.message.model.MessageProjection;
 import com.xiaozhi.utils.JsonUtil;
 import org.mapstruct.Mapper;
 import org.springframework.util.StringUtils;
@@ -15,7 +18,9 @@ public interface MessageConvert {
 
     MessageDO toDO(MessageBO messageBO);
 
-    MessageResp toResp(MessageBO messageBO);
+    MessageResp toResp(MessageProjection projection);
+
+    ConversationResp toResp(ConversationProjection projection);
 
     /**
      * DO.metadata (JSON 字符串) → BO.metadata (值对象)。

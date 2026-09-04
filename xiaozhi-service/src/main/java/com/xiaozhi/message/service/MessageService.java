@@ -1,9 +1,9 @@
 package com.xiaozhi.message.service;
 
 import com.xiaozhi.common.model.bo.MessageBO;
-import com.xiaozhi.common.model.resp.ConversationResp;
-import com.xiaozhi.common.model.resp.MessageResp;
 import com.xiaozhi.common.model.PageResult;
+import com.xiaozhi.message.model.ConversationProjection;
+import com.xiaozhi.message.model.MessageProjection;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -12,12 +12,12 @@ import java.util.List;
 
 public interface MessageService {
 
-    PageResult<MessageResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
-                               String sender, String messageType, Integer roleId,
-                               Date startTime, Date endTime, Integer userId, String sessionId,
-                               String source);
+    PageResult<MessageProjection> page(int pageNo, int pageSize, String deviceId, String deviceName,
+                                       String sender, String messageType, Integer roleId,
+                                       Date startTime, Date endTime, Integer userId, String sessionId,
+                                       String source);
 
-    PageResult<ConversationResp> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source);
+    PageResult<ConversationProjection> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source);
 
     void delete(Integer messageId);
 

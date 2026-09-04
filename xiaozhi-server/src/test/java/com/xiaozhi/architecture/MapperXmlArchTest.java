@@ -25,8 +25,7 @@ class MapperXmlArchTest {
 
     private static final Pattern RESULT_TYPE = Pattern.compile("resultType\\s*=\\s*\"([^\"]+)\"");
 
-    private static final Set<String> RESP_RESULT_TYPES = Set.of(
-        "MessageResp", "ConversationResp");
+    private static final Set<String> RESP_RESULT_TYPES = Set.of();
 
     /** key 是 mapper/ 起的相对路径，value 是文件全文。 */
     private static Map<String, String> mapperXml;

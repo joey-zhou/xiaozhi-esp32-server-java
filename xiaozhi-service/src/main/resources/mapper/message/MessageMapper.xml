@@ -54,7 +54,7 @@
         </if>
     </sql>
 
-    <select id="selectPageResp" resultType="com.xiaozhi.common.model.resp.MessageResp">
+    <select id="selectPage" resultType="com.xiaozhi.message.model.MessageProjection">
         SELECT
         <include refid="Message_Select_Columns"/>
         FROM sys_message m

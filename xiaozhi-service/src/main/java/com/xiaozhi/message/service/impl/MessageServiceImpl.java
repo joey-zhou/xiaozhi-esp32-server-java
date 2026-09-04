@@ -6,14 +6,14 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.MessageBO;
-import com.xiaozhi.common.model.resp.ConversationResp;
-import com.xiaozhi.common.model.resp.MessageResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.event.ConversationHistoryClearedEvent;
 import com.xiaozhi.message.convert.MessageConvert;
 import com.xiaozhi.message.dal.mysql.dataobject.MessageDO;
 import com.xiaozhi.message.dal.mysql.mapper.ConversationMapper;
 import com.xiaozhi.message.dal.mysql.mapper.MessageMapper;
+import com.xiaozhi.message.model.ConversationProjection;
+import com.xiaozhi.message.model.MessageProjection;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.utils.AudioUtils;
 import jakarta.annotation.Resource;
@@ -51,19 +51,19 @@ public class MessageServiceImpl implements MessageService {
     private ConversationMapper conversationMapper;
 
     @Override
-    public PageResult<MessageResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
-                                      String sender, String messageType, Integer roleId,
-                                      Date startTime, Date endTime, Integer userId, String sessionId,
-                                      String source) {
-        Page<MessageResp> page = new Page<>(pageNo, pageSize);
-        IPage<MessageResp> iPage = messageMapper.selectPageResp(page, deviceId, deviceName, sender, messageType, roleId, startTime, endTime, userId, sessionId, source);
+    public PageResult<MessageProjection> page(int pageNo, int pageSize, String deviceId, String deviceName,
+                                              String sender, String messageType, Integer roleId,
+                                              Date startTime, Date endTime, Integer userId, String sessionId,
+                                              String source) {
+        Page<MessageProjection> page = new Page<>(pageNo, pageSize);
+        IPage<MessageProjection> iPage = messageMapper.selectPage(page, deviceId, deviceName, sender, messageType, roleId, startTime, endTime, userId, sessionId, source);
         return new PageResult<>(iPage.getRecords(), iPage.getTotal(), pageNo, pageSize);
     }
 
     @Override
-    public PageResult<ConversationResp> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source) {
-        Page<ConversationResp> page = new Page<>(pageNo, pageSize);
-        IPage<ConversationResp> iPage = conversationMapper.selectConversationPage(page, userId, roleId, source);
+    public PageResult<ConversationProjection> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source) {
+        Page<ConversationProjection> page = new Page<>(pageNo, pageSize);
+        IPage<ConversationProjection> iPage = conversationMapper.selectConversationPage(page, userId, roleId, source);
         return new PageResult<>(iPage.getRecords(), iPage.getTotal(), pageNo, pageSize);
     }
 
