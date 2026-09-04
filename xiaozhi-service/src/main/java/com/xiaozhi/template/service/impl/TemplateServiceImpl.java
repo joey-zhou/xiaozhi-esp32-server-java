@@ -6,7 +6,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.model.bo.TemplateBO;
 import com.xiaozhi.common.model.PageResult;
-import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.template.convert.TemplateConvert;
 import com.xiaozhi.template.dal.mysql.dataobject.TemplateDO;
 import com.xiaozhi.template.dal.mysql.mapper.TemplateMapper;
@@ -33,11 +32,11 @@ public class TemplateServiceImpl implements TemplateService {
     private TemplateConvert templateConvert;
 
     @Override
-    public PageResult<TemplateResp> page(int pageNo, int pageSize, String templateName, String category, Integer userId) {
+    public PageResult<TemplateBO> page(int pageNo, int pageSize, String templateName, String category, Integer userId) {
         Page<TemplateDO> page = new Page<>(pageNo, pageSize);
         IPage<TemplateDO> result = templateMapper.selectPage(page, buildQuery(userId, templateName, category));
-        List<TemplateResp> list = result.getRecords().stream()
-            .map(templateConvert::toResp)
+        List<TemplateBO> list = result.getRecords().stream()
+            .map(templateConvert::toBO)
             .toList();
         return new PageResult<>(
             list,
@@ -47,10 +46,6 @@ public class TemplateServiceImpl implements TemplateService {
         );
     }
 
-    @Override
-    public TemplateResp get(Integer templateId) {
-        return templateConvert.toResp(getTemplate(templateId));
-    }
 
     @Override
     public TemplateBO getBO(Integer templateId) {

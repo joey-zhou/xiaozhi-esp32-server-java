@@ -30,7 +30,8 @@ public class TemplateAppService {
 
     public PageResult<TemplateResp> page(TemplatePageReq req, Integer userId) {
         TemplatePageReq r = req == null ? new TemplatePageReq() : req;
-        return templateService.page(r.getPageNo(), r.getPageSize(), r.getTemplateName(), r.getCategory(), userId);
+        return templateService.page(r.getPageNo(), r.getPageSize(), r.getTemplateName(), r.getCategory(), userId)
+            .map(templateConvert::toResp);
     }
 
     public TemplateResp create(TemplateCreateReq req, Integer userId) {

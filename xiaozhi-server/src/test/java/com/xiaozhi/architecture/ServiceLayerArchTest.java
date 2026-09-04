@@ -31,13 +31,13 @@ class ServiceLayerArchTest {
     };
 
     private static final String RESP_KNOWN_VIOLATIONS =
-        "com\\.xiaozhi\\.(agent|authrole|config|device|message"
-            + "|permission|role|security|template|user)\\..*";
+        "com\\.xiaozhi\\.(authrole|device|message"
+            + "|permission|role|security|user)\\..*";
 
     /** 包名必须与 {@link #RESP_KNOWN_VIOLATIONS} 逐字对应。 */
     private static final String[] RESP_VIOLATION_PACKAGES = {
-        "agent", "authrole", "config", "device", "message",
-        "permission", "role", "security", "template", "user"
+        "authrole", "device", "message",
+        "permission", "role", "security", "user"
     };
 
     private static JavaClasses xiaozhiClasses;

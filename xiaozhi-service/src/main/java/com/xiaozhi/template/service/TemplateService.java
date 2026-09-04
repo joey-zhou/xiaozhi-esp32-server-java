@@ -2,15 +2,12 @@ package com.xiaozhi.template.service;
 
 import com.xiaozhi.common.model.bo.TemplateBO;
 import com.xiaozhi.common.model.PageResult;
-import com.xiaozhi.common.model.resp.TemplateResp;
 
 import java.util.List;
 
 public interface TemplateService {
 
-    PageResult<TemplateResp> page(int pageNo, int pageSize, String templateName, String category, Integer userId);
-
-    TemplateResp get(Integer templateId);
+    PageResult<TemplateBO> page(int pageNo, int pageSize, String templateName, String category, Integer userId);
 
     TemplateBO getBO(Integer templateId);
 

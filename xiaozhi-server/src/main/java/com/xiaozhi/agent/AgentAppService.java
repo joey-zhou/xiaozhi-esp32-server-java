@@ -1,5 +1,6 @@
 package com.xiaozhi.agent;
 
+import com.xiaozhi.agent.convert.AgentConvert;
 import com.xiaozhi.agent.service.AgentService;
 import com.xiaozhi.common.model.req.AgentPageReq;
 import com.xiaozhi.common.model.resp.AgentResp;
@@ -22,8 +23,12 @@ public class AgentAppService {
     @Resource
     private AgentService agentService;
 
+    @Resource
+    private AgentConvert agentConvert;
+
     public PageResult<AgentResp> page(AgentPageReq req, Integer userId) {
         AgentPageReq r = req == null ? new AgentPageReq() : req;
-        return agentService.page(r.getPageNo(), r.getPageSize(), r.getProvider(), r.getAgentName(), userId);
+        return agentService.page(r.getPageNo(), r.getPageSize(), r.getProvider(), r.getAgentName(), userId)
+            .map(agentConvert::toResp);
     }
 }

@@ -35,7 +35,8 @@ public class ConfigAppService {
         ConfigPageReq r = req == null ? new ConfigPageReq() : req;
         return configService.page(r.getPageNo(), r.getPageSize(),
             r.getConfigType(), r.getConfigName(), r.getModelType(),
-            r.getProvider(), r.getIsDefault(), r.getState(), userId);
+            r.getProvider(), r.getIsDefault(), r.getState(), userId)
+            .map(configConvert::toResp);
     }
 
     @Transactional

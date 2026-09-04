@@ -3,7 +3,6 @@ package com.xiaozhi.agent.service.impl;
 import com.xiaozhi.agent.convert.AgentConvert;
 import com.xiaozhi.common.model.bo.AgentBO;
 import com.xiaozhi.common.model.bo.ConfigBO;
-import com.xiaozhi.common.model.resp.AgentResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.config.domain.repository.ConfigRepository;
 import com.xiaozhi.config.infrastructure.convert.ConfigConverter;
@@ -53,7 +52,7 @@ class AgentServiceImplTest {
 
     @Test
     void pageReturnsEmptyWhenProviderUnsupported() {
-        PageResult<AgentResp> result = agentService.page(1, 10, null, null, 1);
+        PageResult<AgentBO> result = agentService.page(1, 10, null, null, 1);
 
         assertThat(result.getList()).isEmpty();
         assertThat(result.getTotal()).isZero();
@@ -64,7 +63,7 @@ class AgentServiceImplTest {
     void pageReturnsEmptyWhenDifyConfigsMissing() {
         when(configService.listBO(1, null, "dify", null, null, ConfigBO.STATE_ENABLED)).thenReturn(List.of());
 
-        PageResult<AgentResp> result = agentService.page(1, 10, "  DIFY  ", null, 1);
+        PageResult<AgentBO> result = agentService.page(1, 10, "  DIFY  ", null, 1);
 
         assertThat(result.getList()).isEmpty();
         assertThat(result.getTotal()).isZero();
@@ -90,21 +89,16 @@ class AgentServiceImplTest {
         llmConfig.setConfigDesc("说明");
         llmConfig.setCreateTime(createTime);
 
-        AgentResp resp = new AgentResp();
         when(configService.listBO(1, null, "dify", null, null, ConfigBO.STATE_ENABLED))
             .thenReturn(List.of(agentConfig, llmConfig));
-        when(agentConvert.toResp(any(AgentBO.class))).thenReturn(resp);
 
-        PageResult<AgentResp> result = agentService.page(1, 10, "dify", null, 1);
+        PageResult<AgentBO> result = agentService.page(1, 10, "dify", null, 1);
 
-        assertThat(result.getList()).containsExactly(resp);
         assertThat(result.getTotal()).isEqualTo(1);
         verify(configService).listBO(1, null, "dify", null, null, ConfigBO.STATE_ENABLED);
 
         // 断言智能体字段来自本地 llm 配置：一旦回落到 /info 远端分支，名称会变成 "DIFY Agent"
-        ArgumentCaptor<AgentBO> captor = ArgumentCaptor.forClass(AgentBO.class);
-        verify(agentConvert).toResp(captor.capture());
-        AgentBO agent = captor.getValue();
+        AgentBO agent = result.getList().get(0);
         assertThat(agent.getAgentName()).isEqualTo("现有智能体");
         assertThat(agent.getAgentDesc()).isEqualTo("说明");
         assertThat(agent.getConfigId()).isEqualTo(66);
