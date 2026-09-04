@@ -1,23 +1,19 @@
 package com.xiaozhi.authrole.service;
 
-import com.xiaozhi.common.model.resp.AuthRolePermissionConfigResp;
-import com.xiaozhi.common.model.resp.AuthRoleResp;
 import com.xiaozhi.common.model.PageResult;
-import com.xiaozhi.common.model.resp.PermissionResp;
+import com.xiaozhi.common.model.bo.AuthRoleBO;
 
 import java.util.List;
 
 public interface AuthRoleService {
 
-    PageResult<AuthRoleResp> page(int pageNo, int pageSize, String authRoleName, String roleKey, String status);
+    PageResult<AuthRoleBO> page(int pageNo, int pageSize, String authRoleName, String roleKey, String status);
 
-    AuthRoleResp get(Integer authRoleId);
+    /** 不存在时返回 null。 */
+    AuthRoleBO getBO(Integer authRoleId);
 
-    AuthRolePermissionConfigResp getPermissionConfig(Integer authRoleId);
-
-    AuthRoleResp getByUserId(Integer userId);
+    /** 不存在时返回 null。 */
+    String getRoleKey(Integer authRoleId);
 
     void assignPermissions(Integer authRoleId, List<Integer> permissionIds);
-
-    List<PermissionResp> listPermissions(Integer authRoleId);
 }

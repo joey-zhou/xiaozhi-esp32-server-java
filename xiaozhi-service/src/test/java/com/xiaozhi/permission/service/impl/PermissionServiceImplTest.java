@@ -2,9 +2,8 @@ package com.xiaozhi.permission.service.impl;
 
 import com.xiaozhi.authrolepermission.dal.mysql.dataobject.AuthRolePermissionDO;
 import com.xiaozhi.authrolepermission.dal.mysql.mapper.AuthRolePermissionMapper;
+import com.xiaozhi.common.model.bo.PermissionBO;
 import com.xiaozhi.common.model.bo.UserBO;
-import com.xiaozhi.common.model.resp.PermissionResp;
-import com.xiaozhi.common.model.resp.PermissionTreeResp;
 import com.xiaozhi.permission.convert.PermissionConvert;
 import com.xiaozhi.permission.dal.mysql.dataobject.PermissionDO;
 import com.xiaozhi.permission.dal.mysql.mapper.PermissionMapper;
@@ -61,6 +60,20 @@ class PermissionServiceImplTest {
         selfField.set(permissionService, self);
     }
 
+    private static PermissionBO permission(Integer permissionId, Integer parentId, String permissionKey) {
+        PermissionBO permission = new PermissionBO();
+        permission.setPermissionId(permissionId);
+        permission.setParentId(parentId);
+        permission.setPermissionKey(permissionKey);
+        return permission;
+    }
+
+    private static UserBO userWithAuthRole(Integer authRoleId) {
+        UserBO user = new UserBO();
+        user.setAuthRoleId(authRoleId);
+        return user;
+    }
+
     @Test
     void listByAuthRoleIdReturnsEmptyWhenAuthRoleIdMissing() {
         assertThat(permissionService.listByAuthRoleId(null)).isEmpty();
@@ -85,18 +98,37 @@ class PermissionServiceImplTest {
 
     @Test
     void listByUserIdReturnsPermissionsForUserRole() {
-        UserBO user = new UserBO();
-        user.setAuthRoleId(2);
-        PermissionResp permissionResp = new PermissionResp();
-        permissionResp.setPermissionId(10);
+        PermissionBO permission = permission(10, 0, "system:user:list");
 
-        when(userService.getBO(1)).thenReturn(user);
-        when(self.listByAuthRoleId(2)).thenReturn(List.of(permissionResp));
+        when(userService.getBO(1)).thenReturn(userWithAuthRole(2));
+        when(self.listByAuthRoleId(2)).thenReturn(List.of(permission));
 
-        List<PermissionResp> result = permissionService.listByUserId(1);
+        List<PermissionBO> result = permissionService.listByUserId(1);
 
-        assertThat(result).containsExactly(permissionResp);
+        assertThat(result).containsExactly(permission);
         verify(userService).getBO(1);
+    }
+
+    @Test
+    void listByUserIdReturnsEmptyWhenUserHasNoAuthRole() {
+        when(userService.getBO(1)).thenReturn(userWithAuthRole(null));
+
+        assertThat(permissionService.listByUserId(1)).isEmpty();
+        verifyNoInteractions(self);
+    }
+
+    @Test
+    void listKeysByUserIdSkipsBlankKeys() {
+        when(userService.getBO(1)).thenReturn(userWithAuthRole(2));
+        when(self.listByAuthRoleId(2)).thenReturn(List.of(
+            permission(10, 0, "system:user:list"),
+            permission(11, 0, null),
+            permission(12, 0, " "),
+            permission(13, 0, "system:user:detail")));
+
+        List<String> result = permissionService.listKeysByUserId(1);
+
+        assertThat(result).containsExactly("system:user:list", "system:user:detail");
     }
 
     @Test
@@ -105,30 +137,30 @@ class PermissionServiceImplTest {
         parentDO.setPermissionId(1);
         PermissionDO childDO = new PermissionDO();
         childDO.setPermissionId(2);
-
-        PermissionResp parentResp = new PermissionResp();
-        parentResp.setPermissionId(1);
-        parentResp.setParentId(0);
-        PermissionResp childResp = new PermissionResp();
-        childResp.setPermissionId(2);
-        childResp.setParentId(1);
-
-        PermissionTreeResp parentTree = new PermissionTreeResp();
-        parentTree.setPermissionId(1);
-        parentTree.setParentId(0);
-        PermissionTreeResp childTree = new PermissionTreeResp();
-        childTree.setPermissionId(2);
-        childTree.setParentId(1);
+        PermissionBO parent = permission(1, 0, "system");
+        PermissionBO child = permission(2, 1, "system:user");
 
         when(permissionMapper.selectList(any())).thenReturn(List.of(parentDO, childDO));
-        when(permissionConvert.toResp(parentDO)).thenReturn(parentResp);
-        when(permissionConvert.toResp(childDO)).thenReturn(childResp);
-        when(permissionConvert.toTreeResp(parentResp)).thenReturn(parentTree);
-        when(permissionConvert.toTreeResp(childResp)).thenReturn(childTree);
+        when(permissionConvert.toBO(parentDO)).thenReturn(parent);
+        when(permissionConvert.toBO(childDO)).thenReturn(child);
 
-        List<PermissionTreeResp> result = permissionService.listTree();
+        List<PermissionBO> result = permissionService.listTree();
 
-        assertThat(result).containsExactly(parentTree);
-        assertThat(parentTree.getChildren()).containsExactly(childTree);
+        assertThat(result).containsExactly(parent);
+        assertThat(parent.getChildren()).containsExactly(child);
+        assertThat(child.getChildren()).isEmpty();
+    }
+
+    @Test
+    void listTreeByUserIdTreatsOrphanAsRoot() {
+        PermissionBO orphan = permission(5, 99, "system:orphan");
+        PermissionBO root = permission(1, null, "system");
+
+        when(userService.getBO(1)).thenReturn(userWithAuthRole(2));
+        when(self.listByAuthRoleId(2)).thenReturn(List.of(orphan, root));
+
+        List<PermissionBO> result = permissionService.listTreeByUserId(1);
+
+        assertThat(result).containsExactly(orphan, root);
     }
 }

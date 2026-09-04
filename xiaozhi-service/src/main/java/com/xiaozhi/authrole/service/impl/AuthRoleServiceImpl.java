@@ -8,32 +8,25 @@ import com.xiaozhi.authrole.convert.AuthRoleConvert;
 import com.xiaozhi.authrole.dal.mysql.dataobject.AuthRoleDO;
 import com.xiaozhi.authrole.dal.mysql.mapper.AuthRoleMapper;
 import com.xiaozhi.authrole.service.AuthRoleService;
-import com.xiaozhi.common.exception.ResourceNotFoundException;
-import com.xiaozhi.common.model.resp.AuthRolePermissionConfigResp;
-import com.xiaozhi.common.model.resp.AuthRoleResp;
-import com.xiaozhi.common.model.PageResult;
-import com.xiaozhi.common.model.resp.PermissionResp;
-import com.xiaozhi.permission.service.PermissionService;
 import com.xiaozhi.authrolepermission.dal.mysql.dataobject.AuthRolePermissionDO;
 import com.xiaozhi.authrolepermission.dal.mysql.mapper.AuthRolePermissionMapper;
-import com.xiaozhi.user.dal.mysql.dataobject.UserDO;
-import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
+import com.xiaozhi.common.exception.ResourceNotFoundException;
+import com.xiaozhi.common.model.PageResult;
+import com.xiaozhi.common.model.bo.AuthRoleBO;
+import com.xiaozhi.permission.service.PermissionService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Objects;
 
 @Service
 public class AuthRoleServiceImpl implements AuthRoleService {
 
     @Resource
     private AuthRoleMapper authRoleMapper;
-
-    @Resource
-    private UserMapper userMapper;
 
     @Resource
     private AuthRolePermissionMapper authRolePermissionMapper;
@@ -45,7 +38,7 @@ public class AuthRoleServiceImpl implements AuthRoleService {
     private AuthRoleConvert authRoleConvert;
 
     @Override
-    public PageResult<AuthRoleResp> page(int pageNo, int pageSize, String authRoleName, String roleKey, String status) {
+    public PageResult<AuthRoleBO> page(int pageNo, int pageSize, String authRoleName, String roleKey, String status) {
         Page<AuthRoleDO> page = new Page<>(pageNo, pageSize);
         IPage<AuthRoleDO> result = authRoleMapper.selectPage(page, new LambdaQueryWrapper<AuthRoleDO>()
             .like(StringUtils.hasText(authRoleName), AuthRoleDO::getAuthRoleName, authRoleName)
@@ -54,7 +47,7 @@ public class AuthRoleServiceImpl implements AuthRoleService {
             .orderByAsc(AuthRoleDO::getAuthRoleId));
 
         return new PageResult<>(
-            result.getRecords().stream().map(authRoleConvert::toResp).toList(),
+            result.getRecords().stream().map(authRoleConvert::toBO).toList(),
             result.getTotal(),
             Math.toIntExact(result.getCurrent()),
             Math.toIntExact(result.getSize())
@@ -62,68 +55,44 @@ public class AuthRoleServiceImpl implements AuthRoleService {
     }
 
     @Override
-    public AuthRoleResp get(Integer authRoleId) {
+    public AuthRoleBO getBO(Integer authRoleId) {
         if (authRoleId == null) {
-            throw new IllegalArgumentException("权限角色ID不能为空");
-        }
-        AuthRoleResp result = authRoleConvert.toResp(authRoleMapper.selectById(authRoleId));
-        if (result == null) {
-            throw new ResourceNotFoundException("权限角色不存在");
-        }
-        return result;
-    }
-
-    @Override
-    public AuthRolePermissionConfigResp getPermissionConfig(Integer authRoleId) {
-        AuthRoleResp authRole = get(authRoleId);
-
-        AuthRolePermissionConfigResp resp = new AuthRolePermissionConfigResp();
-        resp.setAuthRoleId(authRole.getAuthRoleId());
-        resp.setAuthRoleName(authRole.getAuthRoleName());
-        resp.setRoleKey(authRole.getRoleKey());
-        resp.setDescription(authRole.getDescription());
-        resp.setStatus(authRole.getStatus());
-        resp.setCreateTime(authRole.getCreateTime());
-        resp.setUpdateTime(authRole.getUpdateTime());
-        resp.setPermissionTree(permissionService.listTree());
-        resp.setCheckedPermissionIds(permissionService.listIdsByAuthRoleId(authRoleId));
-        return resp;
-    }
-
-    @Override
-    public AuthRoleResp getByUserId(Integer userId) {
-        if (userId == null) {
             return null;
         }
-        UserDO user = userMapper.selectById(userId);
-        return user == null ? null : get(user.getAuthRoleId());
+        return authRoleConvert.toBO(authRoleMapper.selectById(authRoleId));
+    }
+
+    @Override
+    public String getRoleKey(Integer authRoleId) {
+        if (authRoleId == null) {
+            return null;
+        }
+        AuthRoleDO authRole = authRoleMapper.selectById(authRoleId);
+        return authRole == null ? null : authRole.getRoleKey();
     }
 
     @Override
     @Transactional
     public void assignPermissions(Integer authRoleId, List<Integer> permissionIds) {
-        get(authRoleId);
+        if (authRoleId == null || authRoleMapper.selectById(authRoleId) == null) {
+            throw new ResourceNotFoundException("权限角色不存在");
+        }
         authRolePermissionMapper.delete(new LambdaUpdateWrapper<AuthRolePermissionDO>()
             .eq(AuthRolePermissionDO::getAuthRoleId, authRoleId));
         if (permissionIds != null && !permissionIds.isEmpty()) {
             List<AuthRolePermissionDO> list = permissionIds.stream()
-                .filter(id -> id != null)
+                .filter(Objects::nonNull)
                 .map(permissionId -> {
                     AuthRolePermissionDO relation = new AuthRolePermissionDO();
                     relation.setAuthRoleId(authRoleId);
                     relation.setPermissionId(permissionId);
                     return relation;
                 })
-                .collect(Collectors.toList());
+                .toList();
             if (!list.isEmpty()) {
                 authRolePermissionMapper.insertBatch(list);
             }
         }
         permissionService.clearAuthRoleCache(authRoleId);
-    }
-
-    @Override
-    public List<PermissionResp> listPermissions(Integer authRoleId) {
-        return permissionService.listByAuthRoleId(authRoleId);
     }
 }

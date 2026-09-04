@@ -1,7 +1,6 @@
 package com.xiaozhi.permission.service;
 
-import com.xiaozhi.common.model.resp.PermissionResp;
-import com.xiaozhi.common.model.resp.PermissionTreeResp;
+import com.xiaozhi.common.model.bo.PermissionBO;
 
 import java.util.List;
 
@@ -9,15 +8,18 @@ public interface PermissionService {
 
     String CACHE_NAME = "XiaoZhi:Permission";
 
-    List<PermissionTreeResp> listTree();
+    List<PermissionBO> listTree();
 
-    List<PermissionResp> listByAuthRoleId(Integer authRoleId);
+    List<PermissionBO> listByAuthRoleId(Integer authRoleId);
 
     List<Integer> listIdsByAuthRoleId(Integer authRoleId);
 
     void clearAuthRoleCache(Integer authRoleId);
 
-    List<PermissionResp> listByUserId(Integer userId);
+    List<PermissionBO> listByUserId(Integer userId);
 
-    List<PermissionTreeResp> listTreeByUserId(Integer userId);
+    List<PermissionBO> listTreeByUserId(Integer userId);
+
+    /** 空白的 permissionKey 不会出现在结果里。 */
+    List<String> listKeysByUserId(Integer userId);
 }

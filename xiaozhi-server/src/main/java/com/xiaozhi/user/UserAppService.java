@@ -1,5 +1,6 @@
 package com.xiaozhi.user;
 
+import com.xiaozhi.authrole.convert.AuthRoleConvert;
 import com.xiaozhi.authrole.service.AuthRoleService;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
@@ -16,6 +17,7 @@ import com.xiaozhi.common.model.resp.PermissionTreeResp;
 import com.xiaozhi.common.model.resp.UserResp;
 import com.xiaozhi.common.port.DeviceWriter;
 import com.xiaozhi.device.service.DeviceService;
+import com.xiaozhi.permission.convert.PermissionConvert;
 import com.xiaozhi.permission.service.PermissionService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.security.AuthenticationService;
@@ -74,6 +76,12 @@ public class UserAppService {
 
     @Resource
     private PermissionService permissionService;
+
+    @Resource
+    private AuthRoleConvert authRoleConvert;
+
+    @Resource
+    private PermissionConvert permissionConvert;
 
     // ==================== 查询 ====================
 
@@ -187,8 +195,10 @@ public class UserAppService {
             return null;
         }
 
-        AuthRoleResp authRoleResp = authRoleService.get(user.getAuthRoleId());
-        List<PermissionTreeResp> permissionResp = permissionService.listTreeByUserId(userId);
+        AuthRoleResp authRoleResp = authRoleConvert.toResp(authRoleService.getBO(user.getAuthRoleId()));
+        List<PermissionTreeResp> permissionResp = permissionService.listTreeByUserId(userId).stream()
+            .map(permissionConvert::toTreeResp)
+            .toList();
 
         return LoginResp.builder()
             .token(token)

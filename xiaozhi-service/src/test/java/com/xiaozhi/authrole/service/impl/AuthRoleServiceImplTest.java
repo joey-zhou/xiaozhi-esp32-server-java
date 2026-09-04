@@ -6,13 +6,9 @@ import com.xiaozhi.authrole.dal.mysql.mapper.AuthRoleMapper;
 import com.xiaozhi.authrolepermission.dal.mysql.dataobject.AuthRolePermissionDO;
 import com.xiaozhi.authrolepermission.dal.mysql.mapper.AuthRolePermissionMapper;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
-import com.xiaozhi.common.model.resp.AuthRolePermissionConfigResp;
-import com.xiaozhi.common.model.resp.AuthRoleResp;
-import com.xiaozhi.common.model.resp.PermissionResp;
-import com.xiaozhi.common.model.resp.PermissionTreeResp;
+import com.xiaozhi.common.model.bo.AuthRoleBO;
 import com.xiaozhi.permission.service.PermissionService;
 import com.xiaozhi.support.MybatisPlusTestHelper;
-import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,11 +24,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * 钉住后台权限角色的授权配置装配：角色字段要原样搬进配置响应，
- * 授权保存要过滤空 ID 并清掉权限缓存。
+ * 钉住后台权限角色读侧：不存在时返 null 而不是抛异常；
+ * 授权保存要先校验角色存在、过滤空 ID 并清掉权限缓存。
  */
 @ExtendWith(MockitoExtension.class)
 class AuthRoleServiceImplTest {
@@ -46,9 +43,6 @@ class AuthRoleServiceImplTest {
     private AuthRoleMapper authRoleMapper;
 
     @Mock
-    private UserMapper userMapper;
-
-    @Mock
     private AuthRolePermissionMapper authRolePermissionMapper;
 
     @Mock
@@ -60,51 +54,66 @@ class AuthRoleServiceImplTest {
     @InjectMocks
     private AuthRoleServiceImpl authRoleService;
 
-    @Test
-    void getThrowsWhenAuthRoleIdMissing() {
-        assertThatThrownBy(() -> authRoleService.get(null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("权限角色ID不能为空");
+    private static AuthRoleDO authRoleDO(Integer authRoleId, String roleKey) {
+        AuthRoleDO authRoleDO = new AuthRoleDO();
+        authRoleDO.setAuthRoleId(authRoleId);
+        authRoleDO.setRoleKey(roleKey);
+        return authRoleDO;
     }
 
     @Test
-    void getPermissionConfigAssemblesRoleAndPermissionInfo() {
-        AuthRoleDO authRoleDO = new AuthRoleDO();
-        authRoleDO.setAuthRoleId(1);
-        AuthRoleResp authRoleResp = new AuthRoleResp();
-        authRoleResp.setAuthRoleId(1);
-        authRoleResp.setAuthRoleName("管理员");
-        authRoleResp.setRoleKey("admin");
-        authRoleResp.setDescription("拥有全部后台权限");
-        authRoleResp.setStatus("1");
-        PermissionTreeResp tree = new PermissionTreeResp();
-        tree.setPermissionId(10);
+    void getBOReturnsNullWhenAuthRoleIdMissing() {
+        assertThat(authRoleService.getBO(null)).isNull();
+        verifyNoInteractions(authRoleMapper, authRoleConvert);
+    }
 
+    @Test
+    void getBOReturnsNullWhenAuthRoleNotFound() {
+        when(authRoleMapper.selectById(1)).thenReturn(null);
+
+        assertThat(authRoleService.getBO(1)).isNull();
+    }
+
+    @Test
+    void getBOConvertsStoredAuthRole() {
+        AuthRoleDO authRoleDO = authRoleDO(1, "admin");
+        AuthRoleBO authRoleBO = new AuthRoleBO();
+        authRoleBO.setAuthRoleId(1);
         when(authRoleMapper.selectById(1)).thenReturn(authRoleDO);
-        when(authRoleConvert.toResp(authRoleDO)).thenReturn(authRoleResp);
-        when(permissionService.listTree()).thenReturn(List.of(tree));
-        when(permissionService.listIdsByAuthRoleId(1)).thenReturn(List.of(10, 20));
+        when(authRoleConvert.toBO(authRoleDO)).thenReturn(authRoleBO);
 
-        AuthRolePermissionConfigResp result = authRoleService.getPermissionConfig(1);
+        assertThat(authRoleService.getBO(1)).isSameAs(authRoleBO);
+    }
 
-        assertThat(result.getAuthRoleId()).isEqualTo(1);
-        assertThat(result.getAuthRoleName()).isEqualTo("管理员");
-        assertThat(result.getRoleKey()).isEqualTo("admin");
-        assertThat(result.getDescription()).isEqualTo("拥有全部后台权限");
-        assertThat(result.getStatus()).isEqualTo("1");
-        assertThat(result.getPermissionTree()).containsExactly(tree);
-        assertThat(result.getCheckedPermissionIds()).containsExactly(10, 20);
+    @Test
+    void getRoleKeyReturnsNullWhenAuthRoleNotFound() {
+        when(authRoleMapper.selectById(1)).thenReturn(null);
+
+        assertThat(authRoleService.getRoleKey(1)).isNull();
+        assertThat(authRoleService.getRoleKey(null)).isNull();
+    }
+
+    @Test
+    void getRoleKeyReturnsStoredRoleKey() {
+        when(authRoleMapper.selectById(1)).thenReturn(authRoleDO(1, "manager"));
+
+        assertThat(authRoleService.getRoleKey(1)).isEqualTo("manager");
+        verifyNoInteractions(authRoleConvert);
+    }
+
+    @Test
+    void assignPermissionsThrowsWhenAuthRoleNotFound() {
+        when(authRoleMapper.selectById(1)).thenReturn(null);
+
+        assertThatThrownBy(() -> authRoleService.assignPermissions(1, List.of(10)))
+            .isInstanceOf(ResourceNotFoundException.class)
+            .hasMessage("权限角色不存在");
+        verifyNoInteractions(authRolePermissionMapper, permissionService);
     }
 
     @Test
     void assignPermissionsClearsCacheWhenPermissionListEmpty() {
-        AuthRoleDO authRoleDO = new AuthRoleDO();
-        authRoleDO.setAuthRoleId(1);
-        AuthRoleResp authRoleResp = new AuthRoleResp();
-        authRoleResp.setAuthRoleId(1);
-
-        when(authRoleMapper.selectById(1)).thenReturn(authRoleDO);
-        when(authRoleConvert.toResp(authRoleDO)).thenReturn(authRoleResp);
+        when(authRoleMapper.selectById(1)).thenReturn(authRoleDO(1, "admin"));
 
         authRoleService.assignPermissions(1, List.of());
 
@@ -114,13 +123,7 @@ class AuthRoleServiceImplTest {
 
     @Test
     void assignPermissionsPersistsValidPermissionIds() {
-        AuthRoleDO authRoleDO = new AuthRoleDO();
-        authRoleDO.setAuthRoleId(1);
-        AuthRoleResp authRoleResp = new AuthRoleResp();
-        authRoleResp.setAuthRoleId(1);
-
-        when(authRoleMapper.selectById(1)).thenReturn(authRoleDO);
-        when(authRoleConvert.toResp(authRoleDO)).thenReturn(authRoleResp);
+        when(authRoleMapper.selectById(1)).thenReturn(authRoleDO(1, "admin"));
 
         authRoleService.assignPermissions(1, Arrays.asList(10, null, 20));
 
@@ -129,16 +132,5 @@ class AuthRoleServiceImplTest {
         assertThat(captor.getValue()).extracting(AuthRolePermissionDO::getPermissionId)
             .containsExactly(10, 20);
         verify(permissionService).clearAuthRoleCache(1);
-    }
-
-    @Test
-    void listPermissionsDelegatesToPermissionService() {
-        PermissionResp permission = new PermissionResp();
-        permission.setPermissionId(1);
-        when(permissionService.listByAuthRoleId(1)).thenReturn(List.of(permission));
-
-        List<PermissionResp> result = authRoleService.listPermissions(1);
-
-        assertThat(result).containsExactly(permission);
     }
 }

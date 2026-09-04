@@ -1,15 +1,14 @@
 package com.xiaozhi.permission.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.xiaozhi.authrolepermission.dal.mysql.dataobject.AuthRolePermissionDO;
+import com.xiaozhi.authrolepermission.dal.mysql.mapper.AuthRolePermissionMapper;
+import com.xiaozhi.common.model.bo.PermissionBO;
 import com.xiaozhi.common.model.bo.UserBO;
-import com.xiaozhi.common.model.resp.PermissionResp;
-import com.xiaozhi.common.model.resp.PermissionTreeResp;
 import com.xiaozhi.permission.convert.PermissionConvert;
 import com.xiaozhi.permission.dal.mysql.dataobject.PermissionDO;
 import com.xiaozhi.permission.dal.mysql.mapper.PermissionMapper;
 import com.xiaozhi.permission.service.PermissionService;
-import com.xiaozhi.authrolepermission.dal.mysql.dataobject.AuthRolePermissionDO;
-import com.xiaozhi.authrolepermission.dal.mysql.mapper.AuthRolePermissionMapper;
 import com.xiaozhi.user.service.UserService;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +18,7 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -49,19 +49,19 @@ public class PermissionServiceImpl implements PermissionService {
     private PermissionService self;
 
     @Override
-    public List<PermissionTreeResp> listTree() {
-        List<PermissionResp> permissions = permissionMapper.selectList(new LambdaQueryWrapper<PermissionDO>()
+    public List<PermissionBO> listTree() {
+        List<PermissionBO> permissions = permissionMapper.selectList(new LambdaQueryWrapper<PermissionDO>()
                 .eq(PermissionDO::getStatus, ENABLED)
                 .orderByAsc(PermissionDO::getSort, PermissionDO::getPermissionId))
             .stream()
-            .map(permissionConvert::toResp)
-            .collect(Collectors.toCollection(ArrayList::new));
+            .map(permissionConvert::toBO)
+            .toList();
         return buildTree(permissions);
     }
 
     @Override
     @Cacheable(value = CACHE_NAME, key = "'authRole:list:' + #authRoleId", condition = "#authRoleId != null")
-    public List<PermissionResp> listByAuthRoleId(Integer authRoleId) {
+    public List<PermissionBO> listByAuthRoleId(Integer authRoleId) {
         if (authRoleId == null) {
             return new ArrayList<>();
         }
@@ -76,7 +76,7 @@ public class PermissionServiceImpl implements PermissionService {
                 .eq(PermissionDO::getStatus, ENABLED)
                 .orderByAsc(PermissionDO::getSort, PermissionDO::getPermissionId))
             .stream()
-            .map(permissionConvert::toResp)
+            .map(permissionConvert::toBO)
             .collect(Collectors.toCollection(ArrayList::new));
     }
 
@@ -104,7 +104,7 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
-    public List<PermissionResp> listByUserId(Integer userId) {
+    public List<PermissionBO> listByUserId(Integer userId) {
         if (userId == null) {
             return new ArrayList<>();
         }
@@ -117,25 +117,32 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
-    public List<PermissionTreeResp> listTreeByUserId(Integer userId) {
-        List<PermissionResp> permissions = listByUserId(userId);
-        return buildTree(permissions);
+    public List<PermissionBO> listTreeByUserId(Integer userId) {
+        return buildTree(listByUserId(userId));
     }
 
-    private List<PermissionTreeResp> buildTree(List<PermissionResp> permissions) {
+    @Override
+    public List<String> listKeysByUserId(Integer userId) {
+        return listByUserId(userId).stream()
+            .map(PermissionBO::getPermissionKey)
+            .filter(StringUtils::hasText)
+            .toList();
+    }
+
+    /** 直接在入参节点上挂 children，每个节点的 children 都会先重置为空。 */
+    private List<PermissionBO> buildTree(List<PermissionBO> permissions) {
         if (permissions.isEmpty()) {
             return List.of();
         }
 
-        Map<Integer, PermissionTreeResp> nodeMap = new LinkedHashMap<>();
-        for (PermissionResp permission : permissions) {
-            PermissionTreeResp node = permissionConvert.toTreeResp(permission);
-            node.setChildren(new ArrayList<>());
-            nodeMap.put(node.getPermissionId(), node);
+        Map<Integer, PermissionBO> nodeMap = new LinkedHashMap<>();
+        for (PermissionBO permission : permissions) {
+            permission.setChildren(new ArrayList<>());
+            nodeMap.put(permission.getPermissionId(), permission);
         }
 
-        List<PermissionTreeResp> roots = new ArrayList<>();
-        for (PermissionTreeResp node : nodeMap.values()) {
+        List<PermissionBO> roots = new ArrayList<>();
+        for (PermissionBO node : nodeMap.values()) {
             Integer parentId = node.getParentId();
             if (parentId == null || parentId == 0 || !nodeMap.containsKey(parentId)) {
                 roots.add(node);
