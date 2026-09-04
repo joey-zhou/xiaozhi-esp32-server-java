@@ -6,9 +6,10 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
-import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.common.model.PageResult;
+import com.xiaozhi.common.model.resp.SummaryResp;
 import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.summary.convert.SummaryConvert;
 import com.xiaozhi.summary.service.SummaryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,16 +32,19 @@ public class MemoryController extends BaseController {
     @Resource
     private SummaryService summaryService;
 
+    @Resource
+    private SummaryConvert summaryConvert;
+
     @GetMapping("/summary/{roleId}/{deviceId}")
     @SaCheckPermission("system:role:memory:summary:api:list")
     @CheckOwner(resource = "role", id = "#roleId")
     @CheckOwner(resource = "device", id = "#deviceId")
     @Operation(summary = "查询指定角色的摘要记忆", description = "返回摘要记忆列表，可按设备 ID 筛选")
-    public ApiResponse<PageResult<SummaryBO>> querySummary(@PathVariable Integer roleId,
+    public ApiResponse<PageResult<SummaryResp>> querySummary(@PathVariable Integer roleId,
                                       @PathVariable String deviceId,
                                       @RequestParam(defaultValue = "1") Integer pageNo,
                                       @RequestParam(defaultValue = "10") Integer pageSize) {
-        return ApiResponse.success(summaryService.page(deviceId, roleId, pageNo, pageSize));
+        return ApiResponse.success(summaryService.page(deviceId, roleId, pageNo, pageSize).map(summaryConvert::toResp));
     }
 
     @DeleteMapping("/summary/{roleId}/{deviceId}")

@@ -50,8 +50,7 @@ class ServiceLayerArchTest {
     };
 
     private static final String CONTROLLER_RETURN_KNOWN_VIOLATIONS =
-        "com\\.xiaozhi\\.(memory\\.MemoryController"
-            + "|server\\.web\\.chat\\.WebChatController)";
+        "com\\.xiaozhi\\.server\\.web\\.chat\\.WebChatController";
 
     private static final String API_RESPONSE = "com.xiaozhi.common.web.ApiResponse";
     private static final String PAGE_RESULT = "com.xiaozhi.common.model.PageResult";

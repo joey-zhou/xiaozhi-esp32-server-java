@@ -1,6 +1,7 @@
 package com.xiaozhi.summary.convert;
 
 import com.xiaozhi.common.model.bo.SummaryBO;
+import com.xiaozhi.common.model.resp.SummaryResp;
 import com.xiaozhi.summary.dal.mysql.dataobject.SummaryDO;
 import org.mapstruct.Mapper;
 
@@ -17,6 +18,8 @@ public interface SummaryConvert {
     List<SummaryBO> toBOList(List<SummaryDO> summaryDOList);
 
     SummaryDO toDO(SummaryBO summaryBO);
+
+    SummaryResp toResp(SummaryBO summaryBO);
 
     default Instant map(LocalDateTime value) {
         return value == null ? null : value.atZone(ZoneId.systemDefault()).toInstant();
