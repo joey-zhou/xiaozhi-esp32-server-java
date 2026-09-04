@@ -7,6 +7,8 @@ import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackages;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,8 +21,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ModuleBoundaryArchTest {
 
-    /** communication.auth 的源码在 xiaozhi-common，不在这两个包里 */
-    private static final String[] DIALOGUE_PACKAGES = {"com.xiaozhi.dialogue..", "com.xiaozhi.communication.."};
+    /** communication.auth 的源码在 xiaozhi-common，不在这三个包里 */
+    private static final String[] DOWNSTREAM_PACKAGES = {
+        "com.xiaozhi.dialogue..", "com.xiaozhi.communication..", "com.xiaozhi.ai.."
+    };
+
+    private static final String[] MODULES_BELOW_SERVICE = {
+        "com.xiaozhi.ai..", "com.xiaozhi.dialogue..", "com.xiaozhi.server.."
+    };
 
     private static final String[] PROVIDER_SDK_PACKAGES = {
         "org.springframework.ai..", "com.alibaba.dashscope..", "com.aliyun..",
@@ -37,8 +45,13 @@ class ModuleBoundaryArchTest {
     private static final ImportOption ONLY_SERVER_MODULE =
         location -> location.contains("/xiaozhi-server/target/classes/");
 
+    /** 同上，用它的规则须先过 {@link #serviceModuleIsActuallyScanned}。 */
+    private static final ImportOption ONLY_SERVICE_MODULE =
+        location -> location.contains("/xiaozhi-service/target/classes/");
+
     private static JavaClasses xiaozhiClasses;
     private static JavaClasses serverClasses;
+    private static JavaClasses serviceClasses;
 
     @BeforeAll
     static void importClasses() {
@@ -49,28 +62,50 @@ class ModuleBoundaryArchTest {
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .withImportOption(ONLY_SERVER_MODULE)
             .importPackages("com.xiaozhi");
+        serviceClasses = new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+            .withImportOption(ONLY_SERVICE_MODULE)
+            .importPackages("com.xiaozhi");
     }
 
     @Test
-    void dialogueDoesNotReachIntoDomainRepositories() {
+    void downstreamModulesDoNotReachIntoDomainRepositories() {
         ArchRule rule = noClasses()
-            .that().resideInAnyPackage(DIALOGUE_PACKAGES)
+            .that().resideInAnyPackage(DOWNSTREAM_PACKAGES)
             .should().dependOnClassesThat()
             .resideInAPackage("..domain.repository..")
-            .because("实时链路写设备走 common/port/DeviceWriter，直连 Repository 会连聚合根一起绕开");
+            .because("聚合根的写路径归 service 模块自己，下游拿到 Repository 会连聚合根一起绕开；实时链路写设备走 common/port/DeviceWriter");
 
         rule.check(xiaozhiClasses);
     }
 
     @Test
-    void dialogueDoesNotReachIntoServiceImplementations() {
+    void downstreamModulesDoNotReachIntoServiceImplementations() {
         ArchRule rule = noClasses()
-            .that().resideInAnyPackage(DIALOGUE_PACKAGES)
-            .should().dependOnClassesThat()
-            .resideInAPackage("..service.impl..")
+            .that().resideInAnyPackage(DOWNSTREAM_PACKAGES)
+            .should().dependOnClassesThat(
+                resideInAPackage("..service.impl..").and(resideOutsideOfPackages(DOWNSTREAM_PACKAGES)))
             .because("下游模块只依赖 Service 接口或 common/port，依赖实现类会把事务与缓存细节泄漏到会话链路");
 
         rule.check(xiaozhiClasses);
+    }
+
+    @Test
+    void serviceModuleIsActuallyScanned() {
+        assertThat(serviceClasses)
+            .as("按路径过滤 xiaozhi-service 的产物失效了，依赖它的规则会假绿")
+            .hasSizeGreaterThan(80);
+    }
+
+    // 挡的不是写错 import——那种 Maven 先编译不过（service 的 pom 里没有 ai/dialogue/server）。
+    // 挡的是有人往 xiaozhi-service/pom.xml 里加反向依赖：加完编译能过，依赖链当场成环。
+    @Test
+    void serviceModuleDoesNotDependOnDownstreamModules() {
+        ArchRule rule = noClasses()
+            .should().dependOnClassesThat().resideInAnyPackage(MODULES_BELOW_SERVICE)
+            .because("service 反向依赖下游模块就是把依赖链掰成环；反向需求一律经 common/port 倒置");
+
+        rule.check(serviceClasses);
     }
 
     @Test
