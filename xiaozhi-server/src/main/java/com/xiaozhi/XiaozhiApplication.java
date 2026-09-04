@@ -39,6 +39,7 @@ import lombok.extern.slf4j.Slf4j;
     "com.xiaozhi.token",
     "com.xiaozhi.user",
     "com.xiaozhi.userauth",
+    "com.xiaozhi.verifycode",
     "com.xiaozhi.task",
     // xiaozhi-ai
     "com.xiaozhi.ai",
@@ -62,6 +63,7 @@ import lombok.extern.slf4j.Slf4j;
     "com.xiaozhi.template.dal.mysql.mapper",
     "com.xiaozhi.userauth.dal.mysql.mapper",
     "com.xiaozhi.user.dal.mysql.mapper",
+    "com.xiaozhi.verifycode.dal.mysql.mapper",
     "com.xiaozhi.operationlog.dal.mysql.mapper",
 })
 @Slf4j

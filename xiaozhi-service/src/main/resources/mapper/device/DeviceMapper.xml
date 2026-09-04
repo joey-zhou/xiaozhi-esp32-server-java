@@ -47,15 +47,6 @@
         </if>
     </sql>
 
-    <sql id="Device_Code_Columns">
-        c.code,
-        c.deviceId,
-        c.sessionId,
-        c.type,
-        c.audioPath,
-        c.createTime
-    </sql>
-
     <select id="selectPage" resultType="com.xiaozhi.device.model.DeviceProjection">
         SELECT
         <include refid="Device_Select_Columns"/>
@@ -72,40 +63,4 @@
         LIMIT 1
     </select>
 
-    <select id="selectValidCode" resultType="com.xiaozhi.common.model.bo.VerifyCodeBO">
-        SELECT
-        <include refid="Device_Code_Columns"/>
-        FROM sys_code c
-        WHERE 1 = 1
-        <if test="deviceId != null and deviceId != ''">
-            AND c.deviceId = #{deviceId}
-        </if>
-        <if test="sessionId != null and sessionId != ''">
-            AND c.sessionId = #{sessionId}
-        </if>
-        <if test="code != null and code != ''">
-            AND c.code = #{code}
-        </if>
-        AND c.createTime &gt;= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
-        ORDER BY c.createTime DESC
-        LIMIT 1
-    </select>
-
-    <insert id="insertVerifyCode">
-        INSERT INTO sys_code (deviceId, sessionId, type, code, createTime)
-        VALUES (#{deviceId}, #{sessionId}, #{type}, #{code}, NOW())
-    </insert>
-
-    <delete id="deleteVerifyCodeByDeviceId">
-        DELETE FROM sys_code
-        WHERE deviceId = #{deviceId}
-    </delete>
-
-    <update id="updateCodeAudioPath">
-        UPDATE sys_code
-        SET audioPath = #{audioPath}
-        WHERE deviceId = #{deviceId}
-          AND sessionId = #{sessionId}
-          AND code = #{code}
-    </update>
 </mapper>

@@ -12,6 +12,7 @@ import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
 import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.support.MybatisPlusTestHelper;
+import com.xiaozhi.verifycode.service.VerifyCodeService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,6 +55,9 @@ class DeviceServiceImplTest {
 
     @Mock
     private DeviceConvert deviceConvert;
+
+    @Mock
+    private VerifyCodeService verifyCodeService;
 
     @Mock
     private CacheManager cacheManager;
@@ -166,24 +170,24 @@ class DeviceServiceImplTest {
         VerifyCodeBO existing = new VerifyCodeBO();
         existing.setCode("123456");
 
-        when(deviceMapper.selectValidCode(null, "device-1", "session-1")).thenReturn(existing);
+        when(verifyCodeService.findValid(null, "device-1", "session-1")).thenReturn(existing);
 
         assertThat(deviceService.generateCode("device-1", "session-1", "bind")).isSameAs(existing);
 
-        verify(deviceMapper, never()).insertVerifyCode(any(), any(), any(), any());
+        verify(verifyCodeService, never()).createForDevice(any(), any(), any(), any());
     }
 
     @Test
     void generateCodeInsertsSixDigitCodeWhenNoneValid() {
         VerifyCodeBO created = new VerifyCodeBO();
 
-        when(deviceMapper.selectValidCode(nullable(String.class), eq("device-1"), eq("session-1")))
+        when(verifyCodeService.findValid(nullable(String.class), eq("device-1"), eq("session-1")))
             .thenReturn(null, created);
 
         assertThat(deviceService.generateCode("device-1", "session-1", "bind")).isSameAs(created);
 
         ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
-        verify(deviceMapper).insertVerifyCode(eq("device-1"), eq("session-1"), eq("bind"), codeCaptor.capture());
+        verify(verifyCodeService).createForDevice(eq("device-1"), eq("session-1"), eq("bind"), codeCaptor.capture());
         // 验证码需左侧补零到固定六位，否则设备端按定长解析会取错
         assertThat(codeCaptor.getValue()).matches("\\d{6}");
     }
@@ -195,7 +199,7 @@ class DeviceServiceImplTest {
         assertThat(deviceService.updateCodeAudioPath("device-1", "session-1", " ", "/a.wav")).isZero();
         assertThat(deviceService.updateCodeAudioPath("device-1", "session-1", "123456", " ")).isZero();
 
-        verifyNoInteractions(deviceMapper);
+        verifyNoInteractions(deviceMapper, verifyCodeService);
     }
 
     /** getBO 走缓存包装，测试里让它先读缓存、未命中再回源。 */

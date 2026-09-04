@@ -11,6 +11,7 @@ import com.xiaozhi.user.dal.mysql.dataobject.UserDO;
 import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
 import com.xiaozhi.user.model.UserProjection;
 import com.xiaozhi.user.service.UserService;
+import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -30,6 +31,9 @@ public class UserServiceImpl implements UserService {
 
     @Resource
     private UserConvert userConvert;
+
+    @Resource
+    private VerifyCodeService verifyCodeService;
 
     @Override
     public PageResult<UserProjection> page(int pageNo, int pageSize, String name, String email,
@@ -165,7 +169,7 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("账号不能为空");
         }
         String code = String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
-        if (userMapper.insertCode(account, code) <= 0) {
+        if (verifyCodeService.createForEmail(account, code) <= 0) {
             throw new IllegalStateException("生成验证码失败");
         }
         return code;
@@ -176,7 +180,6 @@ public class UserServiceImpl implements UserService {
         if (!StringUtils.hasText(account) || !StringUtils.hasText(code)) {
             return false;
         }
-        Integer count = userMapper.countValidCode(account, code);
-        return count != null && count > 0;
+        return verifyCodeService.hasValidEmail(account, code);
     }
 }

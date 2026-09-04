@@ -15,6 +15,7 @@ import com.xiaozhi.event.DeviceOnlineEvent;
 import com.xiaozhi.event.DeviceRoleChangedEvent;
 import com.xiaozhi.event.DeviceSessionClosedEvent;
 import com.xiaozhi.event.DeviceUpdatedEvent;
+import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -45,6 +46,9 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     private DeviceConverter deviceConverter;
 
     @Resource
+    private VerifyCodeService verifyCodeService;
+
+    @Resource
     private ApplicationEventPublisher eventPublisher;
 
     @Resource
@@ -72,14 +76,14 @@ public class DeviceRepositoryImpl implements DeviceRepository {
 
     @Override
     public Optional<VerifyCode> findVerifyCode(String code, String deviceId, String sessionId) {
-        VerifyCodeBO bo = deviceMapper.selectValidCode(code, deviceId, sessionId);
+        VerifyCodeBO bo = verifyCodeService.findValid(code, deviceId, sessionId);
         return Optional.ofNullable(bo).map(deviceConverter::toVerifyCode);
     }
 
     @Override
     public void invalidateVerifyCodes(String deviceId) {
         if (deviceId == null || deviceId.isBlank()) return;
-        deviceMapper.deleteVerifyCodeByDeviceId(deviceId);
+        verifyCodeService.deleteByDeviceId(deviceId);
     }
 
     @Override

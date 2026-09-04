@@ -36,6 +36,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.xiaozhi.summary",
         "com.xiaozhi.token",
         "com.xiaozhi.task",
+        "com.xiaozhi.verifycode",
         // xiaozhi-ai
         "com.xiaozhi.ai",
         // xiaozhi-dialogue
@@ -52,6 +53,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.xiaozhi.message.dal.mysql.mapper",
     "com.xiaozhi.role.dal.mysql.mapper",
     "com.xiaozhi.summary.dal.mysql.mapper",
+    "com.xiaozhi.verifycode.dal.mysql.mapper",
 })
 public class DialogueApplication {
 

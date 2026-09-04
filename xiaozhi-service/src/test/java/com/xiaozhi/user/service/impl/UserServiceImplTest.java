@@ -9,6 +9,7 @@ import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.dal.mysql.dataobject.UserDO;
 import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
 import com.xiaozhi.user.model.UserProjection;
+import com.xiaozhi.verifycode.service.VerifyCodeService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,10 +22,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -44,6 +47,9 @@ class UserServiceImplTest {
 
     @Mock
     private UserConvert userConvert;
+
+    @Mock
+    private VerifyCodeService verifyCodeService;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -140,5 +146,30 @@ class UserServiceImplTest {
         assertThatThrownBy(() -> userService.generateCaptcha(" "))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("账号不能为空");
+    }
+
+    @Test
+    void generateCaptchaReturnsSixDigitCodeItPersisted() {
+        when(verifyCodeService.createForEmail(eq("a@b.com"), anyString())).thenReturn(1);
+
+        String code = userService.generateCaptcha("a@b.com");
+
+        assertThat(code).matches("\\d{6}");
+        verify(verifyCodeService).createForEmail("a@b.com", code);
+    }
+
+    @Test
+    void checkCaptchaReturnsFalseWithoutQueryWhenArgumentBlank() {
+        assertThat(userService.checkCaptcha(" ", "123456")).isFalse();
+        assertThat(userService.checkCaptcha("a@b.com", " ")).isFalse();
+
+        verifyNoInteractions(verifyCodeService);
+    }
+
+    @Test
+    void checkCaptchaDelegatesToVerifyCodeService() {
+        when(verifyCodeService.hasValidEmail("a@b.com", "123456")).thenReturn(true);
+
+        assertThat(userService.checkCaptcha("a@b.com", "123456")).isTrue();
     }
 }

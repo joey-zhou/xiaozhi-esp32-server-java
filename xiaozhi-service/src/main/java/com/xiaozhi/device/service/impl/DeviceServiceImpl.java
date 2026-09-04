@@ -14,6 +14,7 @@ import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
+import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,9 @@ public class DeviceServiceImpl implements DeviceService {
 
     @Resource
     private DeviceRepository deviceRepository;
+
+    @Resource
+    private VerifyCodeService verifyCodeService;
 
     @Resource
     private DeviceConvert deviceConvert;
@@ -95,21 +99,17 @@ public class DeviceServiceImpl implements DeviceService {
         return deviceMapper.selectProjectionById(deviceId);
     }
 
-    private VerifyCodeBO queryVerifyCode(String code, String deviceId, String sessionId) {
-        return deviceMapper.selectValidCode(code, deviceId, sessionId);
-    }
-
     @Override
     @Transactional
     public VerifyCodeBO generateCode(String deviceId, String sessionId, String type) {
-        VerifyCodeBO existingCode = queryVerifyCode(null, deviceId, sessionId);
+        VerifyCodeBO existingCode = verifyCodeService.findValid(null, deviceId, sessionId);
         if (existingCode != null) {
             return existingCode;
         }
 
         String code = String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
-        deviceMapper.insertVerifyCode(deviceId, sessionId, type, code);
-        return queryVerifyCode(code, deviceId, sessionId);
+        verifyCodeService.createForDevice(deviceId, sessionId, type, code);
+        return verifyCodeService.findValid(code, deviceId, sessionId);
     }
 
     @Override
@@ -118,7 +118,7 @@ public class DeviceServiceImpl implements DeviceService {
             || !StringUtils.hasText(code) || !StringUtils.hasText(audioPath)) {
             return 0;
         }
-        return deviceMapper.updateCodeAudioPath(deviceId, sessionId, code, audioPath);
+        return verifyCodeService.updateAudioPath(deviceId, sessionId, code, audioPath);
     }
 
     @Override
