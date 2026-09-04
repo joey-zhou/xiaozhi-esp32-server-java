@@ -61,29 +61,11 @@
         </if>
     </sql>
 
-    <select id="selectPageResp" resultType="com.xiaozhi.common.model.resp.RoleResp">
+    <select id="selectPage" resultType="com.xiaozhi.role.model.RoleProjection">
         SELECT
         <include refid="Role_Select_Columns"/>
         <include refid="Role_From_And_Where"/>
         ORDER BY r.createTime DESC
-    </select>
-
-    <select id="selectRespById" resultType="com.xiaozhi.common.model.resp.RoleResp">
-        SELECT
-        <include refid="Role_Select_Columns"/>
-        FROM sys_role r
-        LEFT JOIN sys_config tts_config
-            ON r.ttsId = tts_config.configId
-           AND tts_config.configType = 'tts'
-        LEFT JOIN sys_config model_config
-            ON r.modelId = model_config.configId
-           AND model_config.configType = 'llm'
-        WHERE 1 = 1
-        <if test="userId != null">
-            AND r.userId = #{userId}
-        </if>
-        AND r.roleId = #{roleId}
-        LIMIT 1
     </select>
 
 </mapper>

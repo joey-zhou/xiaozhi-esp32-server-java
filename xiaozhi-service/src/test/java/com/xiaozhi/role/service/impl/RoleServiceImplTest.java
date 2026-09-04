@@ -4,11 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.RoleBO;
-import com.xiaozhi.common.model.resp.RoleResp;
 import com.xiaozhi.role.convert.RoleConvert;
 import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
 import com.xiaozhi.role.dal.mysql.mapper.RoleMapper;
+import com.xiaozhi.role.model.RoleProjection;
 import com.xiaozhi.support.MybatisPlusTestHelper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -89,21 +90,22 @@ class RoleServiceImplTest {
 
     @Test
     void pageReturnsMapperResult() {
-        RoleResp roleResp = new RoleResp();
-        roleResp.setRoleId(10);
+        RoleProjection first = newRoleProjection(10);
+        RoleProjection second = newRoleProjection(11);
 
-        Page<RoleResp> page = new Page<>(2, 5);
-        page.setRecords(List.of(roleResp));
+        Page<RoleProjection> page = new Page<>(2, 5);
+        page.setRecords(List.of(first, second));
         page.setTotal(8);
 
-        when(roleMapper.selectPageResp(any(Page.class), isNull(), isNull(), isNull(), isNull(), eq(7))).thenReturn(page);
+        when(roleMapper.selectPage(any(Page.class), isNull(), isNull(), isNull(), isNull(), eq(7))).thenReturn(page);
 
-        var result = roleService.page(2, 5, null, null, null, null, 7);
+        PageResult<RoleProjection> result = roleService.page(2, 5, null, null, null, null, 7);
 
-        assertThat(result.getList()).containsExactly(roleResp);
+        assertThat(result.getList()).containsExactly(first, second);
         assertThat(result.getTotal()).isEqualTo(8);
         assertThat(result.getPageNo()).isEqualTo(2);
         assertThat(result.getPageSize()).isEqualTo(5);
+        verifyNoInteractions(roleConvert);
     }
 
     @Test
@@ -201,5 +203,11 @@ class RoleServiceImplTest {
         RoleBO roleBO = new RoleBO();
         roleBO.setRoleId(roleId);
         return roleBO;
+    }
+
+    private static RoleProjection newRoleProjection(Integer roleId) {
+        RoleProjection projection = new RoleProjection();
+        projection.setRoleId(roleId);
+        return projection;
     }
 }

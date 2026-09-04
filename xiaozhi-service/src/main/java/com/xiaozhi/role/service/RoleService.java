@@ -2,7 +2,7 @@ package com.xiaozhi.role.service;
 
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.PageResult;
-import com.xiaozhi.common.model.resp.RoleResp;
+import com.xiaozhi.role.model.RoleProjection;
 
 import java.util.List;
 
@@ -13,8 +13,8 @@ public interface RoleService {
 
     // ===================== 查询操作 =====================
 
-    PageResult<RoleResp> page(int pageNo, int pageSize, Integer roleId, String roleName,
-                            String isDefault, String state, Integer userId);
+    PageResult<RoleProjection> page(int pageNo, int pageSize, Integer roleId, String roleName,
+                                    String isDefault, String state, Integer userId);
 
     RoleBO getBO(Integer roleId);
 

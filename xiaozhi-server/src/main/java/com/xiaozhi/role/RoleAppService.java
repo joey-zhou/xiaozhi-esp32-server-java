@@ -42,7 +42,8 @@ public class RoleAppService {
     public PageResult<RoleResp> page(RolePageReq req, Integer userId) {
         RolePageReq r = req == null ? new RolePageReq() : req;
         return roleService.page(r.getPageNo(), r.getPageSize(),
-            r.getRoleId(), r.getRoleName(), r.getIsDefault(), r.getState(), userId);
+                r.getRoleId(), r.getRoleName(), r.getIsDefault(), r.getState(), userId)
+            .map(roleConvert::toResp);
     }
 
     @Transactional

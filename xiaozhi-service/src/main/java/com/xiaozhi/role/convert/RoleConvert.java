@@ -1,54 +1,16 @@
 package com.xiaozhi.role.convert;
 
 import com.xiaozhi.common.model.bo.RoleBO;
-import com.xiaozhi.common.model.req.RoleCreateReq;
-import com.xiaozhi.common.model.req.RoleUpdateReq;
 import com.xiaozhi.common.model.resp.RoleResp;
 import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
-import org.mapstruct.BeanMapping;
+import com.xiaozhi.role.model.RoleProjection;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
-import org.mapstruct.NullValuePropertyMappingStrategy;
 
 @Mapper(componentModel = "spring")
 public interface RoleConvert {
 
-    @Mapping(target = "createTime", ignore = true)
-    @Mapping(target = "updateTime", ignore = true)
-    @Mapping(target = "roleId", ignore = true)
-    @Mapping(target = "userId", ignore = true)
-    RoleDO toDO(RoleCreateReq req);
-
-    @Mapping(target = "createTime", ignore = true)
-    @Mapping(target = "updateTime", ignore = true)
-    @Mapping(target = "roleId", ignore = true)
-    @Mapping(target = "userId", ignore = true)
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    void updateDO(RoleUpdateReq req, @MappingTarget RoleDO roleDO);
-
-    @Mapping(target = "roleId", ignore = true)
-    @Mapping(target = "userId", ignore = true)
-    RoleBO toCreateBO(RoleCreateReq req);
-
-    @Mapping(target = "roleId", ignore = true)
-    @Mapping(target = "userId", ignore = true)
-    RoleBO toUpdateBO(RoleUpdateReq req);
-
-    @Mapping(target = "createTime", ignore = true)
-    @Mapping(target = "updateTime", ignore = true)
-    @Mapping(target = "roleId", ignore = true)
-    @Mapping(target = "userId", ignore = true)
-    RoleDO toCreateDO(RoleBO bo);
-
-    @Mapping(target = "createTime", ignore = true)
-    @Mapping(target = "updateTime", ignore = true)
-    @Mapping(target = "roleId", ignore = true)
-    @Mapping(target = "userId", ignore = true)
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    void updateDO(RoleBO bo, @MappingTarget RoleDO roleDO);
-
-    RoleResp toResp(RoleDO roleDO);
+    RoleResp toResp(RoleProjection projection);
 
     @Mapping(target = "totalDevice", ignore = true)
     @Mapping(target = "modelName", ignore = true)

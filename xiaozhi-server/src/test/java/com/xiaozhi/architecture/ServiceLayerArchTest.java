@@ -42,11 +42,11 @@ class ServiceLayerArchTest {
     };
 
     private static final String RESP_KNOWN_VIOLATIONS =
-        "com\\.xiaozhi\\.(device|message|role)\\..*";
+        "com\\.xiaozhi\\.(device|message)\\..*";
 
     /** 包名必须与 {@link #RESP_KNOWN_VIOLATIONS} 逐字对应。 */
     private static final String[] RESP_VIOLATION_PACKAGES = {
-        "device", "message", "role"
+        "device", "message"
     };
 
     private static final String CONTROLLER_RETURN_KNOWN_VIOLATIONS =
