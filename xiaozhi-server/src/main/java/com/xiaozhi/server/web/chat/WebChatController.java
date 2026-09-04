@@ -2,7 +2,8 @@ package com.xiaozhi.server.web.chat;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
-import com.xiaozhi.common.model.ChatToken;
+import com.xiaozhi.common.model.resp.ChatTokenResp;
+import com.xiaozhi.server.web.chat.convert.WebChatConvert;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -22,6 +23,9 @@ public class WebChatController {
 
     @Resource
     private WebChatService webChatService;
+
+    @Resource
+    private WebChatConvert webChatConvert;
 
     /**
      * 开启聊天会话。
@@ -51,8 +55,8 @@ public class WebChatController {
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @SaCheckPermission("system:chat:api:stream")
     @Operation(summary = "流式聊天", description = "通过 SSE 返回 AI 回复 Token 流，包含 thinking 和 content 两种类型")
-    public Flux<ChatToken> stream(@RequestParam String sessionId, @RequestParam String text) {
-        return webChatService.chatStream(sessionId, text);
+    public Flux<ChatTokenResp> stream(@RequestParam String sessionId, @RequestParam String text) {
+        return webChatService.chatStream(sessionId, text).map(webChatConvert::toResp);
     }
 
     /**

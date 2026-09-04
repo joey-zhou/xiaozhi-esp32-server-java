@@ -23,21 +23,20 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class MapperXmlArchTest {
 
-    private static final Pattern RESULT_TYPE = Pattern.compile("resultType\\s*=\\s*\"([^\"]+)\"");
+    /** 单引号与双引号都接受，group(2) 是类全名。 */
+    private static final Pattern RESULT_TYPE = Pattern.compile("resultType\\s*=\\s*([\"'])([^\"']+)\\1");
 
-    private static final Set<String> RESP_RESULT_TYPES = Set.of();
+    private static final Pattern DTO_PACKAGE = Pattern.compile("\\.model\\.(req|resp)\\.");
 
-    /** key 是 mapper/ 起的相对路径，value 是文件全文。 */
+    /** key 是资源 URI 全串，value 是文件全文。 */
     private static Map<String, String> mapperXml;
 
     @BeforeAll
     static void loadMapperXml() throws IOException {
         mapperXml = new LinkedHashMap<>();
         for (Resource resource : new PathMatchingResourcePatternResolver().getResources("classpath*:mapper/**/*.xml")) {
-            String uri = resource.getURI().toString();
             try (InputStream in = resource.getInputStream()) {
-                mapperXml.put(uri.substring(uri.lastIndexOf("/mapper/") + 1),
-                    new String(in.readAllBytes(), StandardCharsets.UTF_8));
+                mapperXml.put(resource.getURI().toString(), new String(in.readAllBytes(), StandardCharsets.UTF_8));
             }
         }
     }
@@ -52,44 +51,24 @@ class MapperXmlArchTest {
     @Test
     void resultTypeDoesNotPointToReqOrResp() {
         Map<String, Set<String>> offending = mapperXml.entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey,
-                e -> dtoResultTypes(e.getValue()).stream()
-                    .filter(type -> !RESP_RESULT_TYPES.contains(simpleName(type)))
-                    .collect(Collectors.toCollection(TreeSet::new))))
-            .entrySet().stream()
-            .filter(e -> !e.getValue().isEmpty())
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            .filter(e -> !dtoResultTypes(e.getValue()).isEmpty())
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> dtoResultTypes(e.getValue())));
 
         assertThat(offending)
             .as("resultType 直指 Req/Resp 会让 Service 返回 web 出参，SQL 直出的附加列应落到包内 XxxProjection")
             .isEmpty();
     }
 
-    @Test
-    void respResultTypesMatchTheRegistryExactly() {
-        Set<String> actual = mapperXml.values().stream()
-            .flatMap(xml -> dtoResultTypes(xml).stream())
-            .map(MapperXmlArchTest::simpleName)
-            .collect(Collectors.toSet());
-
-        assertThat(actual)
-            .as("resultType 指向 Req/Resp 的集合变了，请同步改 RESP_RESULT_TYPES")
-            .containsExactlyInAnyOrderElementsOf(RESP_RESULT_TYPES);
-    }
-
+    /** 按类全名判断，resultType 落在 ..model.req.. / ..model.resp.. 下即违规。 */
     private static Set<String> dtoResultTypes(String xml) {
         Set<String> types = new TreeSet<>();
         Matcher matcher = RESULT_TYPE.matcher(xml);
         while (matcher.find()) {
-            String type = matcher.group(1);
-            if (type.contains(".model.resp.") || type.contains(".model.req.")) {
+            String type = matcher.group(2);
+            if (DTO_PACKAGE.matcher(type).find()) {
                 types.add(type);
             }
         }
         return types;
-    }
-
-    private static String simpleName(String fullName) {
-        return fullName.substring(fullName.lastIndexOf('.') + 1);
     }
 }

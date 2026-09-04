@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>
  * Req 只允许出现在 Controller，进入 Service 之前必须先拆成独立入参或转成 BO；
  * Resp 的组装只发生在 server 模块，读侧 Service 返回 BO 或包内只读投影；
- * Controller 的 public 方法出参只允许 Resp、PageResult、ApiResponse、原语与 java/jakarta/spring 类型；
+ * Controller 的 public 方法出参只允许 Resp、PageResult、ApiResponse、原语与 java/jakarta/spring/reactor 类型；
  * 投影类只放 {pkg}/model 且只许本顶层业务包引用。
  * <p>
  * 扫描范围是整个 com.xiaozhi，新增业务模块自动纳管，不维护包白名单。
@@ -40,16 +40,6 @@ class ServiceLayerArchTest {
     private static final String[] BELOW_SERVER_PACKAGES = {
         "..service..", "..dal..", "..security.."
     };
-
-    private static final String RESP_KNOWN_VIOLATIONS =
-        "com\\.xiaozhi\\.()\\..*";
-
-    /** 包名必须与 {@link #RESP_KNOWN_VIOLATIONS} 逐字对应。 */
-    private static final String[] RESP_VIOLATION_PACKAGES = {
-    };
-
-    private static final String CONTROLLER_RETURN_KNOWN_VIOLATIONS =
-        "com\\.xiaozhi\\.server\\.web\\.chat\\.WebChatController";
 
     private static final String API_RESPONSE = "com.xiaozhi.common.web.ApiResponse";
     private static final String PAGE_RESULT = "com.xiaozhi.common.model.PageResult";
@@ -78,35 +68,11 @@ class ServiceLayerArchTest {
     void serviceLayerDoesNotDependOnRespDtoPackage() {
         ArchRule rule = noClasses()
             .that().resideInAnyPackage(BELOW_SERVER_PACKAGES)
-            .and().haveNameNotMatching(RESP_KNOWN_VIOLATIONS)
             .should().dependOnClassesThat()
             .resideInAPackage("..model.resp..")
             .because("Resp 的组装只发生在 server 模块，读侧 Service 返回 BO 或包内只读投影");
 
         rule.check(xiaozhiClasses);
-    }
-
-    /**
-     * 豁免名单一旦写宽，新包的违规会被悄悄吸收；清零一个包却忘了删名单，清单就不会变短。
-     * 比集合而不是比数量，两个方向才都会红。
-     */
-    @Test
-    void respViolationPackagesMatchTheRegistryExactly() {
-        Set<String> actual = xiaozhiClasses.stream()
-            .filter(ServiceLayerArchTest::isBelowServer)
-            .filter(c -> c.getDirectDependenciesFromSelf().stream()
-                .anyMatch(d -> d.getTargetClass().getPackageName().contains(".model.resp")))
-            .map(ServiceLayerArchTest::businessPackage)
-            .collect(Collectors.toSet());
-
-        assertThat(actual)
-            .as("读侧返回 Resp 的包变了，请同步改 RESP_KNOWN_VIOLATIONS 与 RESP_VIOLATION_PACKAGES")
-            .containsExactlyInAnyOrder(RESP_VIOLATION_PACKAGES);
-    }
-
-    private static boolean isBelowServer(JavaClass javaClass) {
-        String pkg = javaClass.getPackageName() + ".";
-        return pkg.contains(".service.") || pkg.contains(".dal.") || pkg.contains(".security.");
     }
 
     /** com.xiaozhi 之后的第一段包名。 */
@@ -144,7 +110,6 @@ class ServiceLayerArchTest {
     void controllerReturnTypesAreRespOnly() {
         ArchRule rule = classes()
             .that().haveSimpleNameEndingWith("Controller")
-            .and().haveNameNotMatching(CONTROLLER_RETURN_KNOWN_VIOLATIONS)
             .should(onlyReturnWebTypesFromPublicMethods())
             .because("Controller 出参只能是 Resp、PageResult<Resp>、原语或 Void，BO/DO/投影直接出 web 就绕开了 Resp 这道字段收口");
 
@@ -158,28 +123,12 @@ class ServiceLayerArchTest {
             .isGreaterThanOrEqualTo(10);
     }
 
-    @Test
-    void controllerReturnViolationsMatchTheRegistryExactly() {
-        Set<String> actual = controllers()
-            .filter(c -> c.getMethods().stream().anyMatch(m -> !nonWebReturnTypes(m).isEmpty()))
-            .map(JavaClass::getName)
-            .collect(Collectors.toSet());
-        Set<String> registered = controllers()
-            .filter(c -> c.getName().matches(CONTROLLER_RETURN_KNOWN_VIOLATIONS))
-            .map(JavaClass::getName)
-            .collect(Collectors.toSet());
-
-        assertThat(actual)
-            .as("出参越界的 Controller 变了，请同步改 CONTROLLER_RETURN_KNOWN_VIOLATIONS")
-            .containsExactlyInAnyOrderElementsOf(registered);
-    }
-
     private static Stream<JavaClass> controllers() {
         return xiaozhiClasses.stream().filter(c -> c.getSimpleName().endsWith("Controller"));
     }
 
     private static ArchCondition<JavaClass> onlyReturnWebTypesFromPublicMethods() {
-        return new ArchCondition<>("public 方法的返回类型只含 Resp、PageResult、ApiResponse、原语与 java/jakarta/spring 类型") {
+        return new ArchCondition<>("public 方法的返回类型只含 Resp、PageResult、ApiResponse、原语与 java/jakarta/spring/reactor 类型") {
             @Override
             public void check(JavaClass controller, ConditionEvents events) {
                 for (JavaMethod method : controller.getMethods()) {
@@ -213,6 +162,7 @@ class ServiceLayerArchTest {
             || name.startsWith("java.")
             || name.startsWith("jakarta.")
             || name.startsWith("org.springframework.")
+            || name.startsWith("reactor.")
             || API_RESPONSE.equals(name)
             || PAGE_RESULT.equals(name)
             || pkg.contains(".model.resp.");
