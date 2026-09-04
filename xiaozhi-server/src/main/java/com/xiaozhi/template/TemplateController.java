@@ -12,7 +12,8 @@ import com.xiaozhi.common.model.req.TemplateUpdateReq;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.common.web.ApiResponse;
-import com.xiaozhi.template.TemplateAppService;
+import com.xiaozhi.template.convert.TemplateConvert;
+import com.xiaozhi.template.service.TemplateService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,7 +30,10 @@ import org.springframework.web.bind.annotation.*;
 public class TemplateController extends BaseController {
 
     @Resource
-    private TemplateAppService templateAppService;
+    private TemplateService templateService;
+
+    @Resource
+    private TemplateConvert templateConvert;
 
     /**
      * 查询模板列表
@@ -39,7 +43,9 @@ public class TemplateController extends BaseController {
     @SaCheckPermission("system:prompt-template:api:list")
     @Operation(summary = "根据条件查询角色模板", description = "返回模板列表")
     public ApiResponse<PageResult<TemplateResp>> list(@Valid TemplatePageReq req) {
-        return ApiResponse.success(templateAppService.page(req, StpUtil.getLoginIdAsInt()));
+        return ApiResponse.success(templateService
+            .page(req.getPageNo(), req.getPageSize(), req.getTemplateName(), req.getCategory(), StpUtil.getLoginIdAsInt())
+            .map(templateConvert::toResp));
     }
 
     /**
@@ -51,7 +57,8 @@ public class TemplateController extends BaseController {
     @AuditLog(module = "模板管理", operation = "创建模板")
     @Operation(summary = "添加角色模板", description = "添加新的提示词模板")
     public ApiResponse<TemplateResp> create(@Valid @RequestBody TemplateCreateReq req) {
-        return ApiResponse.success(templateAppService.create(req, StpUtil.getLoginIdAsInt()));
+        return ApiResponse.success(
+            templateConvert.toResp(templateService.create(StpUtil.getLoginIdAsInt(), templateConvert.toBO(req))));
     }
 
     /**
@@ -64,7 +71,7 @@ public class TemplateController extends BaseController {
     @AuditLog(module = "模板管理", operation = "更新模板")
     @Operation(summary = "更新角色模板", description = "更新提示词模板信息")
     public ApiResponse<TemplateResp> update(@PathVariable Integer templateId, @Valid @RequestBody TemplateUpdateReq req) {
-        return ApiResponse.success(templateAppService.update(templateId, req));
+        return ApiResponse.success(templateConvert.toResp(templateService.update(templateId, templateConvert.toBO(req))));
     }
 
     /**
@@ -77,7 +84,7 @@ public class TemplateController extends BaseController {
     @AuditLog(module = "模板管理", operation = "删除模板")
     @Operation(summary = "删除角色模板", description = "删除提示词模板（逻辑删除）")
     public ApiResponse<Void> delete(@PathVariable Integer templateId) {
-        templateAppService.delete(templateId);
+        templateService.delete(templateId);
         return ApiResponse.success("删除成功");
     }
 }

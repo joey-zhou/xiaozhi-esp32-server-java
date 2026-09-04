@@ -13,7 +13,8 @@ import com.xiaozhi.common.model.resp.ConversationResp;
 import com.xiaozhi.common.model.resp.MessageResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
-import com.xiaozhi.message.MessageAppService;
+import com.xiaozhi.message.convert.MessageConvert;
+import com.xiaozhi.message.service.MessageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -34,14 +35,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class MessageController extends BaseController {
 
     @Resource
-    private MessageAppService messageAppService;
+    private MessageService messageService;
+
+    @Resource
+    private MessageConvert messageConvert;
 
     @GetMapping("")
     @ResponseBody
     @SaCheckPermission(value = {"system:role:memory:chat:api:list", "system:chat"}, mode = SaMode.OR)
     @Operation(summary = "根据条件查询对话消息", description = "返回对话消息列表")
     public ApiResponse<PageResult<MessageResp>> list(@Valid MessagePageReq req) {
-        return ApiResponse.success(messageAppService.page(req, StpUtil.getLoginIdAsInt()));
+        return ApiResponse.success(messageService
+            .page(req.getPageNo(), req.getPageSize(), req.getDeviceId(), req.getDeviceName(),
+                req.getSender(), req.getMessageType(), req.getRoleId(), req.getStartTime(), req.getEndTime(),
+                StpUtil.getLoginIdAsInt(), req.getSessionId(), req.getSource())
+            .map(messageConvert::toResp));
     }
 
     @GetMapping("/conversations")
@@ -49,7 +57,9 @@ public class MessageController extends BaseController {
     @SaCheckPermission("system:chat")
     @Operation(summary = "查询用户的会话列表", description = "返回当前用户的历史会话列表，基于sessionId聚合")
     public ApiResponse<PageResult<ConversationResp>> conversations(@Valid ConversationPageReq req) {
-        return ApiResponse.success(messageAppService.conversationPage(req, StpUtil.getLoginIdAsInt()));
+        return ApiResponse.success(messageService
+            .conversationPage(req.getPageNo(), req.getPageSize(), StpUtil.getLoginIdAsInt(), req.getRoleId(), req.getSource())
+            .map(messageConvert::toResp));
     }
 
     @DeleteMapping("/{messageId}")
@@ -59,7 +69,7 @@ public class MessageController extends BaseController {
     @AuditLog(module = "消息管理", operation = "删除消息")
     @Operation(summary = "删除对话消息", description = "删除指定的对话消息，逻辑删除")
     public ApiResponse<Void> delete(@PathVariable Integer messageId) {
-        messageAppService.delete(messageId);
+        messageService.delete(messageId);
         return ApiResponse.success("删除成功");
     }
 
@@ -70,7 +80,7 @@ public class MessageController extends BaseController {
     @AuditLog(module = "消息管理", operation = "批量删除设备消息")
     @Operation(summary = "批量删除设备消息", description = "清除指定设备的所有聊天记录")
     public ApiResponse<Void> batchDelete(@RequestParam String deviceId) {
-        int rows = messageAppService.deleteByDeviceId(deviceId);
+        int rows = messageService.deleteByDeviceId(deviceId);
         log.info("清除设备记忆，删除聊天记录：{}行。", rows);
         return ApiResponse.success("删除成功，共删除" + rows + "条消息");
     }

@@ -4,7 +4,8 @@ import com.xiaozhi.server.web.BaseController;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
-import com.xiaozhi.agent.AgentAppService;
+import com.xiaozhi.agent.convert.AgentConvert;
+import com.xiaozhi.agent.service.AgentService;
 import com.xiaozhi.common.model.req.AgentPageReq;
 import com.xiaozhi.common.model.resp.AgentResp;
 import com.xiaozhi.common.model.PageResult;
@@ -29,7 +30,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class AgentController extends BaseController {
 
     @Resource
-    private AgentAppService agentAppService;
+    private AgentService agentService;
+
+    @Resource
+    private AgentConvert agentConvert;
 
     /**
      * 查询智能体列表
@@ -42,6 +46,8 @@ public class AgentController extends BaseController {
     @SaCheckPermission("system:config:agent:api:list")
     @Operation(summary = "根据条件查询智能体", description = "返回智能体列表信息，会自动查询平台当前存在的智能体并同步本地配置")
     public ApiResponse<PageResult<AgentResp>> list(@Valid AgentPageReq req) {
-        return ApiResponse.success(agentAppService.page(req, StpUtil.getLoginIdAsInt()));
+        return ApiResponse.success(agentService
+            .page(req.getPageNo(), req.getPageSize(), req.getProvider(), req.getAgentName(), StpUtil.getLoginIdAsInt())
+            .map(agentConvert::toResp));
     }
 }

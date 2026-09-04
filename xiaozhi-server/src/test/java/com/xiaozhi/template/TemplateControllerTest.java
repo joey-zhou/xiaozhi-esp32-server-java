@@ -1,16 +1,17 @@
 package com.xiaozhi.template;
 
 import com.xiaozhi.common.exception.ResourceNotFoundException;
+import com.xiaozhi.common.model.bo.TemplateBO;
 import com.xiaozhi.common.model.req.TemplateCreateReq;
 import com.xiaozhi.common.model.PageResult;
-import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.common.web.ResultStatus;
-import com.xiaozhi.common.model.req.TemplatePageReq;
 import com.xiaozhi.support.ControllerTestSupport;
+import com.xiaozhi.template.convert.TemplateConvert;
+import com.xiaozhi.template.service.TemplateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -19,9 +20,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -40,24 +38,24 @@ class TemplateControllerTest extends ControllerTestSupport {
     private MockMvc mockMvc;
 
     @Mock
-    private TemplateAppService templateAppService;
+    private TemplateService templateService;
 
     private TemplateController templateController;
 
     @BeforeEach
     void setUp() {
         templateController = new TemplateController();
-        ReflectionTestUtils.setField(templateController, "templateAppService", templateAppService);
+        ReflectionTestUtils.setField(templateController, "templateService", templateService);
+        ReflectionTestUtils.setField(templateController, "templateConvert", Mappers.getMapper(TemplateConvert.class));
         mockMvc = buildMockMvc(templateController);
     }
 
     @Test
     void listReturnsPagedTemplatesForCurrentUser() throws Exception {
-        TemplateResp resp = new TemplateResp();
-        resp.setTemplateId(1);
-        resp.setTemplateName("欢迎词");
-        PageResult<TemplateResp> pageResp = new PageResult<>(List.of(resp), 1L, 1, 10);
-        when(templateAppService.page(any(TemplatePageReq.class), eq(7))).thenReturn(pageResp);
+        TemplateBO template = new TemplateBO();
+        template.setTemplateId(1);
+        template.setTemplateName("欢迎词");
+        when(templateService.page(1, 10, null, "system", 7)).thenReturn(new PageResult<>(List.of(template), 1L, 1, 10));
 
         try (var ignored = mockLoginUser(7)) {
             mockMvc.perform(get("/api/template")
@@ -69,9 +67,7 @@ class TemplateControllerTest extends ControllerTestSupport {
                 .andExpect(jsonPath("$.data.list[0].templateId").value(1));
         }
 
-        ArgumentCaptor<TemplatePageReq> captor = ArgumentCaptor.forClass(TemplatePageReq.class);
-        verify(templateAppService).page(captor.capture(), eq(7));
-        assertThat(captor.getValue().getCategory()).isEqualTo("system");
+        verify(templateService).page(1, 10, null, "system", 7);
     }
 
     @Test
@@ -93,7 +89,7 @@ class TemplateControllerTest extends ControllerTestSupport {
     // 异常文案由 GlobalExceptionHandlerTest 集中覆盖，这里只钉路由与路径变量绑定
     @Test
     void deleteReturnsNotFoundWhenTemplateMissing() throws Exception {
-        doThrow(new ResourceNotFoundException("模板不存在或无权访问")).when(templateAppService).delete(7);
+        doThrow(new ResourceNotFoundException("模板不存在或无权访问")).when(templateService).delete(7);
 
         mockMvc.perform(delete("/api/template/7"))
             .andExpect(status().isNotFound())

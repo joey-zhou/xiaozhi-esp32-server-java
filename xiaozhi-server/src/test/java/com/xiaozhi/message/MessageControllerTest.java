@@ -1,24 +1,23 @@
 package com.xiaozhi.message;
 
 import com.xiaozhi.common.exception.ResourceNotFoundException;
-import com.xiaozhi.common.model.resp.MessageResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ResultStatus;
-import com.xiaozhi.common.model.req.MessagePageReq;
+import com.xiaozhi.message.convert.MessageConvert;
+import com.xiaozhi.message.model.MessageProjection;
+import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,24 +35,25 @@ class MessageControllerTest extends ControllerTestSupport {
     private MockMvc mockMvc;
 
     @Mock
-    private MessageAppService messageAppService;
+    private MessageService messageService;
 
     private MessageController messageController;
 
     @BeforeEach
     void setUp() {
         messageController = new MessageController();
-        ReflectionTestUtils.setField(messageController, "messageAppService", messageAppService);
+        ReflectionTestUtils.setField(messageController, "messageService", messageService);
+        ReflectionTestUtils.setField(messageController, "messageConvert", Mappers.getMapper(MessageConvert.class));
         mockMvc = buildMockMvc(messageController);
     }
 
     @Test
     void listReturnsPagedMessagesForCurrentUser() throws Exception {
-        MessageResp messageResp = new MessageResp();
-        messageResp.setMessageId(1);
-        messageResp.setDeviceId("dev-1");
-        PageResult<MessageResp> pageResp = new PageResult<>(List.of(messageResp), 1L, 1, 10);
-        when(messageAppService.page(any(MessagePageReq.class), eq(7))).thenReturn(pageResp);
+        MessageProjection message = new MessageProjection();
+        message.setMessageId(1L);
+        message.setDeviceId("dev-1");
+        when(messageService.page(1, 10, "dev-1", null, null, null, null, null, null, 7, null, null))
+            .thenReturn(new PageResult<>(List.of(message), 1L, 1, 10));
 
         try (var ignored = mockLoginUser(7)) {
             mockMvc.perform(get("/api/message")
@@ -65,15 +65,13 @@ class MessageControllerTest extends ControllerTestSupport {
                 .andExpect(jsonPath("$.data.list[0].messageId").value(1));
         }
 
-        ArgumentCaptor<MessagePageReq> captor = ArgumentCaptor.forClass(MessagePageReq.class);
-        verify(messageAppService).page(captor.capture(), eq(7));
-        assertThat(captor.getValue().getDeviceId()).isEqualTo("dev-1");
+        verify(messageService).page(1, 10, "dev-1", null, null, null, null, null, null, 7, null, null);
     }
 
     // 异常文案由 GlobalExceptionHandlerTest 集中覆盖，这里只钉路由与路径变量绑定
     @Test
     void deleteReturnsNotFoundWhenMessageMissing() throws Exception {
-        doThrow(new ResourceNotFoundException("消息不存在或无权访问")).when(messageAppService).delete(5);
+        doThrow(new ResourceNotFoundException("消息不存在或无权访问")).when(messageService).delete(5);
 
         mockMvc.perform(delete("/api/message/5"))
             .andExpect(status().isNotFound())
@@ -82,7 +80,7 @@ class MessageControllerTest extends ControllerTestSupport {
 
     @Test
     void batchDeleteReturnsDeletedCountMessage() throws Exception {
-        when(messageAppService.deleteByDeviceId("dev-1")).thenReturn(3);
+        when(messageService.deleteByDeviceId("dev-1")).thenReturn(3);
 
         mockMvc.perform(delete("/api/message").param("deviceId", "dev-1"))
             .andExpect(status().isOk())

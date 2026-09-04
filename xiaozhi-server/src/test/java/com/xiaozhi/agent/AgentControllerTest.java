@@ -1,14 +1,15 @@
 package com.xiaozhi.agent;
 
-import com.xiaozhi.common.model.req.AgentPageReq;
-import com.xiaozhi.common.model.resp.AgentResp;
+import com.xiaozhi.agent.convert.AgentConvert;
+import com.xiaozhi.agent.service.AgentService;
+import com.xiaozhi.common.model.bo.AgentBO;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -16,9 +17,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -26,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 钉住智能体分页接口：查询条件必须从 query 参数绑定进 AgentPageReq，用户维度取自当前登录态。
+ * 钉住智能体分页接口：查询条件必须从 query 参数绑定后逐项传给 Service，用户维度取自当前登录态。
  */
 @ExtendWith(MockitoExtension.class)
 class AgentControllerTest extends ControllerTestSupport {
@@ -34,24 +32,24 @@ class AgentControllerTest extends ControllerTestSupport {
     private MockMvc mockMvc;
 
     @Mock
-    private AgentAppService agentAppService;
+    private AgentService agentService;
 
     private AgentController agentController;
 
     @BeforeEach
     void setUp() {
         agentController = new AgentController();
-        ReflectionTestUtils.setField(agentController, "agentAppService", agentAppService);
+        ReflectionTestUtils.setField(agentController, "agentService", agentService);
+        ReflectionTestUtils.setField(agentController, "agentConvert", Mappers.getMapper(AgentConvert.class));
         mockMvc = buildMockMvc(agentController);
     }
 
     @Test
     void listReturnsPagedAgentsForCurrentUser() throws Exception {
-        AgentResp agentResp = new AgentResp();
-        agentResp.setAgentId(1);
-        agentResp.setAgentName("讲解员");
-        PageResult<AgentResp> pageResp = new PageResult<>(List.of(agentResp), 1L, 1, 10);
-        when(agentAppService.page(any(AgentPageReq.class), eq(7))).thenReturn(pageResp);
+        AgentBO agent = new AgentBO();
+        agent.setAgentId(1);
+        agent.setAgentName("讲解员");
+        when(agentService.page(1, 10, "coze", null, 7)).thenReturn(new PageResult<>(List.of(agent), 1L, 1, 10));
 
         try (var ignored = mockLoginUser(7)) {
             mockMvc.perform(get("/api/agent")
@@ -64,8 +62,6 @@ class AgentControllerTest extends ControllerTestSupport {
                 .andExpect(jsonPath("$.data.list[0].agentName").value("讲解员"));
         }
 
-        ArgumentCaptor<AgentPageReq> captor = ArgumentCaptor.forClass(AgentPageReq.class);
-        verify(agentAppService).page(captor.capture(), eq(7));
-        assertThat(captor.getValue().getProvider()).isEqualTo("coze");
+        verify(agentService).page(1, 10, "coze", null, 7);
     }
 }
