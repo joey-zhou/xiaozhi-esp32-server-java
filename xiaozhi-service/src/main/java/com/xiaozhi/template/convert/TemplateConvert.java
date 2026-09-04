@@ -15,19 +15,6 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 public interface TemplateConvert {
 
     @Mapping(target = "templateId", ignore = true)
-    @Mapping(target = "userId", ignore = true)
-    @Mapping(target = "createTime", ignore = true)
-    @Mapping(target = "updateTime", ignore = true)
-    TemplateDO toDO(TemplateCreateReq req);
-
-    @Mapping(target = "templateId", ignore = true)
-    @Mapping(target = "userId", ignore = true)
-    @Mapping(target = "createTime", ignore = true)
-    @Mapping(target = "updateTime", ignore = true)
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    void updateDO(TemplateUpdateReq req, @MappingTarget TemplateDO templateDO);
-
-    @Mapping(target = "templateId", ignore = true)
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
     TemplateDO toDO(TemplateBO templateBO);
@@ -45,8 +32,6 @@ public interface TemplateConvert {
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
     TemplateBO toBO(TemplateUpdateReq req);
-
-    TemplateResp toResp(TemplateDO templateDO);
 
     TemplateResp toResp(TemplateBO bo);
 
