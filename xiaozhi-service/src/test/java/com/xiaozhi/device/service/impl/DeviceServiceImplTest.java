@@ -1,12 +1,15 @@
 package com.xiaozhi.device.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
+import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.support.MybatisPlusTestHelper;
 import org.junit.jupiter.api.BeforeAll;
@@ -26,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -62,6 +66,37 @@ class DeviceServiceImplTest {
 
     @InjectMocks
     private DeviceServiceImpl deviceService;
+
+    @Test
+    void pageReturnsProjectionRecordsUntouched() {
+        DeviceProjection projection = new DeviceProjection();
+        projection.setDeviceId("00:11:22");
+        projection.setRoleName("小智");
+
+        Page<DeviceProjection> page = new Page<>(2, 5);
+        page.setRecords(List.of(projection));
+        page.setTotal(8);
+
+        when(deviceMapper.selectPage(any(Page.class), isNull(), eq("客厅"), isNull(), isNull(), isNull(), eq(7)))
+            .thenReturn(page);
+
+        PageResult<DeviceProjection> result = deviceService.page(2, 5, null, "客厅", null, null, null, 7);
+
+        assertThat(result.getList()).containsExactly(projection);
+        assertThat(result.getTotal()).isEqualTo(8);
+        assertThat(result.getPageNo()).isEqualTo(2);
+        assertThat(result.getPageSize()).isEqualTo(5);
+    }
+
+    @Test
+    void getReadsProjectionByDeviceIdWithoutCache() {
+        DeviceProjection projection = new DeviceProjection();
+        when(deviceMapper.selectProjectionById("00:11:22")).thenReturn(projection);
+
+        assertThat(deviceService.get("00:11:22")).isSameAs(projection);
+
+        verifyNoInteractions(cacheManager, cacheHelper, deviceConvert);
+    }
 
     @Test
     void getBOReturnsNullWithoutTouchingCacheWhenDeviceIdBlank() {

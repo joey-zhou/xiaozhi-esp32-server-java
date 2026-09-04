@@ -6,13 +6,13 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
-import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
 import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
+import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.CacheManager;
@@ -43,10 +43,10 @@ public class DeviceServiceImpl implements DeviceService {
     private CacheHelper cacheHelper;
 
     @Override
-    public PageResult<DeviceResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
-                                     String roleName, String state, Integer roleId, Integer userId) {
-        Page<DeviceResp> page = new Page<>(pageNo, pageSize);
-        IPage<DeviceResp> result = deviceMapper.selectPageResp(page, deviceId, deviceName, roleName, state, roleId, userId);
+    public PageResult<DeviceProjection> page(int pageNo, int pageSize, String deviceId, String deviceName,
+                                           String roleName, String state, Integer roleId, Integer userId) {
+        Page<DeviceProjection> page = new Page<>(pageNo, pageSize);
+        IPage<DeviceProjection> result = deviceMapper.selectPage(page, deviceId, deviceName, roleName, state, roleId, userId);
         return new PageResult<>(
             result.getRecords(),
             result.getTotal(),
@@ -91,8 +91,8 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
     @Override
-    public DeviceResp get(String deviceId) {
-        return deviceMapper.selectRespById(deviceId, null);
+    public DeviceProjection get(String deviceId) {
+        return deviceMapper.selectProjectionById(deviceId);
     }
 
     private VerifyCodeBO queryVerifyCode(String code, String deviceId, String sessionId) {

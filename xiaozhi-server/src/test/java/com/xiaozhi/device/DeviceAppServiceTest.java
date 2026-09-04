@@ -1,6 +1,8 @@
 package com.xiaozhi.device;
 
+import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
+import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.common.model.req.DeviceScanBindReq;
 import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
@@ -11,11 +13,13 @@ import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.domain.vo.VerifyCode;
+import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.role.service.RoleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -43,8 +47,7 @@ class DeviceAppServiceTest {
     private DeviceService deviceService;
     @Mock
     private DeviceRepository deviceRepository;
-    @Mock
-    private DeviceConvert deviceConvert;
+    private final DeviceConvert deviceConvert = Mappers.getMapper(DeviceConvert.class);
     @Mock
     private RoleService roleService;
     @Mock
@@ -59,9 +62,15 @@ class DeviceAppServiceTest {
 
     @BeforeEach
     void setUp() {
-        DeviceResp boundDevice = new DeviceResp();
+        ReflectionTestUtils.setField(deviceAppService, "deviceConvert", deviceConvert);
+        DeviceBO boundDevice = new DeviceBO();
         boundDevice.setDeviceId(DEVICE_ID);
-        lenient().when(deviceService.get(DEVICE_ID)).thenReturn(boundDevice);
+        boundDevice.setDeviceName("客厅音箱");
+        lenient().when(deviceService.getBO(DEVICE_ID)).thenReturn(boundDevice);
+        DeviceProjection projection = new DeviceProjection();
+        projection.setDeviceId(DEVICE_ID);
+        projection.setRoleName("小智");
+        lenient().when(deviceService.get(DEVICE_ID)).thenReturn(projection);
     }
 
     @Test
@@ -78,6 +87,45 @@ class DeviceAppServiceTest {
     }
 
     @Test
+    void handleOtaIssuesActivationCodeWhenDeviceUnbound() {
+        when(deviceService.getBO(DEVICE_ID)).thenReturn(null);
+        VerifyCodeBO code = new VerifyCodeBO();
+        code.setCode("123456");
+        when(deviceService.generateCode(DEVICE_ID, null, "dual-board")).thenReturn(code);
+
+        Map<String, Object> response = deviceAppService.handleOta(otaRequest());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> activation = (Map<String, Object>) response.get("activation");
+        assertThat(activation).containsEntry("code", "123456").containsEntry("challenge", DEVICE_ID);
+        assertThat(response).containsKey("websocket");
+        verify(deviceService, never()).get(any());
+    }
+
+    @Test
+    void handleOtaSyncsBoundDeviceWithoutReadingProjection() {
+        OtaReq req = otaRequest();
+        req.setIp("10.0.0.8");
+        when(deviceRepository.findById(DEVICE_ID))
+                .thenReturn(Optional.of(Device.newDevice(DEVICE_ID, "客厅音箱", "dual-board", 7, 3)));
+
+        Map<String, Object> response = deviceAppService.handleOta(req);
+
+        assertThat(response).containsKey("websocket").doesNotContainKey("activation");
+        verify(deviceRepository).save(any(Device.class));
+        verify(deviceService, never()).get(any());
+    }
+
+    @Test
+    void checkOtaActivationReadsBoundDeviceFromBO() {
+        assertThat(deviceAppService.checkOtaActivation(DEVICE_ID)).isTrue();
+
+        when(deviceService.getBO(DEVICE_ID)).thenReturn(null);
+        assertThat(deviceAppService.checkOtaActivation(DEVICE_ID)).isFalse();
+        verify(deviceService, never()).get(any());
+    }
+
+    @Test
     void scanBindCreatesDeviceWhenUnboundAndRecentlyOnline() {
         when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
         when(deviceRepository.findVerifyCode(null, DEVICE_ID, null))
@@ -90,6 +138,7 @@ class DeviceAppServiceTest {
         DeviceResp result = deviceAppService.scanBind(scanBindReq("AA-BB-CC-DD-EE-FF"), 7);
 
         assertThat(result.getDeviceId()).isEqualTo(DEVICE_ID);
+        assertThat(result.getRoleName()).isEqualTo("小智");
         ArgumentCaptor<Device> captor = ArgumentCaptor.forClass(Device.class);
         verify(deviceRepository).save(captor.capture());
         assertThat(captor.getValue().getDeviceId()).isEqualTo(DEVICE_ID);
@@ -152,6 +201,7 @@ class DeviceAppServiceTest {
     private OtaReq otaRequest() {
         OtaReq req = new OtaReq();
         req.setDeviceId(DEVICE_ID);
+        req.setType("dual-board");
         return req;
     }
 }

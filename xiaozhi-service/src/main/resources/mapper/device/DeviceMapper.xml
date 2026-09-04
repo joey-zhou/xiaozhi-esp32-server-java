@@ -56,23 +56,19 @@
         c.createTime
     </sql>
 
-    <select id="selectPageResp" resultType="com.xiaozhi.common.model.resp.DeviceResp">
+    <select id="selectPage" resultType="com.xiaozhi.device.model.DeviceProjection">
         SELECT
         <include refid="Device_Select_Columns"/>
         <include refid="Device_From_And_Where"/>
         ORDER BY d.createTime DESC
     </select>
 
-    <select id="selectRespById" resultType="com.xiaozhi.common.model.resp.DeviceResp">
+    <select id="selectProjectionById" resultType="com.xiaozhi.device.model.DeviceProjection">
         SELECT
         <include refid="Device_Select_Columns"/>
         FROM sys_device d
         LEFT JOIN sys_role r ON r.roleId = d.roleId
-        WHERE 1 = 1
-        <if test="userId != null">
-            AND d.userId = #{userId}
-        </if>
-        AND d.deviceId = #{deviceId}
+        WHERE d.deviceId = #{deviceId}
         LIMIT 1
     </select>
 

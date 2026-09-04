@@ -2,9 +2,9 @@ package com.xiaozhi.device.service;
 
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
-import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.port.DeviceWriter;
+import com.xiaozhi.device.model.DeviceProjection;
 
 import java.util.List;
 
@@ -15,14 +15,14 @@ public interface DeviceService extends DeviceWriter {
 
     // ===================== 查询操作 =====================
 
-    PageResult<DeviceResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
-                              String roleName, String state, Integer roleId, Integer userId);
+    PageResult<DeviceProjection> page(int pageNo, int pageSize, String deviceId, String deviceName,
+                                    String roleName, String state, Integer roleId, Integer userId);
 
     DeviceBO getBO(String deviceId);
 
     List<DeviceBO> listByStateAndType(String state, String type);
 
-    DeviceResp get(String deviceId);
+    DeviceProjection get(String deviceId);
 
     // ===================== 验证码操作（独立表，非 Device 聚合） =====================
 

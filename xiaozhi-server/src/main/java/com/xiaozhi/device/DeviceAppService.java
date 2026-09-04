@@ -20,6 +20,7 @@ import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.domain.vo.VerifyCode;
+import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.utils.CmsUtils;
@@ -81,8 +82,9 @@ public class DeviceAppService {
     public PageResult<DeviceResp> page(DevicePageReq req, Integer userId) {
         DevicePageReq r = req == null ? new DevicePageReq() : req;
         return deviceService.page(r.getPageNo(), r.getPageSize(),
-            r.getDeviceId(), r.getDeviceName(), r.getRoleName(),
-            r.getState(), r.getRoleId(), userId);
+                r.getDeviceId(), r.getDeviceName(), r.getRoleName(),
+                r.getState(), r.getRoleId(), userId)
+            .map(deviceConvert::toResp);
     }
 
     @Transactional
@@ -99,9 +101,9 @@ public class DeviceAppService {
         if (existingDevice.isPresent()) {
             Device d = existingDevice.get();
             if (userId != null && userId.equals(d.getUserId())) {
-                DeviceResp result = deviceService.get(d.getDeviceId());
+                DeviceProjection result = deviceService.get(d.getDeviceId());
                 if (result == null) throw new IllegalStateException("查询设备失败");
-                return result;
+                return deviceConvert.toResp(result);
             }
             throw new IllegalStateException("设备已被其他用户绑定");
         }
@@ -116,9 +118,9 @@ public class DeviceAppService {
                 userId, selectedRole.getRoleId());
         deviceRepository.save(device);
 
-        DeviceResp result = deviceService.get(device.getDeviceId());
+        DeviceProjection result = deviceService.get(device.getDeviceId());
         if (result == null) throw new IllegalStateException("添加设备失败");
-        return result;
+        return deviceConvert.toResp(result);
     }
 
     /**
@@ -140,9 +142,9 @@ public class DeviceAppService {
         if (existingDevice.isPresent()) {
             Device d = existingDevice.get();
             if (userId != null && userId.equals(d.getUserId())) {
-                DeviceResp result = deviceService.get(d.getDeviceId());
+                DeviceProjection result = deviceService.get(d.getDeviceId());
                 if (result == null) throw new IllegalStateException("查询设备失败");
-                return result;
+                return deviceConvert.toResp(result);
             }
             throw new IllegalStateException("设备已被其他用户绑定");
         }
@@ -161,9 +163,9 @@ public class DeviceAppService {
         deviceRepository.save(device);
         deviceRepository.invalidateVerifyCodes(deviceId);
 
-        DeviceResp result = deviceService.get(device.getDeviceId());
+        DeviceProjection result = deviceService.get(device.getDeviceId());
         if (result == null) throw new IllegalStateException("添加设备失败");
-        return result;
+        return deviceConvert.toResp(result);
     }
 
     /** 归一化二维码中的 MAC：贴纸可能印大写或 '-' 分隔，设备上报为小写冒号格式 */
@@ -186,9 +188,9 @@ public class DeviceAppService {
         device.update(req.getDeviceName(), req.getRoleId(), req.getLocation());
         deviceRepository.save(device);
 
-        DeviceResp result = deviceService.get(deviceId);
+        DeviceProjection result = deviceService.get(deviceId);
         if (result == null) throw new IllegalStateException("更新设备失败");
-        return result;
+        return deviceConvert.toResp(result);
     }
 
     @Transactional
@@ -220,10 +222,6 @@ public class DeviceAppService {
         data.put("successCount", successCount);
         data.put("totalCount", req.getDeviceIds().split(",").length);
         return data;
-    }
-
-    public DeviceResp getResp(String deviceId) {
-        return deviceService.get(deviceId);
     }
 
     public DeviceResp generateCode(String deviceId, String sessionId, String type) {
@@ -274,7 +272,7 @@ public class DeviceAppService {
         }
 
         String deviceId = req.getDeviceId();
-        DeviceResp boundDevice = getResp(deviceId);
+        DeviceBO boundDevice = deviceService.getBO(deviceId);
         Map<String, Object> otaResponse = new HashMap<>();
 
         // --- 固件信息 ---
@@ -349,7 +347,7 @@ public class DeviceAppService {
         if (!StringUtils.hasText(deviceId) || !CommonUtils.isMacAddressValid(deviceId)) {
             return false;
         }
-        DeviceResp device = getResp(deviceId);
+        DeviceBO device = deviceService.getBO(deviceId);
         if (device == null) {
             return false;
         }
