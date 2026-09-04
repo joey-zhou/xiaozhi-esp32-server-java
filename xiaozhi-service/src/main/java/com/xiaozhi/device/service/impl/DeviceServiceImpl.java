@@ -7,7 +7,7 @@ import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.common.model.resp.DeviceResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
@@ -43,11 +43,11 @@ public class DeviceServiceImpl implements DeviceService {
     private CacheHelper cacheHelper;
 
     @Override
-    public PageResp<DeviceResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
+    public PageResult<DeviceResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
                                      String roleName, String state, Integer roleId, Integer userId) {
         Page<DeviceResp> page = new Page<>(pageNo, pageSize);
         IPage<DeviceResp> result = deviceMapper.selectPageResp(page, deviceId, deviceName, roleName, state, roleId, userId);
-        return new PageResp<>(
+        return new PageResult<>(
             result.getRecords(),
             result.getTotal(),
             Math.toIntExact(result.getCurrent()),

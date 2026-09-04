@@ -18,7 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 响应体文件 URL 自动签名。
  * <p>
- * 在响应写出前扫描 {@link ApiResponse#getData()}（含分页 {@link com.xiaozhi.common.model.resp.PageResp}、
+ * 在响应写出前扫描 {@link ApiResponse#getData()}（含分页 {@link com.xiaozhi.common.model.resp.PageResult}、
  * 集合、单对象），将标注 {@link com.xiaozhi.common.annotation.SignedFileUrl} 的 String 字段值经当前存储服务的
  * {@link StorageService#getAccessUrl(String)} 处理——云端私有桶替换为带签名的临时 URL，本地原样返回。
  * <p>

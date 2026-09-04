@@ -2,7 +2,7 @@ package com.xiaozhi.message;
 
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.resp.MessageResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.common.model.req.MessagePageReq;
 import com.xiaozhi.support.ControllerTestSupport;
@@ -52,7 +52,7 @@ class MessageControllerTest extends ControllerTestSupport {
         MessageResp messageResp = new MessageResp();
         messageResp.setMessageId(1);
         messageResp.setDeviceId("dev-1");
-        PageResp<MessageResp> pageResp = new PageResp<>(List.of(messageResp), 1L, 1, 10);
+        PageResult<MessageResp> pageResp = new PageResult<>(List.of(messageResp), 1L, 1, 10);
         when(messageAppService.page(any(MessagePageReq.class), eq(7))).thenReturn(pageResp);
 
         try (var ignored = mockLoginUser(7)) {

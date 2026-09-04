@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.resp.ConfigResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.config.convert.ConfigConvert;
 import com.xiaozhi.config.dal.mysql.dataobject.ConfigDO;
 import com.xiaozhi.config.dal.mysql.mapper.ConfigMapper;
@@ -37,7 +37,7 @@ public class ConfigServiceImpl implements ConfigService {
     private CacheHelper cacheHelper;
 
     @Override
-    public PageResp<ConfigResp> page(int pageNo, int pageSize, String configType, String configName,
+    public PageResult<ConfigResp> page(int pageNo, int pageSize, String configType, String configName,
                                      String modelType, String provider, String isDefault, String state,
                                      Integer userId) {
         Page<ConfigDO> page = new Page<>(pageNo, pageSize);
@@ -49,7 +49,7 @@ public class ConfigServiceImpl implements ConfigService {
         List<ConfigResp> list = result.getRecords().stream()
             .map(configConvert::toResp)
             .toList();
-        return new PageResp<>(
+        return new PageResult<>(
             list,
             result.getTotal(),
             Math.toIntExact(result.getCurrent()),

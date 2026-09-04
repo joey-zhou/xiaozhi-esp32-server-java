@@ -8,7 +8,7 @@ import com.xiaozhi.authrole.AuthRoleAppService;
 import com.xiaozhi.common.model.req.AuthRolePageReq;
 import com.xiaozhi.common.model.resp.AuthRolePermissionConfigResp;
 import com.xiaozhi.common.model.resp.AuthRoleResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import java.util.List;
 import com.xiaozhi.common.web.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,7 +35,7 @@ public class AuthRoleController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:auth-role:api:list")
     @Operation(summary = "根据条件查询后台权限角色", description = "返回后台权限角色列表")
-    public ApiResponse<PageResp<AuthRoleResp>> list(@Valid AuthRolePageReq req) {
+    public ApiResponse<PageResult<AuthRoleResp>> list(@Valid AuthRolePageReq req) {
         return ApiResponse.success(authRoleAppService.page(req));
     }
 

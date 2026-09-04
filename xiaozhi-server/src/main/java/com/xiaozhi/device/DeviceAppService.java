@@ -11,7 +11,7 @@ import com.xiaozhi.common.model.req.DeviceScanBindReq;
 import com.xiaozhi.common.model.req.DeviceUpdateReq;
 import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.communication.ServerAddressProvider;
 import com.xiaozhi.communication.auth.DeviceAuthService;
 import com.xiaozhi.communication.registry.DialogueServerInfo;
@@ -78,7 +78,7 @@ public class DeviceAppService {
     private int websocketProtocolVersion;
 
 
-    public PageResp<DeviceResp> page(DevicePageReq req, Integer userId) {
+    public PageResult<DeviceResp> page(DevicePageReq req, Integer userId) {
         DevicePageReq r = req == null ? new DevicePageReq() : req;
         return deviceService.page(r.getPageNo(), r.getPageSize(),
             r.getDeviceId(), r.getDeviceName(), r.getRoleName(),

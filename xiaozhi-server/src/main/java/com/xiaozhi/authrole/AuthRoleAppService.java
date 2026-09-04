@@ -4,7 +4,7 @@ import com.xiaozhi.authrole.service.AuthRoleService;
 import com.xiaozhi.common.model.req.AuthRolePageReq;
 import com.xiaozhi.common.model.resp.AuthRolePermissionConfigResp;
 import com.xiaozhi.common.model.resp.AuthRoleResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +25,7 @@ public class AuthRoleAppService {
     @Resource
     private AuthRoleService authRoleService;
 
-    public PageResp<AuthRoleResp> page(AuthRolePageReq req) {
+    public PageResult<AuthRoleResp> page(AuthRolePageReq req) {
         AuthRolePageReq r = req == null ? new AuthRolePageReq() : req;
         return authRoleService.page(r.getPageNo(), r.getPageSize(), r.getAuthRoleName(), r.getRoleKey(), r.getStatus());
     }

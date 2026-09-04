@@ -4,7 +4,7 @@ import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.req.RoleCreateReq;
 import com.xiaozhi.common.model.req.RolePageReq;
 import com.xiaozhi.common.model.req.RoleUpdateReq;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.RoleResp;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.support.ControllerTestSupport;
@@ -64,7 +64,7 @@ class RoleControllerTest extends ControllerTestSupport {
         RoleResp roleResp = new RoleResp();
         roleResp.setRoleId(1);
         roleResp.setRoleName("管理员");
-        PageResp<RoleResp> pageResp = new PageResp<>(List.of(roleResp), 1L, 1, 10);
+        PageResult<RoleResp> pageResp = new PageResult<>(List.of(roleResp), 1L, 1, 10);
 
         when(roleAppService.page(any(RolePageReq.class), eq(7))).thenReturn(pageResp);
 

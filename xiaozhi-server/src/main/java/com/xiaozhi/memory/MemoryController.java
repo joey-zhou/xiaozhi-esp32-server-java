@@ -7,7 +7,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.bo.SummaryBO;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.summary.service.SummaryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,7 +36,7 @@ public class MemoryController extends BaseController {
     @CheckOwner(resource = "role", id = "#roleId")
     @CheckOwner(resource = "device", id = "#deviceId")
     @Operation(summary = "查询指定角色的摘要记忆", description = "返回摘要记忆列表，可按设备 ID 筛选")
-    public ApiResponse<PageResp<SummaryBO>> querySummary(@PathVariable Integer roleId,
+    public ApiResponse<PageResult<SummaryBO>> querySummary(@PathVariable Integer roleId,
                                       @PathVariable String deviceId,
                                       @RequestParam(defaultValue = "1") Integer pageNo,
                                       @RequestParam(defaultValue = "10") Integer pageSize) {

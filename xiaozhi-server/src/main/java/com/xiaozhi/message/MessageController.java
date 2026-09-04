@@ -11,7 +11,7 @@ import com.xiaozhi.common.model.req.ConversationPageReq;
 import com.xiaozhi.common.model.req.MessagePageReq;
 import com.xiaozhi.common.model.resp.ConversationResp;
 import com.xiaozhi.common.model.resp.MessageResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.message.MessageAppService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,7 +40,7 @@ public class MessageController extends BaseController {
     @ResponseBody
     @SaCheckPermission(value = {"system:role:memory:chat:api:list", "system:chat"}, mode = SaMode.OR)
     @Operation(summary = "根据条件查询对话消息", description = "返回对话消息列表")
-    public ApiResponse<PageResp<MessageResp>> list(@Valid MessagePageReq req) {
+    public ApiResponse<PageResult<MessageResp>> list(@Valid MessagePageReq req) {
         return ApiResponse.success(messageAppService.page(req, StpUtil.getLoginIdAsInt()));
     }
 
@@ -48,7 +48,7 @@ public class MessageController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:chat")
     @Operation(summary = "查询用户的会话列表", description = "返回当前用户的历史会话列表，基于sessionId聚合")
-    public ApiResponse<PageResp<ConversationResp>> conversations(@Valid ConversationPageReq req) {
+    public ApiResponse<PageResult<ConversationResp>> conversations(@Valid ConversationPageReq req) {
         return ApiResponse.success(messageAppService.conversationPage(req, StpUtil.getLoginIdAsInt()));
     }
 

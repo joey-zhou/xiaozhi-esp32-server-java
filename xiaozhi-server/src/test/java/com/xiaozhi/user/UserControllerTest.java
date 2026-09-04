@@ -2,7 +2,7 @@ package com.xiaozhi.user;
 
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.req.UserPageReq;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.UserResp;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.security.AuthenticationService;
@@ -84,7 +84,7 @@ class UserControllerTest extends ControllerTestSupport {
         UserResp userResp = new UserResp();
         userResp.setUserId(1);
         userResp.setUsername("alice");
-        PageResp<UserResp> pageResp = new PageResp<>(List.of(userResp), 1L, 1, 10);
+        PageResult<UserResp> pageResp = new PageResult<>(List.of(userResp), 1L, 1, 10);
         when(userAppService.page(any(UserPageReq.class))).thenReturn(pageResp);
 
         mockMvc.perform(get("/api/user").param("pageNo", "1").param("pageSize", "10").param("name", "ali"))

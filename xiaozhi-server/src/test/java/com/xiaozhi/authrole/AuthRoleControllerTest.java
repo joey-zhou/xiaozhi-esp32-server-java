@@ -3,7 +3,7 @@ package com.xiaozhi.authrole;
 import com.xiaozhi.common.model.req.AuthRolePageReq;
 import com.xiaozhi.common.model.resp.AuthRoleResp;
 import com.xiaozhi.common.model.resp.AuthRolePermissionConfigResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,7 +52,7 @@ class AuthRoleControllerTest extends ControllerTestSupport {
         AuthRoleResp resp = new AuthRoleResp();
         resp.setAuthRoleId(1);
         resp.setAuthRoleName("管理员");
-        PageResp<AuthRoleResp> pageResp = new PageResp<>(List.of(resp), 1L, 1, 10);
+        PageResult<AuthRoleResp> pageResp = new PageResult<>(List.of(resp), 1L, 1, 10);
         when(authRoleAppService.page(any(AuthRolePageReq.class))).thenReturn(pageResp);
 
         mockMvc.perform(get("/api/auth-role")

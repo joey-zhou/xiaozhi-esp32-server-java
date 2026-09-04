@@ -7,7 +7,7 @@ import com.xiaozhi.agent.service.AgentService;
 import com.xiaozhi.common.model.bo.AgentBO;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.resp.AgentResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.config.domain.AiConfig;
 import com.xiaozhi.config.domain.repository.ConfigRepository;
 import com.xiaozhi.config.infrastructure.convert.ConfigConverter;
@@ -56,7 +56,7 @@ public class AgentServiceImpl implements AgentService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public PageResp<AgentResp> page(int pageNo, int pageSize, String provider, String agentName, Integer userId) {
+    public PageResult<AgentResp> page(int pageNo, int pageSize, String provider, String agentName, Integer userId) {
         String normalizedProvider = provider == null ? "" : provider.trim().toLowerCase();
         List<AgentBO> agentList = switch (normalizedProvider) {
             case "coze" -> getCozeAgents(agentName, userId);
@@ -71,7 +71,7 @@ public class AgentServiceImpl implements AgentService {
         List<AgentResp> list = agentList.subList(fromIndex, toIndex).stream()
             .map(agentConvert::toResp)
             .toList();
-        return new PageResp<>(list, (long) total, pageNo, pageSize);
+        return new PageResult<>(list, (long) total, pageNo, pageSize);
     }
 
     private List<AgentBO> getDifyAgents(String agentName, Integer userId) {

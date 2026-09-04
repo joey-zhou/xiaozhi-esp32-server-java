@@ -6,7 +6,7 @@ import com.xiaozhi.common.model.req.ConfigCreateReq;
 import com.xiaozhi.common.model.req.ConfigPageReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
 import com.xiaozhi.common.model.resp.ConfigResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.config.convert.ConfigConvert;
 import com.xiaozhi.config.domain.AiConfig;
 import com.xiaozhi.config.domain.repository.ConfigRepository;
@@ -31,7 +31,7 @@ public class ConfigAppService {
     @Resource
     private ConfigRepository configRepository;
 
-    public PageResp<ConfigResp> page(ConfigPageReq req, Integer userId) {
+    public PageResult<ConfigResp> page(ConfigPageReq req, Integer userId) {
         ConfigPageReq r = req == null ? new ConfigPageReq() : req;
         return configService.page(r.getPageNo(), r.getPageSize(),
             r.getConfigType(), r.getConfigName(), r.getModelType(),

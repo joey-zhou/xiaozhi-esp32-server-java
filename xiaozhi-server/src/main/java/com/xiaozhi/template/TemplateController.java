@@ -9,7 +9,7 @@ import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.TemplateCreateReq;
 import com.xiaozhi.common.model.req.TemplatePageReq;
 import com.xiaozhi.common.model.req.TemplateUpdateReq;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.template.TemplateAppService;
@@ -38,7 +38,7 @@ public class TemplateController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:prompt-template:api:list")
     @Operation(summary = "根据条件查询角色模板", description = "返回模板列表")
-    public ApiResponse<PageResp<TemplateResp>> list(@Valid TemplatePageReq req) {
+    public ApiResponse<PageResult<TemplateResp>> list(@Valid TemplatePageReq req) {
         return ApiResponse.success(templateAppService.page(req, StpUtil.getLoginIdAsInt()));
     }
 

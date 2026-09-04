@@ -12,7 +12,7 @@ import com.xiaozhi.common.model.req.RoleCreateReq;
 import com.xiaozhi.common.model.req.RolePageReq;
 import com.xiaozhi.common.model.req.RoleUpdateReq;
 import com.xiaozhi.common.model.req.TestVoiceReq;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.RoleResp;
 import com.xiaozhi.common.model.resp.TestVoiceResp;
 import com.xiaozhi.common.web.ApiResponse;
@@ -71,7 +71,7 @@ public class RoleController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:role:api:list")
     @Operation(summary = "根据条件查询角色信息", description = "返回角色信息列表")
-    public ApiResponse<PageResp<RoleResp>> list(@Valid RolePageReq req) {
+    public ApiResponse<PageResult<RoleResp>> list(@Valid RolePageReq req) {
         return ApiResponse.success(roleAppService.page(req, StpUtil.getLoginIdAsInt()));
     }
 

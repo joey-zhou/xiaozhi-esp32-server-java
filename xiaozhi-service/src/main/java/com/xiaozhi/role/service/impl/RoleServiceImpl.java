@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.model.bo.RoleBO;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.RoleResp;
 import com.xiaozhi.role.convert.RoleConvert;
 import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
@@ -39,12 +39,12 @@ public class RoleServiceImpl implements RoleService {
     private CacheHelper cacheHelper;
 
     @Override
-    public PageResp<RoleResp> page(int pageNo, int pageSize, Integer roleId, String roleName,
+    public PageResult<RoleResp> page(int pageNo, int pageSize, Integer roleId, String roleName,
                                    String isDefault, String state, Integer userId) {
         Page<RoleResp> page = new Page<>(pageNo, pageSize);
         IPage<RoleResp> result = roleMapper.selectPageResp(page, roleId, roleName, isDefault, state, userId);
         List<RoleResp> records = result.getRecords();
-        return new PageResp<>(
+        return new PageResult<>(
             records,
             result.getTotal(),
             Math.toIntExact(result.getCurrent()),

@@ -2,7 +2,7 @@ package com.xiaozhi.agent;
 
 import com.xiaozhi.common.model.req.AgentPageReq;
 import com.xiaozhi.common.model.resp.AgentResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +50,7 @@ class AgentControllerTest extends ControllerTestSupport {
         AgentResp agentResp = new AgentResp();
         agentResp.setAgentId(1);
         agentResp.setAgentName("讲解员");
-        PageResp<AgentResp> pageResp = new PageResp<>(List.of(agentResp), 1L, 1, 10);
+        PageResult<AgentResp> pageResp = new PageResult<>(List.of(agentResp), 1L, 1, 10);
         when(agentAppService.page(any(AgentPageReq.class), eq(7))).thenReturn(pageResp);
 
         try (var ignored = mockLoginUser(7)) {

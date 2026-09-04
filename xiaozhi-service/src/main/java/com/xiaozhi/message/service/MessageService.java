@@ -3,7 +3,7 @@ package com.xiaozhi.message.service;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.resp.ConversationResp;
 import com.xiaozhi.common.model.resp.MessageResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -12,12 +12,12 @@ import java.util.List;
 
 public interface MessageService {
 
-    PageResp<MessageResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
+    PageResult<MessageResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
                                String sender, String messageType, Integer roleId,
                                Date startTime, Date endTime, Integer userId, String sessionId,
                                String source);
 
-    PageResp<ConversationResp> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source);
+    PageResult<ConversationResp> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source);
 
     void delete(Integer messageId);
 

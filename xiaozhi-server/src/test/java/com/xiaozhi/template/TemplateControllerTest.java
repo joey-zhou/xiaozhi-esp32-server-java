@@ -2,7 +2,7 @@ package com.xiaozhi.template;
 
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.req.TemplateCreateReq;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.common.model.req.TemplatePageReq;
@@ -56,7 +56,7 @@ class TemplateControllerTest extends ControllerTestSupport {
         TemplateResp resp = new TemplateResp();
         resp.setTemplateId(1);
         resp.setTemplateName("欢迎词");
-        PageResp<TemplateResp> pageResp = new PageResp<>(List.of(resp), 1L, 1, 10);
+        PageResult<TemplateResp> pageResp = new PageResult<>(List.of(resp), 1L, 1, 10);
         when(templateAppService.page(any(TemplatePageReq.class), eq(7))).thenReturn(pageResp);
 
         try (var ignored = mockLoginUser(7)) {

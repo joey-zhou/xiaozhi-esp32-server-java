@@ -21,7 +21,7 @@ import com.xiaozhi.common.model.req.UserTelLoginReq;
 import com.xiaozhi.common.model.req.UserUpdateReq;
 import com.xiaozhi.common.model.req.UserWechatLoginReq;
 import com.xiaozhi.common.model.resp.LoginResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.UserResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.security.AuthenticationService;
@@ -196,7 +196,7 @@ public class UserController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:user:api:list")
     @Operation(summary = "根据条件查询用户信息列表", description = "返回用户信息列表")
-    public ApiResponse<PageResp<UserResp>> queryUsers(@Valid UserPageReq req) {
+    public ApiResponse<PageResult<UserResp>> queryUsers(@Valid UserPageReq req) {
         return ApiResponse.success(userAppService.page(req));
     }
 

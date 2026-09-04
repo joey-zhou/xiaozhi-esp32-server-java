@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.model.bo.SummaryBO;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.summary.convert.SummaryConvert;
 import com.xiaozhi.summary.dal.mysql.dataobject.SummaryDO;
 import com.xiaozhi.summary.dal.mysql.mapper.SummaryMapper;
@@ -33,11 +33,11 @@ public class SummaryServiceImpl implements SummaryService {
     private SummaryConvert summaryConvert;
 
     @Override
-    public PageResp<SummaryBO> page(String deviceId, Integer roleId, Integer pageNo, Integer pageSize) {
+    public PageResult<SummaryBO> page(String deviceId, Integer roleId, Integer pageNo, Integer pageSize) {
         int currentPage = pageNo == null || pageNo < 1 ? DEFAULT_PAGE_NO : pageNo;
         int currentSize = pageSize == null || pageSize < 1 ? DEFAULT_PAGE_SIZE : pageSize;
         if (!StringUtils.hasText(deviceId) || roleId == null) {
-            return new PageResp<>(List.of(), 0L, currentPage, currentSize);
+            return new PageResult<>(List.of(), 0L, currentPage, currentSize);
         }
 
         Page<SummaryDO> page = new Page<>(currentPage, currentSize);
@@ -45,7 +45,7 @@ public class SummaryServiceImpl implements SummaryService {
             .eq(SummaryDO::getDeviceId, deviceId)
             .eq(SummaryDO::getRoleId, roleId)
             .orderByDesc(SummaryDO::getCreateTime));
-        return new PageResp<>(
+        return new PageResult<>(
             summaryConvert.toBOList(result.getRecords()),
             result.getTotal(),
             Math.toIntExact(result.getCurrent()),

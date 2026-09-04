@@ -3,7 +3,7 @@ package com.xiaozhi.device.service;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.common.model.resp.DeviceResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.port.DeviceWriter;
 
 import java.util.List;
@@ -15,7 +15,7 @@ public interface DeviceService extends DeviceWriter {
 
     // ===================== 查询操作 =====================
 
-    PageResp<DeviceResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
+    PageResult<DeviceResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
                               String roleName, String state, Integer roleId, Integer userId);
 
     DeviceBO getBO(String deviceId);

@@ -27,7 +27,7 @@ import com.xiaozhi.common.model.req.DeviceScanBindReq;
 import com.xiaozhi.common.model.req.DeviceUpdateReq;
 import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.utils.JsonUtil;
 import com.xiaozhi.utils.RequestContextUtils;
@@ -64,7 +64,7 @@ public class DeviceController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:device:api:list")
     @Operation(summary = "根据条件查询设备", description = "返回设备信息列表")
-    public ApiResponse<PageResp<DeviceResp>> list(@Valid DevicePageReq req) {
+    public ApiResponse<PageResult<DeviceResp>> list(@Valid DevicePageReq req) {
         return ApiResponse.success(deviceAppService.page(req, StpUtil.getLoginIdAsInt()));
     }
 

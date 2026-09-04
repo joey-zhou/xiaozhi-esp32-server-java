@@ -11,7 +11,7 @@ import com.xiaozhi.common.model.req.ConfigPageReq;
 import com.xiaozhi.common.model.req.ConfigTestReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
 import com.xiaozhi.common.model.resp.ConfigResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,7 +49,7 @@ public class ConfigController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:config:api:list")
     @Operation(summary = "根据条件查询配置", description = "返回配置信息列表")
-    public ApiResponse<PageResp<ConfigResp>> list(@Valid ConfigPageReq req) {
+    public ApiResponse<PageResult<ConfigResp>> list(@Valid ConfigPageReq req) {
         return ApiResponse.success(configAppService.page(req, StpUtil.getLoginIdAsInt()));
     }
 

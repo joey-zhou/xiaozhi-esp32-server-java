@@ -3,7 +3,7 @@ package com.xiaozhi.template;
 import com.xiaozhi.common.model.req.TemplateCreateReq;
 import com.xiaozhi.common.model.req.TemplatePageReq;
 import com.xiaozhi.common.model.req.TemplateUpdateReq;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.template.convert.TemplateConvert;
 import com.xiaozhi.template.service.TemplateService;
@@ -28,7 +28,7 @@ public class TemplateAppService {
     @Resource
     private TemplateConvert templateConvert;
 
-    public PageResp<TemplateResp> page(TemplatePageReq req, Integer userId) {
+    public PageResult<TemplateResp> page(TemplatePageReq req, Integer userId) {
         TemplatePageReq r = req == null ? new TemplatePageReq() : req;
         return templateService.page(r.getPageNo(), r.getPageSize(), r.getTemplateName(), r.getCategory(), userId);
     }

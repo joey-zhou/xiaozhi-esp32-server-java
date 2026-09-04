@@ -3,7 +3,7 @@ package com.xiaozhi.config.service;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.port.ConfigLookup;
 import com.xiaozhi.common.model.resp.ConfigResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import org.springframework.util.Assert;
 
 import java.util.List;
@@ -12,7 +12,7 @@ public interface ConfigService extends ConfigLookup {
 
     String CACHE_NAME = "XiaoZhi:SysConfig";
 
-    PageResp<ConfigResp> page(int pageNo, int pageSize, String configType, String configName,
+    PageResult<ConfigResp> page(int pageNo, int pageSize, String configType, String configName,
                               String modelType, String provider, String isDefault, String state,
                               Integer userId);
 

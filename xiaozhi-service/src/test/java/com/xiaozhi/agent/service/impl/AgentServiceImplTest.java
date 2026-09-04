@@ -4,7 +4,7 @@ import com.xiaozhi.agent.convert.AgentConvert;
 import com.xiaozhi.common.model.bo.AgentBO;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.resp.AgentResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.config.domain.repository.ConfigRepository;
 import com.xiaozhi.config.infrastructure.convert.ConfigConverter;
 import com.xiaozhi.config.service.ConfigService;
@@ -53,7 +53,7 @@ class AgentServiceImplTest {
 
     @Test
     void pageReturnsEmptyWhenProviderUnsupported() {
-        PageResp<AgentResp> result = agentService.page(1, 10, null, null, 1);
+        PageResult<AgentResp> result = agentService.page(1, 10, null, null, 1);
 
         assertThat(result.getList()).isEmpty();
         assertThat(result.getTotal()).isZero();
@@ -64,7 +64,7 @@ class AgentServiceImplTest {
     void pageReturnsEmptyWhenDifyConfigsMissing() {
         when(configService.listBO(1, null, "dify", null, null, ConfigBO.STATE_ENABLED)).thenReturn(List.of());
 
-        PageResp<AgentResp> result = agentService.page(1, 10, "  DIFY  ", null, 1);
+        PageResult<AgentResp> result = agentService.page(1, 10, "  DIFY  ", null, 1);
 
         assertThat(result.getList()).isEmpty();
         assertThat(result.getTotal()).isZero();
@@ -95,7 +95,7 @@ class AgentServiceImplTest {
             .thenReturn(List.of(agentConfig, llmConfig));
         when(agentConvert.toResp(any(AgentBO.class))).thenReturn(resp);
 
-        PageResp<AgentResp> result = agentService.page(1, 10, "dify", null, 1);
+        PageResult<AgentResp> result = agentService.page(1, 10, "dify", null, 1);
 
         assertThat(result.getList()).containsExactly(resp);
         assertThat(result.getTotal()).isEqualTo(1);

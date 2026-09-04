@@ -4,7 +4,7 @@ import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.req.RoleCreateReq;
 import com.xiaozhi.common.model.req.RolePageReq;
 import com.xiaozhi.common.model.req.RoleUpdateReq;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.RoleResp;
 import com.xiaozhi.role.convert.RoleConvert;
 import com.xiaozhi.role.domain.Role;
@@ -39,7 +39,7 @@ public class RoleAppService {
     @Resource
     private RoleConvert roleConvert;
 
-    public PageResp<RoleResp> page(RolePageReq req, Integer userId) {
+    public PageResult<RoleResp> page(RolePageReq req, Integer userId) {
         RolePageReq r = req == null ? new RolePageReq() : req;
         return roleService.page(r.getPageNo(), r.getPageSize(),
             r.getRoleId(), r.getRoleName(), r.getIsDefault(), r.getState(), userId);

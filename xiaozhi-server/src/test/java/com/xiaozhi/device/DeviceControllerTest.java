@@ -6,7 +6,7 @@ import com.xiaozhi.common.model.req.DeviceScanBindReq;
 import com.xiaozhi.common.model.req.DeviceUpdateReq;
 import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,7 +59,7 @@ class DeviceControllerTest extends ControllerTestSupport {
         DeviceResp resp = new DeviceResp();
         resp.setDeviceId("dev-1");
         resp.setDeviceName("客厅音箱");
-        PageResp<DeviceResp> pageResp = new PageResp<>(List.of(resp), 1L, 1, 10);
+        PageResult<DeviceResp> pageResp = new PageResult<>(List.of(resp), 1L, 1, 10);
         when(deviceAppService.page(any(DevicePageReq.class), eq(7))).thenReturn(pageResp);
 
         try (var ignored = mockLoginUser(7)) {

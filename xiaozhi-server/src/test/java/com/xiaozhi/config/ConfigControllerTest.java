@@ -6,7 +6,7 @@ import com.xiaozhi.common.model.req.ConfigPageReq;
 import com.xiaozhi.common.model.req.ConfigTestReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
 import com.xiaozhi.common.model.resp.ConfigResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.support.ControllerTestSupport;
@@ -150,10 +150,10 @@ class ConfigControllerTest extends ControllerTestSupport {
         return req;
     }
 
-    private static PageResp<ConfigResp> singlePage() {
+    private static PageResult<ConfigResp> singlePage() {
         ConfigResp resp = new ConfigResp();
         resp.setConfigId(3);
         resp.setConfigName("默认TTS");
-        return new PageResp<>(List.of(resp), 1L, 1, 10);
+        return new PageResult<>(List.of(resp), 1L, 1, 10);
     }
 }

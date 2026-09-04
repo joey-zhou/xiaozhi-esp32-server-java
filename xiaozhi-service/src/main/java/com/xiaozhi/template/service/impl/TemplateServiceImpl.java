@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.model.bo.TemplateBO;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.template.convert.TemplateConvert;
 import com.xiaozhi.template.dal.mysql.dataobject.TemplateDO;
@@ -33,13 +33,13 @@ public class TemplateServiceImpl implements TemplateService {
     private TemplateConvert templateConvert;
 
     @Override
-    public PageResp<TemplateResp> page(int pageNo, int pageSize, String templateName, String category, Integer userId) {
+    public PageResult<TemplateResp> page(int pageNo, int pageSize, String templateName, String category, Integer userId) {
         Page<TemplateDO> page = new Page<>(pageNo, pageSize);
         IPage<TemplateDO> result = templateMapper.selectPage(page, buildQuery(userId, templateName, category));
         List<TemplateResp> list = result.getRecords().stream()
             .map(templateConvert::toResp)
             .toList();
-        return new PageResp<>(
+        return new PageResult<>(
             list,
             result.getTotal(),
             Math.toIntExact(result.getCurrent()),

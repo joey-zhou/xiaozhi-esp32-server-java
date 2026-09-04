@@ -1,7 +1,7 @@
 package com.xiaozhi.file;
 
 import com.xiaozhi.common.annotation.SignedFileUrl;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -15,7 +15,7 @@ import java.util.function.UnaryOperator;
  * {@link SignedFileUrl} 字段处理工具。
  * <p>
  * 供请求/响应两个方向的 Advice 复用：读边界签名、写边界剥签名，仅转换逻辑不同。
- * 自动展开 {@link PageResp} 与集合，遍历带注解的 String 字段并用给定函数替换其值。
+ * 自动展开 {@link PageResult} 与集合，遍历带注解的 String 字段并用给定函数替换其值。
  */
 final class SignedFileUrlSupport {
 
@@ -30,7 +30,7 @@ final class SignedFileUrlSupport {
      */
     static void apply(Object data, UnaryOperator<String> transformer) {
         if (data == null) return;
-        if (data instanceof PageResp<?> pageResp) {
+        if (data instanceof PageResult<?> pageResp) {
             applyCollection(pageResp.getList(), transformer);
         } else if (data instanceof Collection<?> collection) {
             applyCollection(collection, transformer);

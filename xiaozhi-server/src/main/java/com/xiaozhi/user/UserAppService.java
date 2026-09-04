@@ -11,7 +11,7 @@ import com.xiaozhi.common.model.req.UserResetPasswordReq;
 import com.xiaozhi.common.model.req.UserUpdateReq;
 import com.xiaozhi.common.model.resp.AuthRoleResp;
 import com.xiaozhi.common.model.resp.LoginResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.PermissionTreeResp;
 import com.xiaozhi.common.model.resp.UserResp;
 import com.xiaozhi.common.port.DeviceWriter;
@@ -77,7 +77,7 @@ public class UserAppService {
 
     // ==================== 查询 ====================
 
-    public PageResp<UserResp> page(UserPageReq req) {
+    public PageResult<UserResp> page(UserPageReq req) {
         UserPageReq r = req == null ? new UserPageReq() : req;
         return userService.page(r.getPageNo(), r.getPageSize(),
             r.getName(), r.getEmail(), r.getTel(), r.getIsAdmin(), r.getAuthRoleId());

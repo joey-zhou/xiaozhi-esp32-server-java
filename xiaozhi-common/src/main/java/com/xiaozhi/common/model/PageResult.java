@@ -1,4 +1,4 @@
-package com.xiaozhi.common.model.resp;
+package com.xiaozhi.common.model;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
@@ -12,7 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Schema(description = "分页响应")
-public class PageResp<T> implements Serializable {
+public class PageResult<T> implements Serializable {
 
     @Schema(description = "数据列表")
     private List<T> list;

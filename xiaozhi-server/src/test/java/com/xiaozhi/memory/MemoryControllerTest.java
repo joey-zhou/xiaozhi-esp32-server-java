@@ -1,7 +1,7 @@
 package com.xiaozhi.memory;
 
 import com.xiaozhi.common.model.bo.SummaryBO;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.summary.service.SummaryService;
 import com.xiaozhi.support.ControllerTestSupport;
@@ -45,7 +45,7 @@ class MemoryControllerTest extends ControllerTestSupport {
     void querySummaryReturnsPagedSummaryMemory() throws Exception {
         SummaryBO summaryBO = new SummaryBO();
         summaryBO.setCreateTime(Instant.ofEpochMilli(1L));
-        PageResp<SummaryBO> pageResp = new PageResp<>(List.of(summaryBO), 1L, 1, 10);
+        PageResult<SummaryBO> pageResp = new PageResult<>(List.of(summaryBO), 1L, 1, 10);
         when(summaryService.page("dev-1", 2, 1, 10)).thenReturn(pageResp);
 
         mockMvc.perform(get("/api/memory/summary/2/dev-1")

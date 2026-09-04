@@ -8,7 +8,7 @@ import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.resp.ConversationResp;
 import com.xiaozhi.common.model.resp.MessageResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.event.ConversationHistoryClearedEvent;
 import com.xiaozhi.message.convert.MessageConvert;
 import com.xiaozhi.message.dal.mysql.dataobject.MessageDO;
@@ -51,20 +51,20 @@ public class MessageServiceImpl implements MessageService {
     private ConversationMapper conversationMapper;
 
     @Override
-    public PageResp<MessageResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
+    public PageResult<MessageResp> page(int pageNo, int pageSize, String deviceId, String deviceName,
                                       String sender, String messageType, Integer roleId,
                                       Date startTime, Date endTime, Integer userId, String sessionId,
                                       String source) {
         Page<MessageResp> page = new Page<>(pageNo, pageSize);
         IPage<MessageResp> iPage = messageMapper.selectPageResp(page, deviceId, deviceName, sender, messageType, roleId, startTime, endTime, userId, sessionId, source);
-        return new PageResp<>(iPage.getRecords(), iPage.getTotal(), pageNo, pageSize);
+        return new PageResult<>(iPage.getRecords(), iPage.getTotal(), pageNo, pageSize);
     }
 
     @Override
-    public PageResp<ConversationResp> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source) {
+    public PageResult<ConversationResp> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source) {
         Page<ConversationResp> page = new Page<>(pageNo, pageSize);
         IPage<ConversationResp> iPage = conversationMapper.selectConversationPage(page, userId, roleId, source);
-        return new PageResp<>(iPage.getRecords(), iPage.getTotal(), pageNo, pageSize);
+        return new PageResult<>(iPage.getRecords(), iPage.getTotal(), pageNo, pageSize);
     }
 
     @Override

@@ -11,7 +11,7 @@ import com.xiaozhi.authrole.service.AuthRoleService;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.resp.AuthRolePermissionConfigResp;
 import com.xiaozhi.common.model.resp.AuthRoleResp;
-import com.xiaozhi.common.model.resp.PageResp;
+import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.PermissionResp;
 import com.xiaozhi.permission.service.PermissionService;
 import com.xiaozhi.authrolepermission.dal.mysql.dataobject.AuthRolePermissionDO;
@@ -45,7 +45,7 @@ public class AuthRoleServiceImpl implements AuthRoleService {
     private AuthRoleConvert authRoleConvert;
 
     @Override
-    public PageResp<AuthRoleResp> page(int pageNo, int pageSize, String authRoleName, String roleKey, String status) {
+    public PageResult<AuthRoleResp> page(int pageNo, int pageSize, String authRoleName, String roleKey, String status) {
         Page<AuthRoleDO> page = new Page<>(pageNo, pageSize);
         IPage<AuthRoleDO> result = authRoleMapper.selectPage(page, new LambdaQueryWrapper<AuthRoleDO>()
             .like(StringUtils.hasText(authRoleName), AuthRoleDO::getAuthRoleName, authRoleName)
@@ -53,7 +53,7 @@ public class AuthRoleServiceImpl implements AuthRoleService {
             .eq(StringUtils.hasText(status), AuthRoleDO::getStatus, status)
             .orderByAsc(AuthRoleDO::getAuthRoleId));
 
-        return new PageResp<>(
+        return new PageResult<>(
             result.getRecords().stream().map(authRoleConvert::toResp).toList(),
             result.getTotal(),
             Math.toIntExact(result.getCurrent()),
