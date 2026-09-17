@@ -428,7 +428,6 @@ export default {
     voiceNotFound: '未找到音色信息',
     playVoiceFailed: '播放音色失败',
     loadTemplateFailed: '加载模板列表失败',
-    voskLocalRecognition: 'Vosk本地识别',
     unknownModel: '未知模型',
     voiceTestMessage: '您好，我是您的语音助手，很高兴为您服务',
     
@@ -450,8 +449,10 @@ export default {
     loadModelFailed: '加载模型列表失败',
     loadVoiceFailed: '加载语音列表失败',
     loadSttFailed: '加载语音识别配置失败',
-    voskLocalStt: 'Vosk本地识别',
-    voskLocalSttDesc: '默认Vosk本地语音识别模型',
+    localSttSenseVoice: 'SenseVoice 本地识别',
+    localSttVosk: 'Vosk 本地识别',
+    localSttUnavailable: '本地识别（模型未安装）',
+    localSttDesc: '不配置第三方服务时使用服务端本地模型',
   },
 
   template: {

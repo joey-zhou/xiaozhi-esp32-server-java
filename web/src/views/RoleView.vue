@@ -61,6 +61,8 @@ const {
   allModels,
   allVoices,
   sttOptions,
+  localSttLabel,
+  localSttAvailable,
   loadAllModels,
   loadAllVoices,
   loadSttOptions,
@@ -87,7 +89,7 @@ const formData = reactive<RoleFormData>({
   modelId: undefined,
   temperature: 0.7,
   topP: 0.9,
-  sttId: -1,
+  sttId: undefined,
   vadSpeechTh: 0.5,
   vadSilenceTh: 0.3,
   vadEnergyTh: 0.01,
@@ -264,7 +266,7 @@ const handleEdit = (record: Role) => {
       modelId: record.modelId,
       temperature: record.temperature ?? 0.7,
       topP: record.topP ?? 0.9,
-      sttId: record.sttId ?? -1,
+      sttId: record.sttId ?? (localSttAvailable.value ? -1 : undefined),
       vadSpeechTh: record.vadSpeechTh ?? 0.5,
       vadSilenceTh: record.vadSilenceTh ?? 0.3,
       vadEnergyTh: record.vadEnergyTh ?? 0.01,
@@ -409,7 +411,8 @@ const resetForm = () => {
     modelId: undefined,
     temperature: 0.7,
     topP: 0.9,
-    sttId: -1,
+    // 服务端没有本地识别模型时不预选，逼着选一个第三方配置
+    sttId: localSttAvailable.value ? -1 : undefined,
     vadSpeechTh: 0.5,
     vadSilenceTh: 0.3,
     vadEnergyTh: 0.01,
@@ -698,11 +701,11 @@ Promise.all([
               <!-- 语音识别 -->
               <template v-else-if="column.dataIndex === 'sttName'">
                 <a-tooltip
-                  :title="record.sttId === -1 || record.sttId === null ? t('role.voskLocalRecognition') : getSttLabel(record.sttId)"
+                  :title="record.sttId === -1 || record.sttId === null ? localSttLabel : getSttLabel(record.sttId)"
                   placement="top"
                 >
                   <span v-if="record.sttId === -1 || record.sttId === null" class="ellipsis-text">
-                    {{ t('role.voskLocalRecognition') }}
+                    {{ localSttLabel }}
                   </span>
                   <span v-else class="ellipsis-text">
                     {{ getSttLabel(record.sttId) }}

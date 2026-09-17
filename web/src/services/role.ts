@@ -1,6 +1,6 @@
 import { http } from './request'
 import api from './api'
-import type { Role, RoleQueryParams, RoleFormData, TestVoiceParams, TestVoiceResult } from '@/types/role'
+import type { Role, RoleQueryParams, RoleFormData, TestVoiceParams, TestVoiceResult, LocalStt } from '@/types/role'
 import type { SystemGlobalToolSummary } from '@/types/mcpTool'
 
 /**
@@ -85,4 +85,9 @@ export function getDisabledTools(roleId: number) {
 export function updateToolsStatus(roleId: number, excludeTools: string[]) {
   assertRoleId(roleId)
   return http.post(`${api.mcpTool.batchExclude}/${roleId}/exclude-tools`, { roleId, excludeTools })
+}
+
+/** 服务端本地语音识别当前加载的是哪个模型，角色页的"本地识别"选项据此显示 */
+export function queryLocalStt() {
+  return http.get<LocalStt>(api.role.localStt)
 }

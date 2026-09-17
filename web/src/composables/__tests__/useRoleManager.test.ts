@@ -4,6 +4,7 @@ const serviceMock = vi.hoisted(() => ({
   queryConfigs: vi.fn(),
   queryAgents: vi.fn(),
   querySherpaVoices: vi.fn(),
+  queryLocalStt: vi.fn(),
 }))
 
 // vue-i18n 与 ant-design-vue 由 src/__tests__/setup.ts 统一 mock：
@@ -11,7 +12,10 @@ const serviceMock = vi.hoisted(() => ({
 
 vi.mock('@/services/config', () => ({ queryConfigs: serviceMock.queryConfigs }))
 vi.mock('@/services/agent', () => ({ queryAgents: serviceMock.queryAgents }))
-vi.mock('@/services/role', () => ({ querySherpaVoices: serviceMock.querySherpaVoices }))
+vi.mock('@/services/role', () => ({
+  querySherpaVoices: serviceMock.querySherpaVoices,
+  queryLocalStt: serviceMock.queryLocalStt,
+}))
 
 import { message } from 'ant-design-vue'
 
@@ -130,16 +134,45 @@ describe('useRoleManager 未配置时静默退化', () => {
     expect(message.error).not.toHaveBeenCalled()
   })
 
-  it('STT 配置返回非 200 时只留本地 Vosk 一项，且不弹提示', async () => {
+  it('STT 配置返回非 200 时只留本地识别一项，且不弹提示', async () => {
     serviceMock.queryConfigs.mockResolvedValue({ code: 500, message: 'boom', data: null })
+    serviceMock.queryLocalStt.mockResolvedValue({
+      code: 200, message: 'ok', data: { provider: 'sherpa-onnx', available: true },
+    })
 
-    const { sttOptions, loadSttOptions } = useRoleManager()
+    const { sttOptions, localSttLabel, loadSttOptions } = useRoleManager()
     await loadSttOptions()
 
+    // 本地识别那一项的名字跟着服务端实际加载的模型走
     expect(sttOptions.value).toEqual([
-      { label: 'role.voskLocalStt', value: -1, desc: 'role.voskLocalSttDesc' },
+      { label: 'role.localSttSenseVoice', value: -1, desc: 'role.localSttDesc' },
     ])
+    expect(localSttLabel.value).toBe('role.localSttSenseVoice')
     expect(message.error).not.toHaveBeenCalled()
+  })
+
+  it('本地识别状态取不到时不给本地选项，只留第三方清单', async () => {
+    serviceMock.queryConfigs.mockResolvedValue(page([{ configId: 3, configName: '火山', configDesc: 'd' }]))
+    serviceMock.queryLocalStt.mockRejectedValue(new Error('down'))
+
+    const { sttOptions, localSttAvailable, loadSttOptions } = useRoleManager()
+    await loadSttOptions()
+
+    expect(sttOptions.value.map(o => o.label)).toEqual(['火山'])
+    expect(localSttAvailable.value).toBe(false)
+    expect(message.error).not.toHaveBeenCalled()
+  })
+
+  it('服务端两个本地模型都没有时没有本地识别可选，列表里的老角色显示模型未安装', async () => {
+    serviceMock.queryConfigs.mockResolvedValue(page([]))
+    serviceMock.queryLocalStt.mockResolvedValue({ code: 200, message: 'ok', data: { provider: null, available: false } })
+
+    const { sttOptions, localSttLabel, localSttAvailable, loadSttOptions } = useRoleManager()
+    await loadSttOptions()
+
+    expect(sttOptions.value).toEqual([])
+    expect(localSttAvailable.value).toBe(false)
+    expect(localSttLabel.value).toBe('role.localSttUnavailable')
   })
 })
 
@@ -148,6 +181,9 @@ describe('useRoleManager 请求异常时保留上一次的清单', () => {
     vi.clearAllMocks()
     stubVoiceJsonFetch()
     serviceMock.querySherpaVoices.mockResolvedValue({ code: 200, message: 'ok', data: [] })
+    serviceMock.queryLocalStt.mockResolvedValue({
+      code: 200, message: 'ok', data: { provider: 'vosk', available: true },
+    })
   })
 
   it('TTS 配置请求抛错时报错，且不把音色清单覆写成只有 edge', async () => {
@@ -169,7 +205,7 @@ describe('useRoleManager 请求异常时保留上一次的清单', () => {
     expect(message.error).toHaveBeenCalledWith('role.loadVoiceFailed')
   })
 
-  it('STT 配置请求抛错时报错，且不把选项覆写成只有 Vosk', async () => {
+  it('STT 配置请求抛错时报错，且不把选项覆写成只有本地识别', async () => {
     serviceMock.queryConfigs.mockResolvedValueOnce({
       code: 200,
       message: 'ok',

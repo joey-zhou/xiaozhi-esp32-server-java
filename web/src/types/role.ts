@@ -73,6 +73,12 @@ export interface SttOption {
   desc?: string
 }
 
+/** 服务端本地语音识别状态，对应后端 LocalSttResp */
+export interface LocalStt {
+  provider: 'sherpa-onnx' | 'vosk' | null
+  available: boolean
+}
+
 export interface RoleFormData {
   roleId?: number
   roleName: string
@@ -84,8 +90,7 @@ export interface RoleFormData {
   modelId?: number
   temperature?: number
   topP?: number
-  // 语音识别相关
-  sttId: number
+  sttId?: number
   vadSpeechTh?: number
   vadSilenceTh?: number
   vadEnergyTh?: number

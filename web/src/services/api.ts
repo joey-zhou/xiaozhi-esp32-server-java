@@ -25,6 +25,7 @@ export default {
     root: '/role',
     testVoice: '/role/testVoice',
     sherpaVoices: '/role/sherpaVoices',
+    localStt: '/role/localStt',
   },
   template: '/template',
   message: {

@@ -27,6 +27,9 @@ public class RuntimePathConfig {
     /** Vosk 模型目录 */
     private String voskModelDir = "models/vosk-model";
 
+    /** sherpa-onnx SenseVoice 语音识别模型目录 */
+    private String senseVoiceModelDir = "models/sense-voice";
+
     /** Sherpa-ONNX TTS 模型根目录 */
     private String ttsModelsDir = "models/tts";
 
@@ -57,6 +60,10 @@ public class RuntimePathConfig {
 
     public Path resolveVoskModelDir() {
         return Path.of(voskModelDir).toAbsolutePath().normalize();
+    }
+
+    public Path resolveSenseVoiceModelDir() {
+        return Path.of(senseVoiceModelDir).toAbsolutePath().normalize();
     }
 
     public Path resolveTtsModelsDir() {

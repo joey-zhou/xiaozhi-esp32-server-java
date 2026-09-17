@@ -8,6 +8,7 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
@@ -27,35 +28,68 @@ public class SttServiceFactory {
     @Resource
     private RuntimePathConfig runtimePathConfig;
 
+    /** SenseVoice 单次解码用的 onnxruntime 线程数，解码并发数由核数除以它得到 */
+    @Value("${xiaozhi.stt.sense-voice.num-threads:2}")
+    private int senseVoiceNumThreads = 2;
+
     // 缓存已初始化的服务：key format: "provider:configId"
     private final Map<String, SttService> serviceCache = new ConcurrentHashMap<>();
 
-    // 默认服务提供商名称
-    private static final String DEFAULT_PROVIDER = "vosk";
+    /** 本地 provider：sherpa-onnx 跑 SenseVoice，是首选；Vosk 是模型没就位时的兜底 */
+    static final String SENSE_VOICE_PROVIDER = "sherpa-onnx";
+    static final String VOSK_PROVIDER = "vosk";
 
-    // 标记Vosk是否初始化成功
-    private boolean voskInitialized = false;
+    /** 启动时按模型是否就位决定的本地默认 provider，两个都没有为 null */
+    private volatile String localDefaultProvider;
 
     /**
-     * 应用启动时自动初始化Vosk服务
+     * 应用启动时加载本地识别模型：SenseVoice 优先，没有再试 Vosk
      */
     @PostConstruct
     public void initializeDefaultSttService() {
-        log.info("正在初始化默认语音识别服务(Vosk)...");
-        initializeVosk();
-        if (voskInitialized) {
-            log.info("默认语音识别服务(Vosk)初始化成功，可直接使用");
-        } else {
-            log.warn("默认语音识别服务(Vosk)初始化失败，未配置第三方 STT 的角色将无法识别语音");
+        if (initializeSenseVoice() != null) {
+            localDefaultProvider = SENSE_VOICE_PROVIDER;
+            log.info("默认语音识别服务为 sherpa-onnx SenseVoice");
+            return;
         }
+        if (initializeVosk() != null) {
+            localDefaultProvider = VOSK_PROVIDER;
+            log.info("默认语音识别服务为 Vosk");
+            return;
+        }
+        log.warn("本地语音识别模型都未加载成功，未配置第三方 STT 的角色将无法识别语音");
+    }
+
+    /** 启动时加载成功的本地 provider，两个模型都没有为 null；角色页据此显示"本地识别"到底是哪个模型 */
+    public String getLocalDefaultProvider() {
+        return localDefaultProvider;
+    }
+
+    /**
+     * 初始化 SenseVoice。模型目录缺失是常态（没下载）
+     */
+    private synchronized SttService initializeSenseVoice() {
+        if (serviceCache.containsKey(SENSE_VOICE_PROVIDER)) {
+            return serviceCache.get(SENSE_VOICE_PROVIDER);
+        }
+        try {
+            var service = new SenseVoiceSttService(
+                    runtimePathConfig.resolveSenseVoiceModelDir().toString(), senseVoiceNumThreads);
+            service.initialize();
+            serviceCache.put(SENSE_VOICE_PROVIDER, service);
+            return service;
+        } catch (Throwable e) {
+            log.warn("SenseVoice STT 服务初始化失败: {}", e.getMessage());
+        }
+        return null;
     }
 
     /**
      * 初始化Vosk服务
      */
     private synchronized SttService initializeVosk() {
-        if (serviceCache.containsKey(DEFAULT_PROVIDER)) {
-            return serviceCache.get(DEFAULT_PROVIDER);
+        if (serviceCache.containsKey(VOSK_PROVIDER)) {
+            return serviceCache.get(VOSK_PROVIDER);
         }
 
         try {
@@ -70,12 +104,10 @@ public class SttServiceFactory {
                 throw new Exception("Vosk 模型加载失败");
             }
             
-            serviceCache.put(DEFAULT_PROVIDER, voskService);
-            voskInitialized = true;
+            serviceCache.put(VOSK_PROVIDER, voskService);
             log.info("Vosk STT服务初始化成功");
             return voskService;
         } catch (Throwable e) {
-            voskInitialized = false;
             log.warn("Vosk STT服务初始化失败: {}", e.getMessage());
         }
         return null;
@@ -93,7 +125,9 @@ public class SttServiceFactory {
      */
     public SttService getSttService(ConfigBO config) {
         if (config == null) {
-            config = new ConfigBO().setProvider(DEFAULT_PROVIDER).setConfigId(-1);
+            // 启动时两个模型都没加载成功时留空，交给 localDefaultOrThrow 再试一次并把两个原因一起报出来
+            String provider = localDefaultProvider != null ? localDefaultProvider : "";
+            config = new ConfigBO().setProvider(provider).setConfigId(-1);
         }
 
         // 对于API服务，使用"provider:configId"作为缓存键，确保每个配置使用独立的服务实例
@@ -101,7 +135,6 @@ public class SttServiceFactory {
         final ConfigBO finalConfig = config;
 
         // 使用 computeIfAbsent 确保原子性操作，避免并发创建多个实例
-        // 经 self 调用，让 @Counted 走 Spring 代理，否则同类内自调用会绕过 AOP
         return serviceCache.computeIfAbsent(cacheKey, k -> createApiService(finalConfig));
     }
 
@@ -110,7 +143,7 @@ public class SttServiceFactory {
      * <p>
      * 仅供未保存的临时配置（如配置测试）使用。这类配置的 configId 不指向真实配置，
      * 走 {@link #getSttService(ConfigBO)} 会把临时凭据留在缓存里，被后续真实会话取到。
-     * 本地 vosk 无凭据，仍返回共享实例。
+     * 本地 provider 无凭据，仍返回共享实例。
      */
     public SttService createTransientSttService(@Nonnull ConfigBO config) {
         return createApiService(config);
@@ -127,10 +160,20 @@ public class SttServiceFactory {
             case "funasr" -> new FunASRSttService(config);
             case "xfyun" -> new XfyunSttService(config);
             case "volcengine" -> new VolcengineSttService(config);
-            case "vosk", "" -> voskOrThrow();
-            case null -> voskOrThrow();
+            case SENSE_VOICE_PROVIDER -> senseVoiceOrThrow();
+            case VOSK_PROVIDER -> voskOrThrow();
+            case "" -> localDefaultOrThrow();
+            case null -> localDefaultOrThrow();
             default -> throw new IllegalArgumentException("不支持的 STT provider: " + config.getProvider());
         };
+        return service;
+    }
+
+    private SttService senseVoiceOrThrow() {
+        var service = initializeSenseVoice();
+        if (service == null) {
+            throw new IllegalStateException("本地语音识别(sherpa-onnx SenseVoice)不可用，模型目录未就位，请下载模型或为该角色配置第三方 STT");
+        }
         return service;
     }
 
@@ -138,7 +181,20 @@ public class SttServiceFactory {
         var vosk = initializeVosk();
         if (vosk == null) {
             // 不得回退到其它配置创建出的实例，那会把别的租户的第三方凭据借出去
-            throw new IllegalStateException("默认语音识别服务(Vosk)不可用，请为该角色配置第三方 STT");
+            throw new IllegalStateException("本地语音识别(Vosk)不可用，请为该角色配置第三方 STT");
+        }
+        return vosk;
+    }
+
+    /** 未指定 provider 的配置按本地默认走：SenseVoice 优先，其次 Vosk */
+    private SttService localDefaultOrThrow() {
+        var service = initializeSenseVoice();
+        if (service != null) {
+            return service;
+        }
+        var vosk = initializeVosk();
+        if (vosk == null) {
+            throw new IllegalStateException("本地语音识别不可用，SenseVoice 与 Vosk 模型都未就位，请下载模型或为该角色配置第三方 STT");
         }
         return vosk;
     }

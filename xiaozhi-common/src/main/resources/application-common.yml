@@ -114,6 +114,7 @@ xiaozhi:
     # 生产环境建议改成绝对路径，避免模型目录和原生库目录依赖启动工作目录
     native-lib-dir: lib
     vosk-model-dir: models/vosk-model
+    sense-voice-model-dir: models/sense-voice
     tts-models-dir: models/tts
   operation-log:
     retention-days: 180    # 操作日志保留天数，超期由定时任务清理

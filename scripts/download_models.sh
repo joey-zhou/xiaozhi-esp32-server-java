@@ -8,7 +8,7 @@
 #
 # 用法:
 #   ./scripts/download_models.sh              # 下载所有模型和原生库
-#   ./scripts/download_models.sh stt          # 下载STT模型(Vosk)
+#   ./scripts/download_models.sh stt          # 下载STT模型(SenseVoice，默认)
 #   ./scripts/download_models.sh tts          # 下载TTS模型 (vits-melo, 默认)
 #   ./scripts/download_models.sh vad          # 下载VAD模型 (silero_vad)
 #   ./scripts/download_models.sh models       # 下载所有模型
@@ -36,7 +36,7 @@ source "${_SCRIPT_DIR}/download_tts.sh"
 # 聚合操作
 # ============================================================
 download_all_models() {
-    download_stt "${2:-small}"
+    download_stt "${2:-sensevoice}"
     download_tts "vits-melo"
     download_vad
 }
@@ -90,7 +90,7 @@ case "${1:-all}" in
         echo "用法: $0 <command> [options]"
         echo ""
         echo "模型下载:"
-        echo "  stt [small|standard]   - 下载Vosk语音识别模型 (默认small)"
+        echo "  stt [sensevoice|small|standard] - 下载语音识别模型 (默认 sensevoice，small/standard 为 Vosk)"
         echo "  tts [vits-melo|matcha] - 下载TTS语音合成模型 (默认vits-melo)"
         echo "  vad                    - 下载VAD语音检测模型 (silero_vad)"
         echo "  models                 - 下载所有模型"

@@ -8,7 +8,7 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { queryConfigs } from '@/services/config'
 import { queryAgents } from '@/services/agent'
-import { querySherpaVoices } from '@/services/role'
+import { querySherpaVoices, queryLocalStt } from '@/services/role'
 import type { ModelOption, VoiceOption, SttOption, VoiceProvider } from '@/types/role'
 import type { Config } from '@/types/config'
 import type { Agent } from '@/types/agent'
@@ -129,6 +129,10 @@ export function useRoleManager() {
 
   // 语音识别
   const sttOptions = ref<SttOption[]>([])
+  /** "本地识别"选项的展示名，跟着服务端实际加载的模型走 */
+  const localSttLabel = ref('')
+  /** 服务端有没有加载本地识别模型；没有就不给"本地识别"这个选项，角色只能选第三方配置 */
+  const localSttAvailable = ref(false)
 
   /**
    * 加载所有模型（LLM + Agent）
@@ -254,15 +258,23 @@ export function useRoleManager() {
   async function loadSttOptions() {
     sttLoading.value = true
     try {
-      // 同 loadAllVoices：没配 STT 时静默只留 Vosk，请求挂了要中断并保留上一次的清单，不能用 useRequest.execute
-      const res = await queryConfigs({ configType: 'stt', pageNo: 1, pageSize: 1000 })
-      const options: SttOption[] = [
-        {
-          label: t('role.voskLocalStt'),
+      // 同 loadAllVoices：没配 STT 时静默只留本地识别，请求挂了要中断并保留上一次的清单，不能用 useRequest.execute
+      const [res, localRes] = await Promise.all([
+        queryConfigs({ configType: 'stt', pageNo: 1, pageSize: 1000 }),
+        // 本地模型状态取不到时按"未安装"显示，不影响第三方清单
+        queryLocalStt().catch(() => null),
+      ])
+      const localProvider = localRes?.code === 200 ? localRes.data?.provider : null
+      localSttAvailable.value = !!localProvider
+      localSttLabel.value = localSttLabelOf(localProvider)
+      const options: SttOption[] = []
+      if (localSttAvailable.value) {
+        options.push({
+          label: localSttLabel.value,
           value: -1,
-          desc: t('role.voskLocalSttDesc')
-        }
-      ]
+          desc: t('role.localSttDesc')
+        })
+      }
 
       if (res.code === 200 && res.data?.list) {
         res.data.list.forEach((config: Config) => {
@@ -281,6 +293,12 @@ export function useRoleManager() {
     } finally {
       sttLoading.value = false
     }
+  }
+
+  function localSttLabelOf(provider?: string | null) {
+    if (provider === 'sherpa-onnx') return t('role.localSttSenseVoice')
+    if (provider === 'vosk') return t('role.localSttVosk')
+    return t('role.localSttUnavailable')
   }
 
   /**
@@ -325,6 +343,8 @@ export function useRoleManager() {
     allModels,
     allVoices,
     sttOptions,
+    localSttLabel,
+    localSttAvailable,
     // 方法
     loadAllModels,
     loadAllVoices,

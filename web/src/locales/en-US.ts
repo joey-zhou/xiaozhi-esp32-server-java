@@ -428,7 +428,6 @@ export default {
     voiceNotFound: 'Voice information not found',
     playVoiceFailed: 'Voice playback failed',
     loadTemplateFailed: 'Failed to load template list',
-    voskLocalRecognition: 'Vosk Local Recognition',
     unknownModel: 'Unknown Model',
     voiceTestMessage: 'Hello, I am your voice assistant, I am very happy to serve you',
     
@@ -450,8 +449,10 @@ export default {
     loadModelFailed: 'Failed to load model list',
     loadVoiceFailed: 'Failed to load voice list',
     loadSttFailed: 'Failed to load speech recognition configs',
-    voskLocalStt: 'Vosk Local Recognition',
-    voskLocalSttDesc: 'Default Vosk local speech recognition model',
+    localSttSenseVoice: 'SenseVoice Local Recognition',
+    localSttVosk: 'Vosk Local Recognition',
+    localSttUnavailable: 'Local Recognition (model not installed)',
+    localSttDesc: 'Uses the server-side local model when no third-party service is configured',
   },
 
   template: {

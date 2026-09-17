@@ -14,9 +14,11 @@ import com.xiaozhi.common.model.req.RoleUpdateReq;
 import com.xiaozhi.common.model.req.TestVoiceReq;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.RoleResp;
+import com.xiaozhi.common.model.resp.LocalSttResp;
 import com.xiaozhi.common.model.resp.SherpaVoiceResp;
 import com.xiaozhi.common.model.resp.TestVoiceResp;
 import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.ai.stt.SttServiceFactory;
 import com.xiaozhi.ai.tts.SherpaVoiceProbe;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -52,6 +54,9 @@ public class RoleController extends BaseController {
 
     @Resource
     private SherpaVoiceProbe sherpaVoiceProbe;
+
+    @Resource
+    private SttServiceFactory sttServiceFactory;
 
     @Resource
     private TtsServiceFactory ttsService;
@@ -139,6 +144,18 @@ public class RoleController extends BaseController {
     @Operation(summary = "获取本地 sherpa-onnx 音色列表", description = "扫描配置的本地 TTS 模型目录，自动识别模型类型和 speaker")
     public ApiResponse<List<SherpaVoiceResp>> listSherpaVoices() {
         return ApiResponse.success(sherpaVoiceProbe.listVoices());
+    }
+
+    /**
+     * 本地语音识别当前加载的模型。本地 provider 不进配置页，角色页的"本地识别"选项靠它显示到底是 SenseVoice 还是 Vosk
+     */
+    @GetMapping("/localStt")
+    @ResponseBody
+    @SaCheckPermission("system:role:api:list")
+    @Operation(summary = "获取本地语音识别状态", description = "返回服务端启动时加载成功的本地 STT provider，模型都未就位时 provider 为空")
+    public ApiResponse<LocalSttResp> localStt() {
+        String provider = sttServiceFactory.getLocalDefaultProvider();
+        return ApiResponse.success(new LocalSttResp(provider, provider != null));
     }
 
     @GetMapping("/testVoice")
