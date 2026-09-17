@@ -6,6 +6,7 @@ import dev.onvoid.webrtc.media.audio.AudioProcessing;
 import dev.onvoid.webrtc.media.audio.AudioProcessingConfig;
 import dev.onvoid.webrtc.media.audio.AudioProcessingStats;
 import dev.onvoid.webrtc.media.audio.AudioProcessingStreamConfig;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -53,6 +54,24 @@ public class AecService {
 
     // 10ms 帧参数 (16kHz mono, 16-bit)
     private static final int FRAME_BYTES_10MS = ReferenceFeed.BLOCK_BYTES;
+
+    /**
+     * 启动时先建一个 APM 再丢掉，把 webrtc 原生库的加载压在启动阶段。
+     * 否则第一台开服务端 AEC 的设备要在 hello 里等这次加载，实测 600~800ms，
+     * 排在同一条会话串行队列后面的处理跟着延后。
+     */
+    @PostConstruct
+    void warmUp() {
+        Thread.startVirtualThread(() -> {
+            try {
+                new AecState().dispose();
+            } catch (Throwable t) {
+                nativeUnavailable = true;
+                log.warn("AEC native 库初始化失败，已降级关闭回声消除（不影响设备连接与对话）。" +
+                        "可能原因：webrtc-java native 库缺失。详见异常堆栈定位具体原因。", t);
+            }
+        });
+    }
 
     /**
      * 确保会话的 AEC 状态已初始化。
