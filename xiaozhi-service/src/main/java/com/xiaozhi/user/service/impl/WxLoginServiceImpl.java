@@ -3,9 +3,11 @@ package com.xiaozhi.user.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaozhi.user.service.WxLoginService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -14,6 +16,9 @@ import java.util.Map;
  */
 @Service
 public class WxLoginServiceImpl implements WxLoginService {
+
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
     
     @Value("${wechat.appid:}")
     private String appid;
@@ -21,9 +26,17 @@ public class WxLoginServiceImpl implements WxLoginService {
     @Value("${wechat.secret:}")
     private String secret;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = newRestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
     
+    /** 建带超时的 RestTemplate；默认的 SimpleClientHttpRequestFactory 不设超时即为无限等待。 */
+    private static RestTemplate newRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(CONNECT_TIMEOUT);
+        factory.setReadTimeout(READ_TIMEOUT);
+        return new RestTemplate(factory);
+    }
+
     @Override
     public Map<String, String> getWxLoginInfo(String code) {
         // 微信小程序登录API地址

@@ -25,7 +25,8 @@ const {
   disconnect,
   sendText,
   startRecording: wsStartRecording,
-  stopRecording: wsStopRecording
+  stopRecording: wsStopRecording,
+  clearAllMessages
 } = useWebSocket()
 
 // 聊天窗口状态
@@ -46,11 +47,15 @@ const selectedRoleId = ref<number | undefined>()
 // 头像
 const userAvatar = computed(() => getAvatarUrl(userStore.userInfo?.avatar))
 
+// 虚拟设备ID，与后端自动创建的格式一致；未登录时为空，此时不允许连接与切换角色
+const virtualDeviceId = computed(() =>
+  userStore.userInfo?.userId ? `user_chat_${userStore.userInfo.userId}` : ''
+)
+
 // WebSocket 配置（从 store 获取）
 const wsConfig = computed(() => ({
   url: userStore.wsConfig.url,
-  // 使用 user_chat_ + userId 作为设备ID，与后端自动创建的虚拟设备ID格式一致
-  deviceId: `user_chat_${userStore.userInfo?.userId}`,
+  deviceId: virtualDeviceId.value,
   token: userStore.token
 }))
 
@@ -65,33 +70,38 @@ const fetchRoles = async () => {
       selectedRoleId.value = defaultRole?.roleId || roleList.value[0]?.roleId
     }
   } catch (error) {
-    console.error('获取角色列表失败:', error)
+    console.error('load roles failed:', error)
   }
 }
 
-// 切换角色
+// 切换角色。虚拟设备要等首条对话消息到达服务端才建好，之前切换必然查不到设备
 const handleRoleChange = async (roleId: number) => {
+  if (!virtualDeviceId.value) {
+    AMessage.warning(t('chat.floating.notLoggedIn'))
+    return
+  }
+
   try {
     // 更新虚拟设备的角色ID
     await updateDevice({
-      deviceId: wsConfig.value.deviceId,
+      deviceId: virtualDeviceId.value,
       roleId: roleId
     })
-    
-    AMessage.success('角色切换成功')
-    
+
+    AMessage.success(t('chat.floating.roleChanged'))
+
     // 如果已连接，断开连接（下次发送消息时会自动重连，使用新角色）
     if (isConnected.value) {
       disconnect()
     }
   } catch (error) {
-    AMessage.error('角色切换失败')
-    console.error('角色切换失败:', error)
+    AMessage.error(t('chat.floating.roleChangeFailed'))
+    console.error('switch role failed:', error)
   }
 }
 
 // 组件挂载时获取角色列表
-fetchRoles()
+void fetchRoles()
 
 // 监听消息变化并滚动到底部
 watch(() => wsMessages.length, () => {
@@ -118,16 +128,21 @@ const closeChat = () => {
 
 // 确保WebSocket连接
 const ensureConnection = async (): Promise<boolean> => {
+  if (!virtualDeviceId.value) {
+    AMessage.error(t('chat.floating.notLoggedIn'))
+    return false
+  }
+
   if (!isConnected.value) {
     try {
       const success = await connect(wsConfig.value)
       if (!success) {
-        AMessage.error('未连接到服务器，请检查聊天配置')
+        AMessage.error(t('chat.floating.connectFailed'))
         return false
       }
       await new Promise(resolve => setTimeout(resolve, 300))
     } catch (error) {
-      AMessage.error('连接失败: ' + error)
+      AMessage.error(t('chat.floating.connectError', { error: String(error) }))
       return false
     }
   }
@@ -150,7 +165,7 @@ const sendTextMessage = async () => {
     inputMessage.value = ''
     nextTick(() => scrollToBottom())
   } else {
-    AMessage.error('发送失败，请检查连接状态')
+    AMessage.error(t('chat.floating.sendFailed'))
   }
 }
 
@@ -178,9 +193,9 @@ const startRecording = async () => {
   try {
     isRecording.value = true
     await wsStartRecording()
-  } catch (error) {
+  } catch {
     isRecording.value = false
-    AMessage.error('无法启动录音，请检查麦克风权限')
+    AMessage.error(t('chat.floating.micDenied'))
   }
 }
 
@@ -191,30 +206,40 @@ const stopRecording = async () => {
   try {
     isRecording.value = false
     await wsStopRecording()
-  } catch (error) {
-    AMessage.error('停止录音失败')
+  } catch {
+    AMessage.error(t('chat.floating.stopRecordFailed'))
   }
 }
 
-// 清空消息
+// 清空消息（同时停掉仍在缓冲/播放的 TTS 音频）
 const clearMessages = () => {
-  wsMessages.splice(0, wsMessages.length)
+  clearAllMessages()
 }
 
 // 格式化时间
 const formatTime = (date: Date) => {
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minutes = Math.floor(diff / 60000)
-  
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes}分钟前`
-  
+  const minutes = Math.floor((Date.now() - date.getTime()) / 60000)
+
+  if (minutes < 1) return t('chat.floating.justNow')
+  if (minutes < 60) return t('chat.floating.minutesAgo', { count: minutes })
+
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}小时前`
-  
+  if (hours < 24) return t('chat.floating.hoursAgo', { count: hours })
+
   return date.toLocaleString()
 }
+
+// 情绪标签到表情，取值与后端 EmojiUtils.EMOTION_TO_EMOJIS 的首项一致
+const EMOTION_EMOJI: Record<string, string> = {
+  neutral: '\u{1F610}', happy: '\u{1F60A}', laughing: '\u{1F600}', funny: '\u{1F602}',
+  sad: '\u{1F622}', angry: '\u{1F620}', crying: '\u{1F62D}', loving: '\u{1F60D}',
+  embarrassed: '\u{1F633}', surprised: '\u{1F62E}', shocked: '\u{1F631}', thinking: '\u{1F914}',
+  winking: '\u{1F609}', cool: '\u{1F60E}', relaxed: '\u{1F60C}', delicious: '\u{1F60B}',
+  kissy: '\u{1F618}', confident: '\u{1F4AA}', sleepy: '\u{1F634}', silly: '\u{1F61B}',
+  confused: '\u{1F615}',
+}
+
+const emotionEmoji = (emotion: string) => EMOTION_EMOJI[emotion] ?? ''
 
 // 是否显示时间戳
 const showTimestamp = (index: number) => {
@@ -229,7 +254,7 @@ const showTimestamp = (index: number) => {
 // 连接状态文本
 const connectionStatusText = computed(() => {
   if (isConnected.value) {
-    return '在线'
+    return t('chat.floating.online')
   }
   return connectionStatus.value
 })
@@ -263,7 +288,7 @@ const connectionStatusDot = computed(() => {
             <!-- AI头像 -->
             <RobotAvatar :size="36" fill="#ffffff" background="rgba(255, 255, 255, 0.2)" />
             <div class="header-text">
-              <div class="header-title">AI 助手</div>
+              <div class="header-title">{{ t('chat.defaultAssistant') }}</div>
               <div class="header-status">
                 <span class="status-dot" :class="connectionStatusDot"></span>
                 {{ connectionStatusText }}
@@ -274,7 +299,7 @@ const connectionStatusDot = computed(() => {
             <!-- 角色切换下拉框 -->
             <a-select
               v-model:value="selectedRoleId"
-              placeholder="选择角色"
+              :placeholder="t('chat.selectRole')"
               :style="{ width: '120px' }"
               size="small"
               @change="handleRoleChange"
@@ -292,7 +317,7 @@ const connectionStatusDot = computed(() => {
               type="text"
               size="small"
               @click="clearMessages"
-              title="清空消息"
+              :title="t('chat.floating.clearMessages')"
             >
               <template #icon>
                 <DeleteOutlined />
@@ -313,7 +338,7 @@ const connectionStatusDot = computed(() => {
         <!-- 消息区域 -->
         <div ref="chatContentRef" class="chat-content">
           <div v-if="wsMessages.length === 0" class="empty-chat">
-            <a-empty description="暂无对话记录">
+            <a-empty :description="t('chat.floating.emptyMessages')">
               <template #image>
                 <MessageOutlined :style="{ fontSize: '48px', color: 'var(--ant-color-text-quaternary)' }" />
               </template>
@@ -339,6 +364,7 @@ const connectionStatusDot = computed(() => {
                 <!-- 消息气泡 -->
                 <div class="message-content">
                   <div class="message-bubble">
+                    <span v-if="message.emotion" class="message-emotion">{{ emotionEmoji(message.emotion) }}</span>
                     <div class="message-text">{{ message.content }}</div>
                   </div>
                   <div v-if="message.isLoading" class="loading-indicator">
@@ -370,7 +396,7 @@ const connectionStatusDot = computed(() => {
             <a-textarea
               v-if="!isVoiceMode"
               v-model:value="inputMessage"
-              placeholder="输入消息..."
+              :placeholder="t('chat.floating.inputPlaceholder')"
               :auto-size="{ minRows: 1, maxRows: 3 }"
               :bordered="false"
               @keypress.enter="handleEnterKey"
@@ -388,7 +414,7 @@ const connectionStatusDot = computed(() => {
               @touchstart="startRecording"
               @touchend="stopRecording"
             >
-              {{ isRecording ? '松开结束' : '按住说话' }}
+              {{ isRecording ? t('chat.floating.releaseToSend') : t('chat.floating.holdToTalk') }}
             </a-button>
 
             <!-- 发送按钮 -->
@@ -678,6 +704,13 @@ const connectionStatusDot = computed(() => {
     border-width: 6px 7px 6px 0;
     border-color: transparent var(--ant-color-bg-container) transparent transparent;
   }
+}
+
+.message-emotion {
+  float: left;
+  margin-right: 6px;
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .message-text {

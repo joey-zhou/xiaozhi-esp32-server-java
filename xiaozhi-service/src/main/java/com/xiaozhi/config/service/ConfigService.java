@@ -47,7 +47,7 @@ public interface ConfigService extends ConfigLookup {
     }
 
     /**
-     * 硬约束：AI 运行时的配置查询必须限定用户。userId 为空时 {@link #listBO} 会略过用户条件
+     * AI 运行时的配置查询必须限定用户。userId 为空时 {@link #listBO} 会略过用户条件
      * 退化成全库查询，取到其他用户的凭据。
      */
     @Override

@@ -3,6 +3,7 @@ package com.xiaozhi.device;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
+import com.xiaozhi.common.model.req.DeviceCreateReq;
 import com.xiaozhi.common.model.req.DeviceScanBindReq;
 import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
@@ -16,6 +17,7 @@ import com.xiaozhi.device.domain.vo.VerifyCode;
 import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.role.service.RoleService;
+import com.xiaozhi.utils.CmsUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +25,7 @@ import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -34,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -117,12 +121,74 @@ class DeviceAppServiceTest {
     }
 
     @Test
+    void handleOtaRejectsInvalidDeviceIdBeforeResolvingIpLocation() {
+        OtaReq req = new OtaReq();
+        req.setDeviceId("not-a-mac");
+        req.setIp("203.0.113.7");
+
+        try (MockedStatic<CmsUtils> cmsUtils = mockStatic(CmsUtils.class)) {
+            assertThatThrownBy(() -> deviceAppService.handleOta(req))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("设备ID不正确");
+            // 设备 ID 先过校验再解析 IP 归属，未注册请求带不动 OTA 主链路
+            cmsUtils.verifyNoInteractions();
+        }
+    }
+
+    @Test
+    void handleOtaResolvesIpLocationFromCacheWithoutBlockingLookup() {
+        OtaReq req = otaRequest();
+        req.setIp("203.0.113.7");
+
+        try (MockedStatic<CmsUtils> cmsUtils = mockStatic(CmsUtils.class)) {
+            cmsUtils.when(() -> CmsUtils.getIPInfoFromCache("203.0.113.7"))
+                    .thenReturn(new CmsUtils.IPInfo("203.0.113.7", "广东省深圳市", "电信"));
+
+            deviceAppService.handleOta(req);
+
+            assertThat(req.getLocation()).isEqualTo("广东省深圳市");
+            // 主链路只读本地缓存，阻塞版外呼不能出现在 OTA 上
+            cmsUtils.verify(() -> CmsUtils.getIPInfoByAddress(any()), never());
+        }
+    }
+
+    @Test
     void checkOtaActivationReadsBoundDeviceFromBO() {
         assertThat(deviceAppService.checkOtaActivation(DEVICE_ID)).isTrue();
 
         when(deviceService.getBO(DEVICE_ID)).thenReturn(null);
         assertThat(deviceAppService.checkOtaActivation(DEVICE_ID)).isFalse();
         verify(deviceService, never()).get(any());
+    }
+
+    @Test
+    void createBindsDeviceLocatedByCodeAndInvalidatesRemainingCodes() {
+        when(deviceRepository.findVerifyCodeByCode("123456")).thenReturn(Optional.of(verifyCode("toy-v1")));
+        when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
+        RoleBO role = new RoleBO();
+        role.setRoleId(3);
+        when(roleService.getDefaultOrFirstBO(7)).thenReturn(role);
+
+        DeviceResp result = deviceAppService.create(createReq("123456"), 7);
+
+        assertThat(result.getDeviceId()).isEqualTo(DEVICE_ID);
+        ArgumentCaptor<Device> captor = ArgumentCaptor.forClass(Device.class);
+        verify(deviceRepository).save(captor.capture());
+        assertThat(captor.getValue().getUserId()).isEqualTo(7);
+        assertThat(captor.getValue().getRoleId()).isEqualTo(3);
+        // 绑定用掉的码必须立即失效，否则同一个 6 位码在有效期内还能被继续试
+        verify(deviceRepository).invalidateVerifyCodes(DEVICE_ID);
+    }
+
+    @Test
+    void createRejectsWhenCodeLocatesNoSingleDevice() {
+        when(deviceRepository.findVerifyCodeByCode("123456")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> deviceAppService.create(createReq("123456"), 7))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("无效验证码");
+        verify(deviceRepository, never()).save(any());
+        verify(deviceRepository, never()).invalidateVerifyCodes(any());
     }
 
     @Test
@@ -191,6 +257,12 @@ class DeviceAppServiceTest {
     private DeviceScanBindReq scanBindReq(String deviceId) {
         DeviceScanBindReq req = new DeviceScanBindReq();
         req.setDeviceId(deviceId);
+        return req;
+    }
+
+    private DeviceCreateReq createReq(String code) {
+        DeviceCreateReq req = new DeviceCreateReq();
+        req.setCode(code);
         return req;
     }
 

@@ -1,5 +1,4 @@
 import { shallowRef, computed } from 'vue'
-import { useDebounceFn } from '@vueuse/core'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 
@@ -23,11 +22,6 @@ export interface UseCardListOptions<T extends object> {
    * 默认骨架屏数量
    */
   defaultSkeletonCount?: number
-  
-  /**
-   * 防抖延迟（毫秒）
-   */
-  debounceDelay?: number
   
   /**
    * 是否在初始化时自动加载数据
@@ -122,14 +116,6 @@ export function useCardList<T extends object>(options: UseCardListOptions<T>) {
   }
   
   /**
-   * 防抖搜索
-   */
-  const debouncedSearch = useDebounceFn(() => {
-    // filteredItems 会自动更新，这里不需要额外逻辑
-    // 可以在这里添加搜索分析等
-  }, options.debounceDelay || 300)
-  
-  /**
    * 重置搜索
    */
   const resetSearch = () => {
@@ -190,7 +176,6 @@ export function useCardList<T extends object>(options: UseCardListOptions<T>) {
     // 方法
     loadData,
     refresh,
-    debouncedSearch,
     resetSearch,
     addItem,
     updateItem,

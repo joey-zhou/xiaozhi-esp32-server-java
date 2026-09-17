@@ -1,7 +1,6 @@
 import { http } from './request'
 import api from './api'
-import type { User, UserQueryParams, UpdateUserParams } from '@/types/user'
-import type { LoginResponse } from '@/store/user'
+import type { User, UserQueryParams, UpdateUserParams, LoginResponse } from '@/types/user'
 
 /**
  * 用户登录
@@ -23,6 +22,14 @@ export function telLogin(data: { tel: string; code: string }) {
  */
 export function checkToken() {
   return http.get<LoginResponse>(api.user.checkToken)
+}
+
+/**
+ * 注销当前会话。
+ * 只清前端存储不够：不调它服务端的 Sa-Token 会话仍然有效，旧 token 还能继续用
+ */
+export function logout() {
+  return http.post(api.user.logout)
 }
 
 /**
@@ -52,7 +59,7 @@ export function register(data: {
   if (tel) {
     payload.tel = tel
   }
-  return http.post(api.user.add, payload)
+  return http.post(api.user.root, payload)
 }
 
 /**
@@ -88,17 +95,10 @@ export function sendSmsCaptcha(data: { tel: string; type: string }) {
 }
 
 /**
- * 验证验证码
- */
-export function checkCaptcha(data: { email: string; code: string; type: string }) {
-  return http.get(api.user.checkCaptcha, data)
-}
-
-/**
  * 查询用户列表
  */
 export function queryUsers(params: Partial<UserQueryParams>) {
-  return http.getPage<User>(api.user.query, params)
+  return http.getPage<User>(api.user.root, params)
 }
 
 /**
@@ -106,12 +106,12 @@ export function queryUsers(params: Partial<UserQueryParams>) {
  */
 export function updateUser(data: Partial<UpdateUserParams>) {
   const { userId, ...updateData } = data
-  return http.put(`${api.user.update}/${userId}`, updateData)
+  return http.put(`${api.user.root}/${userId}`, updateData)
 }
 
 /**
  * 添加用户
  */
 export function addUser(data: Partial<User>) {
-  return http.post(api.user.add, data)
+  return http.post(api.user.root, data)
 }

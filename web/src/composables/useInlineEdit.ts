@@ -8,6 +8,8 @@ import { ref, type Ref } from 'vue'
 export interface UseInlineEditOptions<T> {
   /**
    * 获取项的唯一标识
+   * 必须返回不参与编辑的稳定主键：editingKey 定位、cacheData 还原、updateField 都按它查，
+   * 取到正在被编辑的字段会让这三处同时失准
    * @param item 数据项
    * @returns 唯一标识（通常是 ID）
    */
@@ -29,6 +31,9 @@ export interface UseInlineEditOptions<T> {
 
 export interface EditableItem {
   editable?: boolean
+  // 索引签名只能是 any：TS 仅在目标索引类型为 any 时放行没有索引签名的 interface，
+  // 换成 unknown 会让 Device / VoiceprintProfile / VoiceCloneItem 都不满足 T extends EditableItem
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any
 }
 

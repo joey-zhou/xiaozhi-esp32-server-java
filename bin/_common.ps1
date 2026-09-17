@@ -117,6 +117,13 @@ function Start-XzService {
         return
     }
 
+    # 未设置时设备握手鉴权关闭，本地联调可用，生产部署必须设置
+    if ($null -eq (Get-Item Env:XIAOZHI_DEVICE_AUTH_SECRET -ErrorAction SilentlyContinue)) {
+        Write-XzWarn "未设置 XIAOZHI_DEVICE_AUTH_SECRET，$Name 的设备握手鉴权处于关闭状态"
+        Write-XzWarn '  设置方式: $env:XIAOZHI_DEVICE_AUTH_SECRET = "<32位十六进制随机串>"'
+        Write-XzWarn '  server 与 dialogue 必须使用同一个值'
+    }
+
     $jar = Find-Jar $Module
     if (-not $jar) {
         Write-XzErr "$Module jar 不存在，请先编译"

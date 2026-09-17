@@ -103,7 +103,7 @@ public class UserAppService {
         if (!StringUtils.hasText(account)) {
             throw new IllegalArgumentException("邮箱或手机号至少填写一个");
         }
-        if (!userService.checkCaptcha(account, req.getCode())) {
+        if (!userService.consumeCaptcha(account, req.getCode())) {
             throw new IllegalArgumentException("无效验证码");
         }
 
@@ -150,7 +150,7 @@ public class UserAppService {
 
     @Transactional
     public void resetPassword(UserResetPasswordReq req) {
-        if (!userService.checkCaptcha(req.getEmail(), req.getCode())) {
+        if (!userService.consumeCaptcha(req.getEmail(), req.getCode())) {
             throw new IllegalArgumentException("验证码错误或已过期");
         }
         UserBO user = userService.getByEmail(req.getEmail());
@@ -177,10 +177,31 @@ public class UserAppService {
         if (user == null) {
             throw new UsernameNotFoundException();
         }
+        userService.requireEnabled(user);
         if (!authenticationService.isPasswordValid(password, user.getPassword())) {
             throw new UserPasswordNotMatchException();
         }
         return user;
+    }
+
+    /**
+     * 启用或禁用账号，state 取 UserBO.STATE_ENABLED / STATE_DISABLED
+     */
+    @Transactional
+    public UserResp updateState(Integer userId, String state) {
+        if (!UserBO.STATE_ENABLED.equals(state) && !UserBO.STATE_DISABLED.equals(state)) {
+            throw new IllegalArgumentException("账号状态取值不合法");
+        }
+        UserBO existing = userService.getBO(userId);
+        if (existing == null) {
+            throw new ResourceNotFoundException("无此用户，更新失败");
+        }
+
+        UserBO update = new UserBO();
+        update.setUserId(userId);
+        update.setState(state);
+        userService.update(update);
+        return userConvert.toResp(userService.getBO(userId));
     }
 
     public void recordLoginInfo(UserBO user, String loginIp) {

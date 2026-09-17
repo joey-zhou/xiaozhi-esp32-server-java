@@ -14,6 +14,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 // @Component
 public class LocalMusicPlayer implements ToolsGlobalRegistry.GlobalFunction {
     public static final String TOOL_NAME = "play_music";
+    private static final String MUSIC_SUFFIX = ".mp3";
 
     // 使用虚拟线程执行器处理定时任务
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(
@@ -41,22 +43,42 @@ public class LocalMusicPlayer implements ToolsGlobalRegistry.GlobalFunction {
     public String playMusic(@ToolParam(description = "要播放的歌曲名称") String songName, ToolContext toolContext) {
         String sessionId = (String) toolContext.getContext().get(Persona.TOOL_CONTEXT_SESSION_ID_KEY);
         ChatSession chatSession = sessionManager.getSession(sessionId);
+        if (chatSession == null || chatSession.getPlayer() == null) {
+            return "音乐播放失败";
+        }
+        if (songName == null || songName.isEmpty()) {
+            return "你没有告诉我具体的歌曲名称，我播放不了！";
+        }
 
         try {
-            if (songName == null || songName.isEmpty()) {
-                return "你没有告诉我具体的歌曲名称，我播放不了！";
-            } else {
-                scheduler.schedule(() -> {
-                    // 必须异步处理，也就是先返回一个回应用户的字符串，再开始播放。
-                    chatSession.getPlayer().play(songName, Path.of(runtimePathConfig.getMusicDir(), songName + ".mp3"));
-                }, 60, TimeUnit.MILLISECONDS);
-                return "尝试播放歌曲《" + songName + "》";
+            Path musicFile = resolveMusicFile(songName);
+            if (musicFile == null) {
+                return "我这里没有《" + songName + "》这首歌";
             }
+            scheduler.schedule(() -> {
+                // 必须异步处理，也就是先返回一个回应用户的字符串，再开始播放。
+                chatSession.getPlayer().play(songName, musicFile);
+            }, 60, TimeUnit.MILLISECONDS);
+            return "尝试播放歌曲《" + songName + "》";
 
         } catch (Exception e) {
             log.error("device 音乐播放异常，song name: {}", songName, e);
             return "音乐播放失败";
         }
+    }
+
+    /**
+     * 歌名解析到音乐目录下的 mp3 文件。歌名可能已带 .mp3（来自歌曲列表），
+     * 解析结果必须仍在音乐目录内，文件不存在返回 null。
+     */
+    private Path resolveMusicFile(String songName) {
+        String fileName = songName.endsWith(MUSIC_SUFFIX) ? songName : songName + MUSIC_SUFFIX;
+        Path musicDir = runtimePathConfig.resolveMusicDir();
+        Path musicFile = musicDir.resolve(fileName).normalize();
+        if (!musicFile.startsWith(musicDir) || !Files.isRegularFile(musicFile)) {
+            return null;
+        }
+        return musicFile;
     }
 
     @Override

@@ -4,10 +4,10 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { useStorage } from '@vueuse/core'
 import { useUserStore } from '@/store/user'
-import { useCountdown } from '@/composables/useCountdown'
-import { login as loginApi, register as registerApi, resetPassword as resetPasswordApi, telLogin as telLoginApi, sendSmsCaptcha } from '@/services/user'
-import { encrypt, decrypt } from '@/utils/jsencrypt'
-import { ROUTES } from '@/router/routes'
+import type { LoginResponse } from '@/types/user'
+import { login as loginApi, logout as logoutApi, register as registerApi, resetPassword as resetPasswordApi, telLogin as telLoginApi } from '@/services/user'
+import { STORAGE_REMEMBER_ME, STORAGE_USERNAME } from '@/constants/storage'
+import { ROUTES, defaultRouteFor } from '@/router/routes'
 
 interface LoginForm {
   username: string
@@ -43,20 +43,48 @@ export function useAuth() {
   const userStore = useUserStore()
   const { t } = useI18n()
   const loading = ref(false)
-  const sendCodeLoading = ref(false)
 
-  const rememberedUsername = useStorage('username', '', localStorage)
-  const rememberedPassword = useStorage('rememberMe', '', localStorage)
+  // 只记住用户名，密码一律不落盘
+  const rememberedUsername = useStorage(STORAGE_USERNAME, '', localStorage)
 
-  // 使用倒计时 composable
-  const {
-    count: countdown,
-    counting,
-    countdownText,
-    start: startCountdown
-  } = useCountdown({
-    initialCount: 60
-  })
+  // 把登录响应写进 store
+  const applyLoginSession = (data: LoginResponse) => {
+    userStore.setUserInfo(data.user)
+    userStore.setPermissions(data.permissions)
+    userStore.setAuthRole(data.authRole)
+    userStore.setToken(data.token)
+    userStore.setRefreshToken(data.refreshToken)
+  }
+
+  // 计算登录后要落地的路径：无权访问 query.redirect 时退回默认页
+  const resolveLandingRoute = (isAdmin: boolean): string => {
+    const defaultRoute = defaultRouteFor(isAdmin)
+    const redirect = router.currentRoute.value.query.redirect as string | undefined
+
+    if (!redirect || redirect === defaultRoute) {
+      return defaultRoute
+    }
+
+    const targetRoute = router.resolve(redirect)
+    if (!targetRoute?.meta) {
+      return redirect
+    }
+
+    if (targetRoute.meta.isAdmin && !isAdmin) {
+      return defaultRoute
+    }
+    if (targetRoute.meta.permission && !userStore.hasPermission(targetRoute.meta.permission)) {
+      return defaultRoute
+    }
+    if (
+      targetRoute.meta.permissions?.length &&
+      !userStore.hasAnyPermission(targetRoute.meta.permissions)
+    ) {
+      return defaultRoute
+    }
+
+    return redirect
+  }
 
   // 登录
   const login = async (form: LoginForm) => {
@@ -68,71 +96,20 @@ export function useAuth() {
       })
 
       if (res.code === 200) {
-        // 设置用户信息
-        userStore.setUserInfo(res.data.user)
-        // 设置权限信息
-        userStore.setPermissions(res.data.permissions)
-        // 设置后台权限角色信息
-        userStore.setAuthRole(res.data.authRole)
-        // 设置token
-        userStore.setToken(res.data.token)
-        userStore.setRefreshToken(res.data.refreshToken)
+        applyLoginSession(res.data)
 
-        if (form.rememberMe) {
-          rememberedUsername.value = form.username
-          const encryptedPassword = encrypt(form.password)
-          if (encryptedPassword) {
-            rememberedPassword.value = encryptedPassword
-          }
-        } else {
-          rememberedUsername.value = ''
-          rememberedPassword.value = ''
-        }
+        rememberedUsername.value = form.rememberMe ? form.username : ''
 
         message.success(t('auth.loginSuccess'))
-        
-        // 根据用户类型跳转到不同页面
-        // 管理员跳转到 dashboard，普通用户跳转到 agents
-        const isAdmin = res.data.user && res.data.user.isAdmin === '1'
-        const defaultRoute = isAdmin ? ROUTES.DASHBOARD : ROUTES.DEVICE
-        
-        // 获取重定向路径
-        let redirect = router.currentRoute.value.query.redirect as string || defaultRoute
-        
-        // 检查用户是否有权限访问redirect路径
-        if (redirect && redirect !== defaultRoute) {
-          const targetRoute = router.resolve(redirect)
-          if (targetRoute && targetRoute.meta) {
-            // 检查是否需要管理员权限
-            if (targetRoute.meta.isAdmin && !isAdmin) {
-              redirect = defaultRoute
-            }
-            // 检查特定权限
-            else if (targetRoute.meta.permission) {
-              const hasPermission = userStore.hasPermission(targetRoute.meta.permission as string)
-              if (!hasPermission) {
-                redirect = defaultRoute
-              }
-            }
-            // 检查多个权限（任一即可）
-            else if (targetRoute.meta.permissions && Array.isArray(targetRoute.meta.permissions)) {
-              const hasAnyPermission = userStore.hasAnyPermission(targetRoute.meta.permissions as string[])
-              if (!hasAnyPermission) {
-                redirect = defaultRoute
-              }
-            }
-          }
-        }
-        
-        // 跳转到指定页面
-        router.push(redirect)
+
+        router.push(resolveLandingRoute(res.data.user?.isAdmin === '1'))
         return true
-      } else {
-        message.error(res.message || t('auth.loginFailed'))
-        return false
       }
-    } catch (error) {
-      message.error(t('auth.loginFailed'))
+
+      message.error(res.message || t('auth.loginFailed'))
+      return false
+    } catch {
+      // HTTP 错误已由全局响应拦截器统一提示，避免重复弹窗
       return false
     } finally {
       loading.value = false
@@ -162,7 +139,7 @@ export function useAuth() {
         message.error(res.message || t('common.error'))
         return false
       }
-    } catch (error) {
+    } catch {
       // HTTP 错误已由全局响应拦截器统一提示，避免重复弹窗
       return false
     } finally {
@@ -190,7 +167,7 @@ export function useAuth() {
         message.error(res.message || t('common.error'))
         return false
       }
-    } catch (error) {
+    } catch {
       // HTTP 错误已由全局响应拦截器统一提示，避免重复弹窗
       return false
     } finally {
@@ -199,14 +176,11 @@ export function useAuth() {
   }
 
   const getRememberedCredentials = () => {
-    const username = rememberedUsername.value
-    const encryptedPassword = rememberedPassword.value
-    const password = encryptedPassword ? decrypt(encryptedPassword) : ''
+    localStorage.removeItem(STORAGE_REMEMBER_ME)
 
     return {
-      username,
-      password: typeof password === 'string' ? password : '',
-      rememberMe: !!encryptedPassword,
+      username: rememberedUsername.value,
+      rememberMe: !!rememberedUsername.value,
     }
   }
 
@@ -220,110 +194,40 @@ export function useAuth() {
       })
 
       if (res.code === 200) {
-        // 设置用户信息
-        userStore.setUserInfo(res.data.user)
-        // 设置权限信息
-        userStore.setPermissions(res.data.permissions)
-        // 设置后台权限角色信息
-        userStore.setAuthRole(res.data.authRole)
-        // 设置token
-        userStore.setToken(res.data.token)
-        userStore.setRefreshToken(res.data.refreshToken)
+        applyLoginSession(res.data)
 
         message.success(t('auth.loginSuccess'))
-        
-        // 根据用户类型跳转到不同页面
-        const isAdmin = res.data.user && res.data.user.isAdmin === '1'
-        const defaultRoute = isAdmin ? ROUTES.DASHBOARD : ROUTES.DEVICE
-        
-        // 获取重定向路径
-        let redirect = router.currentRoute.value.query.redirect as string || defaultRoute
-        
-        // 检查用户是否有权限访问redirect路径
-        if (redirect && redirect !== defaultRoute) {
-          const targetRoute = router.resolve(redirect)
-          if (targetRoute && targetRoute.meta) {
-            // 检查是否需要管理员权限
-            if (targetRoute.meta.isAdmin && !isAdmin) {
-              redirect = defaultRoute
-            }
-            // 检查特定权限
-            else if (targetRoute.meta.permission) {
-              const hasPermission = userStore.hasPermission(targetRoute.meta.permission as string)
-              if (!hasPermission) {
-                redirect = defaultRoute
-              }
-            }
-            // 检查多个权限（任一即可）
-            else if (targetRoute.meta.permissions && Array.isArray(targetRoute.meta.permissions)) {
-              const hasAnyPermission = userStore.hasAnyPermission(targetRoute.meta.permissions as string[])
-              if (!hasAnyPermission) {
-                redirect = defaultRoute
-              }
-            }
-          }
-        }
-        
-        router.push(redirect)
+
+        router.push(resolveLandingRoute(res.data.user?.isAdmin === '1'))
         return true
-      } else if (res.code === 201) {
+      }
+
+      if (res.code === 201) {
         // 未注册的手机号
         message.warning(res.message)
         router.push(ROUTES.REGISTER)
         return false
-      } else {
-        message.error(res.message || t('auth.loginFailed'))
-        return false
       }
-    } catch (error: any) {
-      if (error && error.code === 201) {
-        message.warning(error.message)
-        router.push(ROUTES.REGISTER)
-      } else {
-        message.error(error?.message || t('auth.loginFailed'))
-      }
+
+      message.error(res.message || t('auth.loginFailed'))
+      return false
+    } catch {
+      // HTTP 错误已由全局响应拦截器统一提示，避免重复弹窗
       return false
     } finally {
       loading.value = false
     }
   }
 
-  // 发送短信验证码
-  const sendVerificationCode = async (tel: string) => {
-    if (!tel) {
-      message.error(t('auth.enterMobilePhone'))
-      return false
-    }
-
-    if (sendCodeLoading.value || counting.value) {
-      return false
-    }
-
-    sendCodeLoading.value = true
+  const logout = async () => {
     try {
-      const res = await sendSmsCaptcha({
-        tel,
-        type: 'login',
-      })
-
-      if (res.code === 200) {
-        message.success(t('auth.verificationCodeSent'))
-        // 开始倒计时（60秒）
-        startCountdown(60)
-        return true
-      } else {
-        message.error(res.message || t('auth.sendVerificationCodeFailed'))
-        return false
-      }
+      // 先让服务端注销 Sa-Token 会话，否则旧 token 在服务端仍然有效
+      await logoutApi()
     } catch (error) {
-      message.error(t('auth.sendVerificationCodeFailed'))
-      return false
-    } finally {
-      sendCodeLoading.value = false
+      // 服务端注销失败也要把本地登录态清干净
+      console.error('logout failed:', error)
     }
-  }
 
-  const logout = () => {
     userStore.clearUserInfo()
     userStore.clearToken()
     router.push(ROUTES.LOGIN)
@@ -331,15 +235,10 @@ export function useAuth() {
 
   return {
     loading,
-    sendCodeLoading,
-    countdown,
-    counting,
-    countdownText,
     login,
     telLogin,
     register,
     resetPassword,
-    sendVerificationCode,
     getRememberedCredentials,
     logout,
   }

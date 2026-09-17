@@ -20,7 +20,8 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * 在响应写出前扫描 {@link ApiResponse#getData()}（含分页 {@link com.xiaozhi.common.model.resp.PageResult}、
  * 集合、单对象），将标注 {@link com.xiaozhi.common.annotation.SignedFileUrl} 的 String 字段值经当前存储服务的
- * {@link StorageService#getAccessUrl(String)} 处理——云端私有桶替换为带签名的临时 URL，本地原样返回。
+ * {@link StorageService#getAccessUrl(String)} 处理：云端私有桶替换为带签名的临时 URL，
+ * 本地存储的受保护目录追加时效签名，两侧语义一致，此处不做分支。
  * <p>
  * presign 为本地运算无网络开销，字段元数据带缓存，列表响应亦安全。
  */

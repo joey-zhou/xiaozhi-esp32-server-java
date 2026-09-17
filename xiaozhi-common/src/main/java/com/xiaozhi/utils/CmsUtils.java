@@ -8,6 +8,10 @@ import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,6 +31,43 @@ public class CmsUtils {
             "https://www.cip.cc/", // CIP.CC，返回详细信息
             "https://myip.ipip.net/json", // IPIP.net，返回详细信息
     };
+
+    /** 查询 IP 归属的连接与读取超时（毫秒） */
+    private static final int IP_INFO_TIMEOUT_MS = 1000;
+
+    /** IP 归属查询成功后的缓存有效期（毫秒） */
+    private static final long IP_INFO_TTL_MS = 24L * 60 * 60 * 1000;
+
+    /** IP 归属查询失败后的缓存有效期（毫秒），避免失败时每次请求都重新外呼 */
+    private static final long IP_INFO_FAILURE_TTL_MS = 5L * 60 * 1000;
+
+    /** IP 归属缓存条数上限，超出按最久未访问淘汰 */
+    private static final int IP_INFO_CACHE_MAX = 10000;
+
+    /** 后台补查的并发上限 */
+    private static final int IP_INFO_MAX_INFLIGHT = 16;
+
+    /** IP 归属缓存，被请求线程与后台补查线程共同访问，全部走 synchronizedMap 包装 */
+    private static final Map<String, IPInfoCacheEntry> IP_INFO_CACHE = Collections.synchronizedMap(
+            new LinkedHashMap<>(256, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, IPInfoCacheEntry> eldest) {
+                    return size() > IP_INFO_CACHE_MAX;
+                }
+            });
+
+    /** 正在后台补查的 IP，用于去重与限制并发 */
+    private static final Set<String> IP_INFO_INFLIGHT = ConcurrentHashMap.newKeySet();
+
+    private static final ExecutorService IP_INFO_EXECUTOR = Executors.newThreadPerTaskExecutor(
+            Thread.ofVirtual().name("ip-info-", 0).factory());
+
+    /** IP 归属缓存条目 */
+    private record IPInfoCacheEntry(IPInfo info, long expireAtMillis) {
+        boolean isValid() {
+            return expireAtMillis > System.currentTimeMillis();
+        }
+    }
 
     // 私有IP地址段
     private static final String[] PRIVATE_IP_PATTERNS = {
@@ -616,19 +657,86 @@ public class CmsUtils {
     }
 
     /**
-     * 根据指定IP地址获取地理位置信息
+     * 根据指定IP地址获取地理位置信息。
+     * 命中缓存直接返回，未命中时同步查询第三方服务，调用方需自行承担外呼耗时。
      */
     public static IPInfo getIPInfoByAddress(String ipAddress) {
-        if (ipAddress == null || ipAddress.isEmpty() || "127.0.0.1".equals(ipAddress) || "0:0:0:0:0:0:0:1".equals(ipAddress)) {
-            return null;
+        if (!isQueryableIp(ipAddress)) {
+            return offlineIPInfo(ipAddress);
         }
 
-        // 对于私有IP地址，不进行地理位置查询
-        if (isPrivateIp(ipAddress)) {
+        IPInfoCacheEntry cached = IP_INFO_CACHE.get(ipAddress);
+        if (cached != null && cached.isValid()) {
+            return cached.info();
+        }
+        return queryAndCacheIPInfo(ipAddress);
+    }
+
+    /**
+     * 只读本地缓存的 IP 归属信息，未命中时返回 null 并在后台补查，结果供后续请求使用。
+     * 不做任何阻塞的外部调用，可用于请求主链路。
+     */
+    public static IPInfo getIPInfoFromCache(String ipAddress) {
+        if (!isQueryableIp(ipAddress)) {
+            return offlineIPInfo(ipAddress);
+        }
+
+        IPInfoCacheEntry cached = IP_INFO_CACHE.get(ipAddress);
+        if (cached != null && cached.isValid()) {
+            return cached.info();
+        }
+        refreshIPInfoAsync(ipAddress);
+        return null;
+    }
+
+    /**
+     * 是否需要外呼查询：必须是合法 IP 字面量，且不是回环、不是私网
+     */
+    private static boolean isQueryableIp(String ipAddress) {
+        return RequestContextUtils.isIpLiteral(ipAddress)
+                && !isLoopbackIp(ipAddress)
+                && !isPrivateIp(ipAddress);
+    }
+
+    /**
+     * 不需要外呼时的结论：私网标记为「内网」，非法字面量与回环返回 null
+     */
+    private static IPInfo offlineIPInfo(String ipAddress) {
+        if (RequestContextUtils.isIpLiteral(ipAddress) && !isLoopbackIp(ipAddress) && isPrivateIp(ipAddress)) {
             return new IPInfo(ipAddress, null, "内网");
         }
+        return null;
+    }
 
-        // 首先尝试使用现有的IP_INFO_SERVICES（优先使用已有服务）
+    private static boolean isLoopbackIp(String ip) {
+        return ip.startsWith("127.") || "0.0.0.0".equals(ip)
+                || "::1".equals(ip) || "0:0:0:0:0:0:0:1".equals(ip);
+    }
+
+    /**
+     * 后台补查 IP 归属，同一 IP 同时只补查一次，整体并发不超过 IP_INFO_MAX_INFLIGHT
+     */
+    private static void refreshIPInfoAsync(String ipAddress) {
+        if (IP_INFO_INFLIGHT.size() >= IP_INFO_MAX_INFLIGHT || !IP_INFO_INFLIGHT.add(ipAddress)) {
+            return;
+        }
+        try {
+            IP_INFO_EXECUTOR.execute(() -> {
+                try {
+                    queryAndCacheIPInfo(ipAddress);
+                } finally {
+                    IP_INFO_INFLIGHT.remove(ipAddress);
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            IP_INFO_INFLIGHT.remove(ipAddress);
+        }
+    }
+
+    /**
+     * 外呼查询 IP 归属并写入缓存，查询失败按较短有效期缓存兜底结果
+     */
+    private static IPInfo queryAndCacheIPInfo(String ipAddress) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
 
@@ -639,8 +747,8 @@ public class CmsUtils {
 
             URL url = URI.create(queryUrl).toURL();
             connection = (HttpURLConnection) url.openConnection();
-            connection.setConnectTimeout(3000);
-            connection.setReadTimeout(3000);
+            connection.setConnectTimeout(IP_INFO_TIMEOUT_MS);
+            connection.setReadTimeout(IP_INFO_TIMEOUT_MS);
             connection.setRequestProperty("User-Agent",
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
 
@@ -657,7 +765,10 @@ public class CmsUtils {
                 IPInfo ipInfo = parseIPInfo(queryUrl, content);
                 if (ipInfo != null) {
                     // 强制设置IP地址为指定的IP（因为服务可能返回的是其他IP）
-                    return new IPInfo(ipAddress, ipInfo.getLocation(), ipInfo.getIsp());
+                    IPInfo result = new IPInfo(ipAddress, ipInfo.getLocation(), ipInfo.getIsp());
+                    IP_INFO_CACHE.put(ipAddress,
+                            new IPInfoCacheEntry(result, System.currentTimeMillis() + IP_INFO_TTL_MS));
+                    return result;
                 }
             }
         } catch (Exception e) {
@@ -672,7 +783,10 @@ public class CmsUtils {
         }
 
         // 如果现有服务都无法查询，返回基本的IP信息
-        return new IPInfo(ipAddress, "未知位置", "未知运营商");
+        IPInfo unknown = new IPInfo(ipAddress, "未知位置", "未知运营商");
+        IP_INFO_CACHE.put(ipAddress,
+                new IPInfoCacheEntry(unknown, System.currentTimeMillis() + IP_INFO_FAILURE_TTL_MS));
+        return unknown;
     }
 
     /**

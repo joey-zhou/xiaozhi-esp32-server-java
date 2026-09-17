@@ -13,28 +13,14 @@ export type { Message, Conversation, MessageQueryParams, ConversationQueryParams
  * 查询消息列表
  */
 export function queryMessages(params: MessageQueryParams) {
-  return http.getPage<Message>(api.message.query, params)
+  return http.getPage<Message>(api.message.root, params)
 }
 
 /**
  * 删除消息
  */
 export function deleteMessage(messageId: number) {
-  return http.delete(`${api.message.delete}/${messageId}`)
-}
-
-/**
- * 批量删除设备消息
- */
-export function batchDeleteMessages(deviceId: string) {
-  return http.delete(api.message.delete, { deviceId })
-}
-
-/**
- * 导出消息
- */
-export function exportMessages(params: Omit<MessageQueryParams, 'pageNo' | 'pageSize'>) {
-  return http.get(api.message.export, params)
+  return http.delete(`${api.message.root}/${messageId}`)
 }
 
 /**

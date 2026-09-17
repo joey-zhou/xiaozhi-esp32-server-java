@@ -1,16 +1,20 @@
 package com.xiaozhi.user;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.req.UserPageReq;
 import com.xiaozhi.common.model.PageResult;
+import com.xiaozhi.common.model.resp.LoginResp;
 import com.xiaozhi.common.model.resp.UserResp;
 import com.xiaozhi.common.web.ResultStatus;
+import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.security.AuthenticationService;
 import com.xiaozhi.support.ControllerTestSupport;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.user.service.WxLoginService;
 import com.xiaozhi.userauth.service.UserAuthService;
 import com.xiaozhi.utils.CaptchaUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,10 +29,13 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -55,6 +62,9 @@ class UserControllerTest extends ControllerTestSupport {
     @Mock
     private CaptchaUtils captchaUtils;
 
+    @Mock
+    private TrustedProxyPolicy trustedProxyPolicy;
+
     private UserController userController;
 
     @BeforeEach
@@ -66,6 +76,7 @@ class UserControllerTest extends ControllerTestSupport {
         ReflectionTestUtils.setField(userController, "wxLoginService", wxLoginService);
         ReflectionTestUtils.setField(userController, "userAuthService", userAuthService);
         ReflectionTestUtils.setField(userController, "captchaUtils", captchaUtils);
+        ReflectionTestUtils.setField(userController, "trustedProxyPolicy", trustedProxyPolicy);
         mockMvc = buildMockMvc(userController);
     }
 
@@ -118,5 +129,69 @@ class UserControllerTest extends ControllerTestSupport {
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value(ResultStatus.CONFLICT))
             .andExpect(jsonPath("$.message").value("手机已注册"));
+    }
+
+    /** loginIp 是安全审计字段，取值必须来自可信代理判定，不能由请求头决定 */
+    @Test
+    void loginRecordsTrustedClientIpInsteadOfForwardedHeader() throws Exception {
+        UserBO user = new UserBO();
+        user.setUserId(3);
+        when(userAppService.login("alice", "secret")).thenReturn(user);
+        when(userAppService.getTokenExpireSeconds()).thenReturn(60);
+        when(trustedProxyPolicy.resolveClientIp(any(HttpServletRequest.class))).thenReturn("10.0.0.7");
+        when(userAppService.buildLoginResp(eq(3), any(), eq(false)))
+            .thenReturn(LoginResp.builder().userId(3).build());
+
+        try (var ignored = mockLoginUser(3)) {
+            mockMvc.perform(post("/api/user/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Forwarded-For", "9.9.9.9")
+                    .content("""
+                        {"username":"alice","password":"secret"}
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.userId").value(3));
+        }
+
+        verify(userAppService).recordLoginInfo(user, "10.0.0.7");
+    }
+
+    @Test
+    void updateStateRefusesToDisableTheCallersOwnAccount() throws Exception {
+        try (var ignored = mockLoginUser(1)) {
+            mockMvc.perform(put("/api/user/1/state").param("state", UserBO.STATE_DISABLED))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("不能禁用当前登录账号"));
+        }
+        verifyNoInteractions(userAppService);
+    }
+
+    @Test
+    void updateStateRevokesIssuedTokensOfTheDisabledAccount() throws Exception {
+        UserResp updated = new UserResp();
+        updated.setUserId(2);
+        updated.setState(UserBO.STATE_DISABLED);
+        when(userAppService.updateState(2, UserBO.STATE_DISABLED)).thenReturn(updated);
+
+        try (var stpUtil = mockLoginUser(1)) {
+            mockMvc.perform(put("/api/user/2/state").param("state", UserBO.STATE_DISABLED))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.state").value(UserBO.STATE_DISABLED));
+
+            stpUtil.verify(() -> StpUtil.logout(2));
+        }
+    }
+
+    /** 前端登出只清本地 token 的话，服务端签发的 Token 仍然有效，必须调到这个接口。 */
+    @Test
+    void logoutRevokesCurrentToken() throws Exception {
+        try (var stpUtil = mockLoginUser(1)) {
+            mockMvc.perform(post("/api/user/logout"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(ResultStatus.SUCCESS));
+
+            stpUtil.verify(StpUtil::logout);
+        }
+        verifyNoInteractions(userAppService);
     }
 }

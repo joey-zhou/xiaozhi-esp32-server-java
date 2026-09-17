@@ -38,13 +38,14 @@ export function queryChatMemory(params: {
   if (startTime) queryParams.startTime = startTime
   if (endTime) queryParams.endTime = endTime
 
-  return http.getPage<ChatMemory>(api.message.query, queryParams)
+  return http.getPage<ChatMemory>(api.message.root, queryParams)
 }
 
 /**
  * 删除摘要记忆
+ * id 允许字符串：后端把 Long 主键序列化成字符串保精度，转 number 会删错行
  */
-export function deleteSummaryMemory(roleId: number, deviceId: string, summaryId?: number) {
+export function deleteSummaryMemory(roleId: number, deviceId: string, summaryId?: number | string) {
   const url = `${api.memory.summary}/${roleId}/${deviceId}`
   const params = summaryId ? { id: summaryId } : {}
   return http.delete(url, params)

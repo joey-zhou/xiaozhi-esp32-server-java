@@ -64,7 +64,7 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
     @Cacheable(value = CACHE_NAME, key = "'role_disabled:' + #roleId")
     public List<String> getRoleDisabledTools(Integer roleId) {
         if (roleId == null) {
-            return List.of();
+            return new ArrayList<>();
         }
         List<String> disabledTools = new ArrayList<>();
         List<McpToolExcludeDO> configs = mcpToolExcludeMapper.selectList(new LambdaQueryWrapper<McpToolExcludeDO>()

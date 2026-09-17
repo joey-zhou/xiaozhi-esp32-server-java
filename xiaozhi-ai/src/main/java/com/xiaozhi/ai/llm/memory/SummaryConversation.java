@@ -13,7 +13,6 @@ import org.springframework.util.StringUtils;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -47,14 +46,13 @@ public class SummaryConversation extends Conversation {
     private final PromptTemplate againSummarizerPromptTemplate ;
     private final ChatMemory chatMemory;
     private final ChatClient chatClient;
-    private final Object summaryLock = new Object();
     // 运行时不应该发生变化，避免计算错误
 
     private final int maxMessages ;
     // 运行时不应该发生变化，避免计算错误
     private final int batchSize;
 
-    // 消息摘要
+    // 消息摘要，与 messages 一样由 this 锁保护
     private SummaryBO lastSummary = null;
     private boolean summarizing = false;
 
@@ -88,7 +86,7 @@ public class SummaryConversation extends Conversation {
         if(lastSummary == null){
             List<Message> history = chatMemory.find(getOwnerId(), getRoleId(), maxMessages);
             log.info("当前{}还没有历史summary,加载{}条普通消息进入对话上下文", getOwnerId(), history.size());
-            synchronized (summaryLock) {
+            synchronized (this) {
                 super.messages.addAll(history);
                 dropLeadingOrphans();
             }
@@ -103,7 +101,7 @@ public class SummaryConversation extends Conversation {
         }else {
             List<Message> history = chatMemory.find(getOwnerId(), getRoleId(), lastSummary.getLastMessageTimestamp());
             log.info("加载{}的{}条未被摘要的消息作为对话历史", getOwnerId(), history.size());
-            synchronized (summaryLock) {
+            synchronized (this) {
                 super.messages.addAll(history);
                 dropLeadingOrphans();
             }
@@ -134,7 +132,7 @@ public class SummaryConversation extends Conversation {
      */
     @Override
     public void add(Message message) {
-        synchronized (summaryLock) {
+        synchronized (this) {
             super.add(message);
         }
         // 达到阈值则触发大模型进行摘要。只在添加 AssistantMessage 时触发（避免重复触发）
@@ -151,7 +149,7 @@ public class SummaryConversation extends Conversation {
         List<Message> needSummaryMessages;
         int size;
         int actualBatchSize;
-        synchronized (summaryLock) {
+        synchronized (this) {
             if (summarizing) {
                 return;
             }
@@ -178,7 +176,7 @@ public class SummaryConversation extends Conversation {
 
         // 2. 拼接提示词
         String lastSummaryText;
-        synchronized (summaryLock) {
+        synchronized (this) {
             lastSummaryText = lastSummary == null ? null : lastSummary.getSummary();
         }
         String factExtractPrompt;
@@ -208,13 +206,13 @@ public class SummaryConversation extends Conversation {
             SummaryBO newSummary = new SummaryBO()
                     .setDeviceId(getOwnerId())
                     .setRoleId(getRoleId())
-                    .setLastMessageTimestamp(MessageTimeMetadata.getTimeMillis(needSummaryMessages.getLast()).truncatedTo(ChronoUnit.SECONDS))
+                    .setLastMessageTimestamp(MessageTimeMetadata.getTimeMillis(needSummaryMessages.getLast()))
                     .setSummary(factExtract)
                     .setCreateTime(Instant.now());
             chatMemory.save(newSummary);
 
             int removed;
-            synchronized (summaryLock) {
+            synchronized (this) {
                 // 5. 移除已处理的消息，按引用匹配，内容相同的其它消息不受影响
                 removed = removeByIdentity(needSummaryMessages);
                 this.lastSummary = newSummary;
@@ -226,7 +224,7 @@ public class SummaryConversation extends Conversation {
             }
         } catch (Exception e) {
             log.error("{}对话摘要失败", getOwnerId(), e);
-            synchronized (summaryLock) {
+            synchronized (this) {
                 summarizing = false;
             }
         }
@@ -243,10 +241,11 @@ public class SummaryConversation extends Conversation {
         return before - messages.size();
     }
 
+    @Override
     public List<Message> messages(ConversationContext context) {
         List<Message> messageSnapshot;
         SummaryBO summarySnapshot;
-        synchronized (summaryLock) {
+        synchronized (this) {
             messageSnapshot = new ArrayList<>(messages);
             summarySnapshot = lastSummary;
         }

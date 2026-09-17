@@ -1,58 +1,39 @@
+/**
+ * 后端接口路径表
+ *
+ * 同一资源的增删改查共用一个 root，子资源路径由各 service 自行拼接。
+ * 不按 CRUD 动作起别名——别名值全都一样，只会让人误以为 query 常量不能拿来发 POST。
+ * 只登记后端真实存在的路径，加之前先去对应 Controller 核对。
+ */
 export default {
   user: {
-    add: '/user',
+    root: '/user',
     login: '/user/login',
     telLogin: '/user/tel-login',
     checkToken: '/user/check-token',
+    logout: '/user/logout',
     refreshToken: '/user/refresh-token',
-    query: '/user',
-    update: '/user',
     resetPassword: '/user/resetPassword',
     sendEmailCaptcha: '/user/sendEmailCaptcha',
     sendSmsCaptcha: '/user/sendSmsCaptcha',
-    checkCaptcha: '/user/checkCaptcha',
     checkUser: '/user/checkUser',
   },
-  authRole: {
-    query: '/auth-role',
-    permissions: '/auth-role',
-  },
-  device: {
-    add: '/device',
-    query: '/device',
-    update: '/device',
-    delete: '/device',
-    export: '/device/export',
-  },
-  agent: {
-    query: '/agent',
-  },
+  authRole: '/auth-role',
+  // 设备的发消息/暂停/继续/停止等动作都是 /device/{id}/xxx 子资源
+  device: '/device',
+  agent: '/agent',
   role: {
-    add: '/role',
-    query: '/role',
-    update: '/role',
-    delete: '/role',
+    root: '/role',
     testVoice: '/role/testVoice',
     sherpaVoices: '/role/sherpaVoices',
   },
-  template: {
-    query: '/template',
-    add: '/template',
-    update: '/template',
-    delete: '/template',
-  },
+  template: '/template',
   message: {
-    query: '/message',
-    update: '/message',
-    delete: '/message',
-    export: '/message/export',
+    root: '/message',
     conversations: '/message/conversations',
   },
   config: {
-    add: '/config',
-    query: '/config',
-    update: '/config',
-    delete: '/config',
+    root: '/config',
     test: '/config/test',
   },
   mcpTool: {
@@ -66,7 +47,6 @@ export default {
   memory: {
     summary: '/memory/summary',
   },
-  // Web 聊天 API
   chat: {
     open: '/chat/open',
     stream: '/chat/stream',

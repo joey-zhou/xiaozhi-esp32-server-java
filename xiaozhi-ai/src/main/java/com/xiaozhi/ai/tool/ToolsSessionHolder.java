@@ -4,6 +4,7 @@ import com.xiaozhi.common.model.bo.DeviceBO;
 import org.springframework.ai.tool.ToolCallback;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -13,7 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 public class ToolsSessionHolder {
     private static final String TAG = "FUNCTION_SESSION";
 
-    private final Map<String, ToolCallback> functionRegistry = new HashMap<>();
+    /** 设备 MCP 注册线程、IoT 消息线程与对话线程并发读写，必须是并发容器 */
+    private final Map<String, ToolCallback> functionRegistry = new ConcurrentHashMap<>();
 
     private String sessionId;
 
@@ -61,8 +63,7 @@ public class ToolsSessionHolder {
      * @return true if successful, false otherwise
      */
     public boolean unregisterFunction(String name) {
-        // Check if the function exists before unregistering
-        if (!functionRegistry.containsKey(name)) {
+        if (functionRegistry.remove(name) == null) {
             log.error("[{}] - SessionId:{} Function:{} not found", TAG, sessionId, name);
             return false;
         }
@@ -87,7 +88,7 @@ public class ToolsSessionHolder {
      * @return a map of all registered functions
      */
     public List<ToolCallback> getAllFunction() {
-        return functionRegistry.values().stream().toList();
+        return List.copyOf(functionRegistry.values());
     }
 
     /**
@@ -96,7 +97,7 @@ public class ToolsSessionHolder {
      * @return a list of all registered function name
      */
     public List<String> getAllFunctionName() {
-        return new ArrayList<>(functionRegistry.keySet());
+        return List.copyOf(functionRegistry.keySet());
     }
 
     /**

@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  * Coze LLM服务实现
  */
 @Slf4j
-public class CozeChatModel implements ChatModel {
+public class CozeChatModel implements ChatModel, AutoCloseable {
 
     private final CozeAPI coze;
     private final String botId;
@@ -178,10 +178,6 @@ public class CozeChatModel implements ChatModel {
                             }
                         }
 
-                        if (ChatEventType.DONE.equals(event.getEvent())) {
-                            coze.shutdownExecutor();
-                        }
-
                         var message = event.getMessage();
 
                         Map<String, Object> messageMetadata = Optional.ofNullable(message)
@@ -227,6 +223,15 @@ public class CozeChatModel implements ChatModel {
             log.error("创建流式请求时出错: {}", e.getMessage(), e);
             return Flux.error(e);
         }
+    }
+
+    /**
+     * 释放 CozeAPI 持有的 OkHttp 线程池。只能在实例不再被复用时调用：
+     * 线程池关闭后该实例的所有流式请求都会被拒绝。
+     */
+    @Override
+    public void close() {
+        coze.shutdownExecutor();
     }
 
     /**

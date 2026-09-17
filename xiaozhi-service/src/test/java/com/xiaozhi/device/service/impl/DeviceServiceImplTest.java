@@ -3,6 +3,7 @@ package com.xiaozhi.device.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
@@ -27,12 +28,14 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -40,7 +43,7 @@ import static org.mockito.Mockito.when;
 /**
  * 钉住设备查询的缓存穿透路径与激活码生成：
  * 设备号里的冒号在缓存键上要换成连字符，命中缓存时不得回源；
- * 已有有效验证码时直接复用，否则新插入一个六位数字码。
+ * 已有有效验证码时直接复用，否则摇一个有效期内没被占用的六位数字码，摇满次数仍撞码就拒绝发码。
  */
 @ExtendWith(MockitoExtension.class)
 class DeviceServiceImplTest {
@@ -190,6 +193,35 @@ class DeviceServiceImplTest {
         verify(verifyCodeService).createForDevice(eq("device-1"), eq("session-1"), eq("bind"), codeCaptor.capture());
         // 验证码需左侧补零到固定六位，否则设备端按定长解析会取错
         assertThat(codeCaptor.getValue()).matches("\\d{6}");
+    }
+
+    @Test
+    void generateCodeRerollsWhenDrawnCodeIsAlreadyTaken() {
+        VerifyCodeBO created = new VerifyCodeBO();
+
+        when(verifyCodeService.findValid(nullable(String.class), eq("device-1"), eq("session-1")))
+            .thenReturn(null, created);
+        // 按 code 全局探测：第一次摇到的码在有效期内已被占用，必须重摇
+        when(verifyCodeService.findValid(anyString(), isNull(), isNull()))
+            .thenReturn(new VerifyCodeBO())
+            .thenReturn(null);
+
+        assertThat(deviceService.generateCode("device-1", "session-1", "bind")).isSameAs(created);
+
+        verify(verifyCodeService, times(2)).findValid(anyString(), isNull(), isNull());
+        verify(verifyCodeService).createForDevice(eq("device-1"), eq("session-1"), eq("bind"), anyString());
+    }
+
+    @Test
+    void generateCodeFailsWhenEveryDrawnCodeIsTaken() {
+        when(verifyCodeService.findValid(isNull(), eq("device-1"), eq("session-1"))).thenReturn(null);
+        when(verifyCodeService.findValid(anyString(), isNull(), isNull())).thenReturn(new VerifyCodeBO());
+
+        // 绑定只凭 6 位码定位设备，摇满次数仍撞码时拒绝发码，不能落一个重复码
+        assertThatThrownBy(() -> deviceService.generateCode("device-1", "session-1", "bind"))
+            .isInstanceOf(OperationFailedException.class);
+
+        verify(verifyCodeService, never()).createForDevice(any(), any(), any(), any());
     }
 
     @Test

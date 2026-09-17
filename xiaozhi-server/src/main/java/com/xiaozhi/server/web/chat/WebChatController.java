@@ -2,11 +2,13 @@ package com.xiaozhi.server.web.chat;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
+import com.xiaozhi.common.model.req.ChatStreamReq;
 import com.xiaozhi.common.model.resp.ChatTokenResp;
 import com.xiaozhi.server.web.chat.convert.WebChatConvert;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
@@ -46,17 +48,17 @@ public class WebChatController {
     }
 
     /**
-     * 流式聊天（SSE）
+     * 流式聊天（SSE）。
+     * 用户输入走请求体，不放 query，避免被 access log 与反向代理日志留存。
      *
-     * @param sessionId 会话ID
-     * @param text      用户消息
+     * @param req 会话 ID 与用户消息
      * @return AI 回复文本流
      */
-    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @SaCheckPermission("system:chat:api:stream")
     @Operation(summary = "流式聊天", description = "通过 SSE 返回 AI 回复 Token 流，包含 thinking 和 content 两种类型")
-    public Flux<ChatTokenResp> stream(@RequestParam String sessionId, @RequestParam String text) {
-        return webChatService.chatStream(sessionId, text).map(webChatConvert::toResp);
+    public Flux<ChatTokenResp> stream(@Valid @RequestBody ChatStreamReq req) {
+        return webChatService.chatStream(req.getSessionId(), req.getText()).map(webChatConvert::toResp);
     }
 
     /**

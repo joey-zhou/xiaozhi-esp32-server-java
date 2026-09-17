@@ -14,27 +14,14 @@ export interface ApiResponse<T = unknown> {
 }
 
 /**
- * 分页数据接口
+ * 分页数据
+ * pageNo / pageSize 是回显用的请求参数，前端只消费 list 与 total
  */
 export interface PageData<T = unknown> {
   list: T[]
   total: number
-  pageNum: number
-  pageSize: number
-  size: number
-  startRow: number
-  endRow: number
-  pages: number
-  prePage: number
-  nextPage: number
-  isFirstPage: boolean
-  isLastPage: boolean
-  hasPreviousPage: boolean
-  hasNextPage: boolean
-  navigatePages: number
-  navigatepageNums: number[]
-  navigateFirstPage: number
-  navigateLastPage: number
+  pageNo?: number
+  pageSize?: number
 }
 
 /**
@@ -49,13 +36,6 @@ export interface PageResponse<T = unknown> extends ApiResponse<PageData<T>> {
  */
 export interface ListResponse<T = unknown> extends ApiResponse<T[]> {
   data: T[]
-}
-
-/**
- * 通用响应接口（无数据）
- */
-export interface EmptyResponse extends ApiResponse<null> {
-  data: null
 }
 
 /**

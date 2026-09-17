@@ -155,8 +155,8 @@ public class AiConfig {
     /**
      * 按 patch 覆盖自身字段并返回合并结果，patch 未提供的字段取自身当前值。
      * <p>纯查询：不改变自身状态，不产生信号。
-     * <p>硬约束：判定「未提供」只认 null，空白串必须在 Req → BO 边界就规范成 null。
-     * <p>硬约束：身份（configId、userId）与时间戳恒取自身，patch 改不动。
+     * <p>判定「未提供」只认 null，空白串必须在 Req → BO 边界就规范成 null。
+     * <p>身份（configId、userId）与时间戳恒取自身，patch 改不动。
      */
     public ConfigBO mergePatch(ConfigBO patch) {
         return new ConfigBO()

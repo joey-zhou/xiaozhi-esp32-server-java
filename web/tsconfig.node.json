@@ -6,7 +6,8 @@
     "cypress.config.*",
     "nightwatch.conf.*",
     "playwright.config.*",
-    "eslint.config.*"
+    "eslint.config.*",
+    "e2e/**/*.ts"
   ],
   "compilerOptions": {
     "noEmit": true,
@@ -14,6 +15,10 @@
 
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "types": ["node"]
+    "types": ["node"],
+
+    // 与 tsconfig.app.json 保持同一档严格度
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   }
 }

@@ -2,32 +2,23 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 
-/**
- * 文件验证器
- */
-export interface FileValidator {
-  /**
-   * 验证文件是否合法
-   * @param file 要验证的文件
-   * @returns 验证结果，如果合法返回 true，否则返回错误消息
-   */
-  validate: (file: File) => true | string
-}
+import type { FileValidator } from '@/utils/fileValidators'
 
 /**
  * 拖拽上传配置
  */
 export interface DragUploadOptions {
   /**
-   * 文件验证器
+   * 文件验证器；拖拽入口没有文件选择器，用不上规则表的 accept
    */
-  validator: FileValidator
+  validator: Pick<FileValidator, 'validate'>
 
   /**
    * 文件处理回调
    * @param file 上传的文件
+   * @returns 返回 false 表示未受理该文件，此时不弹成功提示
    */
-  onDrop: (file: File) => void | Promise<void>
+  onDrop: (file: File) => void | boolean | Promise<void | boolean>
 
   /**
    * 是否启用拖拽上传
@@ -60,30 +51,15 @@ export interface DragUploadOptions {
  *
  * @example
  * ```ts
- * // 音频文件上传
- * const audioValidator: FileValidator = {
- *   validate: (file) => {
- *     const isAudio = file.type.startsWith('audio/') ||
- *                     file.name.match(/\.(wav|mp3|m4a)$/i)
- *     if (!isAudio) return 'common.audioFormatError'
- *
- *     const isLt10M = file.size / 1024 / 1024 < 10
- *     if (!isLt10M) return 'common.audioSizeError'
- *
- *     return true
- *   }
- * }
- *
+ * // 音频文件上传：onDrop 必须把处理结果返回出来，返回 false 时不弹成功提示
  * const { isDragging } = useDragUpload({
- *   validator: audioValidator,
- *   onDrop: (file) => {
- *     handleFileUpload(file)
- *   },
+ *   validator: fileValidators.audio,
+ *   onDrop: (file) => handleFileUpload(file),
  *   enabled: () => activeTab.value === 'upload',
  *   messages: {
- *     dragText: 'firmware.dragDropText',
- *     dragHint: 'firmware.dragDropHint',
- *     successMessage: 'firmware.fileUploadSuccess'
+ *     dragText: 'common.dragDropFile',
+ *     dragHint: 'common.dragDropFile',
+ *     successMessage: 'common.saveSuccess'
  *   }
  * })
  * ```
@@ -119,12 +95,14 @@ export function useDragUpload(options: DragUploadOptions) {
     e.preventDefault()
     e.stopPropagation()
 
-    // 检查是否启用
+    // 计数必须先于 enabled 判断，否则拖拽途中 enabled 翻转会让 enter/leave 配不上对
+    dragCounter++
+
+    // enabled 只决定是否显示遮罩
     if (!enabled()) {
+      isDragging.value = false
       return
     }
-
-    dragCounter++
 
     // 检查是否包含文件
     if (e.dataTransfer) {
@@ -150,8 +128,9 @@ export function useDragUpload(options: DragUploadOptions) {
     e.preventDefault()
     e.stopPropagation()
 
-    // 检查是否启用
+    // enabled 只决定是否显示遮罩
     if (!enabled()) {
+      isDragging.value = false
       return
     }
 
@@ -172,14 +151,10 @@ export function useDragUpload(options: DragUploadOptions) {
     e.preventDefault()
     e.stopPropagation()
 
-    // 检查是否启用
-    if (!enabled()) {
-      return
-    }
+    // 计数必须先于 enabled 判断；下限取 0，防止拖拽途中挂载导致 leave 多于 enter
+    dragCounter = Math.max(0, dragCounter - 1)
 
-    dragCounter--
-
-    if (dragCounter === 0) {
+    if (dragCounter === 0 || !enabled()) {
       isDragging.value = false
     }
   }
@@ -214,7 +189,10 @@ export function useDragUpload(options: DragUploadOptions) {
 
       // 处理文件
       try {
-        await onDrop(file)
+        // onDrop 返回 false 表示未受理，不能再弹成功提示
+        if (await onDrop(file) === false) {
+          return
+        }
 
         // 显示成功提示
         if (showSuccessMessage && messages.successMessage) {
@@ -267,71 +245,4 @@ export function useDragUpload(options: DragUploadOptions) {
     install,
     uninstall
   }
-}
-
-/**
- * 预定义的文件验证器
- */
-export const fileValidators = {
-  /**
-   * 音频文件验证器（10MB限制）
-   */
-  audio: {
-    validate: (file: File) => {
-      const isAudio = file.type.startsWith('audio/') ||
-                      file.name.toLowerCase().match(/\.(wav|mp3|m4a|flac|ogg)$/)
-
-      if (!isAudio) {
-        return 'common.audioFormatError'
-      }
-
-      const isLt10M = file.size / 1024 / 1024 < 10
-      if (!isLt10M) {
-        return 'common.audioSizeError'
-      }
-
-      return true
-    }
-  } as FileValidator,
-
-  /**
-   * 图片文件验证器（2MB限制）
-   */
-  image: {
-    validate: (file: File) => {
-      const isImage = file.type.startsWith('image/')
-
-      if (!isImage) {
-        return 'common.onlyImageFiles'
-      }
-
-      const isLt2M = file.size / 1024 / 1024 < 2
-      if (!isLt2M) {
-        return 'common.imageSizeLimit'
-      }
-
-      return true
-    }
-  } as FileValidator,
-
-  /**
-   * 固件文件验证器（.bin/.hex文件，50MB限制）
-   */
-  firmware: {
-    validate: (file: File) => {
-      const isFirmware = file.name.toLowerCase().endsWith('.bin') ||
-                        file.name.toLowerCase().endsWith('.hex')
-
-      if (!isFirmware) {
-        return 'firmware.invalidFileType'
-      }
-
-      const isLt50M = file.size / 1024 / 1024 < 50
-      if (!isLt50M) {
-        return 'firmware.fileSizeLimit'
-      }
-
-      return true
-    }
-  } as FileValidator
 }

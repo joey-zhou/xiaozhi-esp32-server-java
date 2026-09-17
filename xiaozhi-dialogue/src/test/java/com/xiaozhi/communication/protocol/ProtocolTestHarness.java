@@ -16,6 +16,7 @@ import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.communication.server.websocket.WebSocketHandler;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.dialogue.DialogueService;
+import com.xiaozhi.communication.server.websocket.DeviceAuthHandshakeInterceptor;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.dialogue.llm.tool.device.IotService;
 import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpService;
@@ -28,9 +29,13 @@ import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import jakarta.annotation.Resource;
+import org.springframework.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
@@ -272,10 +277,43 @@ class ProtocolTestHarness {
 
     /** 用自定义传输建立连接，可编排握手头缺失、device-id 走 query 参数等场景 */
     FakeDevice connect(String deviceId, FakeWebSocketTransport transport) {
+        // 生产链路由握手拦截器判定设备身份并写入属性，这里不经过拦截器，按同一规则补上
+        applyHandshakeIdentity(transport);
         webSocketHandler.afterConnectionEstablished(transport);
         FakeDevice device = new FakeDevice(this, deviceId, transport);
         connected.add(device);
         return device;
+    }
+
+    /**
+     * 复刻 {@link DeviceAuthHandshakeInterceptor#beforeHandshake} 的取值规则：
+     * 握手头优先、URI 查询参数兜底，判定结果写进握手属性。取不到就不写，让 handler 走拒绝分支。
+     */
+    private void applyHandshakeIdentity(FakeWebSocketTransport transport) {
+        String deviceId = transport.getHandshakeHeaders().getFirst("device-id");
+        if (!StringUtils.hasText(deviceId)) {
+            deviceId = queryParam(transport.getUri(), "device-id");
+        }
+        if (StringUtils.hasText(deviceId)) {
+            transport.getAttributes().put(DeviceAuthHandshakeInterceptor.ATTR_DEVICE_ID, deviceId);
+        }
+    }
+
+    private static String queryParam(URI uri, String name) {
+        String query = uri == null ? null : uri.getRawQuery();
+        if (!StringUtils.hasText(query)) {
+            return null;
+        }
+        for (String pair : query.split("&")) {
+            int eq = pair.indexOf('=');
+            if (eq <= 0) {
+                continue;
+            }
+            if (URLDecoder.decode(pair.substring(0, eq), StandardCharsets.UTF_8).equals(name)) {
+                return URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8);
+            }
+        }
+        return null;
     }
 
     /** 新建一个未连接的传输，id 自增保证同一 harness 内不重复 */

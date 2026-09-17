@@ -6,17 +6,17 @@ import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpService;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.handler.AbstractWebSocketHandler;
+import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
 import org.springframework.web.socket.WebSocketSession;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 
 import lombok.extern.slf4j.Slf4j;
@@ -33,12 +33,25 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
     @Resource
     private DeviceMcpService deviceMcpService;
 
+    /**
+     * 单条下行消息的最长发送时间，超过即断开该连接。
+     * 字段初值供未经 Spring 装配的调用方使用，容器内由配置覆盖。
+     */
+    @Value("${websocket.async-send-timeout:5000}")
+    private int sendTimeLimitMs = 5000;
+
+    /**
+     * 单会话下行待发缓冲上限，超过按最旧优先丢弃。
+     */
+    @Value("${websocket.send-buffer-size-limit:524288}")
+    private int sendBufferSizeLimit = 512 * 1024;
+
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        Map<String, String> headers = getHeadersFromSession(session);
-        String deviceIdAuth = headers.get("device-id");
-        String token = headers.get("Authorization");
-        if (deviceIdAuth == null || deviceIdAuth.isEmpty()) {
+        // 设备身份只认握手拦截器写入的属性，不从请求头或 query 二次解析
+        String deviceIdAuth = (String) session.getAttributes()
+                .get(DeviceAuthHandshakeInterceptor.ATTR_DEVICE_ID);
+        if (!StringUtils.hasText(deviceIdAuth)) {
             log.error("设备ID为空");
             try {
                 session.close(CloseStatus.BAD_DATA.withReason("设备ID为空"));
@@ -48,8 +61,12 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
             return;
         }
 
+        // 播放线程、容器线程、工具调用线程会同时下行，原生 session 禁止并发写，
+        // 装饰器负责串行化；缓冲溢出丢最旧帧而不是断连，避免弱网直接掉线
         com.xiaozhi.communication.server.websocket.WebSocketSession xiaoZhiSession
-                = new com.xiaozhi.communication.server.websocket.WebSocketSession(session);
+                = new com.xiaozhi.communication.server.websocket.WebSocketSession(
+                        new ConcurrentWebSocketSessionDecorator(session, sendTimeLimitMs, sendBufferSizeLimit,
+                                ConcurrentWebSocketSessionDecorator.OverflowStrategy.DROP));
         // 握手头先给出版本，hello 到达后以其声明为准
         xiaoZhiSession.setProtocolVersion(resolveProtocolVersion(
                 parseVersion(session.getHandshakeHeaders().getFirst("Protocol-Version")), session.getId()));
@@ -70,6 +87,9 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
             var msg = JsonUtil.fromJson(payload, Message.class);
             if (Objects.requireNonNull(msg) instanceof HelloMessage m) {
                 handleHelloMessage(session, m);
+            } else if (msg instanceof PingMessage) {
+                // 保活报文：收到即已重置容器的空闲计时，不进设备绑定、不进业务分发、不回应答
+                return;
             } else {
                 if (device == null || device.getRoleId() == null) {
                     // 设备未绑定，尝试自动绑定
@@ -181,14 +201,18 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
                 .setAudioParams(AudioParams.serverCapability());
 
         try {
-            session.sendMessage(new TextMessage(JsonUtil.toJson(resp)));
+            // 走会话对象下行，直接写原生 session 会绕过串行化装饰器
+            if (current == null) {
+                log.warn("会话未注册，hello响应无法下发 - SessionId: {}", sessionId);
+                return;
+            }
+            current.sendTextMessage(JsonUtil.toJson(resp));
             if(message.getFeatures() != null && message.getFeatures().getMcp()) {
                 //如果客户端开启mcp协议，异步初始化MCP工具
-                ChatSession chatSession = sessionManager.getSession(sessionId);
                 Thread.startVirtualThread(() -> {
-                    DeviceBO device = chatSession != null ? chatSession.getDevice() : null;
+                    DeviceBO device = current.getDevice();
                     if (device != null && device.getRoleId() != null) {
-                        deviceMcpService.initialize(chatSession);
+                        deviceMcpService.initialize(current);
                     }
                 });
             }
@@ -222,34 +246,4 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
         }
     }
 
-    private Map<String, String> getHeadersFromSession(WebSocketSession session) {
-        // 设备标识只认 device-id，与握手鉴权拦截器保持一致
-        String[] deviceKeys = { "device-id", "Authorization" };
-
-        Map<String, String> headers = new HashMap<>();
-
-        for (String key : deviceKeys) {
-            String value = session.getHandshakeHeaders().getFirst(key);
-            if (value != null) {
-                headers.put(key, value);
-            }
-        }
-        // 尝试从URI参数中获取
-        URI uri = session.getUri();
-        if (uri != null) {
-            String query = uri.getQuery();
-            if (query != null) {
-                for (String key : deviceKeys) {
-                    String paramPattern = key + "=";
-                    int startIdx = query.indexOf(paramPattern);
-                    if (startIdx >= 0) {
-                        startIdx += paramPattern.length();
-                        int endIdx = query.indexOf('&', startIdx);
-                        headers.put(key, endIdx >= 0 ? query.substring(startIdx, endIdx) : query.substring(startIdx));
-                    }
-                }
-            }
-        }
-        return headers;
-    }
 }

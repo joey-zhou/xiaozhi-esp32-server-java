@@ -8,7 +8,7 @@ services:
     container_name: xiaozhi-mysql
     restart: always
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"  # 只监听宿主机回环，服务跑在本机，无需对外网暴露
     environment:
       - MYSQL_ROOT_PASSWORD=abc123456
       - MYSQL_DATABASE=xiaozhi
@@ -42,7 +42,7 @@ services:
     container_name: xiaozhi-redis
     restart: always
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"  # 只监听宿主机回环，Redis 无口令，不能对外网可达
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data

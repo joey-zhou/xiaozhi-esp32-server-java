@@ -1,10 +1,16 @@
 services:
   mysql:
-    build:
-      context: .
-      dockerfile: Dockerfile-mysql
+    image: mysql:8.0-debian
     ports:
-      - "3306:3306"  # 修改为 3306 或其他未使用的端口
+      - "127.0.0.1:13306:3306"  # 只监听宿主机回环，容器间用服务名 mysql:3306 互访
+    environment:
+      - MYSQL_ROOT_PASSWORD=abc123456
+      - MYSQL_DATABASE=xiaozhi
+      - MYSQL_USER=xiaozhi
+      - MYSQL_PASSWORD=123456
+      - LANG=C.UTF-8
+      - MYSQL_CHARSET=utf8mb4
+      - MYSQL_COLLATION=utf8mb4_unicode_ci
     networks:
       - app-network
     volumes:
@@ -27,8 +33,6 @@ services:
       - "8084:8084"
     networks:
       - app-network
-    environment:
-      - API_URL=http://server:8091
 
   server:
     build:
@@ -55,6 +59,14 @@ services:
       - SPRING_DATASOURCE_USERNAME=xiaozhi
       - SPRING_DATASOURCE_PASSWORD=123456
       - HOST_IP=${HOST_IP:-}
+      # 设备接入鉴权密钥，未导出则不鉴权；.env 被 git 跟踪，不要把真实值写进去
+      # 生产部署前 export XIAOZHI_DEVICE_AUTH_SECRET=$(openssl rand -hex 16)
+      - XIAOZHI_DEVICE_AUTH_SECRET=${XIAOZHI_DEVICE_AUTH_SECRET:-}
+      # 镜像内跑的是 dev profile，logback dev 段把 com.xiaozhi 开到 DEBUG，这里压回 INFO
+      - LOGGING_LEVEL_COM_XIAOZHI=INFO
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AI=INFO
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB_REACTIVE=INFO
+      - LOGGING_LEVEL_REACTOR_NETTY_HTTP_CLIENT=INFO
     restart: always  # 自动重启
     deploy:
       resources:
@@ -89,6 +101,15 @@ services:
       - SPRING_DATASOURCE_USERNAME=xiaozhi
       - SPRING_DATASOURCE_PASSWORD=123456
       - HOST_IP=${HOST_IP:-}
+      # 设备接入鉴权密钥，未导出则不鉴权；.env 被 git 跟踪，不要把真实值写进去
+      # 生产部署前 export XIAOZHI_DEVICE_AUTH_SECRET=$(openssl rand -hex 16)
+      - XIAOZHI_DEVICE_AUTH_SECRET=${XIAOZHI_DEVICE_AUTH_SECRET:-}
+      # 镜像内跑的是 dev profile，logback dev 段把 com.xiaozhi 开到 DEBUG，这里压回 INFO
+      - LOGGING_LEVEL_COM_XIAOZHI=INFO
+      - LOGGING_LEVEL_COM_XIAOZHI_DIALOGUE=INFO
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AI=INFO
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB_REACTIVE=INFO
+      - LOGGING_LEVEL_REACTOR_NETTY_HTTP_CLIENT=INFO
     restart: always
     deploy:
       resources:

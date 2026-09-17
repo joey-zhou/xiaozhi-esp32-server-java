@@ -6,7 +6,7 @@ import type { FormInstance } from 'ant-design-vue'
  * 用于统一管理创建/编辑弹窗的状态和逻辑
  */
 
-export interface UseModalOptions<T = any> {
+export interface UseModalOptions<T = unknown> {
   /**
    * 提交回调函数
    * @param data 表单数据
@@ -32,7 +32,7 @@ export interface UseModalOptions<T = any> {
   formRef?: Ref<FormInstance | undefined>
 }
 
-export function useModal<T = any>(options?: UseModalOptions<T>) {
+export function useModal<T = unknown>(options?: UseModalOptions<T>) {
   // 弹窗可见性
   const visible = ref(false)
   

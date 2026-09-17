@@ -40,7 +40,7 @@ public class ConfigConnectionChecker {
 
     /**
      * 测试用临时配置 ID 的取号器，取值落在负数区间，与真实配置的正数 ID 不重合。
-     * <p>硬约束：每次测试都要拿到独立的 ID。下游按 configId 键控 Token 与连接缓存，
+     * <p>每次测试都要拿到独立的 ID。下游按 configId 键控 Token 与连接缓存，
      * 共用一个固定值会让不同用户的临时凭据落进同一个缓存槽。
      */
     private static final AtomicInteger TRANSIENT_CONFIG_ID_SEQ = new AtomicInteger();
@@ -65,7 +65,7 @@ public class ConfigConnectionChecker {
 
     /**
      * 测试配置：使用表单当前值（可能未保存）直接发起一次真实调用，将 Provider 报错原样返回给前端。
-     * <p>硬约束：库里保存的密钥只能配库里保存的端点使用。本人的配置允许用表单值覆盖端点，
+     * <p>库里保存的密钥只能配库里保存的端点使用。本人的配置允许用表单值覆盖端点，
      * 共享配置一律按库里那条原样测试，表单里的端点与密钥都不生效。
      */
     public ApiResponse<Void> test(ConfigTestReq req, Integer userId) {

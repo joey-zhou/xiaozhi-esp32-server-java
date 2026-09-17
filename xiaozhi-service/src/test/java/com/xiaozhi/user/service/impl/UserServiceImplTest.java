@@ -2,6 +2,7 @@ package com.xiaozhi.user.service.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
+import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.support.MybatisPlusTestHelper;
@@ -159,17 +160,34 @@ class UserServiceImplTest {
     }
 
     @Test
-    void checkCaptchaReturnsFalseWithoutQueryWhenArgumentBlank() {
-        assertThat(userService.checkCaptcha(" ", "123456")).isFalse();
-        assertThat(userService.checkCaptcha("a@b.com", " ")).isFalse();
+    void consumeCaptchaReturnsFalseWithoutQueryWhenArgumentBlank() {
+        assertThat(userService.consumeCaptcha(" ", "123456")).isFalse();
+        assertThat(userService.consumeCaptcha("a@b.com", " ")).isFalse();
 
         verifyNoInteractions(verifyCodeService);
     }
 
     @Test
-    void checkCaptchaDelegatesToVerifyCodeService() {
-        when(verifyCodeService.hasValidEmail("a@b.com", "123456")).thenReturn(true);
+    void consumeCaptchaConsumesCodeThroughVerifyCodeService() {
+        when(verifyCodeService.consumeByAccount("a@b.com", "123456")).thenReturn(true);
 
-        assertThat(userService.checkCaptcha("a@b.com", "123456")).isTrue();
+        assertThat(userService.consumeCaptcha("a@b.com", "123456")).isTrue();
+
+        verify(verifyCodeService).consumeByAccount("a@b.com", "123456");
+    }
+
+    @Test
+    void requireEnabledRejectsDisabledUserOnly() {
+        UserBO disabled = new UserBO();
+        disabled.setState(UserBO.STATE_DISABLED);
+
+        assertThatThrownBy(() -> userService.requireEnabled(disabled))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("账号已被禁用");
+
+        UserBO enabled = new UserBO();
+        enabled.setState(UserBO.STATE_ENABLED);
+        userService.requireEnabled(enabled);
+        userService.requireEnabled(null);
     }
 }

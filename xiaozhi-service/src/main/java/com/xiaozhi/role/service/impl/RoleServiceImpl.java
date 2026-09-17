@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xiaozhi.role.domain.Role;
 import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.PageResult;
@@ -23,7 +24,6 @@ import java.util.List;
 @Service
 public class RoleServiceImpl implements RoleService {
 
-    private static final String ENABLED = "1";
     // 缓存名称统一定义在 RoleService 接口中
 
     @Resource
@@ -79,7 +79,7 @@ public class RoleServiceImpl implements RoleService {
         }
         List<RoleBO> roles = roleMapper.selectList(new LambdaQueryWrapper<RoleDO>()
                 .eq(RoleDO::getUserId, userId)
-                .eq(RoleDO::getState, ENABLED)
+                .eq(RoleDO::getState, Role.STATE_ENABLED)
                 .orderByDesc(RoleDO::getIsDefault, RoleDO::getCreateTime)
                 .last("LIMIT " + limit))
             .stream()
@@ -135,7 +135,7 @@ public class RoleServiceImpl implements RoleService {
 
         return roleMapper.selectOne(new LambdaQueryWrapper<RoleDO>()
             .eq(RoleDO::getUserId, userId)
-            .eq(RoleDO::getState, ENABLED)
+            .eq(RoleDO::getState, Role.STATE_ENABLED)
             .orderByDesc(RoleDO::getIsDefault)
             .orderByAsc(RoleDO::getRoleId)
             .last("LIMIT 1"));

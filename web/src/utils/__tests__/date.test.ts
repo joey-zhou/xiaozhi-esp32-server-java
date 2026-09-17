@@ -1,5 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { formatDate, formatDateTime, getRelativeTime } from '../date'
+
+// 全局 setup 把 vue-i18n 的 createI18n 也 mock 了，真实 locales 模块在测试里无法求值
+vi.mock('@/locales', () => ({
+  i18n: {
+    global: {
+      locale: { value: 'zh-CN' },
+      t: (key: string, params?: Record<string, unknown>) =>
+        params ? `${key}:${JSON.stringify(params)}` : key,
+    },
+  },
+}))
+
+import {
+  formatBackendDateTime,
+  formatDate,
+  formatDateTime,
+  formatShortDateTime,
+  getRelativeTime,
+} from '../date'
 
 describe('formatDate', () => {
   it('返回默认值 "-" 当输入为空', () => {
@@ -13,11 +31,21 @@ describe('formatDate', () => {
     expect(formatDate('', '暂无')).toBe('暂无')
   })
 
+  it('非法日期串按默认值处理，不返回 Invalid Date', () => {
+    expect(formatDate('不是日期')).toBe('-')
+    expect(formatDateTime('不是日期')).toBe('-')
+  })
+
   it('格式化有效日期字符串', () => {
     const result = formatDate('2026-03-12')
     // toLocaleDateString 输出因环境而异，只验证返回了非默认值
     expect(result).not.toBe('-')
     expect(typeof result).toBe('string')
+  })
+
+  it('接受时间戳与 Date 对象', () => {
+    const date = new Date('2026-03-12T10:30:00')
+    expect(formatDate(date)).toBe(formatDate(date.getTime()))
   })
 })
 
@@ -39,6 +67,29 @@ describe('formatDateTime', () => {
   })
 })
 
+describe('formatShortDateTime', () => {
+  it('输出「月-日 时:分」且时分补零', () => {
+    expect(formatShortDateTime('2026-03-12T09:05:00')).toBe('3-12 09:05')
+    expect(formatShortDateTime('2026-12-01T22:30:00')).toBe('12-1 22:30')
+  })
+
+  it('空值与非法值走默认值', () => {
+    expect(formatShortDateTime()).toBe('-')
+    expect(formatShortDateTime('不是日期', 'N/A')).toBe('N/A')
+  })
+})
+
+describe('formatBackendDateTime', () => {
+  it('输出 yyyy-MM-dd HH:mm:ss 且不随语言变化', () => {
+    expect(formatBackendDateTime('2026-03-12T09:05:07')).toBe('2026-03-12 09:05:07')
+  })
+
+  it('空值与非法值走默认值', () => {
+    expect(formatBackendDateTime()).toBe('-')
+    expect(formatBackendDateTime('不是日期')).toBe('-')
+  })
+})
+
 describe('getRelativeTime', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -55,34 +106,27 @@ describe('getRelativeTime', () => {
     expect(getRelativeTime('')).toBe('-')
   })
 
-  it('返回 "刚刚" 当时间差小于60秒', () => {
-    const now = new Date('2026-03-12T11:59:30')
-    expect(getRelativeTime(now.toISOString())).toBe('刚刚')
+  // 四档文案全部走 i18n，不能再出现硬编码中文
+  it('时间差小于60秒走 time.justNow', () => {
+    expect(getRelativeTime(new Date('2026-03-12T11:59:30'))).toBe('time.justNow')
   })
 
-  it('返回 "N分钟前" 当时间差小于60分钟', () => {
-    const fiveMinAgo = new Date('2026-03-12T11:55:00')
-    expect(getRelativeTime(fiveMinAgo.toISOString())).toBe('5分钟前')
-
-    const thirtyMinAgo = new Date('2026-03-12T11:30:00')
-    expect(getRelativeTime(thirtyMinAgo.toISOString())).toBe('30分钟前')
+  it('时间差小于60分钟走 time.minutesAgo 并带 count', () => {
+    expect(getRelativeTime(new Date('2026-03-12T11:55:00'))).toBe('time.minutesAgo:{"count":5}')
+    expect(getRelativeTime(new Date('2026-03-12T11:30:00'))).toBe('time.minutesAgo:{"count":30}')
   })
 
-  it('返回 "N小时前" 当时间差小于24小时', () => {
-    const twoHoursAgo = new Date('2026-03-12T10:00:00')
-    expect(getRelativeTime(twoHoursAgo.toISOString())).toBe('2小时前')
+  it('时间差小于24小时走 time.hoursAgo 并带 count', () => {
+    expect(getRelativeTime(new Date('2026-03-12T10:00:00'))).toBe('time.hoursAgo:{"count":2}')
   })
 
-  it('返回 "N天前" 当时间差小于7天', () => {
-    const threeDaysAgo = new Date('2026-03-09T12:00:00')
-    expect(getRelativeTime(threeDaysAgo.toISOString())).toBe('3天前')
+  it('时间差小于7天走 time.daysAgo 并带 count', () => {
+    expect(getRelativeTime(new Date('2026-03-09T12:00:00'))).toBe('time.daysAgo:{"count":3}')
   })
 
-  it('返回格式化日期 当时间差>=7天', () => {
-    const tenDaysAgo = new Date('2026-03-02T12:00:00')
-    const result = getRelativeTime(tenDaysAgo.toISOString())
-    // 超过7天应回退到 formatDate, 非 "天前" 格式
-    expect(result).not.toContain('天前')
+  it('超过7天回退到日期格式', () => {
+    const result = getRelativeTime(new Date('2026-03-02T12:00:00'))
+    expect(result).not.toContain('time.')
     expect(result).not.toBe('-')
   })
 })

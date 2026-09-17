@@ -101,6 +101,13 @@ public class AliyunNlsSttService implements SttService {
      * 清理指定configId的NlsClient缓存
      */
     public static void clearClientCache(Integer configId) {
+        evictClient(configId);
+    }
+
+    /**
+     * 移出缓存并 shutdown，NlsClient 自带 Netty 线程组，只 remove 不 shutdown 会泄漏线程与连接
+     */
+    private static void evictClient(Integer configId) {
         if (configId == null) {
             return;
         }
@@ -295,7 +302,7 @@ public class AliyunNlsSttService implements SttService {
         } catch (Exception e) {
             log.error("阿里云NLS实时识别失败", e);
             // 连接异常时清除缓存，下次调用时重建client
-            globalClientCache.remove(config.getConfigId());
+            evictClient(config.getConfigId());
             return SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR);
         } finally {
             // 只关闭transcriber，client由缓存统一管理复用，不在此处shutdown

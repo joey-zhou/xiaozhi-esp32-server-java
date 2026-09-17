@@ -2,7 +2,8 @@ package com.xiaozhi.common.config;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
@@ -71,11 +72,22 @@ public class RedisCacheConfig {
             .disableCachingNullValues();
     }
 
+    /**
+     * 缓存值按 @class 反序列化，只放行本仓类型与承载它们的 JDK 容器；
+     * 放行范围之外的类型 id 会被 Jackson 拒绝，新增可缓存类型时按包前缀加白名单。
+     */
     private GenericJackson2JsonRedisSerializer createSerializer() {
+        PolymorphicTypeValidator typeValidator = BasicPolymorphicTypeValidator.builder()
+            .allowIfSubType("com.xiaozhi.")
+            .allowIfSubType("java.util.")
+            .allowIfSubType("java.time.")
+            .allowIfSubType("java.math.")
+            .build();
+
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.activateDefaultTyping(
-            LaissezFaireSubTypeValidator.instance,
+            typeValidator,
             ObjectMapper.DefaultTyping.NON_FINAL,
             JsonTypeInfo.As.PROPERTY
         );

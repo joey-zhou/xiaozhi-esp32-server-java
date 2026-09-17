@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useUserStore } from '../user'
-import type { UserInfo, Permission, AuthRole } from '../user'
+import type { User } from '@/types/user'
+import type { AuthRole, PermissionTreeNode } from '@/types/authRole'
 
 describe('useUserStore', () => {
   let store: ReturnType<typeof useUserStore>
@@ -11,6 +12,11 @@ describe('useUserStore', () => {
     store = useUserStore()
     // 清理 localStorage
     localStorage.clear()
+  })
+
+  // useStorage 会挂 storage 事件监听，不销毁会跨用例污染身份状态
+  afterEach(() => {
+    store.$dispose()
   })
 
   describe('初始状态', () => {
@@ -36,7 +42,7 @@ describe('useUserStore', () => {
   })
 
   describe('setUserInfo / updateUserInfo / clearUserInfo', () => {
-    const mockUser: UserInfo = {
+    const mockUser: User = {
       userId: '1',
       username: 'admin',
       name: '管理员',
@@ -93,7 +99,7 @@ describe('useUserStore', () => {
   })
 
   describe('权限检查', () => {
-    const mockPermissions: Permission[] = [
+    const mockPermissions: PermissionTreeNode[] = [
       { permissionId: 1, name: '设备管理', permissionKey: 'device:list', permissionType: 'menu' },
       { permissionId: 2, name: '设备添加', permissionKey: 'device:add', permissionType: 'button' },
       { permissionId: 3, name: '用户管理', permissionKey: 'user:list', permissionType: 'menu' },
@@ -119,6 +125,69 @@ describe('useUserStore', () => {
         store.setUserInfo({ userId: '2', isAdmin: '0' })
         store.setPermissions([])
         expect(store.hasPermission('device:list')).toBe(false)
+      })
+    })
+
+    // 后端下发的是树：菜单是 root，按钮/接口权限挂在 children 上。
+    // hasPermission 唯一非平凡的逻辑就是把整棵树拍平，深层节点查不到等于全站按钮权限失效
+    describe('权限树拍平', () => {
+      const treePermissions: PermissionTreeNode[] = [
+        {
+          permissionId: 1,
+          name: '系统管理',
+          permissionKey: 'system',
+          permissionType: 'menu',
+          children: [
+            {
+              permissionId: 2,
+              name: '设备管理',
+              permissionKey: 'system:device',
+              permissionType: 'menu',
+              children: [
+                { permissionId: 3, name: '新增', permissionKey: 'system:device:create', permissionType: 'button' },
+                { permissionId: 4, name: '发送', permissionKey: 'system:device:api:send', permissionType: 'api' },
+              ],
+            },
+          ],
+        },
+      ]
+
+      it('第三层的按钮/接口权限也能查到', () => {
+        store.setUserInfo({ userId: '2', isAdmin: '0' })
+        store.setPermissions(treePermissions)
+
+        expect(store.hasPermission('system')).toBe(true)
+        expect(store.hasPermission('system:device')).toBe(true)
+        expect(store.hasPermission('system:device:create')).toBe(true)
+        expect(store.hasPermission('system:device:api:send')).toBe(true)
+        expect(store.hasPermission('system:device:delete')).toBe(false)
+      })
+
+      it('没有 permissionKey 的中间节点不会污染集合', () => {
+        store.setUserInfo({ userId: '2', isAdmin: '0' })
+        store.setPermissions([
+          {
+            permissionId: 10,
+            name: '无 key 的分组',
+            permissionKey: '',
+            permissionType: 'menu',
+            children: [
+              { permissionId: 11, name: '导出', permissionKey: 'system:user:export', permissionType: 'button' },
+            ],
+          },
+        ])
+
+        expect(store.hasPermission('')).toBe(false)
+        expect(store.hasPermission('system:user:export')).toBe(true)
+      })
+
+      it('换一批权限后旧的立即失效', () => {
+        store.setUserInfo({ userId: '2', isAdmin: '0' })
+        store.setPermissions(treePermissions)
+        expect(store.hasPermission('system:device:create')).toBe(true)
+
+        store.setPermissions([])
+        expect(store.hasPermission('system:device:create')).toBe(false)
       })
     })
 
@@ -172,20 +241,6 @@ describe('useUserStore', () => {
       const mockRole: AuthRole = { authRoleId: 1, authRoleName: '管理员', roleKey: 'admin' }
       store.setAuthRole(mockRole)
       expect(store.authRole).toEqual(mockRole)
-    })
-  })
-
-  describe('UI 状态管理', () => {
-    it('设置移动端状态', () => {
-      expect(store.isMobile).toBe(false)
-      store.setMobileType(true)
-      expect(store.isMobile).toBe(true)
-    })
-
-    it('设置导航样式', () => {
-      expect(store.navigationStyle).toBe('tabs')
-      store.setNavigationStyle('sidebar')
-      expect(store.navigationStyle).toBe('sidebar')
     })
   })
 

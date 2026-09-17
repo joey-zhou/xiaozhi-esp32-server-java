@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -17,6 +18,7 @@ import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -31,8 +33,18 @@ public class CozeTokenProvider implements TokenProvider {
     private static final String TOKEN_URL = "https://api.coze.cn/api/permission/oauth2/token";
     private static final int JWT_EXPIRE_SECONDS = 600;
     private static final int DEFAULT_DURATION_SECONDS = 86399;
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = newRestTemplate();
+
+    /** 建带超时的 RestTemplate；默认的 SimpleClientHttpRequestFactory 不设超时即为无限等待。 */
+    private static RestTemplate newRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(CONNECT_TIMEOUT);
+        factory.setReadTimeout(READ_TIMEOUT);
+        return new RestTemplate(factory);
+    }
 
     @Override
     public List<String> getSupportedProviders() {

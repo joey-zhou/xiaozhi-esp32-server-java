@@ -65,9 +65,9 @@ Xiaozhi ESP32 Server Java 是基于 [Xiaozhi ESP32](https://github.com/78/xiaozh
 | **后端** | Spring Boot、Spring MVC、MyBatis-Plus、Flyway、WebSocket |
 | **前端** | Vue.js、Ant Design、响应式布局 |
 | **数据层** | MySQL 8.0、Redis 7 |
-| **语音识别** | Vosk、FunASR、阿里云、腾讯云、讯飞 |
-| **语音合成** | sherpa-onnx（本地）、火山引擎、阿里云、Edge TTS |
-| **大语言模型** | OpenAI、智谱 AI、讯飞星火、Ollama、Dify、Coze |
+| **语音识别** | Vosk（本地）、FunASR、阿里云、阿里云 NLS、腾讯云、讯飞、火山引擎 |
+| **语音合成** | sherpa-onnx（本地）、Edge TTS、阿里云、阿里云 NLS、腾讯云、讯飞、火山引擎、MiniMax |
+| **大语言模型** | OpenAI、智谱 AI、讯飞星火、火山方舟、星辰、Ollama、Dify、Coze |
 | **扩展能力** | MCP 工具协议、Function Call、RAG 知识库、音色克隆 |
 
 ---
@@ -111,6 +111,12 @@ Xiaozhi ESP32 Server Java 是基于 [Xiaozhi ESP32](https://github.com/78/xiaozh
 
 ### 快速开始
 
+前置条件：JDK 21、Maven、Node 22，外加两个中间件——
+**MySQL 8.0**（建库 `xiaozhi`、建号 `xiaozhi/123456`）与 **Redis 7**（`localhost:6379`）。
+默认 profile 是 `dev`，这两个连不上时 Flyway 与 Hikari 会在启动阶段直接抛异常。
+建库建号的完整 SQL 见 [CentOS 部署文档](./docs/CENTOS_DEVELOPMENT.md)；
+也可以用 `docker compose -f docker-compose-db.yml up -d` 一次起好 MySQL + Redis。
+
 ```bash
 git clone https://github.com/joey-zhou/xiaozhi-esp32-server-java
 cd xiaozhi-esp32-server-java
@@ -130,7 +136,9 @@ bin/all.sh status              # 查看状态
 | Docker | [Docker 部署文档](./docs/DOCKER.md) | 快速容器化部署 |
 | 固件编译 | [固件编译文档](./docs/FIRMWARE-BUILD.md) | ESP32 固件编译和烧录 |
 
-成功运行后，xiaozhi-server会输出 OTA 和 xiaozhi-dialogue会输出 WebSocket 连接地址，根据固件编译文档使设备接入服务使用。
+成功运行后按[固件编译文档](./docs/FIRMWARE-BUILD.md)让设备接入。两个地址分属两个进程，不要写混：
+**WebSocket** 是 dialogue 进程的 `ws://<内网IP>:8092/ws/xiaozhi/v1/`，
+**OTA** 是 server 进程的 `http://<内网IP>:8091/api/device/ota`（dialogue 启动横幅里那行 OTA 地址带的是自己的 8092 端口，照抄会 404）。
 
 ---
 

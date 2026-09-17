@@ -27,6 +27,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -48,6 +49,9 @@ public class AgentServiceImpl implements AgentService {
 
     @Resource
     private AgentConvert agentConvert;
+
+    /** 第三方平台单次请求的整体超时，超时抛 HttpTimeoutException 由各分支降级。 */
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
 
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
@@ -121,6 +125,7 @@ public class AgentServiceImpl implements AgentService {
                         .uri(URI.create(apiUrl + "/info"))
                         .header("Authorization", "Bearer " + apiKey)
                         .header("Content-Type", "application/json")
+                        .timeout(REQUEST_TIMEOUT)
                         .GET()
                         .build(),
                     HttpResponse.BodyHandlers.ofString());
@@ -148,9 +153,9 @@ public class AgentServiceImpl implements AgentService {
                         agent.setAgentDesc(description);
                         agent.setPublishTime(savedConfig.getCreateTime() == null
                             ? null : java.sql.Timestamp.valueOf(savedConfig.getCreateTime()));
-                        log.debug("添加DIFY LLM配置成功: {}", apiKey);
+                        log.debug("添加DIFY LLM配置成功: configId={}", savedConfig.getConfigId());
                     } catch (RuntimeException e) {
-                        log.warn("同步DIFY智能体配置失败，apiKey={}", apiKey, e);
+                        log.warn("同步DIFY智能体配置失败，configId={}", agentConfig.getConfigId(), e);
                     }
 
                     fillDifyIcon(apiUrl, apiKey, agent);
@@ -229,9 +234,9 @@ public class AgentServiceImpl implements AgentService {
                 fillAgentConfig(agent, savedConfig);
                 agent.setPublishTime(savedConfig.getCreateTime() != null
                     ? java.sql.Timestamp.valueOf(savedConfig.getCreateTime()) : null);
-                log.debug("添加XingChen LLM配置成功: {}", apiKey);
+                log.debug("添加XingChen LLM配置成功: configId={}", savedConfig.getConfigId());
             } catch (RuntimeException e) {
-                log.warn("同步XingChen智能体配置失败，apiKey={}", apiKey, e);
+                log.warn("同步XingChen智能体配置失败，configId={}", agentConfig.getConfigId(), e);
                 fillAgentConfig(agent, agentConfig);
             }
             agent.setAgentName(name);
@@ -267,6 +272,7 @@ public class AgentServiceImpl implements AgentService {
                     .uri(URI.create("https://api.coze.cn/v1/space/published_bots_list?space_id=" + spaceId))
                     .header("Authorization", "Bearer " + token)
                     .header("Content-Type", "application/json")
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -309,17 +315,23 @@ public class AgentServiceImpl implements AgentService {
 
                 ConfigBO existingConfig = existingConfigMap.get(botId);
                 if (existingConfig != null) {
-                    existingConfig.setConfigName(botId);
-                    existingConfig.setConfigDesc(description);
-                    try {
-                        AiConfig aiConfig = configRepository.findById(existingConfig.getConfigId())
-                            .orElseThrow(() -> new RuntimeException("配置不存在: " + existingConfig.getConfigId()));
-                        aiConfig.update(existingConfig);
-                        configRepository.save(aiConfig);
-                        fillAgentConfig(agent, configConverter.toBO(aiConfig));
-                    } catch (RuntimeException e) {
-                        log.warn("同步Coze智能体配置失败，botId={}", botId, e);
+                    // 内容无变化时不得写库。save 会广播 AiConfigChangedEvent，
+                    // 各实例据此清空命中该 llm 配置的在线会话上下文
+                    if (sameText(existingConfig.getConfigDesc(), description)) {
                         fillAgentConfig(agent, existingConfig);
+                    } else {
+                        existingConfig.setConfigName(botId);
+                        existingConfig.setConfigDesc(description);
+                        try {
+                            AiConfig aiConfig = configRepository.findById(existingConfig.getConfigId())
+                                .orElseThrow(() -> new RuntimeException("配置不存在: " + existingConfig.getConfigId()));
+                            aiConfig.update(existingConfig);
+                            configRepository.save(aiConfig);
+                            fillAgentConfig(agent, configConverter.toBO(aiConfig));
+                        } catch (RuntimeException e) {
+                            log.warn("同步Coze智能体配置失败，botId={}", botId, e);
+                            fillAgentConfig(agent, existingConfig);
+                        }
                     }
                 } else {
                     try {
@@ -354,6 +366,11 @@ public class AgentServiceImpl implements AgentService {
         return result;
     }
 
+    /** 文本比较，null 与空串视为相同。 */
+    private static boolean sameText(String left, String right) {
+        return Objects.equals(left == null ? "" : left, right == null ? "" : right);
+    }
+
     private void fillAgentConfig(AgentBO agent, ConfigBO config) {
         if (agent == null || config == null) {
             return;
@@ -379,6 +396,7 @@ public class AgentServiceImpl implements AgentService {
                     .uri(URI.create(apiUrl + "/meta"))
                     .header("Authorization", "Bearer " + apiKey)
                     .header("Content-Type", "application/json")
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build(),
                 HttpResponse.BodyHandlers.ofString());

@@ -1,25 +1,23 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { watch } from 'vue'
 import { RouterView } from 'vue-router'
+import dayjs from 'dayjs'
 import GlobalLoading from './components/GlobalLoading.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
 import { useLocale } from './composables/useLocale'
 import { useAntdTheme } from './composables/useAntdTheme'
-import { useAppStore } from './store/app'
 
-const { antdLocale } = useLocale()
+const { antdLocale, currentLocale } = useLocale()
 const { antdTheme } = useAntdTheme()
-const appStore = useAppStore()
 
-// 初始化和监听窗口大小变化
-onMounted(() => {
-  appStore.updateScreenSize()
-  window.addEventListener('resize', appStore.updateScreenSize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', appStore.updateScreenSize)
-})
+// 把界面语言同步给 dayjs，日期选择器的星期行/月份名与每周首日跟随语言切换
+watch(
+  currentLocale,
+  (locale) => {
+    dayjs.locale(locale === 'zh-CN' ? 'zh-cn' : 'en')
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -27,7 +25,7 @@ onUnmounted(() => {
     <div id="app">
       <!-- 全局 Loading 组件 -->
       <GlobalLoading />
-      
+
       <!-- 错误边界 -->
       <ErrorBoundary>
         <!-- 路由视图 -->

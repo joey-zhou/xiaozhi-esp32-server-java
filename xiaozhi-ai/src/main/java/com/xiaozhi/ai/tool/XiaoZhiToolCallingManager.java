@@ -35,7 +35,9 @@ import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.*;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -75,6 +77,25 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
 
     /** 单轮对话内工具调用的递归层数上限，达到后不再向模型提供工具 */
     private static final int MAX_TOOL_CALL_DEPTH = 5;
+
+    /**
+     * 单次工具执行的等待上限。工具自身的超时（设备 MCP 30s、远端 MCP 60s）应当先于它触发，
+     * 这里只兜住「工具压根不返回」的情况，保证调用线程一定能被释放。
+     */
+    private static final Duration TOOL_CALL_TIMEOUT = Duration.ofSeconds(120);
+
+    /** 全进程同时在执行的工具数上限，防止工具阻塞时压垮设备通道与数据库连接池 */
+    private static final int MAX_CONCURRENT_TOOL_CALLS = 128;
+
+    /**
+     * 工具执行专用执行器。
+     * <p>
+     * 工具调用是同步阻塞的，直接在调用线程（Reactor 的 boundedElastic，与 TTS 播放共用）
+     * 上执行会把整个池占满，必须挪到这里的虚拟线程上跑，并由调用侧按 {@link #TOOL_CALL_TIMEOUT} 设上限。
+     */
+    private static final ExecutorService TOOL_CALL_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
+
+    private static final Semaphore TOOL_CALL_PERMITS = new Semaphore(MAX_CONCURRENT_TOOL_CALLS);
 
     /** 达到递归上限时追加到对话历史末尾的收尾指令 */
     static final String TOOL_DEPTH_LIMIT_INSTRUCTION =
@@ -442,12 +463,17 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
                     .observe(() -> {
                         String toolResult;
                         try {
-                            toolResult = toolCallback.call(toolInputArguments, toolContext);
+                            toolResult = callWithTimeout(toolCallback, toolInputArguments, toolContext);
                         }
                         catch (ToolExecutionException ex) {
                             log.error("Tool execution exception: ", ex);
                             toolResult = this.toolExecutionExceptionProcessor.process(ex);
                             log.debug("Processed tool execution exception result: {}", toolResult);
+                            successRef[0] = false;
+                        }
+                        catch (ToolCallTimeoutException ex) {
+                            log.error("工具执行超时: toolName={}, 上限={}s", toolName, TOOL_CALL_TIMEOUT.toSeconds());
+                            toolResult = ex.getMessage();
                             successRef[0] = false;
                         }
                         catch (Exception ex) {
@@ -477,6 +503,53 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
 
         return new XiaoZhiToolCallingManager.ToolExecResult(ToolResponseMessage.builder().responses(toolResponses).build(),
                 returnDirect != null && returnDirect);
+    }
+
+    /**
+     * 在专用虚拟线程上执行工具，最长等待 {@link #TOOL_CALL_TIMEOUT}。
+     * 超时抛 {@link ToolCallTimeoutException} 并中断执行线程；工具自身抛出的异常原样透出，交由调用侧原有分支处理。
+     */
+    private String callWithTimeout(ToolCallback toolCallback, String toolInputArguments, ToolContext toolContext) {
+        Future<String> future = TOOL_CALL_EXECUTOR.submit(() -> {
+            TOOL_CALL_PERMITS.acquire();
+            try {
+                return toolCallback.call(toolInputArguments, toolContext);
+            }
+            finally {
+                TOOL_CALL_PERMITS.release();
+            }
+        });
+        try {
+            return future.get(TOOL_CALL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        }
+        catch (TimeoutException e) {
+            future.cancel(true);
+            throw new ToolCallTimeoutException("工具 '" + toolCallback.getToolDefinition().name() + "' 执行超过 "
+                    + TOOL_CALL_TIMEOUT.toSeconds() + " 秒仍未返回，请告知用户这次没能完成，可稍后重试。");
+        }
+        catch (InterruptedException e) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("等待工具执行时线程被中断", e);
+        }
+        catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException(cause != null ? cause.getMessage() : e.getMessage(), cause);
+        }
+    }
+
+    /** 工具执行超过 {@link #TOOL_CALL_TIMEOUT} 未返回。 */
+    private static final class ToolCallTimeoutException extends RuntimeException {
+
+        private ToolCallTimeoutException(String message) {
+            super(message);
+        }
     }
 
     private List<Message> buildPostToolHistory(List<Message> previousMessages,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { message, type TablePaginationConfig } from 'ant-design-vue'
+import { message, type TableColumnsType, type TablePaginationConfig } from 'ant-design-vue'
 import { useTable } from '@/composables/useTable'
 import { useExport } from '@/composables/useExport'
 import { queryAuthRoles } from '@/services/authRole'
@@ -46,7 +46,7 @@ const queryFilters = [
 ]
 
 // 表格列配置
-const columns = computed(() => [
+const columns = computed<TableColumnsType>(() => [
   {
     title: t('common.name'),
     dataIndex: 'name',
@@ -123,23 +123,26 @@ const columns = computed(() => [
   },
 ])
 
+// 后端 BasePageReq 限制每页最多 1000 条
+const EXPORT_PAGE_SIZE = 1000
+
+// 组装查询条件（列表与导出共用）
+function buildQueryParams(pageNo: number, pageSize: number): UserQueryParams {
+  const queryParams: UserQueryParams = { pageNo, pageSize }
+
+  if (queryForm.name) queryParams.name = queryForm.name
+  if (queryForm.email) queryParams.email = queryForm.email
+  if (queryForm.tel) queryParams.tel = queryForm.tel
+  if (queryForm.authRoleId !== undefined && queryForm.authRoleId !== null) {
+    queryParams.authRoleId = queryForm.authRoleId
+  }
+
+  return queryParams
+}
+
 // 获取用户数据
 async function fetchData() {
-  await loadData((params) => {
-    const queryParams: UserQueryParams = {
-      pageNo: params.pageNo,
-      pageSize: params.pageSize,
-    }
-    
-    if (queryForm.name) queryParams.name = queryForm.name
-    if (queryForm.email) queryParams.email = queryForm.email
-    if (queryForm.tel) queryParams.tel = queryForm.tel
-    if (queryForm.authRoleId !== undefined && queryForm.authRoleId !== null) {
-      queryParams.authRoleId = queryForm.authRoleId
-    }
-    
-    return queryUsers(queryParams)
-  })
+  await loadData((params) => queryUsers(buildQueryParams(params.pageNo, params.pageSize)))
 }
 
 async function loadAuthRoleOptions() {
@@ -152,31 +155,33 @@ async function loadAuthRoleOptions() {
 // 防抖搜索
 const debouncedSearch = createDebouncedSearch(fetchData, 500)
 
-// 导出用户数据
+// 导出用户数据（按页累加，单页不能超过后端上限）
 async function handleExport() {
   loadingStore.showLoading(t('common.exporting'))
   try {
-    // 先获取全部用户数据
-    const queryParams: UserQueryParams = {
-      pageNo: 1,
-      pageSize: 100000, // 获取全部数据
-    }
-    
-    if (queryForm.name) queryParams.name = queryForm.name
-    if (queryForm.email) queryParams.email = queryForm.email
-    if (queryForm.tel) queryParams.tel = queryForm.tel
-    if (queryForm.authRoleId !== undefined && queryForm.authRoleId !== null) {
-      queryParams.authRoleId = queryForm.authRoleId
-    }
-    
-    const res = await queryUsers(queryParams)
-    
-    if (res.code !== 200 || !res.data?.list || res.data.list.length === 0) {
+    const allData: User[] = []
+    let pageNo = 1
+    let total = 0
+
+    do {
+      const res = await queryUsers(buildQueryParams(pageNo, EXPORT_PAGE_SIZE))
+      if (res.code !== 200 || !res.data?.list) {
+        break
+      }
+
+      allData.push(...res.data.list)
+      total = res.data.total ?? allData.length
+
+      if (res.data.list.length < EXPORT_PAGE_SIZE) {
+        break
+      }
+      pageNo += 1
+    } while (allData.length < total)
+
+    if (allData.length === 0) {
       message.warning(t('export.noData'))
       return
     }
-    
-    const allData = res.data.list
     
     // 导出为 CSV 格式
     await exportToCSV(allData, {
@@ -192,12 +197,12 @@ async function handleExport() {
         { 
           key: 'state', 
           title: t('common.status'),
-          format: (val) => val == 1 ? t('user.normal') : t('user.disabled')
+          format: (val) => val === '1' ? t('user.normal') : t('user.disabled')
         },
         { 
           key: 'isAdmin', 
           title: t('user.accountType'),
-          format: (val) => val == 1 ? t('user.admin') : t('user.normalUser')
+          format: (val) => val === '1' ? t('user.admin') : t('user.normalUser')
         },
         { key: 'authRoleName', title: t('user.authRole') },
         { key: 'loginTime', title: t('user.lastLoginTime') },
@@ -274,7 +279,7 @@ fetchData()
     </a-card>
 
     <!-- 数据表格 -->
-    <a-card :title="t('menu.user')" :bordered="false">
+    <a-card :title="t('router.title.user')" :bordered="false">
       <template #extra>
         <a-button v-permission="'system:user:export'" type="primary" @click="handleExport" :loading="exporting">
           {{ t('common.export') }}
@@ -328,13 +333,13 @@ fetchData()
           
           <!-- 状态列 -->
           <template v-else-if="column.dataIndex === 'state'">
-            <a-tag v-if="record.state == 1" color="green">{{ t('user.normal') }}</a-tag>
+            <a-tag v-if="record.state === '1'" color="green">{{ t('user.normal') }}</a-tag>
             <a-tag v-else color="red">{{ t('user.disabled') }}</a-tag>
           </template>
           
           <!-- 账户类型列 -->
           <template v-else-if="column.dataIndex === 'isAdmin'">
-            <a-tag v-if="record.isAdmin == 1" color="blue">{{ t('user.admin') }}</a-tag>
+            <a-tag v-if="record.isAdmin === '1'" color="blue">{{ t('user.admin') }}</a-tag>
             <a-tag v-else>{{ t('user.normalUser') }}</a-tag>
           </template>
 

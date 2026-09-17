@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
-import type { FormInstance } from 'ant-design-vue'
+import { computed, reactive, ref, onMounted } from 'vue'
 import type { Rule } from 'ant-design-vue/es/form'
 import { useI18n } from 'vue-i18n'
 import {
@@ -12,14 +11,15 @@ import {
   SafetyCertificateOutlined,
 } from '@ant-design/icons-vue'
 import { useAuth } from '@/composables/useAuth'
+import { useVerificationCode } from '@/composables/useVerificationCode'
 import { useFormValidation } from '@/composables/useFormValidation'
 
 const { t } = useI18n()
-const { loading, sendCodeLoading, countdown, login, telLogin, sendVerificationCode, getRememberedCredentials } = useAuth()
-const { usernameRules, passwordRules } = useFormValidation()
+const { loading, login, telLogin, getRememberedCredentials } = useAuth()
+const { sendCodeLoading, canSendCode, buttonText, sendSmsLoginCode } = useVerificationCode()
+const { usernameRules, passwordRules, telRules, verificationCodeRules } = useFormValidation()
 
 const loginType = ref<'account' | 'mobile'>('account')
-const formRef = ref<FormInstance>()
 const formState = reactive({
   username: '',
   password: '',
@@ -31,10 +31,18 @@ const mobileFormState = reactive({
   code: '',
 })
 
-const rules: Record<string, Rule[]> = {
+const accountRules: Record<string, Rule[]> = {
   username: usernameRules,
   password: passwordRules,
 }
+
+// telRules 只有格式校验，必填要自己补
+const mobileRules: Record<string, Rule[]> = {
+  tel: [{ required: true, message: t('auth.enterMobilePhone'), trigger: 'blur' }, ...telRules],
+  code: verificationCodeRules,
+}
+
+const rules = computed(() => (loginType.value === 'account' ? accountRules : mobileRules))
 
 // 切换登录方式
 const switchLoginType = (type: 'account' | 'mobile') => {
@@ -43,7 +51,7 @@ const switchLoginType = (type: 'account' | 'mobile') => {
 
 // 发送验证码
 const handleSendCode = () => {
-  sendVerificationCode(mobileFormState.tel)
+  sendSmsLoginCode(mobileFormState.tel)
 }
 
 // 提交表单
@@ -71,7 +79,6 @@ onMounted(() => {
           <div class="welcome-title">{{ t('auth.login') }}</div>
 
           <a-form
-            ref="formRef"
             :model="loginType === 'account' ? formState : mobileFormState"
             :rules="rules"
             layout="vertical"
@@ -145,18 +152,12 @@ onMounted(() => {
                     <span
                       class="send-code-btn"
                       :class="{
-                        disabled: !mobileFormState.tel || sendCodeLoading || countdown > 0,
+                        disabled: !mobileFormState.tel || !canSendCode,
                         loading: sendCodeLoading,
                       }"
                       @click="handleSendCode"
                     >
-                      {{
-                        sendCodeLoading
-                          ? t('auth.sending')
-                          : countdown > 0
-                            ? t('auth.resendAfter', { seconds: countdown })
-                            : t('auth.sendVerificationCode')
-                      }}
+                      {{ buttonText }}
                     </span>
                   </template>
                 </a-input>
@@ -186,9 +187,9 @@ onMounted(() => {
 
             <div class="privacy-terms">
               <span class="terms-text">{{ t('auth.loginAgreement') }}</span>
-              <a href="#" class="terms-link">《隐私协议》</a>
-              <span class="terms-text">和</span>
-              <a href="#" class="terms-link">《服务条款》</a>
+              <a href="#" class="terms-link">{{ t('auth.privacyPolicy') }}</a>
+              <span class="terms-text">{{ t('auth.agreementConjunction') }}</span>
+              <a href="#" class="terms-link">{{ t('auth.termsOfService') }}</a>
             </div>
 
             <a-divider>

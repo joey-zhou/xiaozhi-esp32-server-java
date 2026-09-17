@@ -1,23 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMenu } from '@/composables/useMenu'
-import type { MenuItem } from '@/types/menu'
-import * as Icons from '@ant-design/icons-vue'
+import { resolveMenuIcon } from './menuIcons'
 
 const { t } = useI18n()
 
-const props = defineProps<{
+defineProps<{
   collapsed?: boolean
 }>()
 
 const { openKeys, selectedKeys, menuItems, handleOpenChange, handleMenuClick } = useMenu()
-
-// 获取图标组件
-function getIcon(iconName?: string) {
-  if (!iconName) return null
-  return (Icons as Record<string, unknown>)[iconName]
-}
 
 // 获取菜单标题（支持多语言）
 function getMenuTitle(title?: string) {
@@ -48,7 +40,7 @@ function getMenuTitle(title?: string) {
         <!-- 无子菜单的项 -->
         <a-menu-item v-if="!item.children || item.children.length === 0" :key="item.path" @click="() => handleMenuClick(item.path)">
           <template #icon>
-            <component :is="getIcon(item.meta.icon)" v-if="item.meta.icon" />
+            <component :is="resolveMenuIcon(item.meta.icon)" v-if="item.meta.icon" />
           </template>
           <span>{{ getMenuTitle(item.meta.title) }}</span>
         </a-menu-item>
@@ -56,7 +48,7 @@ function getMenuTitle(title?: string) {
         <!-- 有子菜单的项 -->
         <a-sub-menu v-else :key="`${item.path}`">
           <template #icon>
-            <component :is="getIcon(item.meta.icon)" v-if="item.meta.icon" />
+            <component :is="resolveMenuIcon(item.meta.icon)" v-if="item.meta.icon" />
           </template>
           <template #title>{{ getMenuTitle(item.meta.title) }}</template>
           
@@ -66,7 +58,7 @@ function getMenuTitle(title?: string) {
             @click="() => handleMenuClick(child.path)"
           >
             <template #icon>
-              <component :is="getIcon(child.meta.icon)" v-if="child.meta.icon" />
+              <component :is="resolveMenuIcon(child.meta.icon)" v-if="child.meta.icon" />
             </template>
             <span>{{ getMenuTitle(child.meta.title) }}</span>
           </a-menu-item>

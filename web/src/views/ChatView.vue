@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, computed, watch } from 'vue'
+import { ref, nextTick, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   UserOutlined,
@@ -84,17 +84,51 @@ const selectedRole = computed(() => roles.value.find((r: Role) => r.roleId === s
 const selectedRoleName = computed(() => selectedRole.value?.roleName || '')
 const selectedRoleAvatar = computed(() => selectedRole.value?.avatar || '')
 
-// 初始化加载
-loadRoles()
-loadConversations()
+// 用户向上翻阅历史时不再被流式 token 拽回底部
+const stickBottom = ref(true)
+let scrollFrame = 0
 
+function onMessagesScroll() {
+  const el = chatContainerRef.value
+  if (!el) return
+  stickBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+}
+
+/** 流式追加内容时的贴底滚动：不在底部就不动，同一帧内只滚一次 */
 function scrollToBottom() {
-  nextTick(() => {
-    if (chatContainerRef.value) {
-      chatContainerRef.value.scrollTop = chatContainerRef.value.scrollHeight
-    }
+  if (!stickBottom.value || scrollFrame) return
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = 0
+    const el = chatContainerRef.value
+    if (el) el.scrollTop = el.scrollHeight
   })
 }
+
+/** 发送新消息、载入历史后强制回到底部 */
+function forceScrollToBottom(smooth = false) {
+  stickBottom.value = true
+  nextTick(() => {
+    const el = chatContainerRef.value
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
+  })
+}
+
+async function init() {
+  try {
+    await loadRoles()
+  } catch (e) {
+    console.error('load roles failed:', e)
+  }
+  await loadConversations()
+}
+
+onMounted(() => {
+  void init()
+})
+
+onBeforeUnmount(() => {
+  if (scrollFrame) cancelAnimationFrame(scrollFrame)
+})
 
 function focusInput() {
   nextTick(() => {
@@ -103,7 +137,7 @@ function focusInput() {
 }
 
 async function selectConversation(conv: Conversation) {
-  const switched = await selectConversationRaw(conv, scrollToBottom)
+  const switched = await selectConversationRaw(conv, () => forceScrollToBottom(true))
   if (switched) {
     selectedRoleId.value = conv.roleId
   }
@@ -129,6 +163,7 @@ async function sendMessage() {
   // 立即清空输入框并重新聚焦
   inputText.value = ''
   focusInput()
+  forceScrollToBottom()
 
   const { openedNow, success } = await sendMessageToSession(text, selectedRoleId.value, scrollToBottom)
   focusInput()
@@ -196,12 +231,12 @@ async function sendMessage() {
     </a-layout-header>
 
     <!-- 主体对话区域 -->
-    <a-layout-content class="chat-content" :style="{ paddingRight: showHistory ? '320px' : '0' }">
+    <div class="chat-content" :style="{ paddingRight: showHistory ? '320px' : '0' }">
       <!-- 消息列表 -->
-      <div class="chat-messages" ref="chatContainerRef">
+      <div class="chat-messages" ref="chatContainerRef" @scroll="onMessagesScroll">
         <div class="chat-messages-inner">
-          <div v-if="messages.length === 0" :style="{ margin: 'auto', textAlign: 'center', color: '#8c8c8c' }">
-            <h2 :style="{ marginBottom: '8px', color: '#1f2329' }">{{ t('chat.greeting', { name: selectedRoleName || t('chat.defaultAssistant') }) }}</h2>
+          <div v-if="messages.length === 0" :style="{ margin: 'auto', textAlign: 'center', color: 'var(--ant-color-text-tertiary)' }">
+            <h2 :style="{ marginBottom: '8px', color: 'var(--ant-color-text)' }">{{ t('chat.greeting', { name: selectedRoleName || t('chat.defaultAssistant') }) }}</h2>
             <span>{{ t('chat.emptyHint') }}</span>
           </div>
 
@@ -301,7 +336,7 @@ async function sendMessage() {
           <a-empty v-else :description="t('chat.noHistory')" />
         </a-spin>
       </a-drawer>
-    </a-layout-content>
+    </div>
   </a-layout>
 </template>
 
@@ -312,16 +347,18 @@ async function sendMessage() {
   left: 0;
   right: 0;
   bottom: 0;
-  background: #fff;
+  background: var(--ant-color-bg-container);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
 .chat-header {
-  background: #fff;
+  background: var(--ant-color-bg-container);
   padding: 0 24px;
   height: 60px;
   line-height: normal;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 
 .role-selector {
@@ -332,11 +369,11 @@ async function sendMessage() {
   height: 32px;
   padding: 0 10px;
   border-radius: 8px;
-  color: #1f2329;
+  color: var(--ant-color-text);
 }
 
 .role-selector:hover {
-  background: #f5f5f5;
+  background: var(--ant-color-fill-tertiary);
 }
 
 .role-selector-text {
@@ -364,11 +401,11 @@ async function sendMessage() {
 }
 
 .role-card:hover {
-  background: #f5f5f5;
+  background: var(--ant-color-fill-tertiary);
 }
 
 .role-card.active {
-  background: #e6f4ff;
+  background: var(--ant-color-primary-bg);
 }
 
 .role-card-info {
@@ -379,7 +416,7 @@ async function sendMessage() {
 .role-card-name {
   font-size: 14px;
   font-weight: 500;
-  color: #1f2329;
+  color: var(--ant-color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -387,7 +424,7 @@ async function sendMessage() {
 
 .role-card-desc {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--ant-color-text-tertiary);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -395,7 +432,7 @@ async function sendMessage() {
 }
 
 .role-card-check {
-  color: #1677ff;
+  color: var(--ant-color-primary);
   font-size: 14px;
   flex-shrink: 0;
 }
@@ -405,7 +442,7 @@ async function sendMessage() {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  background: #f7f8fa;
+  background: var(--ant-color-fill-quaternary);
   overflow: hidden;
   position: relative;
   transition: padding-right 0.3s;
@@ -417,7 +454,6 @@ async function sendMessage() {
   min-height: 0;
   overflow-y: auto;
   padding: 24px;
-  scroll-behavior: smooth;
 }
 
 .chat-messages-inner {
@@ -459,7 +495,7 @@ async function sendMessage() {
 }
 
 .message-bubble.user {
-  background: #e6f4ff;
+  background: var(--ant-color-primary-bg);
   border-top-right-radius: 4px;
 }
 
@@ -495,20 +531,20 @@ async function sendMessage() {
 }
 
 .history-item:hover {
-  background: #f7f8fa;
+  background: var(--ant-color-fill-tertiary);
 }
 
 .history-item.active {
-  background: #f0f7ff;
+  background: var(--ant-color-primary-bg);
 }
 
 .history-item.active :deep(.ant-typography) {
-  color: #1677ff;
+  color: var(--ant-color-primary);
 }
 
 .history-item-meta {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--ant-color-text-tertiary);
 }
 
 @media (max-width: 600px) {

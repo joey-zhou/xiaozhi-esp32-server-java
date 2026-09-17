@@ -5,12 +5,20 @@
 
 import { ref, onBeforeUnmount } from 'vue'
 import { message as antMessage } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { openChatSession, closeChatSession, chatStream } from '@/services/chat'
 import { queryConversations, queryMessages } from '@/services/message'
 import type { ChatMessage } from '@/types/chat'
 import type { Conversation, Message } from '@/types/message'
 
+/** 把任意异常转成可展示的文本 */
+function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e)
+}
+
 export function useChatSession() {
+  const { t } = useI18n()
+
   // 会话状态
   const sessionId = ref<string>('')
   const activeSessionId = ref<string>('') // 通过 openChatSession 打开的活跃会话
@@ -42,7 +50,7 @@ export function useChatSession() {
       const res = await queryConversations({ pageNo: 1, pageSize: 50, source: 'web' })
       conversations.value = res.data.list
     } catch (e: unknown) {
-      antMessage.error('加载历史会话失败: ' + (e instanceof Error ? e.message : String(e)))
+      antMessage.error(t('chat.loadConversationsFailed', { error: errorText(e) }))
     } finally {
       loadingConversations.value = false
     }
@@ -57,7 +65,7 @@ export function useChatSession() {
     onAfterLoad?: () => void
   ): Promise<boolean> {
     if (sending.value) {
-      antMessage.warning('当前对话正在进行中，请稍后再试')
+      antMessage.warning(t('chat.chatInProgress'))
       return false
     }
 
@@ -90,7 +98,7 @@ export function useChatSession() {
       onAfterLoad?.()
       return true
     } catch (e: unknown) {
-      antMessage.error('加载消息记录失败: ' + (e instanceof Error ? e.message : String(e)))
+      antMessage.error(t('chat.loadMessagesFailed', { error: errorText(e) }))
       return false
     }
   }
@@ -158,7 +166,7 @@ export function useChatSession() {
         activeSessionId.value = data.sessionId
         openedNow = true
       } catch (e: unknown) {
-        antMessage.error('建立会话失败: ' + (e instanceof Error ? e.message : String(e)))
+        antMessage.error(t('chat.openSessionFailed', { error: errorText(e) }))
         connecting.value = false
         return { openedNow: false, success: false }
       }
@@ -188,6 +196,7 @@ export function useChatSession() {
 
     sending.value = true
     currentAbort = new AbortController()
+    let streamFailed = false
 
     try {
       for await (const token of chatStream(sessionId.value, text, currentAbort.signal)) {
@@ -207,7 +216,8 @@ export function useChatSession() {
       if (e instanceof DOMException && e.name === 'AbortError') {
         // 用户主动取消
       } else {
-        assistantMsg.content += '\n\n⚠️ 回复中断: ' + (e instanceof Error ? e.message : String(e))
+        streamFailed = true
+        assistantMsg.content += '\n\n' + t('chat.replyInterrupted', { error: errorText(e) })
       }
     } finally {
       completeThinking(assistantMsg)
@@ -217,15 +227,24 @@ export function useChatSession() {
       onScroll?.()
     }
 
-    return { openedNow, success: true }
+    return { openedNow, success: !streamFailed }
   }
+
+  function releaseActiveSession() {
+    if (activeSessionId.value) {
+      closeChatSession(activeSessionId.value).catch(() => {})
+      activeSessionId.value = ''
+    }
+  }
+
+  // 关标签页/刷新/前进后退时兜底释放服务端会话，仅靠 onBeforeUnmount 覆盖不到这些路径
+  window.addEventListener('pagehide', releaseActiveSession)
 
   // 组件卸载时清理
   onBeforeUnmount(() => {
+    window.removeEventListener('pagehide', releaseActiveSession)
     abortCurrentStream()
-    if (activeSessionId.value) {
-      closeChatSession(activeSessionId.value).catch(() => {})
-    }
+    releaseActiveSession()
   })
 
   return {

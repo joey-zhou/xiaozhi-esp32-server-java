@@ -46,6 +46,19 @@ public class VadService {
     // 连续静音帧数阈值，超过时重置GRU状态，防止长时间静音后GRU深度收敛（30帧 ≈ 约2秒）
     private static final int SILENCE_RESET_FRAMES = 30;
 
+    // 角色未配置时的 VAD 阈值默认值
+    private static final float DEFAULT_SPEECH_THRESHOLD = 0.4f;
+    private static final float DEFAULT_SILENCE_THRESHOLD = 0.3f;
+    private static final float DEFAULT_ENERGY_THRESHOLD = 0.001f;
+    private static final int DEFAULT_SILENCE_TIMEOUT_MS = 800;
+
+    /** 一次会话内使用的角色 VAD 阈值 */
+    private record RoleThresholds(float speech, float silence, float energy, int silenceMs) {
+        private static final RoleThresholds DEFAULTS = new RoleThresholds(
+                DEFAULT_SPEECH_THRESHOLD, DEFAULT_SILENCE_THRESHOLD,
+                DEFAULT_ENERGY_THRESHOLD, DEFAULT_SILENCE_TIMEOUT_MS);
+    }
+
     @Autowired
     private SileroVadModel vadModel;
 
@@ -68,6 +81,9 @@ public class VadService {
     private class VadState {
         // 是否由服务端 VAD 自动断句。manual 模式为 false
         private boolean autoSegment = true;
+
+        // 角色阈值快照。只在 initSession 与角色变更时整体替换，读写都在 session 锁内
+        private RoleThresholds thresholds = RoleThresholds.DEFAULTS;
 
         private boolean speaking = false;
         private long silenceTime = 0;
@@ -195,6 +211,8 @@ public class VadService {
      * @param autoSegment 是否由服务端 VAD 断句。manual 传 false，仍做解码与 AEC，只是不跑断句状态机
      */
     public void initSession(String sessionId, boolean autoSegment) {
+        // 阈值读放在锁外，不占着 session 锁等缓存/数据库
+        RoleThresholds thresholds = readRoleThresholds(sessionId);
         Object lock = getLock(sessionId);
         synchronized (lock) {
             VadState state = states.get(sessionId);
@@ -205,7 +223,46 @@ public class VadService {
                 state.reset();
             }
             state.autoSegment = autoSegment;
+            state.thresholds = thresholds;
             log.info("VAD会话已初始化: {}, 自动断句: {}", sessionId, autoSegment);
+        }
+    }
+
+    /**
+     * 取一次角色阈值，音频帧处理直接读快照，不再逐帧查缓存。角色没配或读不到时用默认值。
+     */
+    private RoleThresholds readRoleThresholds(String sessionId) {
+        ChatSession chatSession = sessionManager.getSession(sessionId);
+        DeviceBO device = chatSession != null ? chatSession.getDevice() : null;
+        if (device == null || device.getRoleId() == null) {
+            return RoleThresholds.DEFAULTS;
+        }
+        RoleBO role = roleService.getBO(device.getRoleId());
+        if (role == null) {
+            return RoleThresholds.DEFAULTS;
+        }
+        return new RoleThresholds(
+                Optional.ofNullable(role.getVadSpeechTh()).orElse(DEFAULT_SPEECH_THRESHOLD),
+                Optional.ofNullable(role.getVadSilenceTh()).orElse(DEFAULT_SILENCE_THRESHOLD),
+                Optional.ofNullable(role.getVadEnergyTh()).orElse(DEFAULT_ENERGY_THRESHOLD),
+                Optional.ofNullable(role.getVadSilenceMs()).orElse(DEFAULT_SILENCE_TIMEOUT_MS));
+    }
+
+    /**
+     * 重新读取指定会话的角色阈值快照，供角色变更广播（跨实例）调用；
+     * 不调用时阈值在下一次 listen/start 的 initSession 里刷新。会话未初始化 VAD 时什么都不做。
+     */
+    public void refreshRoleThresholds(String sessionId) {
+        if (!states.containsKey(sessionId)) {
+            return;
+        }
+        RoleThresholds thresholds = readRoleThresholds(sessionId);
+        Object lock = getLock(sessionId);
+        synchronized (lock) {
+            VadState state = states.get(sessionId);
+            if (state != null) {
+                state.thresholds = thresholds;
+            }
         }
     }
 
@@ -232,26 +289,13 @@ public class VadService {
 
         Object lock = getLock(sessionId);
 
-        ChatSession chatSession = sessionManager.getSession(sessionId);
-        DeviceBO device = chatSession != null ? chatSession.getDevice() : null;
-        float speechThreshold = 0.4f;
-        float silenceThreshold = 0.3f;
-        float energyThreshold = 0.001f;
-        int silenceTimeoutMs = 800;
-
-        if (device != null && device.getRoleId() != null) {
-            RoleBO role = roleService.getBO(device.getRoleId());
-            if (role != null) {
-                speechThreshold = Optional.ofNullable(role.getVadSpeechTh()).orElse(speechThreshold);
-                silenceThreshold = Optional.ofNullable(role.getVadSilenceTh()).orElse(silenceThreshold);
-                energyThreshold = Optional.ofNullable(role.getVadEnergyTh()).orElse(energyThreshold);
-                silenceTimeoutMs = Optional.ofNullable(role.getVadSilenceMs()).orElse(silenceTimeoutMs);
-            }
-        }
-
         synchronized (lock) {
             try {
-                VadState state = states.computeIfAbsent(sessionId, k -> new VadState());
+                // 会话已被 resetSession 摘除时不再复活，按未初始化处理
+                VadState state = states.get(sessionId);
+                if (state == null) {
+                    return null;
+                }
 
                 byte[] pcmData;
                 try {
@@ -289,11 +333,11 @@ public class VadService {
                 state.addOriginalProb(speechProb);
                 state.addToPreBuffer(pcmData);
 
-                boolean hasEnergy = energy > energyThreshold;
+                boolean hasEnergy = energy > state.thresholds.energy();
 
                 // 播放和静听使用完全相同的判断逻辑
-                boolean isSpeech = speechProb > speechThreshold && hasEnergy;
-                boolean isSilence = speechProb < silenceThreshold || !hasEnergy;
+                boolean isSpeech = speechProb > state.thresholds.speech() && hasEnergy;
+                boolean isSilence = speechProb < state.thresholds.silence() || !hasEnergy;
 
                 state.updateSilence(isSilence);
 
@@ -323,7 +367,7 @@ public class VadService {
 
                     log.debug("检测到语音开始 - SessionId: {}, 概率: {}, 能量: {}, 阈值: {}",
                             sessionId, String.format("%.4f", speechProb),
-                            String.format("%.6f", energy), String.format("%.4f", speechThreshold));
+                            String.format("%.6f", energy), String.format("%.4f", state.thresholds.speech()));
 
                     byte[] preBufferData = state.drainPreBuffer();
                     byte[] result = preBufferData.length > 0 ? preBufferData : pcmData;
@@ -332,7 +376,7 @@ public class VadService {
 
                 } else if (state.isSpeaking() && isSilence) {
                     int silenceDuration = state.getSilenceDuration();
-                    if (silenceDuration > silenceTimeoutMs) {
+                    if (silenceDuration > state.thresholds.silenceMs()) {
                         state.setSpeaking(false);
 
                         int silenceToRemoveMs = silenceDuration - tailKeepMs;

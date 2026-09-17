@@ -101,7 +101,7 @@ public abstract class ChatSession {
     protected volatile Sinks.Many<byte[]> audioSinks;
     /**
      * audioSinks 的写入锁。
-     * 硬约束：Reactor 的 tryEmit* 要求调用方自己保证串行，检测到并发就返回 FAIL_NON_SERIALIZED
+     * Reactor 的 tryEmit* 要求调用方自己保证串行，检测到并发就返回 FAIL_NON_SERIALIZED
      * 把这次信号丢掉。收句的 complete 与 VAD 送帧分处两个线程，不串行化时收句会被丢，
      * 订阅该流的 STT 永远等不到结束信号，这一轮说的话整句丢失、会话停在 THINKING。
      */

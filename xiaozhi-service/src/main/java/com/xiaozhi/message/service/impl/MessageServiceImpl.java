@@ -15,6 +15,8 @@ import com.xiaozhi.message.dal.mysql.mapper.MessageMapper;
 import com.xiaozhi.message.model.ConversationProjection;
 import com.xiaozhi.message.model.MessageProjection;
 import com.xiaozhi.message.service.MessageService;
+import com.xiaozhi.storage.service.StorageService;
+import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
 import jakarta.annotation.Resource;
 import org.springframework.context.ApplicationEventPublisher;
@@ -37,6 +39,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class MessageServiceImpl implements MessageService {
+
+    @Resource
+    private StorageServiceFactory storageServiceFactory;
 
     @Resource
     private MessageMapper messageMapper;
@@ -206,9 +211,9 @@ public class MessageServiceImpl implements MessageService {
                 .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
                 .eq(MessageDO::getDeviceId, deviceId)
                 .eq(MessageDO::getRoleId, roleId)
-                .ge(MessageDO::getCreateTime, createTime)
+                .gt(MessageDO::getCreateTime, createTime)
                 .orderByAsc(MessageDO::getCreateTime)
-                .orderByDesc(MessageDO::getSender))
+                .orderByAsc(MessageDO::getMessageId))
             .stream()
             .map(messageConvert::toBO)
             .toList();
@@ -274,4 +279,38 @@ public class MessageServiceImpl implements MessageService {
         messageMapper.update(null, update);
     }
 
+
+    @Override
+    public int purgeExpiredAudio(int retentionDays, int batchSize) {
+        LocalDateTime expireBefore = LocalDateTime.now().minusDays(retentionDays);
+        int purged = 0;
+
+        while (true) {
+            List<MessageDO> batch = messageMapper.selectList(new LambdaQueryWrapper<MessageDO>()
+                .select(MessageDO::getMessageId, MessageDO::getAudioPath)
+                .isNotNull(MessageDO::getAudioPath)
+                .ne(MessageDO::getAudioPath, "")
+                .lt(MessageDO::getCreateTime, expireBefore)
+                .orderByAsc(MessageDO::getMessageId)
+                .last("LIMIT " + batchSize));
+            if (batch.isEmpty()) {
+                break;
+            }
+
+            StorageService storage = storageServiceFactory.getStorageService();
+            List<Long> messageIds = new ArrayList<>(batch.size());
+            for (MessageDO message : batch) {
+                storage.remove(message.getAudioPath());
+                messageIds.add(message.getMessageId());
+            }
+
+            // 置空而不是删行：录音过期了，对话文本还要留着。
+            // 置空后下一轮查询不会再选中这批，循环得以收敛。
+            messageMapper.update(null, new LambdaUpdateWrapper<MessageDO>()
+                .set(MessageDO::getAudioPath, null)
+                .in(MessageDO::getMessageId, messageIds));
+            purged += messageIds.size();
+        }
+        return purged;
+    }
 }

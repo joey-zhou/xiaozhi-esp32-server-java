@@ -22,7 +22,7 @@ export interface SummaryMemory {
  * 聊天消息（短期/窗口记忆）
  */
 export interface ChatMemory {
-  messageId: string
+  messageId: number
   deviceId: string
   roleId: number
   message: string
@@ -38,18 +38,4 @@ export interface ChatMemory {
 export interface MemoryQueryParams extends PageQueryParams {
   roleId: number
   deviceId: string
-}
-
-/**
- * 记忆管理视图的状态
- */
-export interface MemoryManagementState {
-  roleId: number
-  roleName: string
-  memoryType: 'window' | 'summary'
-  selectedDeviceId: string
-  devices: Array<{
-    deviceId: string
-    deviceName: string
-  }>
 }

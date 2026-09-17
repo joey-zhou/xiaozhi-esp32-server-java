@@ -26,6 +26,28 @@ describe('ThinkingBlock', () => {
     expect(wrapper.emitted('toggle')).toHaveLength(1)
   })
 
+  it('思考中复用 ThinkingState 的 shimmer，展开阅读时放开固定行高', async () => {
+    const wrapper = mount(ThinkingBlock, {
+      props: {
+        content: '这是一句很长的思考内容'.repeat(20),
+        done: false,
+        expanded: false,
+      },
+    })
+
+    expect(wrapper.find('.shimmer').text()).toBe('chat.thinkingInProgress')
+    // 流式滚动时按每句固定高度算版面
+    expect(wrapper.get('.tr-viewport').attributes('style')).toContain('height: 40px')
+
+    await wrapper.setProps({ done: true, expanded: true, durationMs: 1000 })
+
+    const viewport = wrapper.get('.tr-viewport')
+    expect(viewport.classes()).toContain('is-scroll')
+    // 展开后只限制最大高度，长句不再被钉死成两行
+    expect(viewport.attributes('style')).toContain('max-height: 180px')
+    expect(viewport.attributes('style')).not.toContain('height: 40px')
+  })
+
   it('can be expanded again after thinking is complete', () => {
     const wrapper = mount(ThinkingBlock, {
       props: {

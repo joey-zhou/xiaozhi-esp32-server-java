@@ -10,7 +10,7 @@ import java.util.List;
  *
  * <p>语音样本：本地 MeloTTS(vits-melo-tts-zh_en) 合成的中文「你好」，16kHz 单声道，
  * 按 G.711 μ-law 压到 8bit 后 base64 内嵌，取用时解回 16bit 小端 PCM。
- * 硬约束：STT 服务只接受 16kHz 单声道 16bit 小端 PCM，替换语料必须保持该格式。
+ * STT 服务只接受 16kHz 单声道 16bit 小端 PCM，替换语料必须保持该格式。
  *
  * <p>图片样本：64x64 白底红色实心圆的 PNG。
  */

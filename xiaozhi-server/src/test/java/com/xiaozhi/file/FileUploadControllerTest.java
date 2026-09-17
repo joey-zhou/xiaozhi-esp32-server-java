@@ -27,7 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 钉住通用上传接口：文件按 类型/yyyy/MM/dd 分目录存放、文件名换成随机名，
- * 本地存储返回的相对路径要拼成对外可访问的完整 URL，存储层 IO 失败对外统一成 500 文案。
+ * 本地存储除了返回入库用的裸相对路径，还要返回带访问签名的完整 URL 供前端即时预览，
+ * 存储层 IO 失败对外统一成 500 文案。
  */
 @ExtendWith(MockitoExtension.class)
 class FileUploadControllerTest extends ControllerTestSupport {
@@ -59,6 +60,8 @@ class FileUploadControllerTest extends ControllerTestSupport {
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
         when(storageService.upload(any(), anyString(), anyString())).thenReturn("uploads/image/avatar.png");
         when(storageService.getProvider()).thenReturn("local");
+        when(storageService.getAccessUrl("uploads/image/avatar.png"))
+            .thenReturn("uploads/image/avatar.png?exp=1&sig=abc");
         when(serverAddressProvider.getServerAddress()).thenReturn("https://server.test");
 
         mockMvc.perform(multipart("/api/file/upload").file(file).param("type", "image"))
@@ -66,7 +69,7 @@ class FileUploadControllerTest extends ControllerTestSupport {
             .andExpect(jsonPath("$.message").value("上传成功"))
             .andExpect(jsonPath("$.data.fileName").value("avatar.png"))
             .andExpect(jsonPath("$.data.relativePath").value("uploads/image/avatar.png"))
-            .andExpect(jsonPath("$.data.url").value("https://server.test/uploads/image/avatar.png"));
+            .andExpect(jsonPath("$.data.url").value("https://server.test/uploads/image/avatar.png?exp=1&sig=abc"));
 
         ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> nameCaptor = ArgumentCaptor.forClass(String.class);

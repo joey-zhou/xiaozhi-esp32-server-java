@@ -1,46 +1,30 @@
+import type { PageQueryParams } from './api'
+
 /**
- * 设备信息接口
+ * 设备信息，字段对应后端 DeviceResp
  */
 export interface Device {
-  createTime?: string
-  updateTime?: string
   lastLogin?: string
-  roleId?: number
-  avatar?: string
-  roleName?: string
-  roleDesc?: string
-  voiceName?: string
-  state?: string
-  ttsId?: number
-  modelId?: number
-  modelName?: string
-  sttId?: number
-  temperature?: number
-  topP?: number
-  vadEnergyTh?: number
-  vadSpeechTh?: number
-  vadSilenceTh?: number
-  vadSilenceMs?: number
-  modelProvider?: string
-  ttsProvider?: string
-  isDefault?: string
-  totalDevice?: number
   deviceId: string
   sessionId?: string
   deviceName?: string
+  roleId?: number
+  roleName?: string
+  state?: string
   totalMessage?: number
+  code?: string
   audioPath?: string
   wifiName?: string
   ip?: string
   chipModelName?: string
   type?: string
   version?: string
-  functionNames?: string
+  mcpList?: string
   location?: string
+  createTime?: string
+  updateTime?: string
   editable?: boolean // 表格编辑状态
 }
-
-import type { PageQueryParams } from './api'
 
 /**
  * 设备查询参数
@@ -50,22 +34,6 @@ export interface DeviceQueryParams extends PageQueryParams {
   deviceName?: string
   roleName?: string
   state?: string | number
-}
-
-// 移除重复的响应类型定义，使用统一的 PageResponse<Device>
-
-/**
- * 角色信息接口
- */
-export interface Role {
-  roleId: number
-  roleName: string
-  roleDesc?: string
-  prompt?: string
-  model?: string
-  ttsVoice?: string
-  createTime?: string
-  updateTime?: string
 }
 
 

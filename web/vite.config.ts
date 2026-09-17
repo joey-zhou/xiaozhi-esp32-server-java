@@ -14,6 +14,15 @@ export default defineConfig(({ mode }) => {
       vue(),
       vueDevTools(),
     ],
+    // vue-i18n 的编译期特性开关，不给值时它会在运行时全部按 true 兜底，把用不到的代码打进产物。
+    // locales/index.ts 用的是 legacy: false 的 Composition API，模板里也没有 <i18n-t> / v-t，
+    // 所以整包安装（内置组件 + v-t 指令）和 legacy 兼容层都能摇掉；
+    // 模板里的 $t 由 globalInjection 提供，不受 FULL_INSTALL 影响。
+    define: {
+      __VUE_I18N_FULL_INSTALL__: false,
+      __VUE_I18N_LEGACY_API__: false,
+      __INTLIFY_PROD_DEVTOOLS__: false,
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))
@@ -24,10 +33,11 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       proxy: {
         '/api': {
-          target: process.env.API_URL || env.VITE_BACKEND_URL || 'http://localhost:8091',
+          // 只在 vite dev server 生效；容器里跑的是 nginx，转发地址在 Dockerfile-node 的 proxy_pass
+          target: env.VITE_BACKEND_URL || 'http://localhost:8091',
           changeOrigin: true,
-          secure: true, // 支持 https
-          rewrite: (path) => path.replace(/^\/api/, '/api')
+          // 后端地址是 https 且用自签名证书时改成 false，否则代理会因证书校验失败
+          secure: true
         },
       }
     }

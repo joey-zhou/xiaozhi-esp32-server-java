@@ -84,6 +84,8 @@ let encoder: OpusEncoder | null = null
 let frameHandler: ((frame: Uint8Array) => void) | null = null
 let pendingSamples = new Float32Array(0)
 let capturing = false
+// 起播在途的 Promise，用来做并发去重
+let startingPromise: Promise<void> | null = null
 
 // =============================
 // 采样处理
@@ -149,11 +151,22 @@ export function isCapturing(): boolean {
  * 打开麦克风并持续输出 Opus 帧。
  * 调用方需保证在收到第一帧前服务端已进入聆听状态。
  */
-export async function startMicrophoneCapture(handler: (frame: Uint8Array) => void): Promise<void> {
+export function startMicrophoneCapture(handler: (frame: Uint8Array) => void): Promise<void> {
   if (capturing) {
-    return
+    return Promise.resolve()
   }
+  // 起播要过好几个 await，capturing 到最后才置位；并发调用必须共用同一个在途 Promise，
+  // 否则第二次调用会再开一路 MediaStream，把第一路的引用覆盖掉、麦克风永远关不干净
+  if (startingPromise) {
+    return startingPromise
+  }
+  startingPromise = doStartMicrophoneCapture(handler).finally(() => {
+    startingPromise = null
+  })
+  return startingPromise
+}
 
+async function doStartMicrophoneCapture(handler: (frame: Uint8Array) => void): Promise<void> {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     throw new Error('当前浏览器不支持麦克风采集')
   }

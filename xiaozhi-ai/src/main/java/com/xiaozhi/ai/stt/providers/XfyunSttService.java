@@ -186,7 +186,7 @@ public class XfyunSttService implements SttService {
                 webSocketRef.set(webSocket);
                 isClosed.set(false);
                 // 使用 Flux 订阅音频流
-                audioSink.subscribeOn(Schedulers.single())  // 保证顺序执行
+                audioSink.subscribeOn(Schedulers.boundedElastic())
                         .subscribe(
                                 chunk -> {
                                     if (isClosed.get()) return;

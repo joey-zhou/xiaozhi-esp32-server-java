@@ -7,6 +7,7 @@ import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.common.model.PageResult;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
@@ -27,6 +28,9 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class DeviceServiceImpl implements DeviceService {
+
+    /** 验证码摇号最多重试次数 */
+    private static final int CODE_ALLOCATE_ATTEMPTS = 5;
 
     @Resource
     private DeviceMapper deviceMapper;
@@ -107,9 +111,24 @@ public class DeviceServiceImpl implements DeviceService {
             return existingCode;
         }
 
-        String code = String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
+        String code = allocateUnusedCode();
         verifyCodeService.createForDevice(deviceId, sessionId, type, code);
         return verifyCodeService.findValid(code, deviceId, sessionId);
+    }
+
+    /**
+     * 摇一个有效期内没有被别的设备占用的 6 位码。
+     * 绑定时只凭 6 位码定位设备，同一时刻存在两条相同的码就会绑错设备，因此必须摇号后探测占用。
+     * 连续 CODE_ALLOCATE_ATTEMPTS 次都撞上说明码空间已被灌满，宁可拒绝发码也不能发出重复码。
+     */
+    private String allocateUnusedCode() {
+        for (int i = 0; i < CODE_ALLOCATE_ATTEMPTS; i++) {
+            String code = String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
+            if (verifyCodeService.findValid(code, null, null) == null) {
+                return code;
+            }
+        }
+        throw new OperationFailedException("验证码分配失败，请稍后重试");
     }
 
     @Override

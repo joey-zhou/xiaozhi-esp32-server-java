@@ -21,7 +21,7 @@ export interface ExportColumn<T = unknown> {
   /**
    * 自定义格式化函数
    */
-  format?: (value: any, record: T) => string | number
+  format?(value: unknown, record: T): string | number
 }
 
 export interface ExportOptions<T = unknown> {
@@ -39,6 +39,31 @@ export interface ExportOptions<T = unknown> {
    * 是否显示加载提示
    */
   showLoading?: boolean
+}
+
+/** 以这些字符开头的文本会被 Excel/WPS 当公式执行 */
+const CSV_FORMULA_PREFIX = /^[=+\-@\t\r]/
+
+/**
+ * 转义单个 CSV 单元格：公式前缀加单引号强制成文本，引号翻倍，整体加引号
+ * 纯数字（含负数）不加单引号，避免把数值列变成文本
+ */
+/** 转义 HTML 文本节点，防止 CSV 内容里的标签被当标记渲染 */
+function escapeHTML(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function escapeCSVCell(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '""'
+  }
+  const raw = String(value)
+  const safe = CSV_FORMULA_PREFIX.test(raw) && Number.isNaN(Number(raw)) ? `'${raw}` : raw
+  return `"${safe.replace(/"/g, '""')}"`
 }
 
 export function useExport() {
@@ -61,7 +86,7 @@ export function useExport() {
     }))
     
     // CSV 头部
-    const headers = cols.map(col => `"${col.title}"`).join(',')
+    const headers = cols.map(col => escapeCSVCell(col.title)).join(',')
     
     // CSV 数据行
     const rows = data.map(record => {
@@ -74,14 +99,7 @@ export function useExport() {
           value = col.format(value, record)
         }
         
-        // 处理特殊字符
-        if (value === null || value === undefined) {
-          return '""'
-        }
-        
-        // 转为字符串并转义引号
-        const strValue = String(value).replace(/"/g, '""')
-        return `"${strValue}"`
+        return escapeCSVCell(value)
       }).join(',')
     })
     
@@ -90,11 +108,10 @@ export function useExport() {
   
   /**
    * 下载文件
+   * withBom 只给 CSV 用：Excel 靠 BOM 认 UTF-8，而 JSON 带 BOM 会解析失败
    */
-  const downloadFile = (content: string, filename: string, mimeType: string) => {
-    // 添加 BOM 使 Excel 正确识别 UTF-8
-    const BOM = '\uFEFF'
-    const blob = new Blob([BOM + content], { type: `${mimeType};charset=utf-8;` })
+  const downloadFile = (content: string, filename: string, mimeType: string, withBom = true) => {
+    const blob = new Blob([withBom ? `\uFEFF${content}` : content], { type: `${mimeType};charset=utf-8;` })
     const url = URL.createObjectURL(blob)
     
     const link = document.createElement('a')
@@ -190,7 +207,7 @@ export function useExport() {
       const json = JSON.stringify(exportData, null, 2)
       const filename = `${options.filename || 'export'}.json`
       
-      downloadFile(json, filename, 'application/json')
+      downloadFile(json, filename, 'application/json', false)
       
       // 只在启用内部提示时显示成功消息
       if (options.showLoading !== false) {
@@ -369,11 +386,11 @@ export function useExport() {
     }
     
     const headers = parseCSVRow(headerRow || '')
-    const headerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`
+    const headerHTML = `<tr>${headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr>`
     
     const rowsHTML = dataRows.map(row => {
       const cells = parseCSVRow(row)
-      return `<tr>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`
+      return `<tr>${cells.map(c => `<td>${escapeHTML(c)}</td>`).join('')}</tr>`
     }).join('')
     
     return `<thead>${headerHTML}</thead><tbody>${rowsHTML}</tbody>`

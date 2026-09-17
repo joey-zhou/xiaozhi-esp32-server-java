@@ -4,6 +4,7 @@ import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import enUS from 'ant-design-vue/es/locale/en_US'
 import type { Locale } from 'ant-design-vue/es/locale'
 import { i18n } from '@/locales'
+import { STORAGE_LOCALE } from '@/constants/storage'
 
 export type LocaleType = 'zh-CN' | 'en-US'
 
@@ -20,7 +21,7 @@ const localeNames: Record<LocaleType, string> = {
 }
 
 export function useLocale() {
-  const currentLocale = useStorage<LocaleType>('locale', 'zh-CN')
+  const currentLocale = useStorage<LocaleType>(STORAGE_LOCALE, 'zh-CN')
 
   // 获取 Ant Design Vue 的 locale 对象
   const antdLocale = computed(() => localeMap[currentLocale.value])
@@ -46,6 +47,8 @@ export function useLocale() {
       if (i18n && i18n.global) {
         i18n.global.locale.value = newLocale
       }
+      // index.html 里只有静态默认值，切语言后要跟着改，屏幕阅读器与浏览器翻译都读这个
+      document.documentElement.lang = newLocale
     },
     { immediate: true }
   )

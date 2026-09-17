@@ -8,9 +8,10 @@ import com.xiaozhi.event.DeviceUpdatedEvent;
 import com.xiaozhi.event.RoleUpdatedEvent;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
-import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.Map;
 
@@ -39,34 +40,35 @@ public class RedisBroadcast {
     private StringRedisTemplate stringRedisTemplate;
 
     /**
-     * 事件驱动：收到对话清除事件后通过 Redis 广播
+     * 事件驱动：收到对话清除事件后通过 Redis 广播。
+     * 本类六个监听器都在事务提交后触发，无事务上下文时由 fallbackExecution 直接触发。
      */
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onConversationClear(ConversationHistoryClearedEvent event) {
         clearConversation(event.getDeviceId());
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onDeviceRoleChanged(DeviceRoleChangedEvent event) {
         roleChanged(event.getDeviceId());
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onDeviceSessionClosed(DeviceSessionClosedEvent event) {
         closeDeviceSession(event.getDeviceId());
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onAiConfigChanged(AiConfigChangedEvent event) {
         configChanged(event.getConfigType(), event.getConfigId());
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onRoleUpdated(RoleUpdatedEvent event) {
         roleUpdated(event.getRoleId());
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onDeviceUpdated(DeviceUpdatedEvent event) {
         if (event.getDevice() != null && event.getDevice().getDeviceId() != null) {
             deviceUpdated(event.getDevice().getDeviceId());

@@ -9,7 +9,7 @@
             :placeholder="t('template.enterTemplateName')"
             allow-clear
             style="width: 200px"
-            @pressEnter="handleSearch"
+            @pressEnter="debouncedSearch"
           />
         </a-form-item>
         <a-form-item :label="t('template.category')">
@@ -17,7 +17,7 @@
             v-model:value="searchForm.category"
             :placeholder="t('common.all')"
             style="width: 150px"
-            @change="handleSearch"
+            @change="debouncedSearch"
           >
             <a-select-option
               v-for="item in categoryOptions"
@@ -47,7 +47,7 @@
         :pagination="pagination"
         :scroll="{ x: 800 }"
         row-key="templateId"
-        @change="handleTableChange"
+        @change="onTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'templateContent'">
@@ -71,10 +71,10 @@
               show-delete
               :is-default="record.isDefault == 1"
               :delete-title="t('template.confirmDelete')"
-              @edit="handleEdit"
-              @view="handlePreview"
-              @set-default="handleSetDefault"
-              @delete="handleDelete"
+              @edit="() => handleEdit(record)"
+              @view="() => handlePreview(record)"
+              @set-default="() => handleSetDefault(record)"
+              @delete="() => handleDelete(record)"
             />
           </template>
         </template>
@@ -221,7 +221,7 @@ import { ref, reactive, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { PlusOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
-import type { FormInstance, TableProps } from 'ant-design-vue'
+import type { FormInstance, TableColumnsType } from 'ant-design-vue'
 import type { PromptTemplate, TemplateFormData, CategoryOption } from '@/types/template'
 import {
   queryTemplates,
@@ -236,7 +236,7 @@ import TableActionButtons from '@/components/TableActionButtons.vue'
 
 const { t } = useI18n()
 
-const columns = computed(() => [
+const columns = computed<TableColumnsType>(() => [
   {
     title: t('template.templateName'),
     dataIndex: 'templateName',
@@ -284,48 +284,71 @@ const searchForm = reactive({
   category: ''
 })
 
+// 内置分类：value 是入库值，与语言无关；label 存的是翻译键
+const BUILTIN_CATEGORIES = [
+  { label: 'template.categoryBasic', value: '基础角色' },
+  { label: 'template.categoryProfessional', value: '专业角色' },
+  { label: 'template.categorySocial', value: '社交角色' },
+  { label: 'template.categoryEntertainment', value: '娱乐角色' }
+]
+const DEFAULT_CATEGORY = BUILTIN_CATEGORIES[0]!.value
+
 // 默认分类选项
 const defaultCategoryOptions = computed<CategoryOption[]>(() => [
   { label: t('common.all'), value: '' },
-  { label: t('template.categoryBasic'), value: '基础角色' },
-  { label: t('template.categoryProfessional'), value: '专业角色' },
-  { label: t('template.categorySocial'), value: '社交角色' },
-  { label: t('template.categoryEntertainment'), value: '娱乐角色' }
+  ...BUILTIN_CATEGORIES.map(item => ({ label: t(item.label), value: item.value }))
 ])
 
-// 分类选项（包含动态加载的自定义分类）
-const categoryOptions = ref<CategoryOption[]>([...defaultCategoryOptions.value])
+// 接口数据里出现过的自定义分类
+const customCategories = ref<string[]>([])
 
-// 使用表格组合式函数
+// 分类选项（包含动态加载的自定义分类）
+const categoryOptions = computed<CategoryOption[]>(() => [
+  ...defaultCategoryOptions.value,
+  ...customCategories.value.map(category => ({ label: category, value: category }))
+])
+
+// 使用表格组合式函数：分页参数由 useTable 注入，翻页/搜索都走它的三件套
 const {
   data: dataSource,
   loading,
   pagination,
-  handleTableChange: onTableChange,
-  loadData
-} = useTable<PromptTemplate>()
+  fetchData,
+  onTableChange,
+  debouncedSearch
+} = useTable<PromptTemplate>(async ({ pageNo, pageSize }) => {
+  const res = await queryTemplates({
+    ...searchForm,
+    pageNo,
+    pageSize
+  })
+
+  // 更新自定义分类
+  if (res.data?.list) {
+    const categories = new Set<string>()
+    res.data.list.forEach((item: PromptTemplate) => {
+      if (item.category) {
+        categories.add(item.category)
+      }
+    })
+
+    const builtinValues = BUILTIN_CATEGORIES.map(item => item.value)
+    customCategories.value = [...categories].filter(c => c !== '' && !builtinValues.includes(c))
+  }
+
+  return res
+})
 
 const formRef = ref<FormInstance>()
-const modal = useModal({
+const modal = useModal<PromptTemplate>({
   formRef,
   onSubmit: async (data, isEdit) => {
     // Modal 内已有 submitLoading，不需要全局 loading
     try {
-      const category = formData.category === 'custom' && formData.customCategory 
-        ? formData.customCategory 
-        : formData.category
-      
-      const requestData: Partial<PromptTemplate> = {
-        templateName: formData.templateName,
-        templateDesc: formData.templateDesc || '',
-        category: category,
-        templateContent: formData.templateContent,
-        isDefault: formData.isDefault ? 1 : 0,
-        state: 1
-      }
-      
+      const requestData: Partial<PromptTemplate> = { ...data }
+
       if (isEdit && modal.editingItem.value) {
-        requestData.templateId = (modal.editingItem.value as PromptTemplate).templateId
+        requestData.templateId = modal.editingItem.value.templateId
       }
       
       const res = isEdit
@@ -340,14 +363,13 @@ const modal = useModal({
         message.error(res.message || t('template.operationFailed'))
         return false
       }
-    } catch (error) {
+    } catch {
       message.error(t('template.operationFailed'))
       return false
     }
   },
-  onOpen: (item) => {
-    if (item) {
-      const template = item as PromptTemplate
+  onOpen: (template) => {
+    if (template) {
       const isCustomCategory = !categoryOptions.value.some(c => c.value === template.category)
       showCustomCategory.value = isCustomCategory
       
@@ -362,7 +384,7 @@ const modal = useModal({
     } else {
       showCustomCategory.value = false
       resetForm()
-      formData.category = '基础角色'
+      formData.category = DEFAULT_CATEGORY
       formData.isDefault = false
     }
   }
@@ -383,46 +405,6 @@ const formData = reactive<TemplateFormData>({
 // 预览相关
 const previewVisible = ref(false)
 const previewTemplate = ref<PromptTemplate | null>(null)
-
-// 搜索
-const handleSearch = () => {
-  fetchData()
-}
-
-// 加载数据
-const fetchData = async () => {
-  await loadData(async ({ pageNo, pageSize }) => {
-    const res = await queryTemplates({
-      ...searchForm,
-      pageNo,
-      pageSize
-    })
-    
-    // 更新分类选项
-    if (res.data?.list) {
-      const categories = new Set<string>()
-      res.data.list.forEach((item: PromptTemplate) => {
-        if (item.category) {
-          categories.add(item.category)
-        }
-      })
-      
-      const defaultValues = defaultCategoryOptions.value.map(c => c.value)
-      const customCategories = [...categories].filter(c => !defaultValues.includes(c) && c !== '')
-      
-      if (customCategories.length > 0) {
-        categoryOptions.value = [
-          ...defaultCategoryOptions.value,
-          ...customCategories.map(c => ({ label: c, value: c }))
-        ]
-      } else {
-        categoryOptions.value = [...defaultCategoryOptions.value]
-      }
-    }
-    
-    return res
-  })
-}
 
 // 创建
 const handleCreate = () => {
@@ -446,7 +428,7 @@ const handleDelete = async (record: PromptTemplate) => {
     } else {
       message.error(res.message || t('template.deleteFailed'))
     }
-  } catch (error) {
+  } catch {
     message.error(t('template.deleteFailed'))
   } finally {
     loading.value = false
@@ -466,7 +448,7 @@ const handleSetDefault = async (record: PromptTemplate) => {
     } else {
       message.error(res.message || t('template.operationFailed'))
     }
-  } catch (error) {
+  } catch {
     message.error(t('template.operationFailed'))
   } finally {
     loading.value = false
@@ -487,10 +469,22 @@ const handleCategoryChange = (value: string) => {
   }
 }
 
+// 表单数据转成提交给后端的模板对象
+const buildTemplatePayload = (): PromptTemplate => ({
+  templateName: formData.templateName,
+  category: formData.category === 'custom' && formData.customCategory
+    ? formData.customCategory
+    : formData.category,
+  templateDesc: formData.templateDesc || '',
+  templateContent: formData.templateContent,
+  isDefault: formData.isDefault ? 1 : 0,
+  state: 1
+})
+
 const handleSubmit = async () => {
   try {
     await formRef.value?.validate()
-    await modal.submit(formData)
+    await modal.submit(buildTemplatePayload())
   } catch (error) {
     console.error('表单验证失败:', error)
   }
@@ -506,11 +500,6 @@ const resetForm = () => {
   formData.templateContent = ''
   formData.isDefault = false
   showCustomCategory.value = false
-}
-
-// 表格变化处理
-const handleTableChange: TableProps['onChange'] = (pag) => {
-  onTableChange(pag)
 }
 
 // 初始化（非阻塞式加载）

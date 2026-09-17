@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/store/user'
-import { ROUTES } from '@/router/routes'
+import { defaultRouteFor } from '@/router/routes'
 
+const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
 
@@ -11,10 +13,7 @@ function goBack() {
 }
 
 function goHome() {
-  // 清除用户信息和token，避免因权限不足导致的循环跳转
-  userStore.clearUserInfo()
-  userStore.clearToken()
-  router.push(ROUTES.LOGIN)
+  router.replace(defaultRouteFor(userStore.isAdmin))
 }
 </script>
 
@@ -23,12 +22,12 @@ function goHome() {
     <a-result
       status="403"
       title="403"
-      sub-title="抱歉，您没有权限访问此页面。"
+      :sub-title="t('error.noPermission')"
     >
       <template #extra>
         <a-space>
-          <a-button type="primary" @click="() => goHome()">返回首页</a-button>
-          <a-button @click="() => goBack()">返回上一页</a-button>
+          <a-button type="primary" @click="() => goHome()">{{ t('common.backHome') }}</a-button>
+          <a-button @click="() => goBack()">{{ t('common.backPrevious') }}</a-button>
         </a-space>
       </template>
     </a-result>
@@ -41,7 +40,6 @@ function goHome() {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #f0f2f5;
+  background: var(--ant-color-fill-quaternary, #f0f2f5);
 }
 </style>
-

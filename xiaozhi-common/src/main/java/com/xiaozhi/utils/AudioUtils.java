@@ -458,10 +458,23 @@ public class AudioUtils {
                 }
                 short[] samples = output.getBuffer();
                 int len = output.getBufferLength();
-                byte[] frameBytes = new byte[len * 2];
-                for (int i = 0; i < len; i++) {
-                    frameBytes[i * 2] = (byte) (samples[i] & 0xFF);
-                    frameBytes[i * 2 + 1] = (byte) ((samples[i] >> 8) & 0xFF);
+                int channels = output.getChannelCount();
+                byte[] frameBytes;
+                if (channels == 2) {
+                    // getBufferLength 返回的是交织后的总样本数，左右声道取均值下混成单声道
+                    int frames = len / 2;
+                    frameBytes = new byte[frames * 2];
+                    for (int i = 0; i < frames; i++) {
+                        int mixed = (samples[i * 2] + samples[i * 2 + 1]) / 2;
+                        frameBytes[i * 2] = (byte) (mixed & 0xFF);
+                        frameBytes[i * 2 + 1] = (byte) ((mixed >> 8) & 0xFF);
+                    }
+                } else {
+                    frameBytes = new byte[len * 2];
+                    for (int i = 0; i < len; i++) {
+                        frameBytes[i * 2] = (byte) (samples[i] & 0xFF);
+                        frameBytes[i * 2 + 1] = (byte) ((samples[i] >> 8) & 0xFF);
+                    }
                 }
                 pcmOut.write(frameBytes);
                 bitstream.closeFrame();

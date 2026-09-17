@@ -1,23 +1,120 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import type { ConfigType, Config, ConfigField, ModelOption, LLMModel, LLMFactory } from '@/types/config'
-import { queryConfigs, addConfig, updateConfig, deleteConfig as deleteConfigRequest } from '@/services/config'
+import { queryConfigs, updateConfig, deleteConfig as deleteConfigRequest } from '@/services/config'
 import { configTypeMap } from '@/config/providerConfig'
 import llmFactoriesData from '@/config/llm_factories.json'
 import { useTable } from './useTable'
-import { useLoadingStore } from '@/store/loading'
+
+/** 按模型类型分组的工厂模型表 */
+interface LLMFactoryModelInfo {
+  chat?: LLMModel[]
+  vision?: LLMModel[]
+  intent?: LLMModel[]
+  embedding?: LLMModel[]
+}
+
+interface LLMFactoryIndex {
+  /** provider -> 各模型类型下的模型列表 */
+  models: Record<string, LLMFactoryModelInfo>
+  /** provider -> 工厂默认 API URL */
+  urls: Record<string, string>
+  /** 按 rank 降序、同 rank 按字母序的 provider 下拉项 */
+  providers: Array<{ value: string; label: string; configNameOptions?: string[] }>
+}
+
+const EMPTY_LLM_FACTORY_INDEX: LLMFactoryIndex = { models: {}, urls: {}, providers: [] }
+
+// llm_factories.json 是不变常量，索引在模块作用域只建一次，多个 useConfigManager 实例共用
+let llmFactoryIndex: LLMFactoryIndex | null = null
+
+/**
+ * 构建 LLM 工厂索引
+ */
+function buildLlmFactoryIndex(): LLMFactoryIndex {
+  if (!llmFactoriesData || !llmFactoriesData.factory_llm_infos) {
+    console.warn('llm_factories.json 数据格式不正确')
+    return EMPTY_LLM_FACTORY_INDEX
+  }
+
+  const models: Record<string, LLMFactoryModelInfo> = {}
+  const urls: Record<string, string> = {}
+  const ranks: Record<string, number> = {}
+  const providers: Array<{ value: string; label: string }> = []
+
+  llmFactoriesData.factory_llm_infos.forEach((factory: LLMFactory) => {
+    const providerName = factory.name
+    providers.push({ value: providerName, label: providerName })
+
+    if (factory.url) {
+      urls[providerName] = factory.url
+    }
+
+    if (factory.rank) {
+      ranks[providerName] = parseInt(factory.rank) || 0
+    }
+
+    const modelsByType: LLMFactoryModelInfo = {
+      chat: [],
+      embedding: [],
+      vision: [],
+      intent: []
+    }
+
+    if (factory.llm && Array.isArray(factory.llm)) {
+      factory.llm.forEach((llm: LLMModel) => {
+        let mappedModelType = llm.model_type
+
+        // speech2text / image2text 统一并入 vision
+        if (mappedModelType === 'speech2text' || mappedModelType === 'image2text') {
+          mappedModelType = 'vision'
+        }
+
+        if (['chat', 'embedding', 'vision'].includes(mappedModelType as keyof LLMFactoryModelInfo)) {
+          (modelsByType[mappedModelType as keyof LLMFactoryModelInfo] as LLMModel[]).push({
+            llm_name: llm.llm_name,
+            model_type: mappedModelType,
+            max_tokens: llm.max_tokens,
+            is_tools: llm.is_tools || false,
+            tags: llm.tags || '',
+          })
+        }
+      })
+    }
+
+    models[providerName] = modelsByType
+  })
+
+  // rank 越大越靠前，相同 rank 按字母序
+  providers.sort((a, b) => {
+    const rankA = ranks[a.value] || 0
+    const rankB = ranks[b.value] || 0
+    if (rankA !== rankB) return rankB - rankA
+    return a.label.localeCompare(b.label)
+  })
+
+  return { models, urls, providers }
+}
+
+function getLlmFactoryIndex(): LLMFactoryIndex {
+  if (!llmFactoryIndex) {
+    llmFactoryIndex = buildLlmFactoryIndex()
+  }
+  return llmFactoryIndex
+}
 
 export function useConfigManager(configType: ConfigType) {
   const { t } = useI18n()
-  const loadingStore = useLoadingStore()
-  
+
   // 使用统一的表格管理
   const {
     loading,
     data: configItems,
     pagination,
     loadData,
+    handleTableChange,
+    createDebouncedSearch,
   } = useTable<Config>()
 
   // 状态
@@ -25,17 +122,9 @@ export function useConfigManager(configType: ConfigType) {
   const editingConfigId = ref<number>()
   const activeTabKey = ref('1')
   const modelOptions = ref<ModelOption[]>([])
-  
-  // LLM 工厂数据
-  interface LLMFactoryModelInfo {
-    chat?: LLMModel[]
-    vision?: LLMModel[]
-    intent?: LLMModel[]
-    embedding?: LLMModel[]
-  }
-  const llmFactoryData = ref<Record<string, LLMFactoryModelInfo>>({})
-  const llmFactoryUrls = ref<Record<string, string>>({})
-  const availableProviders = ref<Array<{ value: string; label: string; configNameOptions?: string[] }>>([])
+
+  // LLM 工厂数据（常量索引，非 llm 类型不构建）
+  const llmFactory = configType === 'llm' ? getLlmFactoryIndex() : EMPTY_LLM_FACTORY_INDEX
 
   // 查询表单
   const queryForm = ref({
@@ -52,7 +141,7 @@ export function useConfigManager(configType: ConfigType) {
   // 类型选项
   const typeOptions = computed(() => {
     if (configType === 'llm') {
-      return availableProviders.value
+      return llmFactory.providers
     }
     return configTypeInfo.value.typeOptions || []
   })
@@ -68,7 +157,7 @@ export function useConfigManager(configType: ConfigType) {
       if (typeFieldsMap[currentType.value]) {
         const fields = [...(typeFieldsMap[currentType.value] || [])]
         // 如果没有 apiUrl 字段但工厂有 URL，自动追加
-        const factoryUrl = llmFactoryUrls.value[currentType.value]
+        const factoryUrl = llmFactory.urls[currentType.value]
         if (factoryUrl && !fields.some(f => f.name === 'apiUrl')) {
           fields.push({
             name: 'apiUrl',
@@ -84,7 +173,7 @@ export function useConfigManager(configType: ConfigType) {
       }
 
       // 没有明确定义：根据工厂数据自动生成默认字段
-      const factoryUrl = llmFactoryUrls.value[currentType.value] || ''
+      const factoryUrl = llmFactory.urls[currentType.value] || ''
       return [
         {
           name: 'apiKey',
@@ -110,91 +199,13 @@ export function useConfigManager(configType: ConfigType) {
   })
 
   /**
-   * 初始化 LLM 工厂数据
-   */
-  function initLlmFactoriesData() {
-    if (!llmFactoriesData || !llmFactoriesData.factory_llm_infos) {
-      console.warn('llm_factories.json 数据格式不正确')
-      return
-    }
-
-    const factoryData: Record<string, LLMFactoryModelInfo> = {}
-    const providers: Array<{ value: string; label: string }> = []
-    const urls: Record<string, string> = {}
-    const ranks: Record<string, number> = {}
-
-    llmFactoriesData.factory_llm_infos.forEach((factory: LLMFactory) => {
-      const providerName = factory.name
-      providers.push({
-        value: providerName,
-        label: providerName,
-      })
-
-      // 存储工厂 URL
-      if (factory.url) {
-        urls[providerName] = factory.url
-      }
-
-      // 存储排序权重
-      if (factory.rank) {
-        ranks[providerName] = parseInt(factory.rank) || 0
-      }
-
-      // 按模型类型分组存储模型
-      const modelsByType: LLMFactoryModelInfo = {
-        chat: [],
-        embedding: [],
-        vision: [],
-        intent: []
-      }
-
-      if (factory.llm && Array.isArray(factory.llm)) {
-        factory.llm.forEach((llm: LLMModel) => {
-          let mappedModelType = llm.model_type
-
-          // 映射模型类型
-          if (mappedModelType === 'speech2text' || mappedModelType === 'image2text') {
-            mappedModelType = 'vision'
-          }
-
-          // 只保留需要的模型类型
-          if (['chat', 'embedding', 'vision'].includes(mappedModelType as keyof LLMFactoryModelInfo)) {
-            (modelsByType[mappedModelType as keyof LLMFactoryModelInfo] as LLMModel[]).push({
-              llm_name: llm.llm_name,
-              model_type: mappedModelType,
-              max_tokens: llm.max_tokens,
-              is_tools: llm.is_tools || false,
-              tags: llm.tags || '',
-            })
-          }
-        })
-      }
-
-      factoryData[providerName] = modelsByType
-    })
-
-    llmFactoryData.value = factoryData
-    llmFactoryUrls.value = urls
-
-    // 按照工厂 rank 排序（降序，rank 越大越靠前），相同 rank 按字母排序
-    const sortedProviders = providers.sort((a, b) => {
-      const rankA = ranks[a.value] || 0
-      const rankB = ranks[b.value] || 0
-      if (rankA !== rankB) return rankB - rankA
-      return a.label.localeCompare(b.label)
-    })
-
-    availableProviders.value = sortedProviders
-  }
-
-  /**
    * 根据 provider 和 modelType 获取模型列表
    */
   function getModelsByProviderAndType(provider: string, modelType: string): LLMModel[] {
-    if (!llmFactoryData.value[provider]) {
+    const providerData = llmFactory.models[provider]
+    if (!providerData) {
       return []
     }
-    const providerData = llmFactoryData.value[provider]
     return (providerData[modelType as keyof LLMFactoryModelInfo] || []) as LLMModel[]
   }
 
@@ -236,7 +247,7 @@ export function useConfigManager(configType: ConfigType) {
       const res = await deleteConfigRequest(configId)
 
       if (res.code === 200) {
-        message.success(t('common.delete'))
+        message.success(t('common.deleteSuccess'))
         await fetchData()
       } else {
         message.error(res.message)
@@ -278,11 +289,6 @@ export function useConfigManager(configType: ConfigType) {
     }
   }
 
-  // 初始化
-  if (configType === 'llm') {
-    initLlmFactoriesData()
-  }
-
   return {
     // 状态
     loading,
@@ -305,5 +311,7 @@ export function useConfigManager(configType: ConfigType) {
     setAsDefault,
     updateModelOptions,
     getModelsByProviderAndType,
+    handleTableChange,
+    createDebouncedSearch,
   }
 }

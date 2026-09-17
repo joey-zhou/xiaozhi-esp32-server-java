@@ -244,13 +244,13 @@ public class AliyunNlsTtsService implements TtsService {
                         Thread.currentThread().interrupt();
                         log.error("重试等待被中断", ie);
                         // NLS 连接异常时清除缓存，下次调用时重建 client
-                        globalClientCache.remove(config.getConfigId());
+                        evictClient(config.getConfigId());
                         throw e;
                     }
                 } else {
                     log.error("阿里云NLS语音合成失败，已达到最大重试次数: {}", e.getMessage(), e);
                     // NLS 连接异常时清除缓存，下次调用时重建 client
-                    globalClientCache.remove(config.getConfigId());
+                    evictClient(config.getConfigId());
                     throw e;
                 }
             }
@@ -262,6 +262,11 @@ public class AliyunNlsTtsService implements TtsService {
      * 清除指定configId的NlsClient缓存
      */
     public static void clearClientCache(Integer configId) {
+        evictClient(configId);
+    }
+
+    /** 移出缓存并 shutdown，NlsClient 自带 Netty 线程组，只 remove 不 shutdown 会泄漏线程与连接 */
+    private static void evictClient(Integer configId) {
         if (configId != null) {
             CachedNlsClient removed = globalClientCache.remove(configId);
             if (removed != null && removed.client != null) {

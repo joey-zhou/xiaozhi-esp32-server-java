@@ -35,6 +35,8 @@ spring:
       host: localhost
       port: 6379
       database: 0
+      # Redis 开启 requirepass 后用环境变量 SPRING_DATA_REDIS_PASSWORD 提供口令。
+      # 此处不能写 password: 空值——Redisson 会把空串当口令发出 AUTH ""，无口令的 Redis 直接报错拒连。
       lettuce:
         pool:
           max-active: 16
@@ -77,12 +79,23 @@ logging:
     io.netty.handler: ERROR
 
 # ============================================================
+# MQTT 接入（本进程负责验签，设备走 MQTT+UDP 时生效）
+# ============================================================
+mqtt:
+  server:
+    # OTA 下发的 MQTT 口令签名密钥：server 用它签、dialogue 用它验，两端必须同值
+    # 默认值仅供本地联调与运维测试，正式部署用环境变量 MQTT_SIGNATURE_KEY 覆盖
+    # 改这个值会让已下发的 MQTT 口令全部失效，设备需重走 OTA 取新口令
+    signatureKey: ${MQTT_SIGNATURE_KEY:xz@2025}
+
+# ============================================================
 # 小智扩展配置
 # ============================================================
 xiaozhi:
-  # 设备接入鉴权：与 server 模块同配置（token 由 OTA 签发、此处握手校验），配置 secret 即开启
+  # 设备接入鉴权：token 由 OTA 签发、此处握手校验。留空不鉴权，生产部署必须配。
+  # 由环境变量 XIAOZHI_DEVICE_AUTH_SECRET 提供，必须与 server 同值。
   device-auth:
-    secret:
+    secret: ${XIAOZHI_DEVICE_AUTH_SECRET:xz-2026}
     expire-seconds: 2592000
     allowed-devices:
   runtime:
@@ -95,6 +108,7 @@ xiaozhi:
 
 # ============================================================
 # Sa-Token（仅用于 @SaIgnore 和无状态接口校验，token 验证依赖 Redis）
+# 本模块不注册 JWT 版 StpLogic，走默认的 token→loginId 查表，因此没有 jwt-secret-key
 # ============================================================
 sa-token:
   token-name: Authorization

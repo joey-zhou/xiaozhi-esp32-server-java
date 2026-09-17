@@ -6,6 +6,7 @@ import com.xiaozhi.common.model.req.RolePageReq;
 import com.xiaozhi.common.model.req.RoleUpdateReq;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.RoleResp;
+import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.role.convert.RoleConvert;
 import com.xiaozhi.role.domain.Role;
 import com.xiaozhi.role.domain.repository.RoleRepository;
@@ -38,6 +39,9 @@ public class RoleAppService {
 
     @Resource
     private RoleConvert roleConvert;
+
+    @Resource
+    private DeviceService deviceService;
 
     public PageResult<RoleResp> page(RolePageReq req, Integer userId) {
         RolePageReq r = req == null ? new RolePageReq() : req;
@@ -74,6 +78,12 @@ public class RoleAppService {
                 new MemoryStrategy(req.getMemoryType()),
                 req.getIsDefault() == null ? null : "1".equals(req.getIsDefault()),
                 req.getInactiveTimeoutSeconds());
+        
+        if (Role.STATE_ENABLED.equals(req.getState())) {
+            role.enable();
+        } else if (Role.STATE_DISABLED.equals(req.getState())) {
+            role.disable();
+        }
         roleRepository.save(role);
 
         RoleBO updated = roleService.getBO(roleId);
@@ -81,8 +91,21 @@ public class RoleAppService {
         return roleConvert.toResp(updated);
     }
 
+    /**
+     * 删除角色。sys_device.roleId 上没有外键，硬删会留下悬空引用，绑定该角色的设备之后每次接入都会失败，
+     * 因此仍有设备绑定时拒绝删除。
+     */
     @Transactional
     public void delete(Integer roleId) {
+        long boundDevices = countBoundDevices(roleId);
+        if (boundDevices > 0) {
+            throw new IllegalStateException("该角色仍绑定 " + boundDevices + " 台设备，请先将设备改绑到其他角色");
+        }
         roleRepository.delete(roleId);
+    }
+
+    private long countBoundDevices(Integer roleId) {
+        Long total = deviceService.page(1, 1, null, null, null, null, roleId, null).getTotal();
+        return total == null ? 0 : total;
     }
 }

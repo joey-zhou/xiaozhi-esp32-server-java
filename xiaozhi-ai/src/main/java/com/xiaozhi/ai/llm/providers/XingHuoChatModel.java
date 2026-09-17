@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -11,6 +12,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
 import java.io.BufferedReader;
@@ -19,6 +21,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -306,6 +309,9 @@ public class XingHuoChatModel implements ChatModel {
                     if (allToolsComplete) {
                         List<Map<String, Object>> finalToolCalls = new ArrayList<>(toolCallsAccumulator.values());
                         processToolCalls(finalToolCalls, sink, prompt);
+                        // 工具已执行，清空累积状态，防止流读完后在 onResponse 里被再执行一次
+                        toolCallsAccumulator.clear();
+                        hasToolCall[0] = false;
                         sink.complete();
                     }
                 } else if (!hasToolCall[0]) {
@@ -484,28 +490,7 @@ public class XingHuoChatModel implements ChatModel {
         requestBody.put("model", model);
         requestBody.put("stream", stream);
         
-        // 转换消息格式 - 简化版本,只处理用户消息
-        List<Map<String, String>> messages = new ArrayList<>();
-        
-        // 添加系统消息(如果有)
-        if (prompt.getInstructions().size() > 1) {
-            // 第一条可能是系统消息
-            Message firstMsg = prompt.getInstructions().get(0);
-            if ("system".equals(firstMsg.getMessageType().getValue())) {
-                Map<String, String> systemMsg = new HashMap<>();
-                systemMsg.put("role", "system");
-                systemMsg.put("content", firstMsg.getText());
-                messages.add(systemMsg);
-            }
-        }
-        
-        // 添加用户消息
-        Map<String, String> userMsg = new HashMap<>();
-        userMsg.put("role", "user");
-        userMsg.put("content", prompt.getUserMessage().getText());
-        messages.add(userMsg);
-        
-        requestBody.put("messages", messages);
+        requestBody.put("messages", buildMessages(prompt.getInstructions()));
         
         // 添加工具定义(如果有) - 星火Max和Ultra支持Function Call
         ToolCallingChatOptions chatOptions = (ToolCallingChatOptions) prompt.getOptions();
@@ -575,6 +560,55 @@ public class XingHuoChatModel implements ChatModel {
         }
         
         return requestBody;
+    }
+
+    /**
+     * 把多轮历史逐条映射成星火的 messages。星火只接受 system/user/assistant 三种 role，
+     * 工具调用与工具结果压成 assistant 文本；相邻同 role 消息合并，保持 user/assistant 交替。
+     */
+    private List<Map<String, String>> buildMessages(List<Message> instructions) {
+        List<Map<String, String>> messages = new ArrayList<>();
+        for (Message message : instructions) {
+            String role = toRole(message);
+            String content = toContent(message);
+            if (!StringUtils.hasText(content)) {
+                continue;
+            }
+            Map<String, String> last = messages.isEmpty() ? null : messages.get(messages.size() - 1);
+            if (last != null && role.equals(last.get("role"))) {
+                last.put("content", last.get("content") + System.lineSeparator() + content);
+                continue;
+            }
+            Map<String, String> mapped = new HashMap<>();
+            mapped.put("role", role);
+            mapped.put("content", content);
+            messages.add(mapped);
+        }
+        return messages;
+    }
+
+    private static String toRole(Message message) {
+        return switch (message.getMessageType()) {
+            case SYSTEM -> "system";
+            case USER -> "user";
+            case ASSISTANT, TOOL -> "assistant";
+        };
+    }
+
+    private static String toContent(Message message) {
+        if (message instanceof ToolResponseMessage toolResponseMessage) {
+            return toolResponseMessage.getResponses().stream()
+                    .map(response -> "[工具" + response.name() + "返回]" + response.responseData())
+                    .collect(Collectors.joining(System.lineSeparator()));
+        }
+        if (message instanceof AssistantMessage assistantMessage
+                && assistantMessage.hasToolCalls()
+                && !StringUtils.hasText(assistantMessage.getText())) {
+            return "[调用工具:" + assistantMessage.getToolCalls().stream()
+                    .map(AssistantMessage.ToolCall::name)
+                    .collect(Collectors.joining(",")) + "]";
+        }
+        return message.getText();
     }
 
     /**

@@ -2,9 +2,7 @@ import { ref, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { useIntervalFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
-import { checkUser, sendEmailCaptcha, checkCaptcha } from '@/services/user'
-
-type VerificationType = 'register' | 'forget'
+import { checkUser, sendEmailCaptcha, sendSmsCaptcha } from '@/services/user'
 
 export function useVerificationCode() {
   const { t } = useI18n()
@@ -83,7 +81,7 @@ export function useVerificationCode() {
 
       message.error(res.message || t('auth.sendVerificationCodeFailed'))
       return false
-    } catch (error) {
+    } catch {
       // 校验/发送过程中抛出的 HTTP 错误已由全局拦截器统一提示，避免重复弹窗
       return false
     } finally {
@@ -112,7 +110,7 @@ export function useVerificationCode() {
 
       message.error(res.message || t('auth.sendVerificationCodeFailed'))
       return false
-    } catch (error) {
+    } catch {
       // HTTP 错误已由全局拦截器统一提示，避免重复弹窗
       return false
     } finally {
@@ -120,25 +118,35 @@ export function useVerificationCode() {
     }
   }
 
-  // 验证验证码
-  const verifyCode = async (email: string, code: string, type: VerificationType) => {
+  // 发送验证码（手机号登录场景）
+  const sendSmsLoginCode = async (tel: string) => {
+    if (!tel) {
+      message.error(t('auth.enterMobilePhone'))
+      return false
+    }
+    if (!canSendCode.value) return false
+
+    sendCodeLoading.value = true
+
     try {
-      const res = await checkCaptcha({
-        email,
-        code,
-        type,
+      const res = await sendSmsCaptcha({
+        tel,
+        type: 'login',
       })
 
       if (res.code === 200) {
-        message.success(t('auth.verificationSuccess'))
+        message.success(t('auth.verificationCodeSent'))
+        startCountdown()
         return true
       }
 
-      message.error(res.message || t('auth.verificationCodeError'))
+      message.error(res.message || t('auth.sendVerificationCodeFailed'))
       return false
-    } catch (error) {
+    } catch {
       // HTTP 错误已由全局拦截器统一提示，避免重复弹窗
       return false
+    } finally {
+      sendCodeLoading.value = false
     }
   }
 
@@ -150,7 +158,7 @@ export function useVerificationCode() {
     isActive,
     sendRegisterCode,
     sendForgetCode,
-    verifyCode,
+    sendSmsLoginCode,
     validateEmail,
     pause,
     resume

@@ -1,151 +1,83 @@
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
-import type { AuthRole } from '@/types/authRole'
-
-export type { AuthRole } from '@/types/authRole'
-
-export interface UserInfo {
-  userId?: string
-  username?: string
-  email?: string
-  name?: string
-  tel?: string
-  avatar?: string
-  state?: string // 1-正常 0-禁用
-  isAdmin?: string // 1-管理员 0-普通用户
-  totalDevice?: number
-  aliveNumber?: number
-  totalMessage?: number
-  loginTime?: string
-  loginIp?: string
-  authRoleId?: number
-}
-
-// 权限信息
-export interface Permission {
-  permissionId: number
-  parentId?: number
-  name: string
-  permissionKey: string
-  permissionType: 'menu' | 'button' | 'api'
-  path?: string
-  component?: string
-  icon?: string
-  sort?: number
-  visible?: string // '1'-显示 '0'-隐藏
-  status?: string // '1'-启用 '0'-禁用
-  children?: Permission[]
-}
-
-// 登录响应数据
-export interface LoginResponse {
-  user: UserInfo
-  authRole: AuthRole
-  permissions: Permission[]
-  token: string
-  refreshToken: string
-  sessionId: string
-}
+import type { AuthRole, PermissionTreeNode } from '@/types/authRole'
+import type { User } from '@/types/user'
+import {
+  STORAGE_AUTH_ROLE,
+  STORAGE_PERMISSIONS,
+  STORAGE_REFRESH_TOKEN,
+  STORAGE_USER_INFO,
+  STORAGE_USER_TOKEN,
+  STORAGE_WS_CONFIG,
+} from '@/constants/storage'
 
 export interface WebSocketConfig {
   url: string
   deviceName?: string
 }
 
-export const useUserStore = defineStore('user', () => {
-  const userInfo = useStorage<UserInfo | null>('userInfo', null, localStorage, {
-    serializer: {
-      read: (v: string) => {
-        try {
-          return v ? JSON.parse(v) as UserInfo : null
-        } catch (e) {
-          console.error('Failed to parse user info:', e)
-          return null
-        }
-      },
-      write: (v: UserInfo | null) => JSON.stringify(v),
+// 设备 WebSocket 由对话进程（xiaozhi-dialogue）提供，端口与 API 进程不同；
+// 路径尾斜杠是后端 AntPathMatcher 的硬要求，services/websocket.ts 连接前会补齐
+const DEFAULT_WS_URL = 'ws://localhost:8092/ws/xiaozhi/v1/'
+
+function createJsonSerializer<T>(fallback: T, label: string) {
+  return {
+    read: (raw: string): T => {
+      try {
+        return raw ? (JSON.parse(raw) as T) : fallback
+      } catch (e) {
+        console.error(`Failed to parse ${label}:`, e)
+        return fallback
+      }
     },
+    write: (value: T) => JSON.stringify(value),
+  }
+}
+
+export const useUserStore = defineStore('user', () => {
+  const userInfo = useStorage<User | null>(STORAGE_USER_INFO, null, localStorage, {
+    serializer: createJsonSerializer<User | null>(null, 'user info'),
   })
 
   // 权限信息
-  const permissions = useStorage<Permission[]>('permissions', [], localStorage, {
-    serializer: {
-      read: (v: any) => {
-        try {
-          return v ? JSON.parse(v) : []
-        } catch (e) {
-          console.error('Failed to parse permissions:', e)
-          return []
-        }
-      },
-      write: (v: any) => JSON.stringify(v),
-    },
+  const permissions = useStorage<PermissionTreeNode[]>(STORAGE_PERMISSIONS, [], localStorage, {
+    serializer: createJsonSerializer<PermissionTreeNode[]>([], 'permissions'),
   })
 
   // 后台权限角色信息
-  const authRole = useStorage<AuthRole | null>('authRole', null, localStorage, {
-    serializer: {
-      read: (v: any) => {
-        try {
-          return v ? JSON.parse(v) : null
-        } catch (e) {
-          console.error('Failed to parse auth role:', e)
-          return null
-        }
-      },
-      write: (v: any) => JSON.stringify(v),
-    },
+  const authRole = useStorage<AuthRole | null>(STORAGE_AUTH_ROLE, null, localStorage, {
+    serializer: createJsonSerializer<AuthRole | null>(null, 'auth role'),
   })
 
   // Token 管理
-  const token = useStorage<string>('token', '', localStorage)
-  const refreshToken = useStorage<string>('refreshToken', '', localStorage)
+  const token = useStorage<string>(STORAGE_USER_TOKEN, '', localStorage)
+  const refreshToken = useStorage<string>(STORAGE_REFRESH_TOKEN, '', localStorage)
 
   // WebSocket 配置管理
   const defaultWsConfig: WebSocketConfig = {
-    url: import.meta.env.VITE_WS_URL || 'ws://localhost:8091/ws/xiaozhi/v1',
+    url: import.meta.env.VITE_WS_URL || DEFAULT_WS_URL,
   }
-  
+
   const wsConfig = useStorage<WebSocketConfig>(
-    'wsConfig',
+    STORAGE_WS_CONFIG,
     defaultWsConfig,
     localStorage,
     {
-      serializer: {
-        read: (v: string) => {
-          try {
-            return v ? JSON.parse(v) as WebSocketConfig : defaultWsConfig
-          } catch (e) {
-            return defaultWsConfig
-          }
-        },
-        write: (v: WebSocketConfig) => JSON.stringify(v),
-      },
+      serializer: createJsonSerializer<WebSocketConfig>(defaultWsConfig, 'ws config'),
     }
   )
 
-  const navigationStyle = useStorage<'tabs' | 'sidebar'>('navigationStyle', 'tabs', localStorage)
-  const isMobile = ref(false)
-
-  const setUserInfo = (info: UserInfo) => {
+  const setUserInfo = (info: User) => {
     userInfo.value = info
   }
 
-  const setPermissions = (perms: Permission[]) => {
+  const setPermissions = (perms: PermissionTreeNode[]) => {
     permissions.value = perms
   }
 
   const setAuthRole = (roleInfo: AuthRole) => {
     authRole.value = roleInfo
-  }
-
-  const setMobileType = (mobile: boolean) => {
-    isMobile.value = mobile
-  }
-
-  const setNavigationStyle = (style: 'tabs' | 'sidebar') => {
-    navigationStyle.value = style
   }
 
   const clearUserInfo = () => {
@@ -154,7 +86,7 @@ export const useUserStore = defineStore('user', () => {
     authRole.value = null
   }
 
-  const updateUserInfo = (info: Partial<UserInfo>) => {
+  const updateUserInfo = (info: Partial<User>) => {
     if (userInfo.value) {
       userInfo.value = { ...userInfo.value, ...info }
     }
@@ -174,7 +106,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   // 计算属性 - 是否为管理员
-  const isAdmin = computed(() => userInfo.value?.isAdmin == '1')
+  const isAdmin = computed(() => userInfo.value?.isAdmin === '1')
 
   // 权限检查方法
 
@@ -182,7 +114,7 @@ export const useUserStore = defineStore('user', () => {
   // 将整棵树拍平成 Set，供 hasPermission 递归匹配（否则深层 button/api 权限查不到）。
   const permissionKeySet = computed(() => {
     const keys = new Set<string>()
-    const walk = (list?: Permission[]) => {
+    const walk = (list?: PermissionTreeNode[]) => {
       if (!list) return
       for (const perm of list) {
         if (perm.permissionKey) keys.add(perm.permissionKey)
@@ -226,14 +158,10 @@ export const useUserStore = defineStore('user', () => {
     token,
     refreshToken,
     wsConfig,
-    isMobile,
-    navigationStyle,
     isAdmin,
     setUserInfo,
     setPermissions,
     setAuthRole,
-    setMobileType,
-    setNavigationStyle,
     clearUserInfo,
     updateUserInfo,
     setToken,

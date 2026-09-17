@@ -2,6 +2,7 @@
 import { ref, reactive, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
+import { DeviceState } from '@/constants/enums'
 import { useTable } from '@/composables/useTable'
 import { useInlineEdit } from '@/composables/useInlineEdit'
 import { useLoadingStore } from '@/store/loading'
@@ -10,8 +11,9 @@ import { queryDevices, addDevice, updateDevice, deleteDevice, clearDeviceMemory 
 import { queryRoles } from '@/services/role'
 import DeviceEditDialog from '@/components/DeviceEditDialog.vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
-import type { Device, DeviceQueryParams, Role } from '@/types/device'
-import type { TablePaginationConfig } from 'ant-design-vue'
+import type { Device, DeviceQueryParams } from '@/types/device'
+import type { Role } from '@/types/role'
+import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
 
 const { t } = useI18n()
 const loadingStore = useLoadingStore()
@@ -46,9 +48,9 @@ const queryFilters = [
 // 设备状态选项
 const stateOptions = [
   { label: t('common.all'), value: '' },
-  { label: t('device.onlineStatus'), value: '1' },
-  { label: t('device.standbyStatus'), value: '2' },
-  { label: t('device.offlineStatus'), value: '0' },
+  { label: t('device.onlineStatus'), value: DeviceState.ONLINE },
+  { label: t('device.standbyStatus'), value: DeviceState.STANDBY },
+  { label: t('device.offlineStatus'), value: DeviceState.OFFLINE },
 ]
 
 // 角色列表
@@ -95,7 +97,7 @@ const addDeviceCode = ref('')
 const addDeviceLoading = ref(false)
 
 // 表格列配置
-const columns = computed(() => [
+const columns = computed<TableColumnsType>(() => [
   {
     title: t('device.deviceId'),
     dataIndex: 'deviceId',
@@ -324,6 +326,7 @@ function handleEditWithDialog(record: Device) {
 // 直接导出 composable 的方法，无需额外包装
 const handleEdit = startEdit
 const handleCancel = cancelEditInline
+// 行内保存走 composable，保存后由它清掉 editingKey 与行的编辑态
 const handleSave = saveEdit
 
 /**
@@ -351,7 +354,15 @@ function handleRoleChange(value: number, key: string) {
 function getRoleName(roleId?: number) {
   if (!roleId) return ''
   const role = roleItems.value.find((r) => r.roleId === roleId)
-  return role ? role.roleName : `角色ID:${roleId}`
+  return role ? role.roleName : t('device.unknownRole', { id: roleId })
+}
+
+/**
+ * 获取角色描述（DeviceResp 不含角色描述，从角色列表取）
+ */
+function getRoleDesc(roleId?: number) {
+  if (!roleId) return ''
+  return roleItems.value.find((r) => r.roleId === roleId)?.roleDesc || ''
 }
 
 // 处理分页变化
@@ -413,7 +424,7 @@ fetchData()
     <!-- 数据表格 -->
     <a-card :bordered="false">
       <template #title>
-        <span>{{ t('menu.device') }}</span>
+        <span>{{ t('router.title.device') }}</span>
       </template>
 
       <template #extra>
@@ -454,13 +465,13 @@ fetchData()
                 :value="record.deviceName"
                 style="margin: -5px 0; text-align: center"
                 @update:value="(val: string) => handleInputEdit(val, record.deviceId, 'deviceName')"
-                @press-enter="() => handleUpdate(record)"
+                @press-enter="() => handleSave(record)"
                 @keyup.esc="() => handleCancel(record.deviceId)"
               />
               <span
                 v-else-if="editingKey === ''"
               >
-                <a-tooltip :title="record.deviceName || '未命名'" :mouse-enter-delay="0.5">
+                <a-tooltip :title="record.deviceName || t('common.unnamed')" :mouse-enter-delay="0.5">
                   <span v-if="record.deviceName" class="ellipsis-text">{{ record.deviceName }}</span>
                   <span v-else>-</span>
                 </a-tooltip>
@@ -489,7 +500,7 @@ fetchData()
               v-else-if="editingKey === ''"
             >
               <a-tooltip
-                :title="record.roleDesc || getRoleName(record.roleId)"
+                :title="getRoleDesc(record.roleId) || getRoleName(record.roleId)"
                 :mouse-enter-delay="0.5"
                 placement="top"
               >
@@ -530,8 +541,8 @@ fetchData()
 
           <!-- 状态列 -->
           <template v-else-if="column.dataIndex === 'state'">
-            <a-tag :color="record.state == 1 ? 'green' : record.state == 2 ? 'blue' : 'red'">
-              {{ record.state == 1 ? t('device.onlineStatus') : record.state == 2 ? t('device.standbyStatus') : t('device.offlineStatus') }}
+            <a-tag :color="record.state === DeviceState.ONLINE ? 'green' : record.state === DeviceState.STANDBY ? 'blue' : 'red'">
+              {{ record.state === DeviceState.ONLINE ? t('device.onlineStatus') : record.state === DeviceState.STANDBY ? t('device.standbyStatus') : t('device.offlineStatus') }}
             </a-tag>
           </template>
 
@@ -543,9 +554,7 @@ fetchData()
           <!-- 操作列 -->
           <template v-else-if="column.dataIndex === 'operation'">
             <a-space v-if="record.editable">
-              <a-popconfirm :title="t('common.confirmSave')" @confirm="() => handleUpdate(record)">
-                <a>{{ t('common.save') }}</a>
-              </a-popconfirm>
+              <a @click="() => handleSave(record)">{{ t('common.save') }}</a>
               <a @click="() => handleCancel(record.deviceId)">{{ t('common.cancel') }}</a>
             </a-space>
             <TableActionButtons

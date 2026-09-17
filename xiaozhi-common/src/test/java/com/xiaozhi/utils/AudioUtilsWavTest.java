@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 钉住 WAV 解析入口的两条硬约束：任何采样率的 WAV 取出的 PCM 一律归一到服务端 16k，
+ * 钉住 WAV 解析入口的两条任何采样率的 WAV 取出的 PCM 一律归一到服务端 16k，
  * 采样率本来就一致时必须原样返回不做插值；头部非法时按具体原因抛 IOException，不能吞成通用错误。
  */
 class AudioUtilsWavTest {

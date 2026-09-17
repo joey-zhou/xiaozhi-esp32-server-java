@@ -1,7 +1,10 @@
-import type { Router } from 'vue-router'
+import { watch } from 'vue'
+import type { RouteLocationNormalized, Router } from 'vue-router'
+import { message } from 'ant-design-vue'
 import { useUserStore } from '@/store/user'
-import { ROUTES } from '@/router/routes'
-import { cancelPendingRequests } from '@/services/request'
+import { ROUTES, defaultRouteFor } from '@/router/routes'
+import { cancelPendingRequests, isRequestCanceledError } from '@/services/request'
+import { checkToken } from '@/services/user'
 import { i18n } from '@/locales'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
@@ -12,9 +15,55 @@ NProgress.configure({ showSpinner: false, speed: 500 })
 // 不需要登录的白名单
 const whiteList: string[] = [ROUTES.LOGIN, ROUTES.REGISTER, ROUTES.FORGET]
 
+// chunk 加载失败自动刷新的熔断标记，两次刷新间隔小于该值就不再刷新
+const CHUNK_RELOAD_KEY = 'chunk-reload-at'
+const CHUNK_RELOAD_INTERVAL = 10000
+
+// 本次会话是否已用 check-token 同步过权限树
+let permissionsSynced = false
+
+// 用后端实时权限覆盖本地缓存，不阻塞导航；失败时沿用 localStorage 里的旧值
+function syncPermissions(userStore: ReturnType<typeof useUserStore>) {
+  if (permissionsSynced) {
+    return
+  }
+  permissionsSynced = true
+  checkToken()
+    .then((res) => {
+      if (res.code !== 200 || !res.data) {
+        return
+      }
+      userStore.setUserInfo(res.data.user)
+      userStore.setPermissions(res.data.permissions)
+      userStore.setAuthRole(res.data.authRole)
+    })
+    .catch((error) => {
+      // 导航切换会取消在途请求，这种情况下次导航再同步一次
+      if (isRequestCanceledError(error)) {
+        permissionsSynced = false
+      }
+      // 其他失败按本地缓存放行，token 真失效时由响应拦截器统一登出
+    })
+}
+
+// 写标签页标题：路由标题 + 应用名，两段都可能是翻译键
+function applyDocumentTitle(route: RouteLocationNormalized) {
+  const baseTitle = import.meta.env.VITE_APP_TITLE || i18n.global.t('common.appTitle')
+  const routeTitle = route.meta?.title
+  if (routeTitle) {
+    const title = routeTitle.startsWith('router.') ? i18n.global.t(routeTitle) : routeTitle
+    document.title = `${title} - ${baseTitle}`
+  } else {
+    document.title = baseTitle
+  }
+}
+
 export function setupRouterGuards(router: Router) {
+  // 切换语言后按当前路由重写标题，否则标签页会一直停在旧语言
+  watch(i18n.global.locale, () => applyDocumentTitle(router.currentRoute.value))
+
   // 前置守卫 - 页面跳转前执行
-  router.beforeEach((to, from, next) => {
+  router.beforeEach((to, _from, next) => {
     // 取消上一个页面所有进行中的请求
     cancelPendingRequests()
 
@@ -22,16 +71,7 @@ export function setupRouterGuards(router: Router) {
     NProgress.start()
 
     // 设置页面标题
-    const baseTitle = import.meta.env.VITE_APP_TITLE || 'Connect Ai-智能物联网管理平台'
-    if (to.meta.title) {
-      // 如果是翻译键，则进行翻译
-      const title = to.meta.title.startsWith('router.')
-        ? i18n.global.t(to.meta.title)
-        : to.meta.title
-      document.title = `${title} - ${baseTitle}`
-    } else {
-      document.title = baseTitle
-    }
+    applyDocumentTitle(to)
 
     const userStore = useUserStore()
     const hasToken = !!userStore.token
@@ -44,24 +84,25 @@ export function setupRouterGuards(router: Router) {
         next()
       } else {
         // 不在白名单中，跳转到登录页
-        next(`${ROUTES.LOGIN}?redirect=${to.path}`)
+        next(`${ROUTES.LOGIN}?redirect=${encodeURIComponent(to.fullPath)}`)
         NProgress.done()
       }
       return
     }
 
     // 2. 已登录处理
+    syncPermissions(userStore)
+
     if (to.path === ROUTES.LOGIN) {
-      // 如果已登录，访问登录页则跳转到首页
-      next({ path: ROUTES.DASHBOARD })
+      // 如果已登录，访问登录页则跳转到默认落地页
+      next({ path: defaultRouteFor(isAdmin) })
       NProgress.done()
       return
     }
 
     // 2.1 处理根路径重定向（根据用户类型跳转到不同首页）
     if (to.path === '/') {
-      const defaultPath = isAdmin ? ROUTES.DASHBOARD : ROUTES.DEVICE
-      next({ path: defaultPath })
+      next({ path: defaultRouteFor(isAdmin) })
       NProgress.done()
       return
     }
@@ -107,6 +148,8 @@ export function setupRouterGuards(router: Router) {
   router.afterEach(() => {
     // 结束进度条
     NProgress.done()
+    // 导航成功说明 chunk 已可正常加载，清掉熔断标记
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY)
   })
 
   // 错误处理
@@ -120,7 +163,15 @@ export function setupRouterGuards(router: Router) {
       error.message?.includes('Importing a module script failed') ||
       (error.message?.includes('Failed to fetch') && error.message?.match(/\.js/))
     ) {
+      const lastReloadAt = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0)
+      // 刚刷新过还是失败，说明不是版本更新导致的，停止自动刷新避免死循环
+      if (Date.now() - lastReloadAt < CHUNK_RELOAD_INTERVAL) {
+        message.error(i18n.global.t('error.chunkLoadFailed'))
+        return
+      }
+
       console.warn('路由模块加载失败，页面版本可能已更新，即将刷新页面')
+      sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
 
       // 延迟一小段时间后刷新，避免立即刷新造成的闪烁
       setTimeout(() => {

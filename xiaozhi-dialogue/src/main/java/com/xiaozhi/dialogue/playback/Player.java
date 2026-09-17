@@ -266,13 +266,18 @@ public abstract class Player {
      */
     protected void sendStop() {
         try {
-            if (opusRecorder != null) {
-                opusRecorder.onSendStop();
+            try {
+                // 设备收到 stop 才从 SPEAKING 切回 LISTENING，先下发再收尾录音
+                messageService.sendTtsMessage(session, null, "stop");
+                isPlaying = false;
+                // tts stop 下发后设备切换到聆听状态，服务端同步为 LISTENING
+                session.transitionTo(DeviceState.LISTENING);
+            } finally {
+                // 下发失败也要关掉录音文件，否则留下写了一半的 OGG
+                if (opusRecorder != null) {
+                    opusRecorder.onSendStop();
+                }
             }
-            messageService.sendTtsMessage(session, null, "stop");
-            isPlaying = false;
-            // tts stop 下发后设备切换到聆听状态，服务端同步为 LISTENING
-            session.transitionTo(DeviceState.LISTENING);
             Runnable stopped = onPlaybackStopped;
             if (stopped != null) {
                 stopped.run();

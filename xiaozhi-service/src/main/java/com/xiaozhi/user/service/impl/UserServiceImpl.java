@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
+import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.user.convert.UserConvert;
@@ -49,7 +50,8 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Cacheable(value = CACHE_NAME, key = "'bo:' + #userId", condition = "#userId != null")
+    @Cacheable(value = CACHE_NAME, key = "'bo:' + #userId", condition = "#userId != null",
+        unless = "#result == null")
     public UserBO getBO(Integer userId) {
         if (userId == null) {
             return null;
@@ -176,10 +178,17 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public boolean checkCaptcha(String account, String code) {
+    public boolean consumeCaptcha(String account, String code) {
         if (!StringUtils.hasText(account) || !StringUtils.hasText(code)) {
             return false;
         }
-        return verifyCodeService.hasValidEmail(account, code);
+        return verifyCodeService.consumeByAccount(account, code);
+    }
+
+    @Override
+    public void requireEnabled(UserBO user) {
+        if (user != null && UserBO.STATE_DISABLED.equals(user.getState())) {
+            throw new UnauthorizedException("账号已被禁用");
+        }
     }
 }

@@ -12,7 +12,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallback;
-import org.springframework.core.env.Environment;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -91,7 +90,6 @@ class DeviceMcpProtocolTest {
         when(addressProvider.getServerAddress()).thenReturn(SERVER_ADDRESS);
 
         deviceMcpService = new DeviceMcpService();
-        ReflectionTestUtils.setField(deviceMcpService, "environment", mock(Environment.class));
         ReflectionTestUtils.setField(deviceMcpService, "serverAddressProvider", addressProvider);
         ReflectionTestUtils.setField(deviceMcpService, "deviceAuthService", deviceAuthService);
         ReflectionTestUtils.setField(deviceMcpService, "deviceWriter", harness.deviceWriter());

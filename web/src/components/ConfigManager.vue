@@ -2,15 +2,17 @@
 import { ref, computed } from 'vue'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
-import type { FormInstance, TableColumnsType } from 'ant-design-vue'
+import type { FormInstance, TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
 import { useConfigManager } from '@/composables/useConfigManager'
 import { useUserStore } from '@/store/user'
+import { useConfirm } from '@/composables/useConfirm'
 import TableActionButtons from '@/components/TableActionButtons.vue'
-import type { ConfigType, Config, ConfigField } from '@/types/config'
+import type { ConfigType, Config, ConfigField, LLMModel, ModelOption } from '@/types/config'
 import { addConfig, updateConfig, testConfig } from '@/services/config'
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const { confirmAsync } = useConfirm()
 
 interface Props {
   configType: ConfigType
@@ -36,7 +38,35 @@ const {
   setAsDefault,
   updateModelOptions,
   getModelsByProviderAndType,
+  handleTableChange,
+  createDebouncedSearch,
 } = useConfigManager(props.configType)
+
+const debouncedSearch = createDebouncedSearch(fetchData, 500)
+
+// 敏感字段：编辑时留空表示保持原值
+const SECRET_FIELDS = ['apiKey', 'apiSecret', 'ak', 'sk']
+
+/** providerConfig 里 config. 开头的值是 i18n key，其余（品牌名、示例值）原样展示 */
+function localized(text?: string) {
+  if (!text) return ''
+  return text.startsWith('config.') ? t(text) : text
+}
+
+function isSecretField(field: ConfigField) {
+  return SECRET_FIELDS.includes(field.name)
+}
+
+function fieldRequired(field: ConfigField) {
+  return editingConfigId.value && isSecretField(field) ? false : field.required
+}
+
+function fieldPlaceholder(field: ConfigField) {
+  if (editingConfigId.value && isSecretField(field) && currentType.value !== 'sherpa-onnx') {
+    return t('config.keepUnchangedHint')
+  }
+  return localized(field.placeholder) || t('config.enterField', { field: localized(field.label) })
+}
 
 // 当前 provider 的 configName 预设选项（用于 AutoComplete）
 const currentConfigNameOptions = computed(() => {
@@ -61,6 +91,17 @@ const formData = ref<Partial<Config>>({
   sk: undefined,
   enableThinking: false,
 })
+
+// providerConfig 驱动的动态字段一律是文本输入，Config 的索引签名比这更宽（要容纳 isDefault/enableThinking 这类布尔具名字段），
+// 所以读写收敛到这两个函数里做一次收窄，避免把 any 撒到模板上
+function dynamicFieldValue(name: string): string {
+  const value = formData.value[name]
+  return value === undefined || value === null ? '' : String(value)
+}
+
+function setDynamicField(name: string, value: string) {
+  formData.value[name] = value
+}
 
 // 表格列配置
 const columns = computed(() => {
@@ -210,6 +251,9 @@ function handleEdit(record: Config) {
 // 测试连接中
 const testing = ref(false)
 
+// 表单提交中
+const submitLoading = ref(false)
+
 /**
  * 测试配置（使用当前表单值，无需先保存）
  */
@@ -243,6 +287,9 @@ async function handleTest() {
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'errorFields' in error) {
       antMessage.error(t('config.fillRequiredFields'))
+    } else {
+      console.error('测试配置失败:', error)
+      antMessage.error(t('config.testFailed'))
     }
   } finally {
     testing.value = false
@@ -280,31 +327,20 @@ async function handleSubmit() {
         submitData.provider || '',
         submitData.modelType || 'chat'
       )
-      const isValid = validModels.some((m: any) => m.llm_name === submitData.configName)
+      const isValid = validModels.some((m: LLMModel) => m.llm_name === submitData.configName)
       
-      // 如果模型名称不存在，则提示用户是否继续
+      // 模型名称不在已知列表里时问一句，取消则中断提交
       if (!isValid && validModels.length > 0) {
-        try {
-          // Modal.confirm 本身不返回可 await 的 Promise，需手动包装 onOk/onCancel
-          await new Promise<void>((resolve, reject) => {
-            Modal.confirm({
-              title: t('common.confirmSubmit'),
-              content: t('config.modelNameInvalid', { name: submitData.configName }),
-              okText: t('common.confirm'),
-              cancelText: t('common.cancel'),
-              onOk: () => resolve(),
-              onCancel: () => reject(new Error('cancelled')),
-            })
-          })
-          // 用户点击确认，继续执行
-        } catch {
-          // 用户点击取消，中断流程
-          return
-        }
+        const shouldContinue = await confirmAsync({
+          title: t('common.confirmSubmit'),
+          content: t('config.modelNameInvalid', { name: submitData.configName }),
+          okText: t('common.confirm'),
+        })
+        if (!shouldContinue) return
       }
     }
 
-    loading.value = true
+    submitLoading.value = true
 
     const res = editingConfigId.value
       ? await updateConfig(submitData)
@@ -313,8 +349,8 @@ async function handleSubmit() {
     if (res.code === 200) {
       antMessage.success(editingConfigId.value ? t('config.updateSuccess') : t('config.createSuccess'))
       resetForm()
-      fetchData()
       activeTabKey.value = '1'
+      await fetchData()
     } else {
       antMessage.error(res.message || t('common.operationFailed'))
     }
@@ -326,7 +362,7 @@ async function handleSubmit() {
       antMessage.error(t('common.operationFailed'))
     }
   } finally {
-    loading.value = false
+    submitLoading.value = false
   }
 }
 
@@ -409,9 +445,8 @@ function getModelTypeTag(modelType: string) {
 }
 
 // 处理表格变化
-const handleTableChangeWrapper = (pag: any) => {
-  pagination.current = pag.current
-  pagination.pageSize = pag.pageSize
+const onTableChange = (pag: TablePaginationConfig) => {
+  handleTableChange(pag)
   fetchData()
 }
 
@@ -427,7 +462,7 @@ fetchData()
         <a-row :gutter="16">
           <a-col :xxl="8" :xl="8" :lg="12" :xs="24">
             <a-form-item :label="t('config.category')">
-              <a-select v-model:value="queryForm.provider" @change="fetchData">
+              <a-select v-model:value="queryForm.provider" @change="debouncedSearch">
                 <a-select-option value="">{{ t('common.all') }}</a-select-option>
                 <a-select-option
                   v-for="item in typeOptions"
@@ -446,14 +481,14 @@ fetchData()
                 v-model:value="queryForm.configName"
                 :placeholder="t('config.pleaseEnter')"
                 allow-clear
-                @press-enter="fetchData"
+                @input="debouncedSearch"
               />
             </a-form-item>
           </a-col>
 
           <a-col v-if="configType === 'llm'" :xxl="8" :xl="8" :lg="12" :xs="24">
             <a-form-item :label="t('config.modelType')">
-              <a-select v-model:value="queryForm.modelType" @change="fetchData">
+              <a-select v-model:value="queryForm.modelType" @change="debouncedSearch">
                 <a-select-option value="">{{ t('common.all') }}</a-select-option>
                 <a-select-option value="chat">{{ t('config.chatModel') }}</a-select-option>
                 <a-select-option value="vision">{{ t('config.visionModel') }}</a-select-option>
@@ -479,7 +514,7 @@ fetchData()
             :data-source="configItems"
             :loading="loading"
             :pagination="pagination"
-            @change="handleTableChangeWrapper"
+            @change="onTableChange"
             row-key="configId"
             :scroll="{ x: 800 }"
             size="middle"
@@ -521,8 +556,8 @@ fetchData()
                   :show-delete="record.isDefault !== '1'"
                   :is-default="record.isDefault === '1'"
                   :delete-title="t('config.confirmDelete', { type: t(configTypeInfo.label) })"
-                  @edit="handleEdit"
-                  @set-default="setAsDefault"
+                  @edit="() => handleEdit(record)"
+                  @set-default="() => setAsDefault(record)"
                   @delete="() => deleteConfig(record.configId)"
                 />
               </template>
@@ -601,7 +636,7 @@ fetchData()
                     :placeholder="t('config.enterName', { type: t(configTypeInfo.label) })"
                     :options="modelOptions"
                     :filter-option="
-                      (input: string, option: any) =>
+                      (input: string, option: ModelOption) =>
                         option.label.toLowerCase().includes(input.toLowerCase())
                     "
                   />
@@ -612,7 +647,7 @@ fetchData()
                     :options="currentConfigNameOptions"
                     :placeholder="t('config.enterName', { type: t(configTypeInfo.label) })"
                     :filter-option="
-                      (input: string, option: any) =>
+                      (input: string, option: { value: string }) =>
                         option.value.toLowerCase().includes(input.toLowerCase())
                     "
                     allow-clear
@@ -675,14 +710,14 @@ fetchData()
                 show-icon
                 style="margin-bottom: 16px"
               >
-                <template #message>本地语音合成（Sherpa-ONNX）使用说明</template>
+                <template #message>{{ t('config.sherpaOnnx.title') }}</template>
                 <template #description>
                   <div style="font-size: 13px; line-height: 2">
-                    <p style="margin: 0">无需填写任何参数，保存后即可在角色配置中选择本地音色。</p>
-                    <p style="margin: 0">支持 <strong>VITS</strong>、<strong>Kokoro</strong>、<strong>Matcha</strong> 三种模型架构，系统自动识别。</p>
-                    <p style="margin: 0">模型存放目录：<code>models/tts/</code>，每个子目录对应一个模型。</p>
-                    <p style="margin: 0">Matcha 模型需额外下载 vocoder 文件（如 <code>vocos-16khz-univ.onnx</code>）放入模型目录。</p>
-                    <p style="margin: 0">中文模型若缺少 <code>dict/</code> 目录，可软链接至其他模型的 dict 目录共用。</p>
+                    <p style="margin: 0">{{ t('config.sherpaOnnx.noParams') }}</p>
+                    <p style="margin: 0" v-html="t('config.sherpaOnnx.architectures')"></p>
+                    <p style="margin: 0" v-html="t('config.sherpaOnnx.modelDir')"></p>
+                    <p style="margin: 0" v-html="t('config.sherpaOnnx.matchaVocoder')"></p>
+                    <p style="margin: 0" v-html="t('config.sherpaOnnx.chineseDict')"></p>
                   </div>
                 </template>
               </a-alert>
@@ -695,22 +730,23 @@ fetchData()
                   :xs="24"
                 >
                   <a-form-item
-                    :label="field.label"
+                    :label="localized(field.label)"
                     :name="field.name"
-                    :rules="[{ required: editingConfigId && ['apiKey', 'apiSecret', 'ak', 'sk'].includes(field.name) ? false : field.required, message: t('config.enterField', { field: field.label }) }]"
+                    :rules="[{ required: fieldRequired(field), message: t('config.enterField', { field: localized(field.label) }) }]"
                     style="margin-bottom: 24px"
                   >
                     <a-input
-                      v-model:value="formData[field.name]"
-                      :placeholder="(editingConfigId && ['apiKey', 'apiSecret', 'ak', 'sk'].includes(field.name) && currentType !== 'sherpa-onnx') ? '不修改请留空' : (field.placeholder || t('config.enterField', { field: field.label }))"
+                      :value="dynamicFieldValue(field.name)"
+                      :placeholder="fieldPlaceholder(field)"
                       :type="field.inputType || 'text'"
+                      @update:value="(v: string) => setDynamicField(field.name, v)"
                     >
                       <template v-if="field.suffix" #suffix>
                         <span style="color: var(--ant-color-text-tertiary)">{{ getFieldSuffix(field) }}</span>
                       </template>
                     </a-input>
                     <div v-if="field.help" class="field-help">
-                      {{ field.help }}
+                      {{ localized(field.help) }}
                     </div>
                   </a-form-item>
                 </a-col>
@@ -723,10 +759,11 @@ fetchData()
 
             <a-form-item style="margin-top: 24px">
               <a-space>
+                <!-- a-space 会给每个子项包一层 item，v-permission 的 display:none 会留下空格子，这里改用 v-if 整块不渲染 -->
                 <a-button
-                  v-permission="editingConfigId ? `${configTypeInfo.permissionPrefix}:update` : `${configTypeInfo.permissionPrefix}:create`"
+                  v-if="userStore.hasPermission(editingConfigId ? `${configTypeInfo.permissionPrefix}:update` : `${configTypeInfo.permissionPrefix}:create`)"
                   type="primary"
-                  :loading="loading"
+                  :loading="submitLoading"
                   @click="handleSubmit"
                 >
                   {{ editingConfigId ? t('config.update', { type: t(configTypeInfo.label) }) : t('config.create', { type: t(configTypeInfo.label) }) }}

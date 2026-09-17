@@ -6,7 +6,7 @@ package com.xiaozhi.common.monitoring;
  * 失败不抛异常、而是随返回值一起交给调用方：调用方要区分「操作失败」与「操作成功但结果为空」，
  * 必须看 {@link #failureReason()}，不能只看业务字段是否为空。
  *
- * <p>硬约束：{@link #failureReason()} 会被当作监控指标的标签值使用，取值必须是有限的短码，
+ * <p>{@link #failureReason()} 直接作为指标标签值，取值必须是有限的短码，
  * 不得放入错误详情、会话 ID 等高基数内容。
  */
 public interface OperationOutcome {

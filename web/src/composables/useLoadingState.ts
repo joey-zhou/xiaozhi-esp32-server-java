@@ -163,20 +163,6 @@ export function useLoadingState(options: UseLoadingStateOptions = {}) {
     return computed(() => keys.some(key => isLoading(key)))
   }
   
-  /**
-   * 等待所有指定的加载完成
-   */
-  const waitForAll = async (...keys: string[]): Promise<void> => {
-    return new Promise((resolve) => {
-      const checkInterval = setInterval(() => {
-        if (!keys.some(key => isLoading(key))) {
-          clearInterval(checkInterval)
-          resolve()
-        }
-      }, 100)
-    })
-  }
-  
   return {
     // 状态
     loadingStates,
@@ -197,8 +183,7 @@ export function useLoadingState(options: UseLoadingStateOptions = {}) {
     clear,
     clearAll,
     createNamespace,
-    createLoadingComputed,
-    waitForAll
+    createLoadingComputed
   }
 }
 

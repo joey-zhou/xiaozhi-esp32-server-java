@@ -4,7 +4,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
+import com.xiaozhi.dialogue.audio.VadService;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
+import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpService;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.ai.stt.SttServiceFactory;
 import com.xiaozhi.token.TokenService;
@@ -18,11 +20,14 @@ import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +71,16 @@ public class RedisSubscriber {
 
     @Resource
     private RoleService roleService;
+
+    @Resource
+    private VadService vadService;
+
+    @Resource
+    @Lazy
+    private DeviceMcpService deviceMcpService;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory) {
@@ -125,7 +140,8 @@ public class RedisSubscriber {
     }
 
     /**
-     * 角色属性变更（如音色）：遍历本实例 session，清理使用该角色的 Persona
+     * 角色属性变更（如音色、VAD 阈值）：遍历本实例 session，清理使用该角色的 Persona 并刷新 VAD 阈值快照。
+     * VAD 阈值是 initSession 时取的快照，不在这里刷新就要等下一次 listen/start 才生效。
      */
     public void onRoleUpdated(String message) {
         try {
@@ -145,6 +161,7 @@ public class RedisSubscriber {
                         session.setPersona(null);
                         count++;
                     }
+                    vadService.refreshRoleThresholds(session.getSessionId());
                 }
             }
             if (count > 0) {

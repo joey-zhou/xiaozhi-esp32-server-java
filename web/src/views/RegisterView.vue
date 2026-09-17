@@ -19,7 +19,6 @@ const { t } = useI18n()
 const { loading, register } = useAuth()
 const {
   sendCodeLoading,
-  countdown,
   canSendCode,
   buttonText,
   sendRegisterCode,
@@ -72,8 +71,8 @@ const handleSendCode = async () => {
     if (success) {
       showVerificationInput.value = true
     }
-  } catch (error) {
-    // Validation failed
+  } catch {
+    // 表单校验未通过时不发送验证码
   }
 }
 
@@ -230,9 +229,9 @@ const handleSubmit = async () => {
             >
               <a-checkbox v-model:checked="formData.agreeTerms">
                 {{ t('auth.agreeTerms') }}
-                <a href="#" class="terms-link">《用户协议》</a>
-                和
-                <a href="#" class="terms-link">《隐私政策》</a>
+                <a href="#" class="terms-link">{{ t('auth.userAgreement') }}</a>
+                {{ t('auth.agreementConjunction') }}
+                <a href="#" class="terms-link">{{ t('auth.privacyPolicy') }}</a>
               </a-checkbox>
             </a-form-item>
 

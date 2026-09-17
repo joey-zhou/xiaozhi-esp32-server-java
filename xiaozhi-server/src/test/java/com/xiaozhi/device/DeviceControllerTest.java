@@ -8,6 +8,7 @@ import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ResultStatus;
+import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,7 @@ class DeviceControllerTest extends ControllerTestSupport {
     void setUp() {
         deviceController = new DeviceController();
         ReflectionTestUtils.setField(deviceController, "deviceAppService", deviceAppService);
+        ReflectionTestUtils.setField(deviceController, "trustedProxyPolicy", new TrustedProxyPolicy());
         mockMvc = buildMockMvc(deviceController);
     }
 
@@ -182,6 +184,27 @@ class DeviceControllerTest extends ControllerTestSupport {
         assertThat(captor.getValue().getChipModelName()).isEqualTo("ASR1605");
         assertThat(captor.getValue().getVersion()).isEqualTo("2.3.0");
         assertThat(captor.getValue().getType()).isEqualTo("EG800AK");
+    }
+
+    @Test
+    void otaTakesClientIpFromTrustedSourceInsteadOfProxyHeader() throws Exception {
+        when(deviceAppService.handleOta(any())).thenReturn(Map.of("server_time", Map.of("timezone_offset", 480)));
+
+        mockMvc.perform(post("/api/device/ota")
+                .header("Device-Id", "aa:bb:cc:dd:ee:ff")
+                .header("X-Forwarded-For", "203.0.113.9")
+                .with(request -> {
+                    request.setRemoteAddr("198.51.100.4");
+                    return request;
+                })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isOk());
+
+        ArgumentCaptor<OtaReq> captor = ArgumentCaptor.forClass(OtaReq.class);
+        verify(deviceAppService).handleOta(captor.capture());
+        // /ota 匿名开放，未配置可信代理时代理头一律不采信，否则任意请求都能指定要查询的目标 IP
+        assertThat(captor.getValue().getIp()).isEqualTo("198.51.100.4");
     }
 
     @Test

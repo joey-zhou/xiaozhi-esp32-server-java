@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { fileValidators } from '@/utils/fileValidators'
 import { message } from 'ant-design-vue'
 import { 
   UploadOutlined, 
@@ -66,15 +67,9 @@ const formatTime = (seconds: number) => {
 }
 
 const beforeUpload = (file: File) => {
-  const isAudio = file.type === 'audio/wav' || file.type === 'audio/mp3' || file.type === 'audio/mpeg' || file.name.endsWith('.wav') || file.name.endsWith('.mp3')
-  if (!isAudio) {
-    message.error(t('common.audioFormatError'))
-    return false
-  }
-  
-  const isLt10M = file.size / 1024 / 1024 < 10
-  if (!isLt10M) {
-    message.error(t('common.audioSizeError'))
+  const invalidKey = fileValidators.audio.validate(file)
+  if (invalidKey !== true) {
+    message.error(t(invalidKey))
     return false
   }
 
@@ -121,7 +116,7 @@ const handleRestoreOriginal = () => {
               :multiple="false" 
               :before-upload="beforeUpload" 
               :file-list="fileList"
-              accept=".wav,.mp3"
+              accept=".wav,.mp3,.m4a,.flac,.ogg,.opus,.aac"
             >
               <a-button>
                 <template #icon><UploadOutlined /></template>
@@ -135,13 +130,18 @@ const handleRestoreOriginal = () => {
           <div class="record-area">
             <p>{{ t('common.recordTip') }}</p>
             <div class="record-controls">
-              <a-button 
-                type="primary" 
-                shape="circle" 
-                :icon="isRecording ? 'pause' : 'audio'"
-                @click="toggleRecording" 
-                style="margin-right: 16px" 
-              />
+              <a-button
+                type="primary"
+                shape="circle"
+                :aria-label="isRecording ? t('common.stopRecording') : t('common.recordAudio')"
+                @click="toggleRecording"
+                style="margin-right: 16px"
+              >
+                <template #icon>
+                  <PauseOutlined v-if="isRecording" />
+                  <AudioOutlined v-else />
+                </template>
+              </a-button>
               <span>{{ recordingStatusText }}</span>
               <span v-if="isOverRecommendedTime" style="color: var(--ant-color-error); margin-left: 8px">
                 {{ t('common.overRecommendedTime') }}
@@ -155,7 +155,7 @@ const handleRestoreOriginal = () => {
       <!-- 音频预览 -->
       <div v-if="hasAudio" class="audio-preview">
         <a-divider>{{ t('common.audioPreview') }}</a-divider>
-        <AudioPlayer :audio-url="previewUrl || ''" />
+        <AudioPlayer :audio-url="previewUrl || ''" eager />
 
         <!-- 只有在不是使用原有音频时才显示清除按钮 -->
         <a-button 

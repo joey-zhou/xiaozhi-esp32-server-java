@@ -14,9 +14,9 @@ import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.Sensitive;
 import com.xiaozhi.common.model.bo.OperationLogBO;
+import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.operationlog.service.OperationLogService;
 import com.xiaozhi.utils.JsonUtil;
-import com.xiaozhi.utils.RequestContextUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -53,6 +53,9 @@ public class AuditLogAspect {
 
     @Resource
     private OperationLogService operationLogService;
+
+    @Resource
+    private TrustedProxyPolicy trustedProxyPolicy;
 
     @Around("@annotation(auditLog)")
     public Object around(ProceedingJoinPoint pjp, AuditLog auditLog) throws Throwable {
@@ -101,7 +104,8 @@ public class AuditLogAspect {
                 HttpServletRequest request = attrs.getRequest();
                 log.setMethod(request.getMethod());
                 log.setUrl(buildUrl(request));
-                log.setIp(RequestContextUtils.getClientIp(request));
+                // 审计的来源 IP 不能由请求头决定，否则审计表可被投毒
+                log.setIp(trustedProxyPolicy.resolveClientIp(request));
             }
 
             // handler 名称

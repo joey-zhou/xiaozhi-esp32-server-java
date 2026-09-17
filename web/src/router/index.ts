@@ -2,20 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import MainLayout from '../layouts/MainLayout.vue'
 
-// 扩展 RouteMeta 类型
-declare module 'vue-router' {
-  interface RouteMeta {
-    title?: string
-    icon?: string
-    requiresAuth?: boolean
-    isAdmin?: boolean
-    parent?: string
-    hideInMenu?: boolean
-    permission?: string // 单个权限
-    permissions?: string[] // 多个权限（任一即可）
-  }
-}
-
 const routes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -221,18 +207,6 @@ const routes: RouteRecordRaw[] = [
           permission: 'system:setting',
         },
       },
-      // 个人设置（暂时禁用）
-      // {
-      //   path: 'setting/config',
-      //   name: 'setting-config',
-      //   component: () => import('../views/setting/ConfigView.vue'),
-      //   meta: {
-      //     title: 'router.title.personalConfig',
-      //     parent: 'router.parent.settings',
-      //     requiresAuth: true,
-      //     permission: 'system:setting',
-      //   },
-      // },
     ],
   },
 

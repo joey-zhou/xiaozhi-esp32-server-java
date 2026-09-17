@@ -39,6 +39,12 @@ public interface MessageService {
      */
     List<MessageBO> listHistory(String sessionId, int limit);
 
+    /**
+     * 查询 createTime 严格晚于 time 的历史消息，按 createTime、messageId 升序返回。
+     * <p>
+     * 排序必须与写入顺序一致（messageId 自增即写入顺序），工具调用与工具响应之间乱序
+     * 会被 OpenAI 兼容协议直接拒绝。
+     */
     List<MessageBO> listHistoryAfter(String deviceId, Integer roleId, Instant time);
 
     /**
@@ -51,5 +57,15 @@ public interface MessageService {
     /**
      * 把播放途中被打断的 assistant 消息截到用户听到的文本；spokenText 为空则连同 metrics 一起删除。
      */
+    /**
+     * 清理超过保留期的对话录音：从存储层删文件，并把 audioPath 置空。
+     * <p>
+     * 只清音频，消息文本保留。置空是必须的 —— 本地存储模式下文件已被目录级清理删掉，
+     * 列里还留着路径会让历史消息渲染出点不开的播放器。
+     *
+     * @return 清理掉的消息条数
+     */
+    int purgeExpiredAudio(int retentionDays, int batchSize);
+
     void truncateAssistant(String deviceId, Integer roleId, LocalDateTime createTime, String spokenText);
 }

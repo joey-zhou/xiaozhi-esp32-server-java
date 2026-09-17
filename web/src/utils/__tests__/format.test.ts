@@ -16,8 +16,9 @@ describe('formatCompact', () => {
     expect(formatCompact(null as unknown as undefined)).toBe('0')
   })
 
-  it('返回 "0" 当值为 0', () => {
+  it('返回 "0" 当值为 0 或 NaN', () => {
     expect(formatCompact(0)).toBe('0')
+    expect(formatCompact(NaN)).toBe('0')
   })
 
   it('格式化百万级数值为 M', () => {
@@ -113,9 +114,11 @@ describe('formatPercentage', () => {
 })
 
 describe('formatBytes', () => {
-  it('返回 "0 B" 当值为 0 或 falsy', () => {
+  it('返回 "0 B" 当值为 0、undefined 或 NaN', () => {
     expect(formatBytes(0)).toBe('0 B')
     expect(formatBytes(undefined)).toBe('0 B')
+    expect(formatBytes(null as unknown as undefined)).toBe('0 B')
+    expect(formatBytes(NaN)).toBe('0 B')
   })
 
   it('格式化字节', () => {
@@ -138,7 +141,8 @@ describe('formatBytes', () => {
     expect(formatBytes(2684354560)).toBe('2.50 GB')
   })
 
-  it('处理负数（取绝对值）', () => {
-    expect(formatBytes(-1024)).toBe('1.0 KB')
+  it('负数保留符号：脏数据要看得见，不能抹成正数', () => {
+    expect(formatBytes(-1024)).toBe('-1.0 KB')
+    expect(formatBytes(-512)).toBe('-512 B')
   })
 })

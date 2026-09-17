@@ -1,5 +1,7 @@
 package com.xiaozhi.storage.service.impl;
 
+import com.xiaozhi.common.web.LocalFileUrlPolicy;
+import jakarta.annotation.Resource;
 import com.xiaozhi.storage.service.StorageService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -20,6 +22,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 public class LocalStorageService implements StorageService {
+
+    @Resource
+    private LocalFileUrlPolicy localFileUrlPolicy;
 
     @Value("${xiaozhi.upload-path:uploads}")
     private String baseDir;
@@ -90,14 +95,13 @@ public class LocalStorageService implements StorageService {
 
     @Override
     public String getAccessUrl(String storedPath) {
-        // 本地存储返回相对路径，由前端拼接后端地址访问
-        return storedPath;
+        // 本地存储返回相对路径由前端拼接后端地址访问；受保护目录追加时效签名，与云端私有桶预签名对齐
+        return localFileUrlPolicy.sign(storedPath);
     }
 
     @Override
     public String stripSignature(String url) {
-        // 本地路径无签名参数，原样返回
-        return url;
+        return localFileUrlPolicy.stripSignature(url);
     }
 
     @Override

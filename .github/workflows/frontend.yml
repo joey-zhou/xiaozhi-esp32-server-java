@@ -1,0 +1,60 @@
+name: frontend
+
+# 前端门禁：lint（oxlint + eslint）、类型检查、单测、生产构建。
+# 四步都用 !cancelled() 串起来，一次跑完拿到全部失败项，不用改一条推一次。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - '.github/workflows/frontend.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/frontend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # 用 ci 而不是 install：锁文件与 package.json 不一致时直接失败，
+      # 避免 CI 装出一棵没人验证过的依赖树
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        if: ${{ !cancelled() }}
+        run: npm run type-check
+
+      - name: Unit tests
+        if: ${{ !cancelled() }}
+        run: npm run test:run
+
+      # 类型检查过不代表打得出包，产物构建单独兜一道
+      - name: Build
+        if: ${{ !cancelled() }}
+        run: npm run build-only

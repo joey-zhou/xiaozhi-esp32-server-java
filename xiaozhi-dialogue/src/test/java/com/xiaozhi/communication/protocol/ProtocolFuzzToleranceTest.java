@@ -349,6 +349,49 @@ class ProtocolFuzzToleranceTest {
                 () -> invocationCount(harness.deviceService(), "generateCode") == 1);
     }
 
+    /**
+     * 网页端每 30 秒发一次 ping 保活。它必须被服务端正常收下：
+     * 不回应答、不进业务分派，也不能因为反序列化失败刷错误日志。
+     */
+    @Test
+    void pingKeepsSessionAliveWithoutAnyResponse() {
+        FakeDevice device = harness.connect(BOUND_DEVICE_ID);
+        device.hello();
+        device.transport().awaitJson("hello");
+        device.transport().clearOutbound();
+
+        device.sendText("{\"type\":\"ping\"}");
+
+        // 后置信号：紧接着的合法 listen/start 必须被正常处理
+        device.listenStart(ListenMode.Auto);
+        AwaitHelper.until("ping 之后的合法 listen/start 已初始化 VAD",
+                () -> Boolean.TRUE.equals(harness.vad().autoSegmentOf(device.sessionId())));
+
+        assertThat(device.transport().isOpen()).isTrue();
+        assertThat(device.transport().textMessages()).isEmpty();
+        assertThat(device.transport().binaryFrames()).isEmpty();
+    }
+
+    /** 未绑定设备的 ping 不能被当成业务消息推进验证码流程。 */
+    @Test
+    void pingFromUnboundDeviceDoesNotTriggerVerificationCode() throws IOException {
+        harness.withUnboundDevice(UNBOUND_DEVICE_ID);
+        stubVerifyCode("135790");
+
+        FakeDevice device = harness.connect(UNBOUND_DEVICE_ID);
+        device.hello();
+        device.transport().awaitJson("hello");
+        device.transport().clearOutbound();
+
+        device.sendText("{\"type\":\"ping\"}");
+
+        device.hello();
+        AwaitHelper.until("ping 之后的 hello 已应答",
+                () -> device.transport().jsonSignatures().contains("hello"));
+        verify(harness.deviceService(), never()).generateCode(anyString(), anyString(), anyString());
+        assertThat(device.transport().jsonSignatures()).containsOnly("hello");
+    }
+
     // ========== 私有辅助 ==========
 
     /** 统计 mock 上某个方法名被调用的次数，供 AwaitHelper 轮询异步分派 */

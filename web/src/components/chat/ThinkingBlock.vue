@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import ThinkingState from '@/components/chat/ThinkingState.vue'
 
 const props = defineProps<{
   content: string
@@ -22,16 +23,55 @@ const GAP = 4
 const MAX_H = 180
 const FADE = 16
 
+const SENTENCE_PATTERN = /[^。！？.!?\n]+[。！？.!?]?|[^\n]+/g
+
+function splitSentences(text: string) {
+  SENTENCE_PATTERN.lastIndex = 0
+  const found: Array<{ text: string; index: number }> = []
+  let match: RegExpExecArray | null
+  while ((match = SENTENCE_PATTERN.exec(text)) !== null) {
+    found.push({ text: match[0], index: match.index })
+  }
+  return found
+}
+
+// 已定稿的句子和还在生长的最后一句；流式输出时只解析新追加的尾巴，不重跑整篇
+const parsed = { source: '', settled: [] as string[], pending: '' }
+
 const elapsedSeconds = computed(() => Math.max(1, Math.round((props.durationMs || 0) / 1000)))
 const isExpanded = computed(() => (props.done ? Boolean(props.expanded) : true))
-const sentences = computed(() => {
-  const matches = props.content
-    .replace(/\r/g, '')
-    .match(/[^。！？.!?\n]+[。！？.!?]?|[^\n]+/g)
-    ?.map((line) => line.trim())
-    .filter(Boolean)
-  return matches?.length ? matches : [props.content]
-})
+// 增量解析要写缓存，放 watch 而不是 computed：computed 里改外部状态属于副作用
+const sentences = shallowRef<string[]>([])
+
+watch(
+  () => props.content,
+  content => {
+    // 新内容不是接在旧内容后面（换了一条消息、重新生成）时缓存作废
+    if (!content.startsWith(parsed.source)) {
+      parsed.settled = []
+      parsed.pending = ''
+      parsed.source = ''
+    }
+    parsed.pending = (parsed.pending + content.slice(parsed.source.length)).replace(/\r/g, '')
+    parsed.source = content
+
+    // 一段的匹配只取决于它开头之后的文本，所以除最后一段外都不会再被后续内容改写
+    const found = splitSentences(parsed.pending)
+    const growing = found.length > 1 ? found[found.length - 1] : undefined
+    if (growing) {
+      for (const item of found.slice(0, -1)) {
+        const line = item.text.trim()
+        if (line) parsed.settled.push(line)
+      }
+      parsed.pending = parsed.pending.slice(growing.index)
+    }
+
+    const tail = parsed.pending.trim()
+    const lines = tail ? [...parsed.settled, tail] : [...parsed.settled]
+    sentences.value = lines.length ? lines : [content]
+  },
+  { immediate: true },
+)
 const contentH = computed(() => {
   const count = sentences.value.length
   return count > 0 ? count * SENT_H + (count - 1) * GAP : 0
@@ -49,6 +89,12 @@ const mask = computed(() =>
     ? `linear-gradient(to bottom, transparent 0, #000 ${showTop.value ? FADE : 0}px, #000 calc(100% - ${showBottom.value ? FADE : 0}px), transparent 100%)`
     : 'none'
 )
+// 展开后按内容自然高度撑开、只限制最大高度，长句不被裁掉；流式滚动时才按每句固定高度算版面
+const viewportStyle = computed(() => ({
+  ...(scrollable.value ? { maxHeight: `${MAX_H}px` } : { height: `${viewH.value}px` }),
+  maskImage: mask.value,
+  WebkitMaskImage: mask.value,
+}))
 
 function onScroll() {
   const element = viewportRef.value
@@ -71,7 +117,7 @@ function onScroll() {
       <span v-if="done" class="tr-label">
         <span class="tr-verb">{{ t('chat.thought') }}</span>{{ t('chat.thoughtDuration', { seconds: elapsedSeconds }) }}
       </span>
-      <span v-else class="tr-label tr-shimmer">{{ t('chat.thinkingInProgress') }}</span>
+      <ThinkingState v-else />
       <svg
         v-if="done"
         class="tr-chevron"
@@ -97,7 +143,7 @@ function onScroll() {
           ref="viewportRef"
           class="tr-viewport"
           :class="{ 'is-scroll': scrollable }"
-          :style="{ height: `${viewH}px`, maskImage: mask, WebkitMaskImage: mask }"
+          :style="viewportStyle"
           @scroll="onScroll"
         >
           <div class="tr-stream" :style="{ transform: `translateY(${translate}px)` }">
@@ -235,41 +281,19 @@ function onScroll() {
   animation: tr-sentence-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* 展开阅读时放开每句的高度与行数限制 */
+.tr-viewport.is-scroll .tr-sentence {
+  display: block;
+  height: auto;
+  overflow: visible;
+}
+
 @keyframes tr-sentence-in {
   from {
     opacity: 0;
   }
   to {
     opacity: 1;
-  }
-}
-
-.tr-shimmer {
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  background: linear-gradient(
-    90deg,
-    #a1a1a1 0%,
-    #a1a1a1 30%,
-    rgba(161, 161, 161, 0.45) 45%,
-    rgba(161, 161, 161, 0.45) 55%,
-    #a1a1a1 70%,
-    #a1a1a1 100%
-  );
-  background-size: 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  animation: tr-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
-}
-
-@keyframes tr-shine {
-  0%,
-  18% {
-    background-position: 100% 0;
-  }
-  82%,
-  100% {
-    background-position: 0% 0;
   }
 }
 

@@ -354,7 +354,7 @@ public class DialogueService{
      * 置 IDLE 而不是 LISTENING：服务端此刻既没有识别流也没有播放，
      * 且 IDLE 能挡住随后才到达的收句（收句只在 LISTENING 时进 THINKING），
      * 下一次 SPEECH_START 会重新建流并回到 LISTENING。
-     * 硬约束：音频流已被新一轮换掉、或状态已被播放接管（SPEAKING）时不得覆盖。
+     * 音频流已被新一轮换掉、或状态已被播放接管（SPEAKING）时不得覆盖。
      */
     private static void releaseDiscardedTurn(ChatSession session, Sinks.Many<byte[]> turnSink) {
         if (session.getAudioSinks() != turnSink) {

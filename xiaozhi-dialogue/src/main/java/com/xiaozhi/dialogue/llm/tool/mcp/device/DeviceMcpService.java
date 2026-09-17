@@ -19,7 +19,6 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -40,10 +39,9 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class DeviceMcpService {
 
-    /** 设备指令等待应答的上限（秒） */
+    /** 设备指令等待应答的上限（秒）。拍照识图等合法长指令会用满这个时间 */
+    @Value("${xiaozhi.mcp.device.request-timeout-seconds:30}")
     private int mcpRequestTimeoutSeconds = 30;
-    @Resource
-    private Environment environment;
 
     @Resource
     private ServerAddressProvider serverAddressProvider;

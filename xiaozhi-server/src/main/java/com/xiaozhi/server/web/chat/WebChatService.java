@@ -1,5 +1,7 @@
 package com.xiaozhi.server.web.chat;
 
+import com.xiaozhi.common.SerialTaskRegistry;
+
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.ai.llm.memory.ChatMemory;
 import com.xiaozhi.ai.llm.memory.Conversation;
@@ -20,6 +22,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
@@ -31,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -53,10 +57,35 @@ public class WebChatService {
     private int maxMessages;
 
     /**
-     * sessionId → Conversation 映射
+     * 会话空闲多久后回收。浏览器崩溃、断网、进程被杀时收不到 /chat/close，只能靠空闲回收兜底。
      */
-    private final ConcurrentHashMap<String, Conversation> conversations = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, ChatModel> chatModels = new ConcurrentHashMap<>();
+    @Value("${web-chat.session-idle-timeout-minutes:30}")
+    private long sessionIdleTimeoutMinutes;
+
+    /**
+     * sessionId → 进程内会话状态
+     */
+    private final ConcurrentHashMap<String, WebChatSession> sessions = new ConcurrentHashMap<>();
+
+    /**
+     * 一个 Web 聊天会话的进程内状态。
+     * lastAccessMillis 每次取用时刷新，空闲回收只看它。
+     */
+    private static final class WebChatSession {
+        private final Conversation conversation;
+        private final ChatModel chatModel;
+        private volatile long lastAccessMillis;
+
+        private WebChatSession(Conversation conversation, ChatModel chatModel) {
+            this.conversation = conversation;
+            this.chatModel = chatModel;
+            this.lastAccessMillis = System.currentTimeMillis();
+        }
+
+        private void touch() {
+            this.lastAccessMillis = System.currentTimeMillis();
+        }
+    }
 
     /**
      * 开启一个 Web 聊天会话。
@@ -95,11 +124,10 @@ public class WebChatService {
                 .sessionId(sessionId)
                 .sessionScoped(true)
                 .build();
-        conversations.put(sessionId, conversation);
 
         // 初始化 ChatModel
         ChatModel chatModel = chatModelFactory.getChatModel(role);
-        chatModels.put(sessionId, chatModel);
+        sessions.put(sessionId, new WebChatSession(conversation, chatModel));
 
         log.info("Web 聊天会话已创建: sessionId={}, userId={}, roleId={}, resume={}",
                 sessionId, userId, roleId, StringUtils.hasText(resumeSessionId));
@@ -140,11 +168,13 @@ public class WebChatService {
      * @return ChatToken 流，前端可根据 type 区分 thinking/content
      */
     public Flux<ChatToken> chatStream(String sessionId, String text) {
-        Conversation conversation = conversations.get(sessionId);
-        ChatModel chatModel = chatModels.get(sessionId);
-        if (conversation == null || chatModel == null) {
+        WebChatSession session = sessions.get(sessionId);
+        if (session == null) {
             return Flux.error(new IllegalStateException("会话不存在或已过期: " + sessionId));
         }
+        session.touch();
+        Conversation conversation = session.conversation;
+        ChatModel chatModel = session.chatModel;
 
         // Web 场景：裸文本 UserMessage + 时间戳 metadata；
         // Conversation 投影层会在送 LLM 前拼出 [时间戳] 文本 的前缀。
@@ -190,14 +220,16 @@ public class WebChatService {
                     String reply = fullResponse.toString();
                     conversation.add(new AssistantMessage(reply));
                     // 持久化裸文本（元数据由 Conversation 投影层按需拼前缀，DB 保持干净）
-                    persistTurn(conversation, text, userCreatedAt, reply, LocalDateTime.now());
+                    LocalDateTime assistantCreatedAt = LocalDateTime.now();
+                    SerialTaskRegistry.submit(sessionId,
+                            () -> persistTurn(conversation, text, userCreatedAt, reply, assistantCreatedAt));
                 })
                 .doOnError(e -> log.error("Web 聊天流式响应失败: sessionId={}", sessionId, e));
     }
 
     /**
      * 将一轮 Web 对话的 user + assistant 两条消息写入数据库（source='web'）。
-     * 单独提出方便出错时不影响流式完成。
+     * 阻塞 JDBC，只能由 {@link SerialTaskRegistry} 的虚拟线程执行，不得在 Reactor 事件循环线程上调用。
      */
     private void persistTurn(Conversation conversation, String userText, LocalDateTime userCreatedAt,
                              String assistantText, LocalDateTime assistantCreatedAt) {
@@ -228,8 +260,7 @@ public class WebChatService {
      * 关闭 Web 聊天会话，释放资源
      */
     public void closeSession(String sessionId) {
-        conversations.remove(sessionId);
-        chatModels.remove(sessionId);
+        sessions.remove(sessionId);
         log.info("Web 聊天会话已关闭: sessionId={}", sessionId);
     }
 
@@ -237,6 +268,22 @@ public class WebChatService {
      * 检查会话是否存在
      */
     public boolean hasSession(String sessionId) {
-        return conversations.containsKey(sessionId);
+        return sessions.containsKey(sessionId);
+    }
+
+    /**
+     * 回收空闲超时的会话。会话状态只在进程内，删掉不影响已落库的历史消息，
+     * 前端再发消息时会收到「会话不存在或已过期」并重新 open。
+     */
+    @Scheduled(fixedDelay = 5, timeUnit = TimeUnit.MINUTES)
+    public void evictIdleSessions() {
+        long cutoff = System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(sessionIdleTimeoutMinutes);
+        sessions.entrySet().removeIf(entry -> {
+            if (entry.getValue().lastAccessMillis > cutoff) {
+                return false;
+            }
+            log.info("Web 聊天会话空闲超时已回收: sessionId={}", entry.getKey());
+            return true;
+        });
     }
 }

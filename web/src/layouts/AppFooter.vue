@@ -3,8 +3,8 @@ import { GithubOutlined, QqOutlined, CopyrightOutlined, WechatOutlined } from '@
 
 const currentYear = new Date().getFullYear()
 
-// 微信号或微信二维码链接
-const wechatQrCodeValue = '/public/static/img/wechat.jpg' // 可以替换为你的微信号或链接
+// 微信二维码图片，放在 public 根目录，换号只需替换该文件
+const wechatQrCodeSrc = '/wechat.jpg'
 </script>
 
 <template>
@@ -49,7 +49,7 @@ const wechatQrCodeValue = '/public/static/img/wechat.jpg' // 可以替换为你�
       <a-popover placement="top" class="footer-link">
         <template #content>
           <div class="wechat-qrcode-container">
-            <a-qrcode :value="wechatQrCodeValue" :size="160" />
+            <img :src="wechatQrCodeSrc" alt="WeChat" width="160" height="160" />
           </div>
         </template>
         <WechatOutlined />

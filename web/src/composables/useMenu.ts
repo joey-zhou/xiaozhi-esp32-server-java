@@ -97,8 +97,6 @@ export function useMenu() {
     return rootMenus
   })
 
-  const { isAdmin } = userStore
-
   // 过滤后的菜单（根据权限）
   const filteredMenuItems = computed(() => {
     return filterMenuByPermission(menuItems.value)
@@ -124,7 +122,7 @@ export function useMenu() {
         return result
       }
 
-      if (item.meta.isAdmin && !isAdmin) {
+      if (item.meta.isAdmin && !userStore.isAdmin) {
         return result
       }
       if (item.meta.permission && !userStore.hasPermission(item.meta.permission)) {
@@ -167,7 +165,6 @@ export function useMenu() {
     openKeys,
     selectedKeys,
     menuItems: filteredMenuItems,
-    isAdmin,
     handleOpenChange,
     handleMenuClick,
   }

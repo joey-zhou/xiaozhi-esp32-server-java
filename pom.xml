@@ -61,6 +61,8 @@
         <aliyun-oss.version>3.18.1</aliyun-oss.version>
         <aws-sdk.version>2.31.78</aws-sdk.version>
         <dify.version>1.0.7</dify.version>
+        <coze.version>0.4.2</coze.version>
+        <thumbnailator.version>0.4.21</thumbnailator.version>
         <sherpa-onnx-api.version>1.0.1</sherpa-onnx-api.version>
         <sherpa-onnx.version>1.12.21</sherpa-onnx.version>
         <jlayer.version>1.0.1</jlayer.version>
@@ -125,7 +127,7 @@
             <dependency>
                 <groupId>net.coobird</groupId>
                 <artifactId>thumbnailator</artifactId>
-                <version>[0.4, 0.5)</version>
+                <version>${thumbnailator.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.github.xiaoymin</groupId>
@@ -292,7 +294,7 @@
             <dependency>
                 <groupId>com.coze</groupId>
                 <artifactId>coze-api</artifactId>
-                <version>LATEST</version>
+                <version>${coze.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.qcloud</groupId>

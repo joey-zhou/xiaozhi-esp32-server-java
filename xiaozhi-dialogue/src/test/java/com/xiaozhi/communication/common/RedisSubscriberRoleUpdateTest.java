@@ -3,6 +3,7 @@ package com.xiaozhi.communication.common;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
+import com.xiaozhi.dialogue.audio.VadService;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.role.service.RoleService;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +35,9 @@ class RedisSubscriberRoleUpdateTest {
     @Mock
     private RoleService roleService;
 
+    @Mock
+    private VadService vadService;
+
     private RedisSubscriber subscriber;
 
     @BeforeEach
@@ -41,6 +45,7 @@ class RedisSubscriberRoleUpdateTest {
         subscriber = new RedisSubscriber();
         ReflectionTestUtils.setField(subscriber, "sessionManager", sessionManager);
         ReflectionTestUtils.setField(subscriber, "roleService", roleService);
+        ReflectionTestUtils.setField(subscriber, "vadService", vadService);
     }
 
     @Test
@@ -72,6 +77,19 @@ class RedisSubscriberRoleUpdateTest {
     }
 
     @Test
+    void refreshesVadThresholdsForSessionsUsingTheRole() {
+        ChatSession session = sessionWithRole(7);
+        when(session.getSessionId()).thenReturn("s-1");
+        when(roleService.getBO(7)).thenReturn(role(25));
+        when(sessionManager.getAllSessions()).thenReturn(List.of(session));
+
+        subscriber.onRoleUpdated("7");
+
+        // VAD 阈值是 initSession 时的快照，不在这里刷新要等下一次 listen/start 才生效
+        verify(vadService).refreshRoleThresholds("s-1");
+    }
+
+    @Test
     void leavesSessionsOfOtherRolesUntouched() {
         ChatSession session = sessionWithRole(8);
         when(roleService.getBO(7)).thenReturn(role(25));
@@ -81,6 +99,7 @@ class RedisSubscriberRoleUpdateTest {
 
         verify(session, never()).setInactiveTimeoutSeconds(anyInt());
         verify(session, never()).setPersona(any());
+        verify(vadService, never()).refreshRoleThresholds(any());
     }
 
     private static ChatSession sessionWithRole(int roleId) {

@@ -1,9 +1,9 @@
 import type { PageQueryParams } from './api'
 
-// 模型类型
-export type ModelType = 'llm' | 'agent'
+// 角色编辑页用到的模板类型只在模板领域文件里定义一份
+export type { PromptTemplate } from './template'
 
-// 语音提供商类型
+export type RoleModelType = 'llm' | 'agent'
 export type VoiceProvider = 'edge' | 'aliyun' | 'aliyun-nls' | 'volcengine' | 'xfyun' | 'minimax' | 'tencent' | 'sherpa-onnx'
 
 // 语音性别
@@ -63,7 +63,7 @@ export interface ModelOption {
   label: string
   value: number
   desc?: string
-  type: ModelType
+  type: RoleModelType
   provider: string
   configName?: string
   configDesc?: string
@@ -77,13 +77,6 @@ export interface SttOption {
   desc?: string
 }
 
-export interface PromptTemplate {
-  templateId: number
-  templateName: string
-  templateContent: string
-  isDefault?: boolean | number
-}
-
 export interface RoleFormData {
   roleId?: number
   roleName: string
@@ -91,8 +84,7 @@ export interface RoleFormData {
   avatar?: string
   isDefault: boolean | number | string // 支持布尔值、数字和字符串（提交时转为 '1' 或 '0'）
   state?: string
-  // 模型相关
-  modelType: ModelType
+  modelType: RoleModelType
   modelId?: number
   temperature?: number
   topP?: number

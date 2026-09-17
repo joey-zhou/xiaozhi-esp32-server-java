@@ -15,10 +15,26 @@ export default defineConfigWithVueTs(
     files: ['**/*.{ts,mts,tsx,vue}'],
   },
 
-  globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**']),
+  // xiaozhi-assets-generator 是自带工具链的第三方子项目，public 下是运行时静态资源，都不受本项目规则约束
+  globalIgnores([
+    '**/dist/**',
+    '**/dist-ssr/**',
+    '**/coverage/**',
+    'public/**',
+    'xiaozhi-assets-generator/**',
+  ]),
 
   pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
   ...pluginOxlint.configs['flat/recommended'],
   skipFormatting,
+
+  {
+    // 异常页按 HTTP 状态码命名是路由约定，改成多词反而对不上 /403 /404
+    name: 'app/exception-pages',
+    files: ['src/views/exception/*.vue'],
+    rules: {
+      'vue/multi-word-component-names': 'off',
+    },
+  },
 )

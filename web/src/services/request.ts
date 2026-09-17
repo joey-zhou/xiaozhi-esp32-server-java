@@ -1,13 +1,14 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios'
 import { message } from 'ant-design-vue'
 import qs from 'qs'
+import { REQUEST_TIMEOUT } from '@/constants/api'
 import { useUserStore } from '@/store/user'
 import { ROUTES } from '@/router/routes'
+import { i18n } from '@/locales'
 import type {
   ApiResponse,
   PageResponse,
   ListResponse,
-  EmptyResponse,
   DataResponse,
   PageQueryParams,
   BaseQueryParams
@@ -21,10 +22,13 @@ export interface RequestError extends Error {
   isForbidden?: boolean
 }
 
+/** 接口前缀，全站唯一来源；SSE / keepalive fetch 这类绕开 axios 的链路也从这里取 */
+export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || ''
+
 // 创建 axios 实例
 const request: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '',
-  timeout: 30000,
+  baseURL: API_BASE_URL,
+  timeout: REQUEST_TIMEOUT,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json;charset=UTF-8',
@@ -80,7 +84,11 @@ export function shouldIgnoreRequestError(error: unknown): boolean {
     (error instanceof Error && (error as RequestError).isSilent === true)
 }
 
-function handleAuthExpired(authMessage = '登录过期，请重新登录！') {
+/**
+ * 清空登录态并跳登录页。
+ * SSE 等绕开拦截器的链路（services/chat.ts）拿到 401 时也要调它，否则 token 失效后页面只会静默卡住
+ */
+export function handleAuthExpired(authMessage = i18n.global.t('error.sessionExpired')) {
   const userStore = useUserStore()
   userStore.clearUserInfo()
   userStore.clearToken()
@@ -99,7 +107,9 @@ function handleAuthExpired(authMessage = '登录过期，请重新登录！') {
     onClose: () => {
       authExpiredHandling = false
       if (window.location.pathname !== ROUTES.LOGIN) {
-        window.location.replace(ROUTES.LOGIN)
+        // redirect 参数的写法与 router/guards.ts 保持一致，登录成功后由登录页决定是否跳回
+        const target = `${window.location.pathname}${window.location.search}`
+        window.location.replace(`${ROUTES.LOGIN}?redirect=${encodeURIComponent(target)}`)
       }
     },
   })
@@ -140,7 +150,7 @@ request.interceptors.response.use(
     if (data.code === 401) {
       handleAuthExpired()
       return Promise.reject(
-        createRequestError(data.message || '未授权', {
+        createRequestError(data.message || i18n.global.t('error.unauthorized'), {
           code: 'ERR_AUTH_EXPIRED',
           isSilent: true,
           isAuthExpired: true,
@@ -149,8 +159,11 @@ request.interceptors.response.use(
     }
 
     if (data.code === 403) {
+      // 权限不足要当场告诉用户，否则只会被调用方的兜底文案盖成「加载失败」
+      const forbiddenMessage = data.message || i18n.global.t('error.forbidden')
+      message.error({ content: forbiddenMessage, key: 'request-error' })
       return Promise.reject(
-        createRequestError(data.message || '权限不足', {
+        createRequestError(forbiddenMessage, {
           code: 'ERR_FORBIDDEN',
           isForbidden: true,
         })
@@ -174,7 +187,7 @@ request.interceptors.response.use(
 
     if (error.code === 'ECONNABORTED' || error.message?.toLowerCase?.().includes('timeout')) {
       message.error({
-        content: '请求超时',
+        content: i18n.global.t('error.timeout'),
         key: 'timeout-error',
       })
       return Promise.reject(error)
@@ -185,31 +198,33 @@ request.interceptors.response.use(
       const { status } = error.response
       if (status === 401) {
         handleAuthExpired()
-        const requestError = toRequestError(error, '登录过期，请重新登录！')
+        const requestError = toRequestError(error, i18n.global.t('error.sessionExpired'))
         requestError.code = 'ERR_AUTH_EXPIRED'
         requestError.isSilent = true
         requestError.isAuthExpired = true
         return Promise.reject(requestError)
       } else if (status === 403) {
-        const requestError = toRequestError(error, error.response.data?.message || '权限不足')
+        const forbiddenMessage = error.response.data?.message || i18n.global.t('error.forbidden')
+        message.error({ content: forbiddenMessage, key: 'request-error' })
+        const requestError = toRequestError(error, forbiddenMessage)
         requestError.code = 'ERR_FORBIDDEN'
         requestError.isForbidden = true
         return Promise.reject(requestError)
       } else {
         message.error({
-          content: error.response.data?.message || `请求失败 (${status})`,
+          content: error.response.data?.message || `${i18n.global.t('error.serverError')} (${status})`,
           key: 'request-error',
         })
       }
     } else if (error.request) {
       message.error({
-        content: '网络错误，请检查网络连接',
+        content: i18n.global.t('error.networkError'),
         key: 'network-error',
       })
     } else {
       // 其他错误（如请求配置错误等）
       message.error({
-        content: error.message || '请求失败',
+        content: error.message || i18n.global.t('error.unknown'),
         key: 'unknown-error',
       })
     }

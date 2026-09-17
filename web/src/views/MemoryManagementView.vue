@@ -2,14 +2,15 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, onBeforeRouteLeave } from 'vue-router'
-import { message as antMessage, type TablePaginationConfig } from 'ant-design-vue'
+import { message as antMessage, type TableColumnsType, type TablePaginationConfig } from 'ant-design-vue'
 import { useTable } from '@/composables/useTable'
-import { useExport } from '@/composables/useExport'
+import { useExport, type ExportColumn } from '@/composables/useExport'
 import { useSelectLoadMore } from '@/composables/useSelectLoadMore'
 import { useLoadingStore } from '@/store/loading'
 import { queryRoles } from '@/services/role'
 import { queryDevices } from '@/services/device'
 import { deleteMessage } from '@/services/message'
+import { shouldIgnoreRequestError } from '@/services/request'
 import {
   querySummaryMemory,
   queryChatMemory,
@@ -43,8 +44,14 @@ const {
   data,
   pagination,
   handleTableChange,
+  resetPagination,
   loadData,
 } = useTable<SummaryMemory | ChatMemory>()
+
+type MemoryRecord = SummaryMemory | ChatMemory
+
+/** 短期记忆行走消息接口，比 ChatMemory 多一个工具调用字段 */
+type ChatMemoryRow = ChatMemory & { toolCalls?: string }
 
 // 使用导出 composable
 const { exporting, exportToExcel } = useExport()
@@ -70,6 +77,19 @@ const {
 } = useSelectLoadMore<Device>(queryDevices)
 const selectedDeviceId = ref<string>('')
 
+// 路由带来的设备未必落在下拉已加载的那几页里，单查回来的那台挂在这里补进选项
+const routeDeviceOption = ref<Device | null>(null)
+
+// 补进来的设备一旦随翻页进了 devices，就不再单独占一项，避免出现重复 key
+const deviceOptions = computed<Device[]>(() => {
+  const extra = routeDeviceOption.value
+  const loaded = devices.value as Device[]
+  if (!extra || loaded.some((d) => d.deviceId === extra.deviceId)) {
+    return loaded
+  }
+  return [extra, ...loaded]
+})
+
 // 时间范围
 const timeRange = ref<[Dayjs, Dayjs]>([dayjs().startOf('month'), dayjs().endOf('month')])
 
@@ -82,11 +102,11 @@ const rangePresets = computed(() => [
 // 当前选中的设备名称（long 类型后端不返回 deviceName，前端直接取）
 const selectedDeviceName = computed(() => {
   if (!selectedDeviceId.value) return ''
-  return devices.value.find((d: Device) => d.deviceId === selectedDeviceId.value)?.deviceName || selectedDeviceId.value
+  return deviceOptions.value.find((d) => d.deviceId === selectedDeviceId.value)?.deviceName || selectedDeviceId.value
 })
 
 // 表格列配置
-const columns = computed(() => {
+const columns = computed<TableColumnsType>(() => {
 
   const baseColumns = [
     {
@@ -160,6 +180,25 @@ const columns = computed(() => {
 })
 
 /**
+ * 按 deviceId 单查一台设备，补进下拉选项
+ * 下拉按页拉取，路由传来的设备可能不在已加载的页里，不补就会被静默换成第一台
+ */
+async function loadRouteDeviceOption(deviceId: string) {
+  if ((devices.value as Device[]).some((d) => d.deviceId === deviceId)) {
+    return
+  }
+  try {
+    const res = await queryDevices({ pageNo: 1, pageSize: 1, deviceId })
+    if (res.code === 200) {
+      routeDeviceOption.value = res.data?.list?.[0] ?? null
+    }
+  } catch (error) {
+    if (shouldIgnoreRequestError(error)) return
+    console.error('按 deviceId 补充设备选项失败:', error)
+  }
+}
+
+/**
  * 初始化下拉数据并加载表格
  */
 async function initSelects() {
@@ -174,20 +213,24 @@ async function initSelects() {
     selectedRoleId.value = roles.value[0]!.roleId
   }
 
-  if (routeDeviceId.value && devices.value.find((d: Device) => d.deviceId === routeDeviceId.value)) {
+  if (routeDeviceId.value) {
+    await loadRouteDeviceOption(routeDeviceId.value)
+  }
+
+  if (routeDeviceId.value && deviceOptions.value.some((d) => d.deviceId === routeDeviceId.value)) {
     selectedDeviceId.value = routeDeviceId.value
-  } else if (needDefault && devices.value.length > 0) {
-    selectedDeviceId.value = devices.value[0]!.deviceId
+  } else if (needDefault && deviceOptions.value.length > 0) {
+    selectedDeviceId.value = deviceOptions.value[0]!.deviceId
   }
 
   await fetchMemoryData()
 }
 
 /**
- * 角色筛选函数
+ * 角色筛选函数（按 a-select-option 上显式声明的 label 匹配）
  */
-function filterRoleOption(input: string, option: any) {
-  return option.children?.[0]?.children?.toLowerCase().includes(input.toLowerCase())
+function filterRoleOption(input: string, option: { label?: string }) {
+  return (option.label ?? '').toLowerCase().includes(input.toLowerCase())
 }
 
 /**
@@ -196,6 +239,7 @@ function filterRoleOption(input: string, option: any) {
 async function handleRoleChange(roleIdValue: number) {
   selectedRoleId.value = roleIdValue
   data.value = []
+  resetPagination()
   await fetchMemoryData()
 }
 
@@ -203,39 +247,35 @@ async function handleRoleChange(roleIdValue: number) {
  * 获取记忆数据
  */
 async function fetchMemoryData() {
-  // 摘要/长期记忆按「设备+角色」存储，缺任一项会请求到 undefined/undefined，直接拦截并提示
-  if (memoryType.value !== 'chat' && (!selectedRoleId.value || !selectedDeviceId.value)) {
-    data.value = []
-    pagination.total = 0
-    antMessage.warning(t('memory.needRoleAndDevice'))
-    return
-  }
-
-  const params: any = {
-    pageNo: pagination.current || 1,
-    pageSize: pagination.pageSize || 10,
-  }
-
-  // 只有当选择了角色时才添加 roleId
-  if (selectedRoleId.value) {
-    params.roleId = selectedRoleId.value
-  }
-
-  // 只有当选择了设备时才添加 deviceId
-  if (selectedDeviceId.value) {
-    params.deviceId = selectedDeviceId.value
-  }
+  const pageNo = pagination.current || 1
+  const pageSize = pagination.pageSize || 10
+  // 「全部」用 0 / 空串表示，发给后端必须整个不带该字段：roleId=0 会真的按 0 过滤
+  const roleId = selectedRoleId.value || undefined
+  const deviceId = selectedDeviceId.value || undefined
 
   try {
     if (memoryType.value === 'chat') {
       await loadData(() => queryChatMemory({
-        ...params,
+        pageNo,
+        pageSize,
         startTime: timeRange.value[0].format('YYYY-MM-DD HH:mm:ss'),
         endTime: timeRange.value[1].format('YYYY-MM-DD HH:mm:ss'),
+        // queryChatMemory 把 roleId/deviceId 声明成必填，实际「全部」时要留空，
+        // 待 services/memory.ts 把这两项放宽为可选后可去掉这次断言
+        ...({ roleId, deviceId } as { roleId: number; deviceId: string }),
       }))
-    } else if (memoryType.value === 'summary') {
-      await loadData(() => querySummaryMemory(params))
+      return
     }
+
+    // 摘要记忆按「设备+角色」存储，缺任一项会请求到 undefined/undefined，直接拦截并提示
+    if (!roleId || !deviceId) {
+      data.value = []
+      pagination.total = 0
+      antMessage.warning(t('memory.needRoleAndDevice'))
+      return
+    }
+
+    await loadData(() => querySummaryMemory({ pageNo, pageSize, roleId, deviceId }))
   } catch (error) {
     console.error('加载记忆数据失败:', error)
     antMessage.error(t('common.loadFailed'))
@@ -245,7 +285,8 @@ async function fetchMemoryData() {
 /**
  * 处理删除记忆
  */
-async function handleDeleteMemory(record: any) {
+// 摘要的 id 是 createTime 毫秒数；长期记忆的 id 是后端按字符串下发的 Long，原样透传给查询参数保精度
+async function handleDeleteMemory(record: { id: number }) {
   loading.value = true
   try {
     let res
@@ -273,6 +314,15 @@ async function handleDeleteMemory(record: any) {
  */
 async function handleDeviceChange(deviceId: string) {
   selectedDeviceId.value = deviceId
+  resetPagination()
+  await fetchMemoryData()
+}
+
+/**
+ * 处理时间范围切换
+ */
+async function handleTimeRangeChange() {
+  resetPagination()
   await fetchMemoryData()
 }
 
@@ -291,10 +341,19 @@ function getSenderText(sender: string) {
   return sender === 'user' ? t('message.user') : t('message.assistant')
 }
 
+interface ToolCall {
+  name: string
+  arguments: string
+  result: string
+}
+
+/** 展开行是一张 a-table，_key 只用来当 row-key */
+type ToolCallRow = ToolCall & { _key: number }
+
 /**
  * 解析 toolCalls JSON 字符串为数组
  */
-function parseToolCalls(toolCalls: string | undefined | null): { name: string; arguments: string; result: string }[] {
+function parseToolCalls(toolCalls: string | undefined | null): ToolCall[] {
   if (!toolCalls) return []
   try {
     const parsed = JSON.parse(toolCalls)
@@ -302,6 +361,28 @@ function parseToolCalls(toolCalls: string | undefined | null): { name: string; a
   } catch {
     return []
   }
+}
+
+const EMPTY_TOOL_CALLS: ToolCallRow[] = []
+
+// 同一行的 toolCalls 在展开行、tooltip、列内文本三处都要用，
+// 按 messageId 解析一次收进 Map，模板里直接取，避免每次渲染重复 JSON.parse
+const toolCallsByMessage = computed(() => {
+  const rows = new Map<number, ToolCallRow[]>()
+  if (memoryType.value !== 'chat') return rows
+
+  for (const record of data.value as ChatMemoryRow[]) {
+    if (!record.toolCalls) continue
+    rows.set(
+      record.messageId,
+      parseToolCalls(record.toolCalls).map((tool, index) => ({ ...tool, _key: index })),
+    )
+  }
+  return rows
+})
+
+function toolCallsOf(messageId: number): ToolCallRow[] {
+  return toolCallsByMessage.value.get(messageId) ?? EMPTY_TOOL_CALLS
 }
 
 /**
@@ -315,7 +396,7 @@ function hasValidAudio(audioPath: string | undefined | null): boolean {
 /**
  * 删除聊天消息
  */
-async function handleDeleteMessage(record: any) {
+async function handleDeleteMessage(record: { messageId: number }) {
   loading.value = true
   try {
     const res = await deleteMessage(record.messageId)
@@ -342,7 +423,7 @@ async function handleExport() {
 
   loadingStore.showLoading(t('common.exporting'))
   try {
-    let columns: any[] = []
+    let columns: ExportColumn<MemoryRecord>[] = []
     let filename = ''
 
     if (memoryType.value === 'chat') {
@@ -390,9 +471,15 @@ onBeforeUnmount(() => {
   stopAllAudioBus.emit()
 })
 
-// 初始化
+// 初始化。失败必须在这里收住：async onMounted 抛出会冒泡到 ErrorBoundary，整个业务区被替换成错误页
 onMounted(async () => {
-  await initSelects()
+  try {
+    await initSelects()
+  } catch (error) {
+    if (shouldIgnoreRequestError(error)) return
+    console.error('初始化记忆管理页失败:', error)
+    antMessage.error(t('common.loadDataFailed'))
+  }
 })
 </script>
 
@@ -418,6 +505,7 @@ onMounted(async () => {
                 v-for="role in roles"
                 :key="role.roleId"
                 :value="role.roleId"
+                :label="role.roleName"
               >
                 {{ role.roleName }}
               </a-select-option>
@@ -436,7 +524,7 @@ onMounted(async () => {
                 {{ t('common.all') }}
               </a-select-option>
               <a-select-option
-                v-for="device in devices"
+                v-for="device in deviceOptions"
                 :key="device.deviceId"
                 :value="device.deviceId"
               >
@@ -453,7 +541,7 @@ onMounted(async () => {
               :presets="rangePresets"
               :allow-clear="false"
               format="MM-DD"
-              @change="fetchMemoryData"
+              @change="handleTimeRangeChange"
             />
           </a-form-item>
         </a-col>
@@ -484,7 +572,7 @@ onMounted(async () => {
         :scroll="{ x: 800 }"
         size="middle"
         :expandable="{
-          rowExpandable: (record: any) => !!record.toolCalls,
+          rowExpandable: (record: ChatMemoryRow) => !!record.toolCalls,
         }"
         @change="onTableChange"
       >
@@ -495,10 +583,10 @@ onMounted(async () => {
               { title: t('message.toolArguments'), dataIndex: 'arguments', width: 300 },
               { title: t('message.toolResult'), dataIndex: 'result' },
             ]"
-            :data-source="parseToolCalls(record.toolCalls).map((t, i) => ({ ...t, _key: i }))"
+            :data-source="toolCallsOf(record.messageId)"
             :pagination="false"
             size="small"
-            :row-key="(r: any) => r._key"
+            :row-key="(r: { _key: number }) => r._key"
           >
             <template #bodyCell="{ column, record: tool }">
               <template v-if="column.dataIndex === 'arguments'">
@@ -522,9 +610,9 @@ onMounted(async () => {
             <template v-if="!!record.toolCalls">
               <a-tooltip placement="topLeft" :mouse-enter-delay="0.5" :overlay-style="{ maxWidth: '400px' }">
                 <template #title>
-                  <div v-for="(tool, index) in parseToolCalls(record.toolCalls)" :key="index">{{ tool.name }}</div>
+                  <div v-for="tool in toolCallsOf(record.messageId)" :key="tool._key">{{ tool.name }}</div>
                 </template>
-                <div v-for="(tool, index) in parseToolCalls(record.toolCalls)" :key="index" class="ellipsis-text">{{ tool.name }}</div>
+                <div v-for="tool in toolCallsOf(record.messageId)" :key="tool._key" class="ellipsis-text">{{ tool.name }}</div>
               </a-tooltip>
             </template>
             <span v-else>-</span>

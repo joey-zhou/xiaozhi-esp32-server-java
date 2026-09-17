@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
+import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.message.convert.MessageConvert;
 import com.xiaozhi.message.dal.mysql.dataobject.MessageDO;
@@ -11,15 +12,21 @@ import com.xiaozhi.message.dal.mysql.mapper.ConversationMapper;
 import com.xiaozhi.message.dal.mysql.mapper.MessageMapper;
 import com.xiaozhi.message.model.ConversationProjection;
 import com.xiaozhi.message.model.MessageProjection;
+import com.xiaozhi.storage.service.StorageService;
+import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.support.MybatisPlusTestHelper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,6 +58,12 @@ class MessageServiceImplTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private StorageServiceFactory storageServiceFactory;
+
+    @Mock
+    private StorageService storageService;
 
     @InjectMocks
     private MessageServiceImpl messageService;
@@ -95,6 +108,57 @@ class MessageServiceImplTest {
         assertThat(result.getTotal()).isEqualTo(1);
     }
 
+    /**
+     * 短期记忆按时间窗回捞历史。排序口径一旦改回按 sender 排，
+     * tool 响应会跑到触发它的 assistant 工具调用之前，provider 直接 400 拒绝整轮请求。
+     */
+    @Test
+    void listHistoryAfterQueriesStrictlyAfterTimeOrderedByCreateTimeThenId() {
+        Instant after = LocalDateTime.of(2026, 9, 5, 10, 0).atZone(ZoneId.systemDefault()).toInstant();
+        MessageDO toolCall = new MessageDO();
+        toolCall.setMessageId(1L);
+        MessageDO toolResult = new MessageDO();
+        toolResult.setMessageId(2L);
+        MessageBO toolCallBO = new MessageBO();
+        toolCallBO.setMessageId(1L);
+        MessageBO toolResultBO = new MessageBO();
+        toolResultBO.setMessageId(2L);
+
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(toolCall, toolResult));
+        when(messageConvert.toBO(toolCall)).thenReturn(toolCallBO);
+        when(messageConvert.toBO(toolResult)).thenReturn(toolResultBO);
+
+        List<MessageBO> history = messageService.listHistoryAfter("dev-1", 3, after);
+
+        // 数据库给什么顺序就用什么顺序，服务层不得再翻转
+        assertThat(history).containsExactly(toolCallBO, toolResultBO);
+
+        ArgumentCaptor<LambdaQueryWrapper<MessageDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(messageMapper).selectList(captor.capture());
+        LambdaQueryWrapper<MessageDO> wrapper = captor.getValue();
+        String sql = wrapper.getTargetSql();
+
+        // 严格大于：用 >= 会把上一次已经喂过的那条重复带进上下文
+        assertThat(sql).contains("createTime > ?").doesNotContain("createTime >= ?");
+        assertThat(sql).contains("deviceId = ?").contains("roleId = ?").contains("state = ?");
+        assertThat(sql).contains("ORDER BY createTime ASC,messageId ASC");
+        assertThat(sql)
+            .as("按 sender 排序会打乱工具调用与工具响应的先后")
+            .doesNotContain("sender");
+        assertThat(wrapper.getParamNameValuePairs().values())
+            .contains("dev-1", 3, MessageBO.STATE_ENABLED,
+                LocalDateTime.ofInstant(after, ZoneId.systemDefault()));
+    }
+
+    @Test
+    void listHistoryAfterReturnsEmptyWithoutQueryingWhenArgumentsMissing() {
+        assertThat(messageService.listHistoryAfter(" ", 3, Instant.now())).isEmpty();
+        assertThat(messageService.listHistoryAfter("dev-1", null, Instant.now())).isEmpty();
+        assertThat(messageService.listHistoryAfter("dev-1", 3, null)).isEmpty();
+
+        verify(messageMapper, never()).selectList(any(LambdaQueryWrapper.class));
+    }
+
     @Test
     void deleteThrowsWhenMessageIdMissing() {
         assertThatThrownBy(() -> messageService.delete(null))
@@ -129,5 +193,67 @@ class MessageServiceImplTest {
 
         verify(messageMapper).update(isNull(), any(LambdaUpdateWrapper.class));
         verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    void purgeExpiredAudioRemovesFromStorageThenClearsColumn() {
+        when(storageServiceFactory.getStorageService()).thenReturn(storageService);
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class)))
+            .thenReturn(List.of(messageWithAudio(1L, "audio/2026-01-01/a.opus"),
+                                messageWithAudio(2L, "https://oss.example.com/audio/2026-01-01/b.opus")))
+            .thenReturn(List.of());
+
+        int purged = messageService.purgeExpiredAudio(30, 500);
+
+        assertThat(purged).isEqualTo(2);
+        // 本地路径与云端 URL 两种形态都原样交给 StorageService，由它各自解析
+        verify(storageService).remove("audio/2026-01-01/a.opus");
+        verify(storageService).remove("https://oss.example.com/audio/2026-01-01/b.opus");
+
+        ArgumentCaptor<LambdaUpdateWrapper<MessageDO>> captor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(messageMapper).update(isNull(), captor.capture());
+        // getTargetSql 只给 WHERE，SET 子句看 getSqlSet；MP 会把 null 参数化，值在 paramNameValuePairs 里
+        assertThat(captor.getValue().getSqlSet()).startsWith("audioPath=");
+        assertThat(captor.getValue().getParamNameValuePairs().values()).containsNull();
+        assertThat(captor.getValue().getTargetSql()).contains("messageId IN");
+        // 走的是 update 不是 delete，消息行保留
+        verify(messageMapper, never()).delete(any());
+    }
+
+    @Test
+    void purgeExpiredAudioOnlySelectsRowsWithAudioOlderThanRetention() {
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+
+        int purged = messageService.purgeExpiredAudio(30, 500);
+
+        assertThat(purged).isZero();
+        ArgumentCaptor<LambdaQueryWrapper<MessageDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(messageMapper).selectList(captor.capture());
+        String sql = captor.getValue().getTargetSql();
+        assertThat(sql).contains("audioPath IS NOT NULL");
+        assertThat(sql).contains("createTime <");
+        // 没有待清理的行时不该去取存储客户端
+        verifyNoInteractions(storageServiceFactory);
+    }
+
+    @Test
+    void purgeExpiredAudioKeepsBatchingUntilNoRowsLeft() {
+        when(storageServiceFactory.getStorageService()).thenReturn(storageService);
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class)))
+            .thenReturn(List.of(messageWithAudio(1L, "a.opus")))
+            .thenReturn(List.of(messageWithAudio(2L, "b.opus")))
+            .thenReturn(List.of());
+
+        int purged = messageService.purgeExpiredAudio(30, 1);
+
+        assertThat(purged).isEqualTo(2);
+        verify(messageMapper, org.mockito.Mockito.times(2)).update(isNull(), any(LambdaUpdateWrapper.class));
+    }
+
+    private static MessageDO messageWithAudio(Long messageId, String audioPath) {
+        MessageDO message = new MessageDO();
+        message.setMessageId(messageId);
+        message.setAudioPath(audioPath);
+        return message;
     }
 }

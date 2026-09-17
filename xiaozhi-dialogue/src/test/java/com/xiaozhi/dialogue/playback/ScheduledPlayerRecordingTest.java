@@ -51,6 +51,8 @@ class ScheduledPlayerRecordingTest {
         player.play(Flux.just(Speech.ofOpus(new byte[]{1}, "一句话。"), Speech.ofOpus(new byte[]{2})), true);
 
         verify(sender, timeout(5000)).sendTtsMessage(any(), isNull(), eq("stop"));
+        // 收尾录音排在 tts stop 下发之后，只等 sendTtsMessage 会抢在 onSendStop 之前断言
+        verify(recorder, timeout(5000)).onSendStop();
 
         InOrder inOrder = inOrder(recorder);
         inOrder.verify(recorder).onSendStart();

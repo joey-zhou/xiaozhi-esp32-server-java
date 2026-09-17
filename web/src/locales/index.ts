@@ -1,14 +1,14 @@
 /**
  * 国际化配置
- * 注意：需要安装 vue-i18n
- * npm install vue-i18n@9
+ * 语言选择的持久化键与 composables/useLocale.ts 共用 STORAGE_LOCALE，两边不要各写各的
  */
 import { createI18n } from 'vue-i18n'
+import { STORAGE_LOCALE } from '@/constants/storage'
 import zhCN from './zh-CN'
 import enUS from './en-US'
 
 // 默认语言
-const defaultLocale = localStorage.getItem('locale') || 'zh-CN'
+const defaultLocale = localStorage.getItem(STORAGE_LOCALE) || 'zh-CN'
 
 // 创建 i18n 实例
 export const i18n = createI18n({

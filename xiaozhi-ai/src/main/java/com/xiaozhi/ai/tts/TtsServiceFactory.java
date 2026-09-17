@@ -102,7 +102,7 @@ public class TtsServiceFactory {
     /**
      * 清除指定配置的服务实例缓存。
      * <p>
-     * 硬约束：不清理 sherpa-onnx 的本地模型缓存。模型实例只由音色里的模型目录决定，与配置无关；
+     * 不清理 sherpa-onnx 的本地模型缓存。模型实例只由音色里的模型目录决定，与配置无关；
      * 且释放模型会 delete native 指针，与正在执行的合成并发即 use-after-free 崩进程。
      */
     public void removeCache(ConfigBO config) {

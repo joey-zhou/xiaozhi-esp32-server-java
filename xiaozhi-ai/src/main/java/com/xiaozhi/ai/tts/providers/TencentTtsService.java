@@ -3,6 +3,7 @@ package com.xiaozhi.ai.tts.providers;
 import com.tencent.core.ws.Credential;
 import com.tencent.core.ws.SpeechClient;
 import com.tencent.ttsv2.*;
+import com.xiaozhi.ai.tts.TtsRetryPolicy;
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.XiaozhiTtsOptions;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -10,7 +11,6 @@ import com.xiaozhi.utils.AudioUtils;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
-import reactor.util.retry.Retry;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Path;
@@ -142,7 +142,7 @@ public class TencentTtsService implements TtsService {
                             try { synth.close(); } catch (Exception e) { log.error("关闭腾讯云TTS合成器时发生错误", e); }
                         }
                     });
-        }).retryWhen(Retry.fixedDelay(MAX_RETRY_ATTEMPTS - 1, Duration.ofMillis(RETRY_DELAY_MS)))
+        }).transform(source -> TtsRetryPolicy.retryIfNothingEmitted(source, MAX_RETRY_ATTEMPTS - 1, RETRY_DELAY_MS))
           .doOnError(e -> log.error("腾讯云流式语音合成失败，已达到最大重试次数", e));
     }
 
@@ -156,28 +156,19 @@ public class TencentTtsService implements TtsService {
         int attempts = 0;
         while (attempts < MAX_RETRY_ATTEMPTS) {
             try {
-                // 使用流式接口合成音频，然后合并所有音频片段
-                ByteArrayOutputStream audioBuffer = new ByteArrayOutputStream();
-                final Exception[] error = new Exception[1];
-
-                stream(text).subscribe(audioData -> {
-                    if (audioData != null) {
-                        try {
-                            audioBuffer.write(audioData);
-                        } catch (Exception e) {
-                            log.error("写入音频数据失败", e);
-                            error[0] = e;
-                        }
-                    }
-                });
-
-                // 如果有错误，抛出异常
-                if (error[0] != null) {
-                    throw error[0];
-                }
+                // 流式接口是异步回调推送音频，必须阻塞收齐再落盘；
+                // block 超时（含合成失败）抛出的异常由下面的 attempts 重试兜住。
+                ByteArrayOutputStream audioBuffer = stream(text)
+                        .reduce(new ByteArrayOutputStream(), (buffer, audioData) -> {
+                            if (audioData != null) {
+                                buffer.writeBytes(audioData);
+                            }
+                            return buffer;
+                        })
+                        .block(Duration.ofMillis(SYNTHESIS_TIMEOUT_MS));
 
                 // 将合并后的PCM音频数据转换为WAV格式并保存
-                byte[] pcmData = audioBuffer.toByteArray();
+                byte[] pcmData = audioBuffer == null ? new byte[0] : audioBuffer.toByteArray();
                 if (pcmData.length == 0) {
                     log.warn("合成的音频数据为空");
                     return null;

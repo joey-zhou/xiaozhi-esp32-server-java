@@ -3,21 +3,18 @@ import { ref, computed, reactive } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import type { TableColumnsType, FormInstance, TablePaginationConfig } from 'ant-design-vue'
+import type { Rule } from 'ant-design-vue/es/form'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import { useTable } from '@/composables/useTable'
 import { useModal } from '@/composables/useModal'
-import { useConfigManager } from '@/composables/useConfigManager'
 import { useLoadingStore } from '@/store/loading'
 import TableActionButtons from '@/components/TableActionButtons.vue'
-import { updatePlatformConfig, queryPlatformConfig, addPlatformConfig } from '@/services/config'
+import { updateConfig, updatePlatformConfig, queryPlatformConfig, addPlatformConfig } from '@/services/config'
 import type { Agent, PlatformConfig, ProviderOption, PlatformFormItems } from '@/types/agent'
 import { queryAgents } from '@/services/agent'
 
 const { t } = useI18n()
 const loadingStore = useLoadingStore()
-
-// ==================== 配置管理 ====================
-const { setAsDefault } = useConfigManager('llm')
 
 // ==================== 查询表单 ====================
 const searchForm = ref({
@@ -284,7 +281,7 @@ const platformRules = computed(() => {
   // 敏感字段列表
   const sensitiveFields = ['apiKey', 'apiSecret', 'ak', 'sk']
 
-  const rules: Record<string, any[]> = {}
+  const rules: Record<string, Rule[]> = {}
 
   // appId 和 apiUrl 始终必填
   rules.appId = [{ required: true, message: t('agent.enterAppId'), trigger: 'blur' }]
@@ -321,7 +318,7 @@ function getSensitivePlaceholder(field: string, defaultPlaceholder: string): str
   const sensitiveFields = ['apiKey', 'apiSecret', 'ak', 'sk']
 
   if (isEditMode && sensitiveFields.includes(field)) {
-    return '留空则保持原值'
+    return t('config.keepUnchangedHint')
   }
 
   return defaultPlaceholder
@@ -349,11 +346,13 @@ const handleConfigPlatform = async () => {
     ])
 
     if (res.code === 200) {
-      const configs = (res.data as { list: any[] })?.list || []
+      // 后端按 configType+provider 查的就是平台凭据，字段与 PlatformConfig 一致
+      const configs = (res.data?.list ?? []) as PlatformConfig[]
 
-      if (configs.length > 0) {
+      const existing = configs[0]
+      if (existing) {
         // 有配置，以编辑模式打开
-        await platformModal.openEdit(configs[0])
+        await platformModal.openEdit(existing)
       } else {
         // 没有配置，以新增模式打开
         await platformModal.openCreate()
@@ -382,19 +381,24 @@ const handlePlatformModalOk = async () => {
 }
 
 // ==================== 设为默认 ====================
+// 智能体是 agent 类型配置，只提交 configId + isDefault，不带 modelType（那是 llm 才有的维度）
 const handleSetDefault = async (record: Agent) => {
-  // 将Agent转换为Config格式，然后调用统一的setAsDefault
-  const configRecord = {
-    configId: record.configId,
-    configName: record.agentName || record.configName || '',
-    modelType: 'chat' as const,
-    configType: 'agent' as const,
-    provider: 'coze' as const
+  loading.value = true
+  try {
+    const res = await updateConfig({ configId: record.configId, isDefault: '1' })
+
+    if (res.code === 200) {
+      message.success(t('common.setDefaultSuccess', { name: record.agentName || record.configName || '' }))
+      await fetchData()
+    } else {
+      message.error(res.message || t('common.setDefaultFailed'))
+    }
+  } catch (error) {
+    console.error('设置默认智能体失败:', error)
+    message.error(t('common.setDefaultFailed'))
+  } finally {
+    loading.value = false
   }
-  
-  await setAsDefault(configRecord)
-  // 刷新数据
-  await fetchData()
 }
 
 // ==================== 初始化（非阻塞式加载）====================
@@ -431,7 +435,7 @@ fetchData()
     </a-card>
 
     <!-- 表格数据 -->
-    <a-card :title="t('menu.agent')" :bordered="false">
+    <a-card :title="t('router.title.agent')" :bordered="false">
       <template #extra>
         <a-button
           v-permission="['system:config:agent:create', 'system:config:agent:update']"
@@ -495,7 +499,7 @@ fetchData()
               permission-prefix="system:config:agent"
               show-set-default
               :is-default="record.isDefault == 1"
-              @set-default="handleSetDefault"
+              @set-default="() => handleSetDefault(record)"
             />
           </template>
         </template>

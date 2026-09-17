@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import type { Component } from 'vue'
 import { message } from 'ant-design-vue'
 import type { TableColumnsType } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
-import * as Icons from '@ant-design/icons-vue'
 import { queryAuthRoles, getAuthRolePermissionConfig, updateAuthRolePermissions } from '@/services/authRole'
+import { resolveMenuIcon } from '@/layouts/menuIcons'
 import type { AuthRole, AuthRolePermissionConfig, PermissionTreeNode } from '@/types/authRole'
 
 type PermissionTableItem = PermissionTreeNode & {
   children?: PermissionTableItem[]
-  iconComponent?: unknown
+  iconComponent?: Component | null
 }
 
 const { t } = useI18n()
-const antIcons = Icons as Record<string, unknown>
 
 const authRoles = ref<AuthRole[]>([])
 const permissionConfig = ref<AuthRolePermissionConfig | null>(null)
@@ -54,6 +54,9 @@ const permissionTableData = computed<PermissionTableItem[]>(() => {
 })
 
 const expandablePermissionIds = computed(() => collectExpandableIds(permissionConfig.value?.permissionTree ?? []))
+
+// 权限 id -> 父权限 id，保存时用来补齐半选的父节点
+const permissionParentMap = computed(() => buildPermissionParentMap(permissionConfig.value?.permissionTree ?? []))
 
 const permissionColumns = computed<TableColumnsType<PermissionTableItem>>(() => [
   {
@@ -121,7 +124,6 @@ const permissionColumns = computed<TableColumnsType<PermissionTableItem>>(() => 
 
 const permissionRowSelection = computed(() => ({
   selectedRowKeys: checkedPermissionIds.value,
-  preserveSelectedRowKeys: true,
   checkStrictly: false,
   columnWidth: 52,
   onChange: (keys: Array<string | number>) => {
@@ -206,7 +208,7 @@ async function handleSavePermissions() {
 
   saveLoading.value = true
   try {
-    const permissionIds = Array.from(new Set(checkedPermissionIds.value)).sort((a, b) => a - b)
+    const permissionIds = withAncestorPermissionIds(checkedPermissionIds.value)
     const res = await updateAuthRolePermissions(selectedAuthRoleId.value, permissionIds)
     if (res.code !== 200 || !res.data) {
       message.error(res.message || t('authRole.saveFailed'))
@@ -236,6 +238,35 @@ function getPermissionRowClass(record: PermissionTableItem) {
   return checkedPermissionIdSet.value.has(record.permissionId) ? 'permission-row--checked' : ''
 }
 
+function buildPermissionParentMap(nodes: PermissionTreeNode[], parentId?: number): Map<number, number> {
+  const map = new Map<number, number>()
+  for (const node of nodes) {
+    if (parentId !== undefined) {
+      map.set(node.permissionId, parentId)
+    }
+    for (const [childId, childParentId] of buildPermissionParentMap(node.children ?? [], node.permissionId)) {
+      map.set(childId, childParentId)
+    }
+  }
+  return map
+}
+
+// checkStrictly:false 下父节点半选时不会出现在选中项里，提交前沿父链补齐，否则父菜单权限会被静默丢掉
+function withAncestorPermissionIds(ids: number[]): number[] {
+  const parentMap = permissionParentMap.value
+  const result = new Set(ids)
+
+  for (const id of ids) {
+    let parentId = parentMap.get(id)
+    while (parentId !== undefined && !result.has(parentId)) {
+      result.add(parentId)
+      parentId = parentMap.get(parentId)
+    }
+  }
+
+  return Array.from(result).sort((a, b) => a - b)
+}
+
 function collectExpandableIds(nodes: PermissionTreeNode[]): number[] {
   return nodes.flatMap((node) => {
     if (!node.children?.length) {
@@ -248,18 +279,11 @@ function collectExpandableIds(nodes: PermissionTreeNode[]): number[] {
 function toPermissionTableData(nodes: PermissionTreeNode[]): PermissionTableItem[] {
   return nodes.map((node) => {
     const children = toPermissionTableData(node.children ?? [])
-    const normalizedIconName = node.icon
-      ? node.icon
-          .split('-')
-          .filter(Boolean)
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join('') + 'Outlined'
-      : ''
 
     return {
       ...node,
       children: children.length ? children : undefined,
-      iconComponent: node.icon ? antIcons[node.icon] ?? antIcons[normalizedIconName] ?? null : null,
+      iconComponent: resolveMenuIcon(node.icon),
     }
   })
 }

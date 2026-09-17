@@ -46,9 +46,9 @@
       :placement="deletePopconfirmPlacement"
       @confirm="handleDelete"
     >
-      <a :class="deleteClass">
+      <a-button type="link" size="small" danger class="delete-btn" :class="deleteClass">
         {{ deleteText || t('common.delete') }}
-      </a>
+      </a-button>
     </a-popconfirm>
     
     <!-- 更多操作下拉菜单 -->
@@ -104,6 +104,9 @@ export interface MoreAction {
   permission?: string | string[]
 }
 
+/** 行数据来自 a-table 的 bodyCell 插槽，字段由各页表格自行决定 */
+export type ActionRecord = Record<string, unknown>
+
 export interface PermissionConfig {
   edit?: boolean | string | string[]
   view?: boolean | string | string[]
@@ -116,8 +119,8 @@ export interface PermissionConfig {
 
 export interface Props {
   /** 当前行数据 */
-  record?: any
-  /** 标准按钮权限前缀，例如 system:role、system:config:firmware */
+  record?: ActionRecord
+  /** 标准按钮权限前缀，例如 system:role、system:config */
   permissionPrefix?: string
   /** 是否显示编辑按钮 */
   showEdit?: boolean
@@ -188,13 +191,13 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 export interface Emits {
-  (e: 'edit', record: any): void
-  (e: 'view', record: any): void
-  (e: 'delete', record: any): void
-  (e: 'download', record: any): void
-  (e: 'copy', record: any): void
-  (e: 'setDefault', record: any): void
-  (e: 'more', action: string, record: any): void
+  (e: 'edit', record?: ActionRecord): void
+  (e: 'view', record?: ActionRecord): void
+  (e: 'delete', record?: ActionRecord): void
+  (e: 'download', record?: ActionRecord): void
+  (e: 'copy', record?: ActionRecord): void
+  (e: 'setDefault', record?: ActionRecord): void
+  (e: 'more', action: string, record?: ActionRecord): void
 }
 
 const emit = defineEmits<Emits>()
@@ -283,6 +286,13 @@ const handleMoreAction = ({ key }: { key: string }) => emit('more', key, props.r
 </script>
 
 <style scoped lang="scss">
+// 删除按钮用 a-button 承载键盘可达性，去掉 ant 的固定高度与内边距，排版与同列的文字操作保持一致
+.delete-btn.ant-btn {
+  height: auto;
+  padding: 0;
+  border: 0;
+}
+
 .delete-link {
   color: var(--ant-color-error);
 

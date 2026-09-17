@@ -81,7 +81,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/store/user'
 import { useAvatar } from '@/composables/useAvatar'
@@ -89,21 +88,13 @@ import { queryDevices } from '@/services/device'
 import { queryMessages } from '@/services/message'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-// @ts-ignore
 import jsonp from 'jsonp'
 import type { Device } from '@/types/device'
 import type { Message } from '@/types/message'
-import {
-  RobotOutlined,
-  UserOutlined,
-  MessageOutlined,
-  ApiOutlined
-} from '@ant-design/icons-vue'
 import request from '@/services/request'
 import api from '@/services/api'
 
 const { t } = useI18n()
-const router = useRouter()
 const userStore = useUserStore()
 const { getAvatarUrl } = useAvatar()
 
@@ -205,7 +196,7 @@ const userAvatar = computed(() => {
   if (userInfo.value?.avatar) {
     return getAvatarUrl(userInfo.value.avatar)
   }
-  return '/user-avatar.png'
+  return '/logo.png'
 })
 
 // 格式化聊天消息
@@ -252,7 +243,7 @@ const fetchDevices = async () => {
     } else {
       message.error(res.message || '获取设备列表失败')
     }
-  } catch (error) {
+  } catch {
     message.error('获取设备列表失败')
   }
 }
@@ -266,7 +257,7 @@ const fetchMessages = async () => {
     } else {
       message.error(res.message || '获取消息列表失败')
     }
-  } catch (error) {
+  } catch {
     message.error('获取消息列表失败')
   }
 }
@@ -276,9 +267,9 @@ async function fetchStats() {
   try {
     const params = { pageNum: 1, pageSize: 1 }
     const [devicesRes, rolesRes, messagesRes] = await Promise.all([
-      request.get(api.device.query, { params }),
-      request.get(api.role.query, { params }),
-      request.get(api.message.query, { params })
+      request.get(api.device, { params }),
+      request.get(api.role.root, { params }),
+      request.get(api.message.root, { params })
     ])
     
     stats.value.devices = devicesRes.data?.total ?? 0

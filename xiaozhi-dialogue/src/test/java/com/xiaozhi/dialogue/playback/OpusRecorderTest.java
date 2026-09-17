@@ -32,7 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * AI 回复录音落盘的硬约束：
+ * AI 回复录音落盘的
  * granule position 必须逐帧累加写入，恒为 0 会被符合规范的解码器（ffmpeg / 浏览器）
  * 按 end-trim 裁成 0 时长；句间与暂停下发的静音帧只喂 AEC，写进录音会把每条回复撑长。
  */

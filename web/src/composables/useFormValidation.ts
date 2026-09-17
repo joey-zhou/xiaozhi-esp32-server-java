@@ -1,33 +1,55 @@
 import type { Rule } from 'ant-design-vue/es/form'
 import type { Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  VALIDATION_RULES,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+} from '@/constants/api'
 
-// 创建验证规则的工厂函数
-export function createValidationRules() {
+/** 姓名长度上限，真源 UserRegisterReq.name 的 @Size(max = 50) */
+const NAME_MAX_LENGTH = 50
+/** 姓名长度下限，前端附加要求，后端无约束 */
+const NAME_MIN_LENGTH = 2
+
+// 规则统一 blur + change 触发：只在失焦时校验会让用户改完输入仍看到上一次的旧错误
+export function useFormValidation() {
   const { t } = useI18n()
 
   return {
     // 邮箱验证规则
     emailRules: [
-      { required: true, message: t('validation.enterEmail'), trigger: 'blur' },
-      { type: 'email', message: t('validation.enterValidEmail'), trigger: 'blur' },
+      { required: true, message: t('validation.enterEmail'), trigger: ['blur', 'change'] },
+      { type: 'email', message: t('validation.enterValidEmail'), trigger: ['blur', 'change'] },
     ] as Rule[],
 
     // 用户名验证规则
     usernameRules: [
-      { required: true, message: t('validation.enterUsername'), trigger: 'blur' },
-      { min: 3, max: 20, message: t('validation.usernameLength', { min: 3, max: 20 }), trigger: 'blur' },
+      { required: true, message: t('validation.enterUsername'), trigger: ['blur', 'change'] },
+      {
+        min: USERNAME_MIN_LENGTH,
+        max: USERNAME_MAX_LENGTH,
+        message: t('validation.usernameLength', { min: USERNAME_MIN_LENGTH, max: USERNAME_MAX_LENGTH }),
+        trigger: ['blur', 'change'],
+      },
       {
         pattern: /^[a-zA-Z0-9_]+$/,
         message: t('validation.username'),
-        trigger: 'blur',
+        trigger: ['blur', 'change'],
       },
     ] as Rule[],
 
     // 密码验证规则
     passwordRules: [
-      { required: true, message: t('validation.enterPassword'), trigger: 'blur' },
-      { min: 6, max: 20, message: t('validation.passwordLength', { min: 6, max: 20 }), trigger: 'blur' },
+      { required: true, message: t('validation.enterPassword'), trigger: ['blur', 'change'] },
+      {
+        min: PASSWORD_MIN_LENGTH,
+        max: PASSWORD_MAX_LENGTH,
+        message: t('validation.passwordLength', { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }),
+        trigger: ['blur', 'change'],
+      },
     ] as Rule[],
 
     // 确认密码验证规则（响应式版本）
@@ -42,64 +64,34 @@ export function createValidationRules() {
           }
           return Promise.resolve()
         },
-        trigger: 'blur',
+        trigger: ['blur', 'change'],
       },
     ],
 
     // 验证码规则
     verificationCodeRules: [
-      { required: true, message: t('validation.enterVerificationCode'), trigger: 'blur' },
-      { len: 6, message: t('validation.verificationCodeLength', { length: 6 }), trigger: 'blur' },
+      { required: true, message: t('validation.enterVerificationCode'), trigger: ['blur', 'change'] },
+      { len: 6, message: t('validation.verificationCodeLength', { length: 6 }), trigger: ['blur', 'change'] },
     ] as Rule[],
 
     // 手机号规则（可选）
     telRules: [
       {
-        pattern: /^1[3-9]\d{9}$/,
+        pattern: VALIDATION_RULES.PHONE_PATTERN,
         message: t('validation.enterValidPhone'),
-        trigger: 'blur',
+        trigger: ['blur', 'change'],
       },
     ] as Rule[],
 
     // 姓名规则
     nameRules: [
-      { required: true, message: t('validation.enterName'), trigger: 'blur' },
-      { min: 2, max: 20, message: t('validation.nameLength', { min: 2, max: 20 }), trigger: 'blur' },
+      { required: true, message: t('validation.enterName'), trigger: ['blur', 'change'] },
+      {
+        min: NAME_MIN_LENGTH,
+        max: NAME_MAX_LENGTH,
+        message: t('validation.nameLength', { min: NAME_MIN_LENGTH, max: NAME_MAX_LENGTH }),
+        trigger: ['blur', 'change'],
+      },
     ] as Rule[],
   }
-}
-
-// 主要的 composable 函数
-export function useFormValidation() {
-  return createValidationRules()
-}
-
-// 为了向后兼容，提供延迟初始化的规则
-// 这些函数需要在 setup 上下文中调用
-export function useEmailRules() {
-  return createValidationRules().emailRules
-}
-
-export function useUsernameRules() {
-  return createValidationRules().usernameRules
-}
-
-export function usePasswordRules() {
-  return createValidationRules().passwordRules
-}
-
-export function useVerificationCodeRules() {
-  return createValidationRules().verificationCodeRules
-}
-
-export function useTelRules() {
-  return createValidationRules().telRules
-}
-
-export function useNameRules() {
-  return createValidationRules().nameRules
-}
-
-export function useConfirmPasswordRules(passwordRef: Ref<string>) {
-  return createValidationRules().confirmPasswordRules(passwordRef)
 }

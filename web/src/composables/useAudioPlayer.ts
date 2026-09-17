@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { testVoice } from '@/services/role'
@@ -74,7 +74,7 @@ export function useAudioPlayer() {
       playingAudioId.value = audioId
 
       return true
-    } catch (error) {
+    } catch {
       // 播放失败，清除播放状态
       // 注意：不在这里显示错误提示，因为 audio.onerror 会处理错误提示
       playingAudioId.value = ''
@@ -220,6 +220,11 @@ export function useAudioPlayer() {
     })
     audioCache.clear()
   }
+
+  // 卸载时停掉并释放缓存，否则试听音频会跟着用户跑到下一个页面继续播
+  onBeforeUnmount(() => {
+    clearAudioCache()
+  })
 
   return {
     playingAudioId,

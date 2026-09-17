@@ -20,17 +20,31 @@ import org.springframework.stereotype.Component;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Aspect
 @Component
 public class OwnershipAspect {
 
+    /** SpEL 里对方法参数的引用，如 #roleId、#param.roleId 取到的根变量名。 */
+    private static final Pattern VARIABLE_REFERENCE = Pattern.compile("#(\\w+)");
+
+    /** MethodBasedEvaluationContext 除参数名外还注入的内建变量。 */
+    private static final Set<String> BUILTIN_VARIABLES = Set.of("root", "this");
+
     private final Map<String, OwnershipChecker> checkerMap = new LinkedHashMap<>();
     private final ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
     private final ExpressionParser expressionParser = new SpelExpressionParser();
+    /** 已通过表达式变量名校验的方法，校验只做一次。 */
+    private final Map<Method, Boolean> validatedMethods = new ConcurrentHashMap<>();
 
     @Resource
     private UserService userService;
@@ -48,6 +62,8 @@ public class OwnershipAspect {
         if (annotations.length == 0) {
             return;
         }
+
+        validatedMethods.computeIfAbsent(method, m -> requireResolvableVariables(m, annotations));
 
         StpUtil.checkLogin();
         Integer userId = resolveCurrentUserId();
@@ -76,6 +92,35 @@ public class OwnershipAspect {
                 checker.check(candidateId, userId);
             }
         }
+    }
+
+    /**
+     * 表达式里引用的变量必须都是该方法的真实参数名，否则 SpEL 求值为 null，整条归属校验会被静默跳过。
+     * 参数名取不到（编译未带 -parameters）时同样判失败，此时所有 #param 都会解析为 null。
+     */
+    private boolean requireResolvableVariables(Method method, CheckOwner[] annotations) {
+        String[] parameterNames = parameterNameDiscoverer.getParameterNames(method);
+        if (parameterNames == null) {
+            throw new IllegalStateException("无法解析方法参数名，归属校验表达式不可用: " + method);
+        }
+        Set<String> knownVariables = new HashSet<>(Arrays.asList(parameterNames));
+        knownVariables.addAll(BUILTIN_VARIABLES);
+        for (int i = 0; i < parameterNames.length; i++) {
+            knownVariables.add("a" + i);
+            knownVariables.add("p" + i);
+        }
+
+        for (CheckOwner annotation : annotations) {
+            Matcher matcher = VARIABLE_REFERENCE.matcher(annotation.id());
+            while (matcher.find()) {
+                String variable = matcher.group(1);
+                if (!knownVariables.contains(variable)) {
+                    throw new IllegalStateException(
+                        "归属校验表达式引用了不存在的方法参数 #" + variable + ": " + method);
+                }
+            }
+        }
+        return true;
     }
 
     private Integer resolveCurrentUserId() {

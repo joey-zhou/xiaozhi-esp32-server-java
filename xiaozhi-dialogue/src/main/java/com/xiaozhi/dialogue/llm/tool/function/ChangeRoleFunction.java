@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 通过语音切换角色函数
  */
+@Component
 @Slf4j
 // @Component
 public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
@@ -50,6 +51,10 @@ public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
             return null;
         }
         DeviceBO device = chatSession.getDevice();
+        // 注册期抛异常会让整批系统工具都注册不上，取不到设备就当没有这个工具
+        if (device == null || device.getUserId() == null) {
+            return null;
+        }
         List<RoleBO> roleList = roleService.listBO(device.getUserId(), 5);
         if(!roleList.isEmpty() && roleList.size() > 1) {
             return FunctionToolCallback
@@ -67,12 +72,15 @@ public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
                                 device.setRoleId(role.getRoleId());
                                 device.setRoleName(role.getRoleName());
                                 // 切换了角色，需要更换Conversation
-                                if(chatSession.getPersona().getConversation()!=null){
-                                    chatSession.getPersona().getConversation().clear();
+                                Persona current = chatSession.getPersona();
+                                if(current != null && current.getConversation() != null){
+                                    current.getConversation().clear();
                                 }
 
-                                Persona persona = personaFactory.buildPersona(chatSession, device, role);
-                                chatSession.setPersona(persona);
+                                // buildPersona 对已有 Persona 幂等，先摘掉旧的才会按新角色重建；
+                                // 必须紧接着重建，会话中途没有 Persona 的语音轮次会被整轮丢弃
+                                chatSession.setPersona(null);
+                                personaFactory.buildPersona(chatSession, device, role);
                                 return "角色已切换至" + roleName;
                             }else{
                                 return "角色切换失败, 没有对应角色哦";

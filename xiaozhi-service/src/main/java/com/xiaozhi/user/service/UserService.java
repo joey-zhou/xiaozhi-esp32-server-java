@@ -25,5 +25,9 @@ public interface UserService {
 
     String generateCaptcha(String account);
 
-    boolean checkCaptcha(String account, String code);
+    /** 校验验证码并立即消费，命中一次后同一条码不再可用；连续失败达上限会作废该账号所有未过期的码。 */
+    boolean consumeCaptcha(String account, String code);
+
+    /** 账号 state 为禁用时抛 UnauthorizedException，user 为 null 时不判断。 */
+    void requireEnabled(UserBO user);
 }

@@ -41,7 +41,9 @@ interface AudioConfig {
 }
 
 interface StreamingContext {
-  queue: number[]
+  // 解码后的 PCM 按帧分片存放：number[] 每个样本都装箱，且 splice 取头部要整体搬移
+  queue: Float32Array[]
+  queuedSamples: number
   playing: boolean
   endOfStream: boolean
   source: AudioBufferSourceNode | null
@@ -101,40 +103,54 @@ let audioBufferQueue: Uint8Array[] = []
 let isAudioBuffering = false
 let isAudioPlaying = false
 let streamingContext: StreamingContext | null = null
-let audioContextResumePromise: Promise<AudioContext> | null = null
+let audioContextResumePromise: Promise<AudioContext | null> | null = null
+// tts/stop 早于解码链路建立时的结束标记，等 streamingContext 建好再落上去
+let pendingStreamEnd = false
 
 // =============================
 // 音频上下文初始化
 // =============================
 
+const RESUME_GESTURES = ['click', 'touchstart', 'keydown'] as const
+
+/**
+ * 挂上用户交互监听，等一次交互后 resume 音频上下文。
+ * 无论 resume 成功还是抛错都必须摘掉监听并 settle，否则失败一次就永远挂着监听、调用方也永远等不到结果。
+ */
+function resumeOnUserGesture(failureLog: string): Promise<AudioContext | null> {
+  return new Promise((resolve) => {
+    const detach = () => {
+      RESUME_GESTURES.forEach(event => document.removeEventListener(event, onGesture))
+      audioContextResumePromise = null
+    }
+
+    const onGesture = async () => {
+      if (!audioContext) {
+        detach()
+        resolve(null)
+        return
+      }
+      try {
+        await audioContext.resume()
+        log('音频上下文已通过用户交互恢复', 'success')
+        detach()
+        resolve(audioContext)
+      } catch (err) {
+        log(`${failureLog}: ${err}`, 'error')
+        detach()
+        resolve(null)
+      }
+    }
+
+    RESUME_GESTURES.forEach(event => document.addEventListener(event, onGesture))
+  })
+}
+
 async function initAudioContext(): Promise<AudioContext | null> {
   if (audioContext) {
     if (audioContext.state === 'suspended' && !audioContextResumePromise) {
-      audioContextResumePromise = new Promise((resolve) => {
-        log('音频上下文已暂停。需要用户交互才能恢复。', 'warning')
-
-        const resumeAudioContext = async () => {
-          try {
-            if (audioContext) {
-              await audioContext.resume()
-              log('音频上下文已通过用户交互恢复', 'success')
-              resolve(audioContext)
-
-              ;['click', 'touchstart', 'keydown'].forEach(event => {
-                document.removeEventListener(event, resumeAudioContext)
-              })
-              audioContextResumePromise = null
-            }
-          } catch (err) {
-            log('恢复音频上下文失败: ' + err, 'error')
-          }
-        }
-
-        ;['click', 'touchstart', 'keydown'].forEach(event => {
-          document.addEventListener(event, resumeAudioContext, { once: false })
-        })
-      })
-
+      log('音频上下文已暂停。需要用户交互才能恢复。', 'warning')
+      audioContextResumePromise = resumeOnUserGesture('恢复音频上下文失败')
       return audioContextResumePromise
     }
     return audioContext
@@ -146,37 +162,13 @@ async function initAudioContext(): Promise<AudioContext | null> {
       sampleRate: defaultConfig.sampleRate,
       latencyHint: 'interactive'
     })
+    window.audioContext = audioContext
 
     if (audioContext.state === 'suspended') {
       log('新创建的音频上下文处于暂停状态。需要用户交互才能启动。', 'warning')
-
-      audioContextResumePromise = new Promise((resolve) => {
-        const resumeAudioContext = async () => {
-          try {
-            if (audioContext) {
-              await audioContext.resume()
-              log('音频上下文已通过用户交互启动', 'success')
-              resolve(audioContext)
-
-              ;['click', 'touchstart', 'keydown'].forEach(event => {
-                document.removeEventListener(event, resumeAudioContext)
-              })
-              audioContextResumePromise = null
-            }
-          } catch (err) {
-            log('启动音频上下文失败: ' + err, 'error')
-          }
-        }
-
-        ;['click', 'touchstart', 'keydown'].forEach(event => {
-          document.addEventListener(event, resumeAudioContext, { once: false })
-        })
-      })
-
+      audioContextResumePromise = resumeOnUserGesture('启动音频上下文失败')
       return audioContextResumePromise
     }
-
-    window.audioContext = audioContext
 
     return audioContext
   } catch (error) {
@@ -240,6 +232,9 @@ function checkOpusLoaded(): boolean {
   }
 }
 
+/** 候选路径：libopus.js 放在 public 根目录，其余是历史部署形态的兜底 */
+const OPUS_SCRIPT_PATHS = ['/libopus.js', '/js/libopus.js', '/static/js/libopus.js']
+
 export function loadOpusLibrary(): Promise<boolean> {
   return new Promise(resolve => {
     if (checkOpusLoaded()) {
@@ -249,72 +244,57 @@ export function loadOpusLibrary(): Promise<boolean> {
 
     log('尝试加载libopus.js', 'info')
 
-    const possiblePaths = [
-      '/libopus.js',
-      '/js/libopus.js',
-      '/static/js/libopus.js',
-      './libopus.js',
-      '../js/libopus.js'
-    ]
-
-    const script = document.createElement('script')
-    script.async = true
-
-    script.onload = () => {
-      log('libopus.js脚本加载成功，等待初始化', 'success')
-
-      const maxAttempts = 100
-      let attempts = 0
-
-      const checkModule = () => {
-        if (checkOpusLoaded()) {
-          log('Opus库初始化成功', 'success')
-          resolve(true)
-          return
-        }
-
-        if (attempts >= maxAttempts) {
-          log('Opus库初始化超时', 'error')
-          resolve(false)
-          return
-        }
-
-        attempts++
-        setTimeout(checkModule, 100)
-      }
-
-      checkModule()
-    }
-
-    script.onerror = () => {
-      log('libopus.js加载失败，尝试下一个路径', 'warning')
-      tryNextPath()
-    }
-
-    let pathIndex = 0
-
-    function tryNextPath() {
-      if (pathIndex >= possiblePaths.length) {
+    // 每个候选路径都要新建 script 元素：已经开始过加载的 script 改 src 不会重新请求，
+    // 复用同一个元素会让第二个之后的路径全部形同虚设
+    const tryPath = (pathIndex: number) => {
+      const path = OPUS_SCRIPT_PATHS[pathIndex]
+      if (!path) {
         log('所有路径都尝试失败', 'error')
         resolve(false)
         return
       }
 
-      const path = possiblePaths[pathIndex]
-      pathIndex++
+      log(`尝试从路径加载: ${path}`, 'info')
+      const script = document.createElement('script')
+      script.async = true
+      script.src = path
 
-      if (!path) {
-        log('路径为空，加载失败', 'error')
-        resolve(false)
-        return
+      script.onload = () => {
+        log('libopus.js脚本加载成功，等待初始化', 'success')
+
+        const maxAttempts = 100
+        let attempts = 0
+
+        const checkModule = () => {
+          if (checkOpusLoaded()) {
+            log('Opus库初始化成功', 'success')
+            resolve(true)
+            return
+          }
+
+          if (attempts >= maxAttempts) {
+            log('Opus库初始化超时', 'error')
+            resolve(false)
+            return
+          }
+
+          attempts++
+          setTimeout(checkModule, 100)
+        }
+
+        checkModule()
       }
 
-      log(`尝试从路径加载: ${path}`, 'info')
-      script.src = path
+      script.onerror = () => {
+        log(`libopus.js 从 ${path} 加载失败，尝试下一个路径`, 'warning')
+        script.remove()
+        tryPath(pathIndex + 1)
+      }
+
       document.head.appendChild(script)
     }
 
-    tryNextPath()
+    tryPath(0)
   })
 }
 
@@ -500,21 +480,75 @@ export async function initOpusDecoder(): Promise<OpusDecoder | null> {
 // 音频播放
 // =============================
 
-function convertInt16ToFloat32(int16Data: Int16Array): number[] {
-  const float32Data: number[] = []
+function convertInt16ToFloat32(int16Data: Int16Array): Float32Array {
+  const float32Data = new Float32Array(int16Data.length)
   for (let i = 0; i < int16Data.length; i++) {
-    const sample = int16Data[i]
-    if (sample !== undefined) {
-      float32Data.push(sample / (sample < 0 ? 0x8000 : 0x7fff))
-    }
+    const sample = int16Data[i] ?? 0
+    float32Data[i] = sample / (sample < 0 ? 0x8000 : 0x7fff)
   }
   return float32Data
+}
+
+/**
+ * 从分片队列头部取出至多 maxSamples 个样本拼成一段。
+ * 只在跨界的那一片上做切分，不整体搬移队列。
+ */
+function takeSamples(context: StreamingContext, maxSamples: number): Float32Array {
+  const wanted = Math.min(maxSamples, context.queuedSamples)
+  const out = new Float32Array(wanted)
+  let filled = 0
+  while (filled < wanted) {
+    const chunk = context.queue[0]
+    if (!chunk) break
+    const remain = wanted - filled
+    if (chunk.length <= remain) {
+      out.set(chunk, filled)
+      filled += chunk.length
+      context.queue.shift()
+    } else {
+      out.set(chunk.subarray(0, remain), filled)
+      context.queue[0] = chunk.subarray(remain)
+      filled += remain
+    }
+  }
+  context.queuedSamples -= filled
+  return filled === wanted ? out : out.subarray(0, filled)
 }
 
 function resetAudioBuffer(): void {
   audioBufferQueue = []
   isAudioBuffering = false
   isAudioPlaying = false
+  pendingStreamEnd = false
+}
+
+/**
+ * 标记本轮 TTS 音频流已结束。
+ * 服务端只用 {"type":"tts","state":"stop"} 表达流结束，不会发空音频帧。
+ */
+export function markStreamEnd(): boolean {
+  // 还没起播：streamingContext 要等解码链路建好才有，先记下结束标记
+  if (!isAudioPlaying && audioBufferQueue.length > 0) {
+    pendingStreamEnd = true
+    void playBufferedAudio()
+    return true
+  }
+
+  if (streamingContext) {
+    streamingContext.endOfStream = true
+    // 已经播完在等后续数据，不会再有 onended 收尾，这里直接释放
+    if (!streamingContext.playing && streamingContext.queuedSamples === 0 && audioBufferQueue.length === 0) {
+      isAudioPlaying = false
+      streamingContext = null
+      window.streamingContext = undefined
+    }
+    return true
+  }
+
+  // 既没在播也没有待播数据：复位，避免 isAudioPlaying 悬挂为 true
+  isAudioPlaying = false
+  isAudioBuffering = false
+  return false
 }
 
 function addAudioToBuffer(opusData: Uint8Array): boolean {
@@ -604,6 +638,7 @@ async function playBufferedAudio(): Promise<boolean> {
     if (!streamingContext) {
       streamingContext = {
         queue: [],
+        queuedSamples: 0,
         playing: false,
         endOfStream: false,
         source: null,
@@ -617,25 +652,25 @@ async function playBufferedAudio(): Promise<boolean> {
             return
           }
 
-          const decodedSamples: number[] = []
+          let decodedSamples = 0
           for (const frame of opusFrames) {
             try {
               const frameData = opusDecoder.decode(frame)
               if (frameData && frameData.length > 0) {
-                const floatData = convertInt16ToFloat32(frameData)
-                decodedSamples.push(...floatData)
+                this.queue.push(convertInt16ToFloat32(frameData))
+                decodedSamples += frameData.length
               }
             } catch (error) {
               log('Opus解码失败: ' + error, 'error')
             }
           }
 
-          if (decodedSamples.length > 0) {
-            this.queue.push(...decodedSamples)
-            this.totalSamples += decodedSamples.length
+          if (decodedSamples > 0) {
+            this.queuedSamples += decodedSamples
+            this.totalSamples += decodedSamples
 
             const minSamples = defaultConfig.sampleRate * 0.1
-            if (!this.playing && this.queue.length >= minSamples) {
+            if (!this.playing && this.queuedSamples >= minSamples) {
               this.startPlaying()
             }
           } else {
@@ -644,7 +679,7 @@ async function playBufferedAudio(): Promise<boolean> {
         },
 
         startPlaying: function () {
-          if (this.playing || this.queue.length === 0 || !audioContext) return
+          if (this.playing || this.queuedSamples === 0 || !audioContext) return
 
           if (audioContext.state === 'suspended') {
             log('音频上下文仍处于暂停状态，无法播放', 'warning')
@@ -653,21 +688,13 @@ async function playBufferedAudio(): Promise<boolean> {
 
           this.playing = true
 
-          const minPlaySamples = Math.min(this.queue.length, defaultConfig.sampleRate)
-          const currentSamples = this.queue.splice(0, minPlaySamples)
+          const currentSamples = takeSamples(this, defaultConfig.sampleRate)
           const audioBuffer = audioContext.createBuffer(
             defaultConfig.channels,
             currentSamples.length,
             defaultConfig.sampleRate
           )
-
-          const channelData = audioBuffer.getChannelData(0)
-          for (let i = 0; i < currentSamples.length; i++) {
-            const sample = currentSamples[i]
-            if (sample !== undefined) {
-              channelData[i] = sample
-            }
-          }
+          audioBuffer.getChannelData(0).set(currentSamples)
 
           this.source = audioContext.createBufferSource()
           this.source.buffer = audioBuffer
@@ -702,12 +729,20 @@ async function playBufferedAudio(): Promise<boolean> {
           )
 
           this.source.onended = () => {
+            // 播完必须逐个 disconnect：只置 null 的话这三个节点还挂在音频图上，不会被回收
+            try {
+              this.source?.disconnect()
+              analyserNode.disconnect()
+              gainNode.disconnect()
+            } catch {
+              // 忽略重复断开
+            }
             this.source = null
             this.analyser = null
             this.playing = false
 
             // 继续播放队列中的数据
-            if (this.queue.length > 0) {
+            if (this.queuedSamples > 0) {
               setTimeout(() => this.startPlaying(), 10)
             }
             // 检查是否有新的缓冲数据
@@ -738,6 +773,11 @@ async function playBufferedAudio(): Promise<boolean> {
       window.streamingContext = streamingContext
     }
 
+    if (pendingStreamEnd) {
+      streamingContext.endOfStream = true
+      pendingStreamEnd = false
+    }
+
     const frames = [...audioBufferQueue]
     audioBufferQueue = []
 
@@ -757,25 +797,24 @@ export function stopAudioPlayback(): boolean {
   try {
     isAudioPlaying = false
     isAudioBuffering = false
+    pendingStreamEnd = false
 
     if (streamingContext && streamingContext.source) {
       try {
         streamingContext.source.stop()
-        streamingContext.source = null
-        streamingContext.analyser = null
-      } catch (e) {
+        streamingContext.source.disconnect()
+        streamingContext.analyser?.disconnect()
+      } catch {
         // 忽略已停止的音频源错误
       }
+      streamingContext.source = null
+      streamingContext.analyser = null
     }
 
     audioBufferQueue = []
     streamingContext = null
 
     window.streamingContext = undefined
-
-    if (window.dispatchEvent) {
-      window.dispatchEvent(new CustomEvent('audio-playback-stopped'))
-    }
 
     log('音频播放已停止', 'info')
     return true
@@ -791,7 +830,7 @@ export function stopAudioPlayback(): boolean {
 
 export async function initAudio(): Promise<boolean> {
   try {
-    const context = await initAudioContext()
+    await initAudioContext()
 
     window.enableAudio = async function () {
       try {
@@ -808,7 +847,7 @@ export async function initAudio(): Promise<boolean> {
               log(`Opus库加载成功 (尝试 ${i + 1}/3)`, 'success')
               break
             }
-          } catch (err) {
+          } catch {
             log(`尝试 ${i + 1}/3 加载libopus.js失败，将重试`, 'warning')
           }
         }
@@ -848,36 +887,12 @@ export async function handleBinaryAudioMessage(data: ArrayBuffer): Promise<boole
     log(`收到ArrayBuffer音频数据，大小: ${data.byteLength}字节`, 'debug')
 
     const opusData = new Uint8Array(data)
-
-    if (opusData.length > 0) {
-      addAudioToBuffer(opusData)
-
-      if (window.dispatchEvent) {
-        window.dispatchEvent(
-          new CustomEvent('audio-data-received', {
-            detail: { dataLength: opusData.length }
-          })
-        )
-      }
-
-      return true
-    } else {
-      log('收到空音频数据帧，可能是结束标志', 'warning')
-
-      if (audioBufferQueue.length > 0 && !isAudioPlaying) {
-        playBufferedAudio()
-      }
-
-      if (isAudioPlaying && streamingContext) {
-        streamingContext.endOfStream = true
-      }
-
-      if (window.dispatchEvent) {
-        window.dispatchEvent(new CustomEvent('audio-playback-ended'))
-      }
-
-      return true
+    if (opusData.length === 0) {
+      return false
     }
+
+    addAudioToBuffer(opusData)
+    return true
   } catch (error) {
     log('处理二进制消息出错:' + error, 'error')
     return false

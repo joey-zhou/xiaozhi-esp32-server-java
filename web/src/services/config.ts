@@ -7,28 +7,28 @@ import type { PlatformConfig } from '@/types/agent'
  * 查询配置列表
  */
 export function queryConfigs(params: Partial<ConfigQueryParams>) {
-  return http.getPage<Config>(api.config.query, params)
+  return http.getPage<Config>(api.config.root, params)
 }
 
 /**
  * 添加配置
  */
 export function addConfig(data: Partial<Config>) {
-  return http.post(api.config.add, data)
+  return http.post(api.config.root, data)
 }
 
 /**
  * 更新配置
  */
 export function updateConfig(data: Partial<Config>) {
-  return http.put(`${api.config.update}/${data.configId}`, data)
+  return http.put(`${api.config.root}/${data.configId}`, data)
 }
 
 /**
  * 删除配置
  */
 export function deleteConfig(configId: number) {
-  return http.delete(`${api.config.delete}/${configId}`)
+  return http.delete(`${api.config.root}/${configId}`)
 }
 
 /**
@@ -39,10 +39,10 @@ export function testConfig(data: Partial<Config>) {
 }
 
 /**
- * 查询平台配置
+ * 查询平台配置（智能体 / 音色克隆平台，返回的是 PlatformConfig 形状）
  */
 export function queryPlatformConfig(configType: string, provider: string) {
-  return http.getPage<Config>(api.config.query, {
+  return http.getPage<PlatformConfig>(api.config.root, {
     configType,
     provider
   })
@@ -52,12 +52,12 @@ export function queryPlatformConfig(configType: string, provider: string) {
  * 添加平台配置
  */
 export function addPlatformConfig(data: Partial<PlatformConfig>) {
-  return http.post(api.config.add, data)
+  return http.post(api.config.root, data)
 }
 
 /**
  * 更新平台配置
  */
 export function updatePlatformConfig(data: Partial<PlatformConfig>) {
-  return http.put(`${api.config.update}/${data.configId}`, data)
+  return http.put(`${api.config.root}/${data.configId}`, data)
 }

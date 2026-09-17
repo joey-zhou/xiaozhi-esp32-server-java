@@ -35,10 +35,10 @@ class ModuleBoundaryArchTest {
         "com.qcloud..", "software.amazon.."
     };
 
-    /** 生产代码改好后，连同 {@link #knownProviderSdkUsersInServerModule} 一起删。 */
+    /** WebChatService 的内部会话状态类持有同一个 ChatModel，一并豁免 */
     private static final String SDK_KNOWN_VIOLATIONS =
         "com\\.xiaozhi\\.(config\\.ConfigConnectionChecker"
-            + "|server\\.web\\.chat\\.WebChatService"
+            + "|server\\.web\\.chat\\.WebChatService(\\$\\w+)?"
             + "|utils\\.SmsUtils)";
 
     /** 路径匹配失效会扫到 0 个类而假绿，用它的规则须先过 {@link #serverModuleIsActuallyScanned}。 */

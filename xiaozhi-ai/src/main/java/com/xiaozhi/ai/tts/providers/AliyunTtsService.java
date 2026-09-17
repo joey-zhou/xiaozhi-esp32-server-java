@@ -21,9 +21,8 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.HashMap;
@@ -37,14 +36,9 @@ public class AliyunTtsService implements TtsService {
     private static final long RETRY_DELAY_MS = 1000;
     private static final long TTS_TIMEOUT_SECONDS = 5;
 
-    private static final ExecutorService sharedExecutor = new ThreadPoolExecutor(
-            0, 20, 60L, TimeUnit.SECONDS,
-            new SynchronousQueue<>(),
-            r -> {
-                Thread t = new Thread(r, "aliyun-tts-worker");
-                t.setDaemon(true);
-                return t;
-            });
+    // 共享线程池，任务体是阻塞式合成（SDK 同步调用），每任务一条虚拟线程，不设并发上限
+    private static final ExecutorService sharedExecutor = Executors.newThreadPerTaskExecutor(
+            Thread.ofVirtual().name("aliyun-tts-worker-", 0).factory());
 
     static {
         // 注册JVM关闭钩子，确保线程池被正确关闭

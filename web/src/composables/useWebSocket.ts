@@ -13,6 +13,8 @@ import {
   registerStatusChangeCallback,
   unregisterStatusChangeCallback,
   registerBinaryHandler,
+  unregisterBinaryHandler,
+  registerTtsStateHandler,
   sendBinaryFrame,
   messages,
   clearMessages,
@@ -20,7 +22,13 @@ import {
   type WebSocketMessage,
   type ConnectionStatus
 } from '@/services/websocket'
-import { initAudio, handleBinaryAudioMessage } from '@/services/audio'
+import {
+  initAudio,
+  cleanupAudio,
+  handleBinaryAudioMessage,
+  markStreamEnd,
+  stopAudioPlayback
+} from '@/services/audio'
 import { startMicrophoneCapture, stopMicrophoneCapture } from '@/services/audioRecorder'
 
 export function useWebSocket() {
@@ -38,14 +46,30 @@ export function useWebSocket() {
     sessionId.value = status.sessionId
   }
 
+  // 服务端只用 tts 的 start/stop 表达音频流边界，这里把它落到音频服务上
+  const handleTtsState = (state: 'start' | 'stop') => {
+    if (state === 'start') {
+      // 上一轮的音频源与 streamingContext 必须整体丢弃，否则残留的 endOfStream 会让新流一开播就判结束
+      stopAudioPlayback()
+    } else {
+      markStreamEnd()
+    }
+  }
+
   // 注册状态变更回调
   registerStatusChangeCallback(handleStatusChange)
+  registerTtsStateHandler(handleTtsState)
 
   // 组件卸载时清理
   onBeforeUnmount(() => {
     unregisterStatusChangeCallback(handleStatusChange)
+    registerTtsStateHandler(null)
     // 录音中卸载时释放麦克风，否则浏览器录音标识会一直亮着
     void stopMicrophoneCapture()
+    unregisterBinaryHandler(handleBinaryAudioMessage)
+    // 释放 AudioContext 与 Opus 解码器，内部会先停掉正在播放的音频
+    cleanupAudio()
+    disconnectFromServer()
   })
 
   // 连接到服务器
@@ -68,6 +92,8 @@ export function useWebSocket() {
 
   // 断开连接
   const disconnect = (): boolean => {
+    // 摘掉二进制处理函数，重连时由 connect 重新注册
+    unregisterBinaryHandler(handleBinaryAudioMessage)
     return disconnectFromServer()
   }
 
@@ -148,8 +174,9 @@ export function useWebSocket() {
     unregisterMessageHandler(handler)
   }
 
-  // 清空消息
+  // 清空消息（连带停掉仍在缓冲/播放的音频）
   const clearAllMessages = (): boolean => {
+    stopAudioPlayback()
     return clearMessages()
   }
 

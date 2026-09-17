@@ -24,13 +24,13 @@ import com.xiaozhi.common.model.resp.LoginResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.UserResp;
 import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.security.AuthenticationService;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.user.service.WxLoginService;
 import com.xiaozhi.common.model.bo.UserAuthBO;
 import com.xiaozhi.userauth.service.UserAuthService;
 import com.xiaozhi.utils.CaptchaUtils;
-import com.xiaozhi.utils.RequestContextUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -65,6 +65,9 @@ public class UserController extends BaseController {
     @Resource
     private CaptchaUtils captchaUtils;
 
+    @Resource
+    private TrustedProxyPolicy trustedProxyPolicy;
+
     @GetMapping("/check-token")
     @Operation(summary = "检查Token有效性", description = "验证当前Token是否有效，有效则返回用户信息")
     public ApiResponse<LoginResp> checkToken() {
@@ -86,9 +89,12 @@ public class UserController extends BaseController {
             return ApiResponse.unauthorized("用户不存在");
         }
         Integer userId = StpUtil.getLoginIdAsInt();
-        if (userService.getBO(userId) == null) {
+        UserBO user = userService.getBO(userId);
+        if (user == null) {
             return ApiResponse.unauthorized("用户不存在");
         }
+        // 换发 Token 等于重新授予一个完整有效期的访问权，与登录同级，禁用账号不能靠刷新续命
+        userService.requireEnabled(user);
 
         int expireSeconds = userAppService.getTokenExpireSeconds();
         StpUtil.logout();
@@ -99,13 +105,21 @@ public class UserController extends BaseController {
             : ApiResponse.success(response);
     }
 
+    @PostMapping("/logout")
+    @AuditLog(module = "用户管理", operation = "退出登录")
+    @Operation(summary = "退出登录", description = "注销当前会话的 Token，注销后该 Token 立即失效")
+    public ApiResponse<Void> logout() {
+        StpUtil.logout();
+        return ApiResponse.success("退出成功");
+    }
+
     @SaIgnore
     @PostMapping("/login")
     @AuditLog(module = "用户管理", operation = "用户登录")
     @Operation(summary = "用户名密码登录", description = "使用用户名/邮箱/手机号和密码进行登录")
     public ApiResponse<LoginResp> login(@Valid @RequestBody UserLoginReq req, HttpServletRequest request) {
         UserBO user = userAppService.login(req.getUsername(), req.getPassword());
-        userAppService.recordLoginInfo(user, RequestContextUtils.getClientIp(request));
+        userAppService.recordLoginInfo(user, trustedProxyPolicy.resolveClientIp(request));
 
         int expireSeconds = userAppService.getTokenExpireSeconds();
         StpUtil.login(user.getUserId(), expireSeconds);
@@ -117,11 +131,12 @@ public class UserController extends BaseController {
     @AuditLog(module = "用户管理", operation = "手机号登录")
     @Operation(summary = "手机号验证码登录", description = "使用手机号和验证码登录，未注册自动注册")
     public ApiResponse<LoginResp> telLogin(@Valid @RequestBody UserTelLoginReq req, HttpServletRequest request) {
-        if (!userService.checkCaptcha(req.getTel(), req.getCode())) {
+        if (!userService.consumeCaptcha(req.getTel(), req.getCode())) {
             throw new IllegalArgumentException("验证码错误或已过期");
         }
 
         UserBO user = userService.getByTel(req.getTel());
+        userService.requireEnabled(user);
         if (user == null) {
             String suffix = req.getTel().length() >= 4 ? req.getTel().substring(req.getTel().length() - 4) : req.getTel();
             UserBO createUser = new UserBO();
@@ -132,7 +147,7 @@ public class UserController extends BaseController {
             user = userAppService.createUserWithDefaults(createUser);
         }
 
-        userAppService.recordLoginInfo(user, RequestContextUtils.getClientIp(request));
+        userAppService.recordLoginInfo(user, trustedProxyPolicy.resolveClientIp(request));
 
         int expireSeconds = userAppService.getTokenExpireSeconds();
         StpUtil.login(user.getUserId(), expireSeconds);
@@ -175,9 +190,10 @@ public class UserController extends BaseController {
             if (user == null) {
                 throw new ResourceNotFoundException("用户不存在");
             }
+            userService.requireEnabled(user);
         }
 
-        userAppService.recordLoginInfo(user, RequestContextUtils.getClientIp(request));
+        userAppService.recordLoginInfo(user, trustedProxyPolicy.resolveClientIp(request));
 
         int expireSeconds = userAppService.getTokenExpireSeconds();
         StpUtil.login(user.getUserId(), expireSeconds);
@@ -207,6 +223,21 @@ public class UserController extends BaseController {
     @Operation(summary = "修改用户信息", description = "更新用户个人信息")
     public ApiResponse<UserResp> update(@PathVariable Integer userId, @Valid @RequestBody UserUpdateReq req) {
         return ApiResponse.success(userAppService.update(userId, req));
+    }
+
+    @PutMapping("/{userId}/state")
+    @SaCheckPermission("system:user:api:update")
+    @AuditLog(module = "用户管理", operation = "启用禁用账号")
+    @Operation(summary = "启用/禁用账号", description = "state 取 1-正常、0-禁用；禁用后该账号已签发的 Token 立即失效")
+    public ApiResponse<UserResp> updateState(@PathVariable Integer userId, @RequestParam String state) {
+        if (UserBO.STATE_DISABLED.equals(state) && StpUtil.getLoginIdAsInt() == userId.intValue()) {
+            throw new IllegalArgumentException("不能禁用当前登录账号");
+        }
+        UserResp updated = userAppService.updateState(userId, state);
+        if (UserBO.STATE_DISABLED.equals(state)) {
+            StpUtil.logout(userId);
+        }
+        return ApiResponse.success(updated);
     }
 
     @SaIgnore

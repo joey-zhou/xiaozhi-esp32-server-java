@@ -3,6 +3,7 @@ package com.xiaozhi.dialogue.llm.handler;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.dialogue.runtime.DialogueTurn;
 import com.xiaozhi.dialogue.runtime.PersonaListener;
+import com.xiaozhi.common.SerialTaskRegistry;
 import com.xiaozhi.dialogue.runtime.convert.DialogueTurnConverter;
 import com.xiaozhi.message.service.MessageService;
 import jakarta.annotation.Resource;
@@ -28,23 +29,31 @@ public class DialogueListener implements PersonaListener {
     @Resource
     private DialogueTurnConverter dialogueTurnConverter;
 
+    /**
+     * 落库排进本会话队列执行：调用线程是 LLM 流的事件循环线程，不能在上面开阻塞事务。
+     */
     @Override
     public void onDialogueTurn(DialogueTurn turn) {
-        try {
-            messageService.saveAll(dialogueTurnConverter.toMessages(turn));
-        } catch (Exception e) {
-            log.error("对话持久化失败", e);
-        }
+        SerialTaskRegistry.submit(turn.getConversation().getSessionId(), () -> {
+            try {
+                messageService.saveAll(dialogueTurnConverter.toMessages(turn));
+            } catch (Exception e) {
+                log.error("对话持久化失败", e);
+            }
+        });
     }
 
     @Override
     public void onDialogueTurnTruncated(Conversation conversation, Instant assistantMessageCreatedAt, String spokenText) {
-        try {
-            messageService.truncateAssistant(conversation.getOwnerId(), conversation.getRoleId(),
-                    LocalDateTime.ofInstant(assistantMessageCreatedAt, ZoneId.systemDefault()), spokenText);
-        } catch (Exception e) {
-            log.error("截断被打断的助手消息失败", e);
-        }
+        LocalDateTime createdAt = LocalDateTime.ofInstant(assistantMessageCreatedAt, ZoneId.systemDefault());
+        SerialTaskRegistry.submit(conversation.getSessionId(), () -> {
+            try {
+                messageService.truncateAssistant(conversation.getOwnerId(), conversation.getRoleId(),
+                        createdAt, spokenText);
+            } catch (Exception e) {
+                log.error("截断被打断的助手消息失败", e);
+            }
+        });
     }
 
     @Override

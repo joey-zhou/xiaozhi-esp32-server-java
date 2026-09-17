@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 // @Component
 public class PlayListGetter implements ToolsGlobalRegistry.GlobalFunction {
     public static final String TOOL_NAME = "get_playlist";
+    private static final int MAX_PLAYLIST_CHARS = 2000;
 
     @Resource
     private RuntimePathConfig runtimePathConfig;
@@ -27,7 +28,9 @@ public class PlayListGetter implements ToolsGlobalRegistry.GlobalFunction {
     public String getPlayList() {
         try {
             Path playlistPath = Path.of(runtimePathConfig.getMusicDir(), "playlist.txt");
-            return Files.readString(playlistPath);
+            String playlist = Files.readString(playlistPath);
+            // 整份列表会进 LLM 上下文，超长截断
+            return playlist.length() > MAX_PLAYLIST_CHARS ? playlist.substring(0, MAX_PLAYLIST_CHARS) : playlist;
         } catch (IOException e) {
             return "目前没有可播放的歌曲列表";
         }

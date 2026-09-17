@@ -31,7 +31,7 @@ export interface UseClipboardOptions {
   /**
    * 复制失败回调
    */
-  onError?: (error: any) => void
+  onError?: (error: unknown) => void
 }
 
 export function useClipboard(options: UseClipboardOptions = {}) {
@@ -76,7 +76,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
       
       mergedOptions.onSuccess?.(text)
       return true
-    } catch (error: any) {
+    } catch (error) {
       console.error('复制失败:', error)
       
       if (showMessage) {
@@ -129,7 +129,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
       } else {
         throw new Error('execCommand failed')
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('复制失败（降级方案）:', error)
       
       if (showMessage) {
@@ -156,7 +156,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
     try {
       const text = await navigator.clipboard.readText()
       return text
-    } catch (error: any) {
+    } catch (error) {
       console.error('读取剪贴板失败:', error)
       message.error(t('clipboard.pasteFailed'))
       return null
@@ -175,7 +175,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
       await navigator.clipboard.writeText('')
       copiedText.value = ''
       return true
-    } catch (error: any) {
+    } catch (error) {
       console.error('清空剪贴板失败:', error)
       return false
     }
@@ -185,14 +185,14 @@ export function useClipboard(options: UseClipboardOptions = {}) {
    * 复制对象为 JSON 字符串
    */
   const copyJSON = async (
-    obj: any,
+    obj: unknown,
     pretty = true,
     customOptions?: Partial<UseClipboardOptions>
   ): Promise<boolean> => {
     try {
       const json = pretty ? JSON.stringify(obj, null, 2) : JSON.stringify(obj)
       return await copy(json, customOptions)
-    } catch (error: any) {
+    } catch (error) {
       console.error('JSON 序列化失败:', error)
       message.error(t('clipboard.jsonError'))
       return false
@@ -229,7 +229,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
       }
       
       return true
-    } catch (error: any) {
+    } catch (error) {
       console.error('复制 HTML 失败:', error)
       
       // 降级：复制纯文本
@@ -262,7 +262,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
       }
       
       return true
-    } catch (error: any) {
+    } catch (error) {
       console.error('复制图片失败:', error)
       
       if (options.showMessage !== false) {

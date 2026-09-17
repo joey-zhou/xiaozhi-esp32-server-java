@@ -9,7 +9,7 @@ import java.util.function.Supplier;
 
 /**
  * 用户明确告别（说了再见、拜拜等）时的应答式告别语。
- * 硬约束：每条都以应答词开头，只在用户刚开口告别时成立；
+ * 每条都以应答词开头，只在用户刚开口告别时成立；
  * 服务端超时主动退出用 {@link TimeoutMessageSupplier}。
  */
 @Component

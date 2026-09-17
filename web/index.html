@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="">
+<!-- lang 给的是 i18n 的默认语言，切语言时由前端改写 documentElement.lang -->
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8">
     <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connect Ai-智能物联网管理平台</title>
+    <!-- 首屏标题走环境变量，和路由守卫 applyDocumentTitle 里的 baseTitle 同源 -->
+    <title>%VITE_APP_TITLE%</title>
   </head>
   <body>
     <div id="app"></div>

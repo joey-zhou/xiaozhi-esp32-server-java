@@ -2,37 +2,35 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useUserStore } from '@/store/user'
-import { useAppStore } from '@/store/app'
-import { useAvatar } from '@/composables/useAvatar'
-import { useLocale } from '@/composables/useLocale'
-import { useAntdTheme } from '@/composables/useAntdTheme'
-import { ROUTES } from '@/router/routes'
-
-const { t } = useI18n()
-import { 
-  UserOutlined, 
-  SettingOutlined, 
-  LogoutOutlined, 
+import {
+  UserOutlined,
+  LogoutOutlined,
   GlobalOutlined,
   BgColorsOutlined,
   BulbOutlined,
   DesktopOutlined
 } from '@ant-design/icons-vue'
+import { useUserStore } from '@/store/user'
+import { useAvatar } from '@/composables/useAvatar'
+import { useLocale } from '@/composables/useLocale'
+import { useAntdTheme } from '@/composables/useAntdTheme'
+import { useAuth } from '@/composables/useAuth'
+import { ROUTES } from '@/router/routes'
+
+const { t } = useI18n()
 
 const router = useRouter()
 const userStore = useUserStore()
-const appStore = useAppStore()
 const { getAvatarUrl } = useAvatar()
+const { logout } = useAuth()
 const { currentLocale, localeName, setLocale, availableLocales, localeNames } = useLocale()
-const { themeMode, actualTheme, toggleTheme, setTheme } = useAntdTheme()
+const { themeMode, actualTheme, setTheme } = useAntdTheme()
 
 // 用户信息
-const user = computed(() => userStore.userInfo || {})
+const user = computed(() => userStore.userInfo)
 
 // 头像URL
-const avatarUrl = computed(() => getAvatarUrl(user.value.avatar))
-console.log(avatarUrl.value)
+const avatarUrl = computed(() => getAvatarUrl(user.value?.avatar))
 // 主题图标
 const themeIcon = computed(() => {
   switch (actualTheme.value) {
@@ -60,29 +58,10 @@ const themeText = computed(() => {
 })
 
 /**
- * 退出登录
- */
-function handleLogout() {
-  // 清除用户信息
-  userStore.clearUserInfo()
-  // 清除token
-  userStore.clearToken()
-  // 跳转到登录页
-  router.push(ROUTES.LOGIN)
-}
-
-/**
  * 跳转到个人中心
  */
 function goToAccount() {
   router.push(ROUTES.SETTING_ACCOUNT)
-}
-
-/**
- * 跳转到个人设置
- */
-function goToSettings() {
-  router.push(ROUTES.SETTING_CONFIG)
 }
 
 /**
@@ -182,14 +161,8 @@ function handleThemeChange(theme: string) {
               <UserOutlined />
               <span class="menu-text">{{ t('common.personalCenter') }}</span>
             </a-menu-item>
-            <!-- 个人设置（暂时禁用）
-            <a-menu-item @click="() => goToSettings()">
-              <SettingOutlined />
-              <span class="menu-text">{{ t('common.personalSettings') }}</span>
-            </a-menu-item>
-            -->
             <a-menu-divider />
-            <a-menu-item @click="() => handleLogout()">
+            <a-menu-item @click="() => logout()">
               <LogoutOutlined />
               <span class="menu-text">{{ t('common.logout') }}</span>
             </a-menu-item>

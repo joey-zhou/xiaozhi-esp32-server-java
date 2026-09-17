@@ -2,6 +2,7 @@ package com.xiaozhi.file;
 
 import com.xiaozhi.storage.service.StorageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
+import com.xiaozhi.common.web.LocalFileUrlPolicy;
 import jakarta.annotation.Resource;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpInputMessage;
@@ -28,6 +29,9 @@ public class FileUrlStrippingRequestBodyAdvice implements RequestBodyAdvice {
     @Resource
     private StorageServiceFactory storageServiceFactory;
 
+    @Resource
+    private LocalFileUrlPolicy localFileUrlPolicy;
+
     @Override
     public boolean supports(MethodParameter methodParameter, Type targetType,
                             Class<? extends HttpMessageConverter<?>> converterType) {
@@ -46,7 +50,8 @@ public class FileUrlStrippingRequestBodyAdvice implements RequestBodyAdvice {
         if (body != null) {
             try {
                 StorageService storageService = storageServiceFactory.getStorageService();
-                SignedFileUrlSupport.apply(body, storageService::stripSignature);
+                SignedFileUrlSupport.apply(body,
+                    value -> storageService.stripSignature(localFileUrlPolicy.stripSignature(value)));
             } catch (Exception e) {
                 // 剥签名失败不应阻断请求
                 log.warn("请求体文件 URL 剥签名处理失败", e);

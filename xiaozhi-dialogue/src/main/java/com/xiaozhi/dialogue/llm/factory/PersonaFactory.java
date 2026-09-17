@@ -178,16 +178,28 @@ public class PersonaFactory {
         var sttId = role.getSttId();
         if (sttId == null || sttId <= 0) {
             log.warn("角色没有配置STT服务 - Role: {},默认使用vosk", role.getRoleName());
-            return sttFactory.getSttService(null);
+            try {
+                return sttFactory.getSttService(null);
+            } catch (RuntimeException e) {
+                // STT 建不起来只降级成这轮识别不了，不能把整条连接拖垮
+                log.error("无法获取STT服务 - Role: {}", role.getRoleName(), e);
+                return null;
+            }
         }
         var sttConfig = configService.getBO(sttId);
         if(sttConfig == null){
             log.error("无法获取STT服务配置 - Id: {}", sttId);
             return null;
         }
-        SttService sttService = sttFactory.getSttService(sttConfig);
+        SttService sttService;
+        try {
+            sttService = sttFactory.getSttService(sttConfig);
+        } catch (RuntimeException e) {
+            log.error("无法获取STT服务 - Provider: {}", sttConfig.getProvider(), e);
+            return null;
+        }
         if (sttService == null) {
-            log.error("无法获取STT服务 - Provider: {}", sttConfig != null ? sttConfig.getProvider() : "null");
+            log.error("无法获取STT服务 - Provider: {}", sttConfig.getProvider());
         }
         return sttService;
     }

@@ -8,6 +8,11 @@
     "module": "ESNext",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
 
+    // 用不到的形参一律报错，按 _ 前缀命名豁免。
+    // 未使用的局部变量交给 lint：oxlint 管 .ts，eslint 管 .vue；
+    // tsc 的 noUnusedLocals 看不懂模板里的 ref="name"，只绑模板不读取的 ref 会被误报。
+    "noUnusedParameters": true,
+
     "paths": {
       "@/*": ["./src/*"]
     }

@@ -38,14 +38,20 @@ public class FileUploadController {
     /** 允许的文件类型分类（防止路径遍历） */
     private static final Set<String> ALLOWED_TYPES = Set.of("common", "image", "audio", "video", "document", "avatar");
 
-    /** 允许的文件扩展名白名单 */
+    /**
+     * 允许的文件扩展名白名单。
+     * <p>
+     * 不收 .html/.htm：uploads 目录由 WebMvcConfig 以静态资源同源直出且不带 Content-Disposition，
+     * 上传的 HTML 会在本站源里执行脚本。知识库要解析网页内容时应由后端抓取，而不是让用户传 HTML。
+     */
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg",
             ".mp3", ".wav", ".ogg", ".opus", ".flac", ".aac", ".m4a",
             ".mp4", ".avi", ".mov", ".mkv", ".webm",
             ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv",
+            ".md", ".json", ".xml", ".tif", ".tiff",
             ".zip", ".rar", ".7z", ".tar", ".gz",
-            ".bin"
+            ".bin", ".hex"
     );
 
     @Resource
@@ -128,8 +134,8 @@ public class FileUploadController {
             // 云存储私有桶下裸 URL 无法直接访问，返回带签名的临时 URL 供前端即时预览
             data.put("url", storageService.getAccessUrl(filePathOrUrl));
         } else {
-            String fullUrl = serverAddressProvider.getServerAddress() + "/" + filePathOrUrl;
-            data.put("url", fullUrl);
+            // url 供前端即时预览，受保护目录下必须带签名才访问得到；relativePath 是入库用的裸路径
+            data.put("url", serverAddressProvider.getServerAddress() + "/" + storageService.getAccessUrl(filePathOrUrl));
             data.put("relativePath", filePathOrUrl);
         }
 
@@ -147,9 +153,13 @@ public class FileUploadController {
             case ".mp4", ".avi", ".mov", ".mkv", ".webm" -> ct.startsWith("video/");
             case ".pdf" -> ct.equals("application/pdf");
             case ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx" -> ct.startsWith("application/");
-            case ".txt", ".csv" -> ct.startsWith("text/");
+            case ".txt", ".csv", ".md" -> ct.startsWith("text/") || ct.equals("application/octet-stream");
+            case ".json" -> ct.equals("application/json") || ct.startsWith("text/");
+            case ".xml" -> ct.contains("xml") || ct.startsWith("text/");
+            case ".tif", ".tiff" -> ct.startsWith("image/");
             case ".zip", ".rar", ".7z", ".tar", ".gz" -> ct.startsWith("application/");
-            case ".bin" -> ct.equals("application/octet-stream") || ct.startsWith("application/");
+            // Intel HEX 是文本格式，浏览器给的 contentType 在 text/ 与 application/ 之间不固定
+            case ".bin", ".hex" -> ct.startsWith("application/") || ct.startsWith("text/");
             default -> true;
         };
     }

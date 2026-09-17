@@ -1,8 +1,10 @@
+import type { PageQueryParams } from './api'
+
 /**
  * 配置类型
  */
 export type ConfigType = 'llm' | 'stt' | 'tts' | 'agent' | 'oss'
-export type ModelType = 'chat' | 'vision' | 'intent' | 'embedding'
+export type ConfigModelType = 'chat' | 'vision' | 'intent' | 'embedding'
 
 /**
  * 配置信息接口
@@ -13,7 +15,7 @@ export interface Config {
   provider: string
   configName: string
   configDesc?: string
-  modelType?: ModelType
+  modelType?: ConfigModelType
   isDefault?: string | boolean // 1-默认 0-非默认，表单中使用boolean
   state?: string
   createTime?: string
@@ -24,12 +26,13 @@ export interface Config {
   ak?: string
   sk?: string
   apiUrl?: string
+  projectId?: string
+  region?: string
   enableThinking?: boolean
-  // 支持动态字段
-  [key: string]: any
+  // 表单字段由 config/providerConfig.ts 的 ConfigField.name 驱动，动态下标取值靠这条索引签名。
+  // 类型是上面全部具名字段的并集，TS 要求具名属性必须可赋给索引签名
+  [key: string]: string | number | boolean | undefined
 }
-
-import type { PageQueryParams } from './api'
 
 /**
  * 配置查询参数

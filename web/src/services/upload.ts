@@ -1,5 +1,7 @@
+import type { AxiosProgressEvent } from 'axios'
+import { http } from './request'
 import api from './api'
-import { useUserStore } from '@/store/user'
+import { i18n } from '@/locales'
 
 export interface UploadData {
   url: string
@@ -15,83 +17,62 @@ export interface UploadResponse extends UploadData {
   message: string
 }
 
-// 后端实际返回结构：{ code, message, data: { url, ... } }
-interface UploadRawResponse {
-  code: number
-  message: string
-  data?: UploadData
-}
-
 export interface UploadOptions {
   onProgress?: (percent: number) => void
   fullResponse?: boolean
 }
 
+// axios 实例默认 30s 超时，固件这类大文件会被中途打断，上传单独放宽到 5 分钟
+const UPLOAD_TIMEOUT = 300000
+
 /**
  * 通用文件上传方法
  * @param file 要上传的文件
- * @param type 文件类型: avatar, firmware 等
+ * @param type 文件类型: avatar 等
  * @param options 上传配置选项
- * @returns 默认返回URL，fullResponse=true时返回完整响应
+ * @returns 默认返回可入库的路径，fullResponse=true 时返回完整响应
  */
 export function uploadFile(
+  file: File,
+  type: string,
+  options: UploadOptions & { fullResponse: true }
+): Promise<UploadResponse>
+export function uploadFile(
+  file: File,
+  type?: string,
+  options?: UploadOptions & { fullResponse?: false }
+): Promise<string>
+export async function uploadFile(
   file: File,
   type: string = 'avatar',
   options?: UploadOptions
 ): Promise<string | UploadResponse> {
-  return new Promise((resolve, reject) => {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('type', type)
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('type', type)
 
-    const xhr = new XMLHttpRequest()
-    // 使用完整的 API URL，避免相对路径解析到前端域名
-    const baseURL = import.meta.env.VITE_API_BASE_URL || ''
-    const uploadUrl = `${baseURL}${api.upload}`
-    xhr.open('POST', uploadUrl, true)
-
-    // 添加认证 token（使用 Bearer 格式）
-    const userStore = useUserStore()
-    if (userStore.token) {
-      xhr.setRequestHeader('Authorization', `Bearer ${userStore.token}`)
-    }
-
-    if (options?.onProgress) {
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percent = Math.round((event.loaded / event.total) * 100)
-          options.onProgress!(percent)
-        }
+  const raw = await http.postMultipart<UploadData>(api.upload, formData, {
+    timeout: UPLOAD_TIMEOUT,
+    onUploadProgress: (event: AxiosProgressEvent) => {
+      if (!options?.onProgress || !event.total) {
+        return
       }
-    }
-
-    xhr.onload = function () {
-      if (xhr.status === 200) {
-        try {
-          const raw: UploadRawResponse = JSON.parse(xhr.responseText)
-          if (raw.code === 200 && raw.data) {
-            // 将 data 展开到顶层，保持 UploadResponse 的向后兼容
-            const response: UploadResponse = {
-              code: raw.code,
-              message: raw.message,
-              ...raw.data
-            }
-            resolve(options?.fullResponse ? response : response.url)
-          } else {
-            reject(new Error(raw.message || '上传失败'))
-          }
-        } catch (error) {
-          reject(new Error('响应解析失败'))
-        }
-      } else {
-        reject(new Error(`上传失败，状态码: ${xhr.status}`))
-      }
-    }
-
-    xhr.onerror = function () {
-      reject(new Error('网络错误'))
-    }
-
-    xhr.send(formData)
+      options.onProgress(Math.round((event.loaded * 100) / event.total))
+    },
   })
+
+  if (raw.code !== 200 || !raw.data) {
+    throw new Error(raw.message || i18n.global.t('upload.uploadFailed'))
+  }
+
+  // 将 data 展开到顶层，保持 UploadResponse 的形状
+  const response: UploadResponse = {
+    code: raw.code,
+    message: raw.message,
+    ...raw.data,
+  }
+
+  // 默认返回可入库的路径：本地存储给相对路径（避免把主机名写死进库），
+  // 云存储无 relativePath，返回签名 URL，后端入库时剥签名、下发时重签
+  return options?.fullResponse ? response : (response.relativePath || response.url)
 }

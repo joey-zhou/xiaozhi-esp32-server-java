@@ -101,6 +101,13 @@ start_service() {
     return 0
   fi
 
+  # 未设置时设备握手鉴权关闭，本地联调可用，生产部署必须导出
+  if [[ -z "${XIAOZHI_DEVICE_AUTH_SECRET:-}" ]]; then
+    _warn "未设置 XIAOZHI_DEVICE_AUTH_SECRET，$name 的设备握手鉴权处于关闭状态"
+    _warn "  生产部署前导出：export XIAOZHI_DEVICE_AUTH_SECRET=\$(openssl rand -hex 16)"
+    _warn "  server 与 dialogue 必须使用同一个值"
+  fi
+
   local jar
   jar="$(find_jar "$module")"
   if [[ -z "$jar" ]]; then

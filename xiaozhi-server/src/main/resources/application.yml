@@ -59,6 +59,8 @@ spring:
       host: localhost
       port: 6379
       database: 0
+      # Redis 开启 requirepass 后用环境变量 SPRING_DATA_REDIS_PASSWORD 提供口令。
+      # 此处不能写 password: 空值——Redisson 会把空串当口令发出 AUTH ""，无口令的 Redis 直接报错拒连。
       # Lettuce 连接池配置（默认不开池，所有线程共享单连接，高并发下会成为瓶颈）
       lettuce:
         pool:
@@ -114,14 +116,40 @@ logging:
     io.netty.handler: ERROR
 
 # ============================================================
+# 邮件（注册与找回密码的验证码）
+# 未配置时不发信，接口返回发送失败
+# ============================================================
+email:
+  smtp:
+    username: ${EMAIL_SMTP_USERNAME:}
+    password: ${EMAIL_SMTP_PASSWORD:}
+
+# ============================================================
+# MQTT 接入（xiaozhi.communication.protocol 含 mqtt 时生效）
+# ============================================================
+mqtt:
+  server:
+    # OTA 下发的 MQTT 口令签名密钥：server 用它签、dialogue 用它验，两端必须同值
+    # 默认值仅供本地联调与运维测试，正式部署用环境变量 MQTT_SIGNATURE_KEY 覆盖
+    # 改这个值会让已下发的 MQTT 口令全部失效，设备需重走 OTA 取新口令
+    signatureKey: ${MQTT_SIGNATURE_KEY:xz@2025}
+
+# ============================================================
 # 小智扩展配置
 # ============================================================
 xiaozhi:
-  # 设备接入鉴权：配置 secret 即开启（OTA 下发签名 token，WS 握手校验），留空不鉴权
+  # 设备接入鉴权：OTA 下发签名 token，WS 握手校验。留空不鉴权，生产部署必须配。
+  # 由环境变量 XIAOZHI_DEVICE_AUTH_SECRET 提供，server 与 dialogue 必须同值。
   device-auth:
-    secret:
+    secret: ${XIAOZHI_DEVICE_AUTH_SECRET:xz-2026}
     expire-seconds: 2592000
     allowed-devices:  # 逗号分隔的设备MAC，白名单免 token
+  # 安全用途（限流、封禁、登录审计）的客户端 IP 判定
+  security:
+    # 反向代理的 IP 或 CIDR，逗号分隔或 YAML 列表（如 172.16.0.0/12,10.0.0.0/8）
+    # 留空表示不采信任何 X-Forwarded-For，只认 TCP 对端地址
+    # 前面挂了 Nginx/LB 又不配，所有请求会被算成同一个网关 IP、共用一份限流额度
+    trusted-proxies:
   communication:
     # OTA 下发的 WS 二进制帧版本：1=裸Opus，2=带时间戳(服务端AEC需要)，3=带长度头无时间戳
     websocket-protocol-version: 2

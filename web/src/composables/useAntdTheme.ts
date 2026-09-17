@@ -2,6 +2,7 @@ import { useStorage, usePreferredDark } from '@vueuse/core'
 import { computed, watch } from 'vue'
 import { theme } from 'ant-design-vue'
 import type { ThemeConfig } from 'ant-design-vue/es/config-provider/context'
+import { STORAGE_THEME_MODE } from '@/constants/storage'
 
 export type ThemeMode = 'light' | 'dark' | 'auto'
 
@@ -84,7 +85,7 @@ function injectCssVariables(isDark: boolean) {
 }
 
 export function useAntdTheme() {
-  const themeMode = useStorage<ThemeMode>('theme-mode', 'auto')
+  const themeMode = useStorage<ThemeMode>(STORAGE_THEME_MODE, 'auto')
   const prefersDark = usePreferredDark()
 
   // 计算实际应用的主题
@@ -135,19 +136,8 @@ export function useAntdTheme() {
     }
   })
 
-  // 获取主题显示名称
-  const themeName = computed(() => {
-    switch (themeMode.value) {
-      case 'light':
-        return '亮色模式'
-      case 'dark':
-        return '暗色模式'
-      case 'auto':
-        return '跟随系统'
-      default:
-        return '亮色模式'
-    }
-  })
+  // 主题显示名称的多语言 key，交给组件里的 t() 渲染
+  const themeNameKey = computed(() => `component.settings.theme.${themeMode.value}`)
 
   return {
     themeMode,
@@ -156,15 +146,7 @@ export function useAntdTheme() {
     toggleTheme,
     setTheme,
     themeIcon,
-    themeName,
+    themeNameKey,
   }
 }
 
-// 使用示例：
-// const { themeMode, actualTheme, antdTheme, toggleTheme } = useAntdTheme()
-// 
-// <a-config-provider :theme="antdTheme">
-//   <button @click="toggleTheme">
-//     {{ themeIcon }} {{ themeName }}
-//   </button>
-// </a-config-provider>

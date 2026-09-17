@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, onErrorCaptured, provide, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Button } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 
 const { t } = useI18n()
+const router = useRouter()
 
 interface Props {
   /**
@@ -52,10 +53,11 @@ const resetError = () => {
 }
 
 /**
- * 刷新页面
+ * 回首页：根路径由路由守卫按身份重定向到各自的落地页，回去后清掉错误态
  */
-const reloadPage = () => {
-  window.location.reload()
+const goHome = async () => {
+  await router.push('/')
+  resetError()
 }
 
 // 提供重置方法给子组件
@@ -96,7 +98,7 @@ provide('resetError', resetError)
         <!-- 操作按钮 -->
         <div class="error-actions">
           <a-button type="primary" @click="resetError">{{ t('component.errorBoundary.retry') }}</a-button>
-          <a-button @click="reloadPage">{{ t('component.errorBoundary.goHome') }}</a-button>
+          <a-button @click="goHome">{{ t('component.errorBoundary.goHome') }}</a-button>
         </div>
 
         <!-- 错误详情（开发环境） -->

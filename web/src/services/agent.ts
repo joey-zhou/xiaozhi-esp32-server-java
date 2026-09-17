@@ -9,5 +9,5 @@ import type { Agent, AgentQueryParams } from '@/types/agent'
  * 查询智能体列表
  */
 export function queryAgents(params: Partial<AgentQueryParams>) {
-  return http.getPage<Agent>(api.agent.query, params)
+  return http.getPage<Agent>(api.agent, params)
 }

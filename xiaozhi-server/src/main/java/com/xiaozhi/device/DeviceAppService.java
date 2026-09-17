@@ -89,7 +89,7 @@ public class DeviceAppService {
 
     @Transactional
     public DeviceResp create(DeviceCreateReq req, Integer userId) {
-        VerifyCode verifyCode = deviceRepository.findVerifyCode(req.getCode(), null, null)
+        VerifyCode verifyCode = deviceRepository.findVerifyCodeByCode(req.getCode())
                 .orElseThrow(() -> new IllegalArgumentException("无效验证码"));
 
         if (!StringUtils.hasText(verifyCode.deviceId())) {
@@ -117,6 +117,8 @@ public class DeviceAppService {
         Device device = Device.newDevice(verifyCode.deviceId(), name, verifyCode.type(),
                 userId, selectedRole.getRoleId());
         deviceRepository.save(device);
+        // 绑定成功后作废该设备的验证码，避免同一个码在有效期内被继续试探
+        deviceRepository.invalidateVerifyCodes(verifyCode.deviceId());
 
         DeviceProjection result = deviceService.get(device.getDeviceId());
         if (result == null) throw new IllegalStateException("添加设备失败");
@@ -258,17 +260,30 @@ public class DeviceAppService {
      * @throws IllegalArgumentException 设备ID不正确
      * @throws IllegalStateException    生成验证码失败等内部错误
      */
+    /**
+     * 设备直接 HTTP GET 下载固件，拿到相对路径无法定位，本地存储下补上服务地址前缀。
+     * 云端返回的已是完整 URL，原样返回。
+     */
+    private String absoluteDownloadUrl(String url) {
+        if (!StringUtils.hasText(url) || url.startsWith("http://") || url.startsWith("https://")) {
+            return url;
+        }
+        String base = serverAddressProvider.getServerAddress();
+        String path = url.startsWith("/") ? url.substring(1) : url;
+        return base.endsWith("/") ? base + path : base + "/" + path;
+    }
+
     public Map<String, Object> handleOta(OtaReq req) {
-        // --- IP 地理位置解析 ---
+        if (!StringUtils.hasText(req.getDeviceId()) || !CommonUtils.isMacAddressValid(req.getDeviceId())) {
+            throw new IllegalArgumentException("设备ID不正确");
+        }
+
+        // IP 归属只读本地缓存：未命中时由 CmsUtils 后台补查，本次不落地址，下一次 OTA 再写
         if (StringUtils.hasText(req.getIp())) {
-            var ipInfo = CmsUtils.getIPInfoByAddress(req.getIp());
+            var ipInfo = CmsUtils.getIPInfoFromCache(req.getIp());
             if (ipInfo != null && StringUtils.hasText(ipInfo.getLocation())) {
                 req.setLocation(ipInfo.getLocation());
             }
-        }
-
-        if (!StringUtils.hasText(req.getDeviceId()) || !CommonUtils.isMacAddressValid(req.getDeviceId())) {
-            throw new IllegalArgumentException("设备ID不正确");
         }
 
         String deviceId = req.getDeviceId();

@@ -1,31 +1,30 @@
 import type { App } from 'vue'
 import { message } from 'ant-design-vue'
 import { useEventListener } from '@vueuse/core'
+import { i18n } from '@/locales'
 
 // 错误类型
 interface ErrorInfo {
   message: string
   stack?: string
   componentName?: string
-  propsData?: Record<string, unknown>
+  propKeys?: string[]
   url?: string
   line?: number
   column?: number
 }
 
-// 错误日志收集
+// 错误日志收集，只在内存里保留最近 MAX_ERROR_LOGS 条
+const MAX_ERROR_LOGS = 50
 const errorLogs: ErrorInfo[] = []
 
-// 上报错误到服务器（可选）
-function reportError(error: ErrorInfo) {
-  // 这里可以调用后端 API 上报错误
-  console.error('错误上报:', error)
-
-  // 示例：发送到后端
-  // fetch('/api/error/report', {
-  //   method: 'POST',
-  //   body: JSON.stringify(error)
-  // })
+/** 落到内存日志并打印；没有服务端上报通道，不要按名字以为它发了请求 */
+function recordError(errorInfo: ErrorInfo) {
+  errorLogs.push(errorInfo)
+  while (errorLogs.length > MAX_ERROR_LOGS) {
+    errorLogs.shift()
+  }
+  console.error('捕获到错误:', errorInfo)
 }
 
 // Vue 错误处理器
@@ -34,29 +33,27 @@ export function setupErrorHandler(app: App) {
   app.config.errorHandler = (err: unknown, instance, info) => {
     const error = err instanceof Error ? err : new Error(String(err))
     const errorInfo: ErrorInfo = {
-      message: error.message || '未知错误',
+      message: error.message || i18n.global.t('error.unknown'),
       stack: error.stack,
       componentName: instance?.$options.name || instance?.$options.__name,
-      propsData: instance?.$props as Record<string, unknown>,
+      // 只记 prop 名：存 $props 本身会把出错组件的整棵数据钉在内存里不让回收
+      propKeys: instance?.$props ? Object.keys(instance.$props) : undefined,
     }
 
-    // 保存错误日志
-    errorLogs.push(errorInfo)
+    recordError(errorInfo)
 
-    // 上报错误
-    reportError(errorInfo)
-
-    // 显示错误提示
+    // 固定 key：同类错误连发时只留最后一条，不叠成一屏
     message.error({
-      content: `组件错误: ${errorInfo.message}`,
-      duration: 5,
+      content: i18n.global.t('error.componentError', { message: errorInfo.message }),
+      key: 'component-error',
+      duration: 3,
     })
 
     console.error('Vue 错误:', err, info)
   }
 
   if (import.meta.env.DEV) {
-    app.config.warnHandler = (msg, instance, trace) => {
+    app.config.warnHandler = (msg, _instance, trace) => {
       console.warn('Vue 警告:', msg, trace)
     }
   }
@@ -103,7 +100,7 @@ export function setupErrorHandler(app: App) {
       console.warn('动态模块加载失败，可能是页面版本过期:', reason.message)
 
       message.warning({
-        content: '页面版本已更新，即将自动刷新...',
+        content: i18n.global.t('error.pageUpdated'),
         duration: 2,
         onClose: () => {
           window.location.reload()
@@ -119,19 +116,17 @@ export function setupErrorHandler(app: App) {
     }
 
     const errorInfo: ErrorInfo = {
-      message: reason?.message || '未处理的 Promise 错误',
+      message: reason?.message || i18n.global.t('error.unknown'),
       stack: reason?.stack,
     }
 
-    errorLogs.push(errorInfo)
-    reportError(errorInfo)
+    recordError(errorInfo)
 
     message.error({
-      content: `Promise 错误: ${errorInfo.message}`,
-      duration: 5,
+      content: i18n.global.t('error.promiseError', { message: errorInfo.message }),
+      key: 'promise-error',
+      duration: 3,
     })
-
-    console.error('未处理的 Promise 错误:', reason)
   })
 
   useEventListener(window, 'error', (event) => {
@@ -151,15 +146,13 @@ export function setupErrorHandler(app: App) {
       stack: event.error?.stack,
     }
 
-    errorLogs.push(errorInfo)
-    reportError(errorInfo)
+    recordError(errorInfo)
 
     message.error({
-      content: `脚本错误: ${errorInfo.message}`,
-      duration: 5,
+      content: i18n.global.t('error.scriptError', { message: errorInfo.message }),
+      key: 'script-error',
+      duration: 3,
     })
-
-    console.error('全局错误:', event.error)
   })
 
   useEventListener(
@@ -178,19 +171,16 @@ export function setupErrorHandler(app: App) {
           message: `资源加载失败: ${resourceUrl}`,
         }
 
-        errorLogs.push(errorInfo)
-        reportError(errorInfo)
-
-        console.error('资源加载错误:', target)
+        recordError(errorInfo)
       }
     },
     { capture: true }
   )
 }
 
-// 获取错误日志
-export function getErrorLogs() {
-  return errorLogs
+// 获取错误日志（返回副本，调用方改不到内部数组）
+export function getErrorLogs(): ErrorInfo[] {
+  return [...errorLogs]
 }
 
 // 清空错误日志

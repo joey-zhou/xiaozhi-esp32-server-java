@@ -1,4 +1,4 @@
-import { ref, computed, nextTick, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, nextTick, onBeforeUnmount, watch, type Ref } from 'vue'
 
 /**
  * 滚动管理 Composable
@@ -227,13 +227,20 @@ export function useScroll(options: UseScrollOptions = {}) {
     updateScrollInfo()
   }
   
-  // 挂载时初始化
-  onMounted(() => {
-    if (options.enableScrollListener !== false && containerRef.value) {
-      containerRef.value.addEventListener('scroll', handleScroll)
-      updateScrollInfo()
-    }
-  })
+  // 跟着容器元素走：容器在 v-if 内时挂载那一刻还不存在，只在 onMounted 绑会永远绑不上
+  watch(
+    containerRef,
+    (el, prevEl) => {
+      if (prevEl) {
+        prevEl.removeEventListener('scroll', handleScroll)
+      }
+      if (options.enableScrollListener !== false && el) {
+        el.addEventListener('scroll', handleScroll)
+        updateScrollInfo()
+      }
+    },
+    { immediate: true, flush: 'post' }
+  )
   
   // 卸载时清理
   onBeforeUnmount(() => {

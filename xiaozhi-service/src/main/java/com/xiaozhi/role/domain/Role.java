@@ -23,6 +23,11 @@ public class Role {
 
     public static final int DEFAULT_INACTIVE_TIMEOUT_SECONDS = 60;
 
+    /** 启用，与 sys_role.state 列取值一致 */
+    public static final String STATE_ENABLED = "1";
+    /** 禁用，记录保留 */
+    public static final String STATE_DISABLED = "0";
+
     /** 领域信号 */
     public enum DomainSignal { UPDATED }
 
@@ -102,6 +107,18 @@ public class Role {
         if (memoryStrategy != null) this.memoryStrategy = memoryStrategy;
         if (isDefault != null) this.isDefault = isDefault;
         if (inactiveTimeoutSeconds != null) this.inactiveTimeoutSeconds = inactiveTimeoutSeconds;
+        signals.add(DomainSignal.UPDATED);
+    }
+
+    /** 启用角色 */
+    public void enable() {
+        this.state = STATE_ENABLED;
+        signals.add(DomainSignal.UPDATED);
+    }
+
+    /** 禁用角色，前端「删除智能体」走这里，记录保留 */
+    public void disable() {
+        this.state = STATE_DISABLED;
         signals.add(DomainSignal.UPDATED);
     }
 

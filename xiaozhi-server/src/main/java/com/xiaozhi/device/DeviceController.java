@@ -29,8 +29,8 @@ import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.utils.JsonUtil;
-import com.xiaozhi.utils.RequestContextUtils;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -56,6 +56,9 @@ public class DeviceController extends BaseController {
 
     @Resource
     private DeviceAppService deviceAppService;
+
+    @Resource
+    private TrustedProxyPolicy trustedProxyPolicy;
 
     /**
      * 设备查询
@@ -215,7 +218,8 @@ public class DeviceController extends BaseController {
             }
         }
 
-        req.setIp(RequestContextUtils.getClientIp(request));
+        // /ota 匿名开放，落库与归属查询用的 IP 只能取可信来源，不采信代理头原文
+        req.setIp(trustedProxyPolicy.resolveClientIp(request));
         return req;
     }
 

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref, toRef, computed } from 'vue'
 import type { FormInstance } from 'ant-design-vue'
-import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import {
   MailOutlined,
@@ -20,7 +19,6 @@ const {
   canSendCode,
   buttonText,
   sendForgetCode,
-  verifyCode,
 } = useVerificationCode()
 const {
   passwordRules,
@@ -30,7 +28,6 @@ const {
 } = useFormValidation()
 
 const formRef = ref<FormInstance>()
-const isEmailVerified = ref(false)
 const showVerificationInput = ref(false)
 
 // 表单数据
@@ -41,19 +38,12 @@ const formData = reactive({
   confirmPassword: '',
 })
 
-const rules = computed(() => {
-  const baseRules: Record<string, import('ant-design-vue/es/form').Rule[]> = {
-    email: emailRules,
-    verificationCode: verificationCodeRules,
-  }
-
-  if (isEmailVerified.value) {
-    baseRules.newPassword = passwordRules
-    baseRules.confirmPassword = confirmPasswordRules(toRef(formData, 'newPassword'))
-  }
-
-  return baseRules
-})
+const rules = computed<Record<string, import('ant-design-vue/es/form').Rule[]>>(() => ({
+  email: emailRules,
+  verificationCode: verificationCodeRules,
+  newPassword: passwordRules,
+  confirmPassword: confirmPasswordRules(toRef(formData, 'newPassword')),
+}))
 
 const handleSendCode = async () => {
   try {
@@ -62,33 +52,13 @@ const handleSendCode = async () => {
     if (success) {
       showVerificationInput.value = true
     }
-  } catch (error) {
-    // Validation failed
+  } catch {
+    // 表单校验未通过时不发送验证码
   }
 }
 
+// 验证码由后端 resetPassword 一次性校验并消费，前端不做前置校验
 const handleSubmit = async () => {
-  if (!isEmailVerified.value) {
-    await handleVerifyEmail()
-  } else {
-    await handleResetPassword()
-  }
-}
-
-const handleVerifyEmail = async () => {
-  loading.value = true
-  try {
-    const success = await verifyCode(formData.email, formData.verificationCode, 'forget')
-    if (success) {
-      isEmailVerified.value = true
-      message.success('验证成功！请设置新密码')
-    }
-  } finally {
-    loading.value = false
-  }
-}
-
-const handleResetPassword = async () => {
   await resetPassword({
     email: formData.email,
     verificationCode: formData.verificationCode,
@@ -126,14 +96,12 @@ const handleResetPassword = async () => {
                 :placeholder="t('common.enterEmail')"
                 size="large"
                 class="input-field"
-                :disabled="isEmailVerified"
               >
                 <template #prefix>
                   <MailOutlined />
                 </template>
                 <template #suffix>
                   <span
-                    v-if="!isEmailVerified"
                     class="send-code-btn"
                     :class="{
                       disabled: !canSendCode,
@@ -155,7 +123,6 @@ const handleResetPassword = async () => {
                 :placeholder="t('common.enterVerificationCode')"
                 size="large"
                 class="input-field"
-                :disabled="isEmailVerified"
               >
                 <template #prefix>
                   <SafetyCertificateOutlined />
@@ -164,7 +131,7 @@ const handleResetPassword = async () => {
             </a-form-item>
 
             <!-- 新密码输入 -->
-            <a-form-item :label="t('auth.newPassword')" name="newPassword" v-if="isEmailVerified">
+            <a-form-item :label="t('auth.newPassword')" name="newPassword" v-if="showVerificationInput">
               <a-input-password
                 v-model:value="formData.newPassword"
                 :placeholder="t('auth.enterNewPassword')"
@@ -178,7 +145,7 @@ const handleResetPassword = async () => {
             </a-form-item>
 
             <!-- 确认新密码输入 -->
-            <a-form-item :label="t('auth.confirmNewPassword')" name="confirmPassword" v-if="isEmailVerified">
+            <a-form-item :label="t('auth.confirmNewPassword')" name="confirmPassword" v-if="showVerificationInput">
               <a-input-password
                 v-model:value="formData.confirmPassword"
                 :placeholder="t('auth.enterConfirmNewPassword')"
@@ -197,11 +164,12 @@ const handleResetPassword = async () => {
                 type="primary"
                 html-type="submit"
                 :loading="loading"
+                :disabled="!showVerificationInput"
                 block
                 size="large"
                 class="forget-button"
               >
-                {{ isEmailVerified ? t('auth.resetPassword') : t('auth.verifyEmail') }}
+                {{ t('auth.resetPassword') }}
               </a-button>
             </a-form-item>
 

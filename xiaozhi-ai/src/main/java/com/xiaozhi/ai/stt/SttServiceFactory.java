@@ -36,9 +36,6 @@ public class SttServiceFactory {
     // 标记Vosk是否初始化成功
     private boolean voskInitialized = false;
 
-    // 备选默认提供商（当Vosk初始化失败时使用）
-    private String fallbackProvider = null;
-
     /**
      * 应用启动时自动初始化Vosk服务
      */
@@ -49,7 +46,7 @@ public class SttServiceFactory {
         if (voskInitialized) {
             log.info("默认语音识别服务(Vosk)初始化成功，可直接使用");
         } else {
-            log.warn("默认语音识别服务(Vosk)初始化失败，将在需要时尝试使用备选服务");
+            log.warn("默认语音识别服务(Vosk)初始化失败，未配置第三方 STT 的角色将无法识别语音");
         }
     }
 
@@ -111,18 +108,13 @@ public class SttServiceFactory {
         var service = createApiService(config);
         serviceCache.put(cacheKey, service);
 
-        // 如果没有备选默认服务，将此服务设为备选
-        if (fallbackProvider == null) {
-            fallbackProvider = cacheKey;
-        }
-
         return service;
     }
 
     /**
      * 按配置新建一个一次性的STT服务，既不读缓存也不写缓存，用完即弃。
      * <p>
-     * 硬约束：仅供未保存的临时配置（如配置测试）使用。这类配置的 configId 不指向真实配置，
+     * 仅供未保存的临时配置（如配置测试）使用。这类配置的 configId 不指向真实配置，
      * 走 {@link #getSttService(ConfigBO)} 会把临时凭据留在缓存里，被后续真实会话取到。
      * 本地 vosk 无凭据，仍返回共享实例。
      */
@@ -147,11 +139,8 @@ public class SttServiceFactory {
             default -> {
                 var service = initializeVosk();
                 if (service == null) {
-                    // If vosk create failed, return fallback stt service
-                    if (fallbackProvider != null && serviceCache.containsKey(fallbackProvider)) {
-                        yield serviceCache.get(fallbackProvider);
-                    }
-                    throw new RuntimeException("Create vosk service failed");
+                    // 不得回退到其它配置创建出的实例，那会把别的租户的第三方凭据借出去
+                    throw new IllegalStateException("默认语音识别服务(Vosk)不可用，请为该角色配置第三方 STT");
                 }
                 yield service;
             }

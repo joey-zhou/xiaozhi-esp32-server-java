@@ -1,11 +1,49 @@
 # 变更日志
 
-## [5.0.0] - 2025-04-10
+## [Unreleased]
+
+> 5.0.0（2026-09-07）。
+
+### 架构与规约
+- refactor: 读写两条路径分开——读侧 Service 直接出 BO/投影，Resp 组装收回 xiaozhi-server；写侧走 AppService → 聚合根 → Repository
+- refactor: template 包降级，写路径收进 ServiceImpl（Mapper + MapStruct `updateDO`）
+- refactor: 分页信封统一 `PageResult`，Req/DO 不再越过 Service 层
+- refactor: 删除只做一行转发的 AppService、零调用的 Convert 方法与 `AuthUtils`
+- refactor: `sys_code` 独立成 `verifycode` 包，单表读写统一走 MyBatis-Plus，XML 只留 JOIN/子查询
+- test: 新增架构守卫（模块边界、Controller 出参、Mapper XML、组件扫描覆盖、敏感字段）与存量违规登记
+
+### 对话与音频链路
+- feat: WebSocket 二进制协议 v2/v3，打通服务端 AEC 的时间戳对齐
+- feat: 接入 listen mode 与设备侧 AEC，打断改为 ASR 首字触发；误打断可续播
+- feat: STT 流式识别中间结果回调；采集设备补发的唤醒词前置音频
+- feat: 角色系统提示词改为模板渲染，补语音对话约束
+- fix: 音频流写入串行化，收句不再被并发送帧挤掉
+- fix: 打断后截断对话历史到用户实际听到的位置，并丢弃编码器残留样本
+- fix: 消息窗口按对话组边界裁剪，不再留下孤儿工具消息
+- fix: VAD/AEC 原生资源随会话关闭释放
+- perf: 缓存 ChatModel 与 EmbeddingModel 实例
+
+### AI 能力
+- feat: 新增 Web 聊天（`WebChatController` + `WebChatService`），ai 模块弱化 device 概念改为 owner
+- feat: 火山语音合成/识别升级 2.0，适配火山思考模型
+- feat: 新增 S3 对象存储
+- fix: 工具调用递归超过五层后停止提供工具并要求模型收尾；同一轮多个工具调用只播一次提示
+- fix: TTS 文本清洗去除 markdown 结构与括号舞台指示
+
+### 安全
+- feat: 设备接入鉴权与视觉接口签名，图片上传补安全校验
+- fix: 审计日志凭证字段打码，明文口令与密钥不再落库
+- fix: AI 运行时配置查询必须带用户，避免退化成全库查询
+- fix: 用户邮箱与手机号补唯一索引
+
+---
+
+## [5.0.0] - 2026-04-11
 
 ### 💥 重大变更
 - **refactor!: 项目拆分为多模块架构** 
   - 从单体项目重构为 Maven 多模块：`xiaozhi-common`、`xiaozhi-service`、`xiaozhi-ai`、`xiaozhi-dialogue`、`xiaozhi-server`
-  - 模块间通过窄接口解耦，AI 模块与 Service 层解耦 (narrow ports)
+  - 模块间通过窄接口解耦（AI 模块仍依赖 xiaozhi-service，包括两个 Mapper 直连）
   - Web 组件从 common 迁移至 server 模块，职责更清晰
 
 ### 新增功能
@@ -69,7 +107,7 @@
 - refactor: 优化对话逻辑并去掉冗余的虚拟线程方法
 
 #### 清理
-- refactor: 移除未使用的 ExitKeywordDetector、IntentDetector 类
+- refactor: 移除未使用的 IntentDetector 类（同批提到的 ExitKeywordDetector 后来又加了回来，仍被 IntentService 使用）
 - refactor: 移除未使用的 HttpSessionProvider、ResponseUtils、SessionProvider、DramaJson 类
 - refactor: 移除声纹阈值自定义功能
 - refactor: 移除多个过时的架构文档
@@ -254,13 +292,11 @@
 - refactor(stt): 优化 VoskSttService 类的代码结构
 - refactor: 去掉多余 log
 
-# 变更日志
 ## [2.8.16] - 2025-07-02
 ### 其他变更
 - refactor:vad重构，去除agc
 - refactor:重构音频发送逻辑，按照实际帧位置发送
 
-# 变更日志
 ## [2.8.15] - 2025-07-01
 
 ### 修复

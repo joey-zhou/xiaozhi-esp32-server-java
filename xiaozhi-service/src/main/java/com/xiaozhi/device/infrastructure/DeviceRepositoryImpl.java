@@ -81,6 +81,12 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     }
 
     @Override
+    public Optional<VerifyCode> findVerifyCodeByCode(String code) {
+        VerifyCodeBO bo = verifyCodeService.findValidByCode(code);
+        return Optional.ofNullable(bo).map(deviceConverter::toVerifyCode);
+    }
+
+    @Override
     public void invalidateVerifyCodes(String deviceId) {
         if (deviceId == null || deviceId.isBlank()) return;
         verifyCodeService.deleteByDeviceId(deviceId);

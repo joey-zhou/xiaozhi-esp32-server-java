@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { Device, Role } from '@/types/device'
+import type { Device } from '@/types/device'
+import type { Role } from '@/types/role'
 
 const { t } = useI18n()
 

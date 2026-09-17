@@ -37,24 +37,60 @@ const skills = ['Deep Research', 'Code Review', 'Web Search', 'Summarize']
 const hasText = computed(() => props.modelValue.trim().length > 0)
 const sendActive = computed(() => hasText.value && !props.disabled && !props.sending)
 
+// contenteditable 里 Shift+Enter 插入的是 <br>，只有 innerText 会还原成 \n
+function readEditor(): string {
+  return editor.value?.innerText ?? ''
+}
+
+function writeEditor(value: string) {
+  if (editor.value) editor.value.innerText = value
+}
+
 watch(
   () => props.modelValue,
   (value) => {
-    if (editor.value && editor.value.textContent !== value) {
-      editor.value.textContent = value
+    if (editor.value && readEditor() !== value) {
+      writeEditor(value)
     }
   }
 )
 
 function onEditorInput() {
-  emit('update:modelValue', editor.value?.textContent || '')
+  emit('update:modelValue', readEditor())
 }
 
 function onEditorKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter' && !event.shiftKey) {
+  // isComposing / keyCode 229 都表示输入法组字中，此时回车是上屏候选而非发送
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
     event.preventDefault()
     if (sendActive.value) emit('send')
   }
+}
+
+// 粘贴只取纯文本，避免富文本样式与图片节点留在编辑区
+function onEditorPaste(event: ClipboardEvent) {
+  event.preventDefault()
+  const text = event.clipboardData?.getData('text/plain') ?? ''
+  if (!text) return
+
+  const inserted =
+    typeof document.execCommand === 'function' && document.execCommand('insertText', false, text)
+  if (inserted) return
+
+  const selection = window.getSelection()
+  if (selection && selection.rangeCount > 0 && editor.value?.contains(selection.anchorNode)) {
+    const range = selection.getRangeAt(0)
+    range.deleteContents()
+    const node = document.createTextNode(text)
+    range.insertNode(node)
+    range.setStartAfter(node)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+  } else {
+    writeEditor(readEditor() + text)
+  }
+  onEditorInput()
 }
 
 function focus() {
@@ -76,7 +112,7 @@ function onDocumentKeydown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
-  if (editor.value) editor.value.textContent = props.modelValue
+  writeEditor(props.modelValue)
   document.addEventListener('pointerdown', onDocumentPointerDown)
   document.addEventListener('keydown', onDocumentKeydown)
 })
@@ -104,6 +140,7 @@ defineExpose({ focus })
           :data-placeholder="disabled ? t('chat.connectFirst') : t('chat.inputPlaceholder')"
           @input="onEditorInput"
           @keydown="onEditorKeydown"
+          @paste="onEditorPaste"
         ></div>
       </div>
 

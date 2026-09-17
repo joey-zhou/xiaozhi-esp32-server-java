@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, toRef } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { UserOutlined, CameraOutlined } from '@ant-design/icons-vue'
@@ -7,6 +7,8 @@ import type { FormInstance } from 'ant-design-vue'
 import type { Rule } from 'ant-design-vue/es/form'
 import { useUserStore } from '@/store/user'
 import { useAvatar } from '@/composables/useAvatar'
+import { useFormValidation } from '@/composables/useFormValidation'
+import { PASSWORD_MIN_LENGTH } from '@/constants/api'
 import { updateUser } from '@/services/user'
 import { uploadFile, type UploadResponse } from '@/services/upload'
 import type { User, UpdateUserParams } from '@/types/user'
@@ -16,24 +18,42 @@ const { t } = useI18n()
 
 const userStore = useUserStore()
 const { getAvatarUrl } = useAvatar()
+const { confirmPasswordRules, passwordRules } = useFormValidation()
 
-const userInfo = computed(() => userStore.userInfo || {})
-const avatarUrl = computed(() => getAvatarUrl(userInfo.value.avatar))
+// 账号页的密码是「留空即不修改」，所以去掉 passwordRules 里的 required，
+// 只保留与后端 UserUpdateReq.password 的 @Size(min=6,max=20) 一致的长度约束
+const optionalPasswordRules = passwordRules.filter((rule) => !rule.required)
+
+const userInfo = computed(() => userStore.userInfo)
+const avatarUrl = computed(() => getAvatarUrl(userInfo.value?.avatar))
 // 头像上传相关状态
 const avatarLoading = ref(false)
 
 // 表单相关
 const formRef = ref<FormInstance>()
 const formData = reactive({
-  name: userInfo.value.name || '',
-  tel: userInfo.value.tel || '',
-  email: userInfo.value.email || '',
+  name: userInfo.value?.name || '',
+  tel: userInfo.value?.tel || '',
+  email: userInfo.value?.email || '',
   password: '',
   confirmPassword: '',
 })
 
-// 密码强度
-const passwordLevel = ref(0)
+// 密码强度条只是输入提示，不参与校验：后端 UserUpdateReq.password 只约束长度 6-20，
+// 前端再加「必须含两类字符」会让符合后端规则的密码改不了
+const passwordLevel = computed(() => {
+  const value = formData.password
+  if (!value || value.length < PASSWORD_MIN_LENGTH) return 0
+
+  let level = 0
+  // 数字
+  if (/[0-9]/.test(value)) level++
+  // 字母
+  if (/[a-zA-Z]/.test(value)) level++
+  // 特殊符号
+  if (/[^0-9a-zA-Z_]/.test(value)) level++
+  return level
+})
 const passwordLevelVisible = ref(false)
 
 const levelNames = computed(() => [t('account.passwordLevel.low'), t('account.passwordLevel.low'), t('account.passwordLevel.medium'), t('account.passwordLevel.strong')])
@@ -47,62 +67,33 @@ const passwordPercent = computed(() => {
 })
 
 // 表单验证规则
-const rules: Record<string, Rule[]> = {
-  name: [],
-  tel: [
-    {
-      pattern: /^1[3456789]\d{9}$/,
-      message: t('validation.phone'),
-      trigger: ['blur', 'change']
-    }
-  ],
-  email: [
-    {
-      type: 'email',
-      message: t('validation.email'),
-      trigger: ['blur', 'change']
-    }
-  ],
-  password: [
-    {
-      validator: (_rule, value) => {
-        if (!value) {
-          passwordLevel.value = 0
-          return Promise.resolve()
-        }
+const rules = computed<Record<string, Rule[]>>(() => {
+  const baseRules: Record<string, Rule[]> = {
+    name: [],
+    tel: [
+      {
+        pattern: /^1[3456789]\d{9}$/,
+        message: t('validation.phone'),
+        trigger: ['blur', 'change']
+      }
+    ],
+    email: [
+      {
+        type: 'email',
+        message: t('validation.email'),
+        trigger: ['blur', 'change']
+      }
+    ],
+    password: optionalPasswordRules,
+  }
 
-        let level = 0
-        // 数字
-        if (/[0-9]/.test(value)) level++
-        // 字母
-        if (/[a-zA-Z]/.test(value)) level++
-        // 特殊符号
-        if (/[^0-9a-zA-Z_]/.test(value)) level++
-        // 长度
-        if (value.length < 6) level = 0
+  // 只有填了新密码才要求二次确认，否则确认框留空就能改掉密码
+  if (formData.password) {
+    baseRules.confirmPassword = confirmPasswordRules(toRef(formData, 'password'))
+  }
 
-        passwordLevel.value = level
-
-        if (level >= 2) {
-          return Promise.resolve()
-        }
-        return Promise.reject(t('account.validation.passwordStrength'))
-      },
-      trigger: ['blur', 'change']
-    }
-  ],
-  confirmPassword: [
-    {
-      validator: (_rule, value) => {
-        if (value && formData.password && value !== formData.password) {
-          return Promise.reject(t('account.validation.passwordMismatch'))
-        }
-        return Promise.resolve()
-      },
-      trigger: ['blur', 'change']
-    }
-  ]
-}
+  return baseRules
+})
 
 // 密码输入框聚焦
 const handlePasswordFocus = () => {
@@ -125,8 +116,8 @@ const handleSubmit = async () => {
     submitLoading.value = true
 
     const updateData: UpdateUserParams = {
-      userId: userInfo.value.userId,
-      username: userInfo.value.username,
+      userId: userInfo.value?.userId,
+      username: userInfo.value?.username,
       name: formData.name,
       tel: formData.tel,
       email: formData.email,
@@ -141,18 +132,12 @@ const handleSubmit = async () => {
     
     if (res.code === 200) {
       // 更新本地用户信息
-      const userData = res.data as Partial<User>
-      userStore.updateUserInfo({
-        ...userData,
-        state: userData.state?.toString(),
-        isAdmin: userData.isAdmin?.toString()
-      })
+      userStore.updateUserInfo(res.data as Partial<User>)
       message.success(t('account.updateSuccess'))
       
-      // 清空密码字段
+      // 清空密码字段（强度条跟着 formData.password 自动回到 0）
       formData.password = ''
       formData.confirmPassword = ''
-      passwordLevel.value = 0
     } else {
       message.error(res.message || t('account.updateFailed'))
     }
@@ -198,8 +183,8 @@ const beforeAvatarUpload: UploadProps['beforeUpload'] = (file) => {
 const updateUserAvatar = async (avatarPath: string) => {
   try {
     const updateData: UpdateUserParams = {
-      userId: userInfo.value.userId,
-      username: userInfo.value.username,
+      userId: userInfo.value?.userId,
+      username: userInfo.value?.username,
       avatar: avatarPath
     } as UpdateUserParams
 

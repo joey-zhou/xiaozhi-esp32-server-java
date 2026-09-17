@@ -1,357 +1,131 @@
-import { ref, computed } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
+import type { UploadFile } from 'ant-design-vue'
+import type { UploadRequestOption } from 'ant-design-vue/es/vc-upload/interface'
+import type { FileValidator } from '@/utils/fileValidators'
 
 /**
- * 文件上传管理 Composable
- * 统一管理文件上传、验证、进度等功能
+ * <a-upload> 适配器
+ *
+ * 只负责把「校验规则表 + 一个上传实现」拼成 a-upload 需要的三样东西：
+ * accept 串、同步的 beforeUpload、customRequest。
+ * 文件状态（uploading / done / error / percent）由 a-upload 自己维护在 fileList 上，这里不再重复一套
  */
-
-export interface UseFileUploadOptions {
+export interface UseFileUploadOptions<T> {
   /**
-   * 接受的文件类型
-   * 例如: '.pdf,.docx' 或 'image/*' 或 'application/pdf'
+   * 文件校验规则表，同时提供 accept 串
+   */
+  validator?: FileValidator
+
+  /**
+   * 覆盖 accept 串；不给就用校验器自带的那份
    */
   accept?: string
-  
+
   /**
-   * 最大文件大小（MB）
-   */
-  maxSize?: number
-  
-  /**
-   * 是否支持多文件上传
-   */
-  multiple?: boolean
-  
-  /**
-   * 自动上传（选择文件后立即上传）
+   * 校验通过后是否立即交给 customRequest 上传。
+   * 关掉时 beforeUpload 返回 false，文件留在列表里等调用方手动提交
    */
   autoUpload?: boolean
-  
+
   /**
-   * 上传回调函数
-   * @param files 要上传的文件列表
-   * @returns 上传是否成功
+   * 真正把文件送出去的实现，返回值原样交给 a-upload 的 onSuccess
+   * @param file 要上传的文件
+   * @param onProgress 进度回调，百分比整数
    */
-  onUpload?: (files: File[]) => Promise<boolean | void>
-  
-  /**
-   * 文件变化回调
-   */
-  onChange?: (files: File[]) => void
-  
-  /**
-   * 上传进度回调
-   */
-  onProgress?: (progress: number) => void
-  
-  /**
-   * 验证回调（自定义验证逻辑）
-   * @returns true 表示验证通过，false 或错误消息表示验证失败
-   */
-  customValidate?: (file: File) => boolean | string
+  request?: (file: File, onProgress: (percent: number) => void) => Promise<T>
 }
 
-export interface FileItem {
-  uid: string
-  file: File
-  name: string
-  size: number
-  type: string
-  status: 'ready' | 'uploading' | 'success' | 'error'
-  progress: number
-  url?: string
-  error?: string
-  response?: unknown  // 上传响应数据
-}
-
-export function useFileUpload(options: UseFileUploadOptions = {}) {
+export function useFileUpload<T = unknown>(options: UseFileUploadOptions<T> = {}) {
   const { t } = useI18n()
-  
-  // 上传状态
-  const uploading = ref(false)
-  
-  // 文件列表
-  const fileList = ref<FileItem[]>([])
-  
-  // 总进度
-  const totalProgress = ref(0)
-  
-  // 文件数量
-  const fileCount = computed(() => fileList.value.length)
-  
-  // 是否有文件
-  const hasFiles = computed(() => fileCount.value > 0)
-  
-  // 是否全部上传成功
-  const allSuccess = computed(() => {
-    if (fileCount.value === 0) return false
-    return fileList.value.every(item => item.status === 'success')
-  })
-  
-  // 是否有错误
-  const hasError = computed(() => {
-    return fileList.value.some(item => item.status === 'error')
-  })
-  
-  /**
-   * 验证文件类型
-   */
-  const validateFileType = (file: File): boolean => {
-    if (!options.accept) return true
-    
-    const acceptTypes = options.accept.split(',').map(t => t.trim())
-    const fileExt = '.' + file.name.split('.').pop()?.toLowerCase()
-    const fileType = file.type.toLowerCase()
-    
-    const isValid = acceptTypes.some(type => {
-      // 通配符匹配，如 image/*
-      if (type.includes('*')) {
-        const [mainType] = type.split('/')
-        if (!mainType) return false
-        return fileType.startsWith(mainType)
-      }
-      // 扩展名匹配
-      if (type.startsWith('.')) {
-        return type === fileExt
-      }
-      // MIME 类型匹配
-      return type === fileType
-    })
-    
-    if (!isValid) {
-      message.error(t('upload.invalidFileType', { types: options.accept }))
-    }
-    
-    return isValid
-  }
-  
-  /**
-   * 验证文件大小
-   */
-  const validateFileSize = (file: File): boolean => {
-    if (!options.maxSize) return true
-    
-    const maxBytes = options.maxSize * 1024 * 1024
-    const isValid = file.size <= maxBytes
-    
-    if (!isValid) {
-      message.error(t('upload.fileTooLarge', { size: options.maxSize }))
-    }
-    
-    return isValid
-  }
-  
-  /**
-   * 验证文件
-   */
-  const validateFile = (file: File): boolean => {
-    // 基础验证
-    if (!validateFileType(file)) return false
-    if (!validateFileSize(file)) return false
-    
-    // 自定义验证
-    if (options.customValidate) {
-      const result = options.customValidate(file)
-      if (result === false) {
-        message.error(t('upload.validationFailed'))
-        return false
-      }
-      if (typeof result === 'string') {
-        message.error(result)
-        return false
-      }
-    }
-    
-    return true
-  }
-  
-  /**
-   * 创建文件项
-   */
-  const createFileItem = (file: File): FileItem => {
-    return {
-      uid: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      file,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      status: 'ready',
-      progress: 0
-    }
-  }
-  
-  /**
-   * 处理文件选择
-   */
-  const handleFileChange = async (files: File[] | FileList) => {
-    const fileArray = Array.from(files)
 
-    // 验证文件
-    const validFiles = fileArray.filter(validateFile)
-    if (validFiles.length === 0) return
-    
-    // 单文件模式：替换文件列表
-    // 多文件模式：追加文件
-    const newFileItems = validFiles.map(createFileItem)
-    
-    if (options.multiple) {
-      fileList.value.push(...newFileItems)
-    } else {
-      fileList.value = newFileItems
-    }
-    
-    // 触发变化回调
-    options.onChange?.(validFiles)
-    
-    // 自动上传
-    if (options.autoUpload && options.onUpload) {
-      await upload(validFiles)
-    }
-  }
-  
+  /** 与 <a-upload v-model:file-list> 双向绑定；a-upload 每次都整体换新数组，浅层响应即可 */
+  const fileList = shallowRef<UploadFile<T>[]>([])
+
+  /** 在途请求数：一个列表可能同时传多个文件，用计数而不是布尔量 */
+  const pendingCount = ref(0)
+  const uploading = computed(() => pendingCount.value > 0)
+
+  const accept = computed(() => options.accept ?? options.validator?.accept ?? '')
+  const hasFiles = computed(() => fileList.value.length > 0)
+
   /**
-   * 上传文件
+   * a-upload 的 beforeUpload：必须同步给出结论，异步会让 a-upload 先把文件塞进列表
+   *
+   * 返回 true 放行自动上传；返回 false 表示「不要自动上传」——
+   * 校验失败和 autoUpload=false 都走这个返回值，它不是「校验失败」的专用信号
    */
-  const upload = async (files?: File[]): Promise<boolean> => {
-    if (!options.onUpload) {
-      console.warn('未配置上传函数')
+  const beforeUpload = (file: File): boolean => {
+    const result = options.validator?.validate(file)
+    if (typeof result === 'string') {
+      message.error(t(result))
       return false
     }
-    
-    // 如果没有指定文件，上传所有未上传的文件
-    const filesToUpload = files || fileList.value
-      .filter(item => item.status === 'ready' || item.status === 'error')
-      .map(item => item.file)
-    
-    if (filesToUpload.length === 0) {
-      message.warning(t('upload.noFilesToUpload'))
-      return false
+
+    return options.autoUpload !== false
+  }
+
+  /**
+   * 执行一次上传，期间维持 uploading。拖拽这类不经过 a-upload 的入口也走这里
+   */
+  const runUpload = async (file: File, onProgress?: (percent: number) => void): Promise<T> => {
+    if (!options.request) {
+      throw new Error('useFileUpload: 未配置 request')
     }
-    
-    uploading.value = true
-    totalProgress.value = 0
-    
+
+    pendingCount.value += 1
     try {
-      // 更新文件状态为上传中
-      filesToUpload.forEach(file => {
-        const item = fileList.value.find(f => f.file === file)
-        if (item) {
-          item.status = 'uploading'
-          item.progress = 0
-        }
-      })
-      
-      // 执行上传
-      const result = await options.onUpload(filesToUpload)
-      
-      // 上传成功
-      if (result !== false) {
-        filesToUpload.forEach(file => {
-          const item = fileList.value.find(f => f.file === file)
-          if (item) {
-            item.status = 'success'
-            item.progress = 100
-          }
-        })
-        totalProgress.value = 100
-        message.success(t('upload.success'))
-        return true
-      } else {
-        // 上传失败
-        filesToUpload.forEach(file => {
-          const item = fileList.value.find(f => f.file === file)
-          if (item) {
-            item.status = 'error'
-            item.error = t('upload.failed')
-          }
-        })
-        return false
-      }
-    } catch (error: any) {
-      console.error('上传失败:', error)
-      
-      // 标记为失败
-      filesToUpload.forEach(file => {
-        const item = fileList.value.find(f => f.file === file)
-        if (item) {
-          item.status = 'error'
-          item.error = error.message || t('upload.failed')
-        }
-      })
-      
-      message.error(error.message || t('upload.failed'))
-      return false
+      return await options.request(file, percent => onProgress?.(percent))
     } finally {
-      uploading.value = false
+      pendingCount.value -= 1
     }
   }
-  
+
   /**
-   * 更新文件进度
+   * a-upload 的 customRequest：异常吞进 onError，由上传列表展示失败态
    */
-  const updateProgress = (fileUid: string, progress: number) => {
-    const item = fileList.value.find(f => f.uid === fileUid)
-    if (item) {
-      item.progress = progress
-      
-      // 计算总进度
-      const total = fileList.value.reduce((sum, f) => sum + f.progress, 0)
-      totalProgress.value = Math.round(total / fileList.value.length)
-      
-      options.onProgress?.(totalProgress.value)
+  const customRequest = async (option: UploadRequestOption<T>) => {
+    const { file, onProgress, onSuccess, onError } = option
+
+    // customRequest 的 file 声明上允许 Blob/string，这里只接真实文件
+    if (!(file instanceof File)) {
+      onError?.(new Error('unsupported file'))
+      return
+    }
+
+    try {
+      const response = await runUpload(file, percent => onProgress?.({ percent }))
+      onSuccess?.(response)
+    } catch (error) {
+      const failure = error instanceof Error ? error : new Error(String(error))
+      console.error('文件上传失败:', failure)
+      onError?.(failure)
     }
   }
-  
-  /**
-   * 移除文件
-   */
-  const removeFile = (fileUid: string) => {
-    const index = fileList.value.findIndex(f => f.uid === fileUid)
-    if (index !== -1) {
-      fileList.value.splice(index, 1)
-    }
-  }
-  
-  /**
-   * 清空文件列表
-   */
+
   const clearFiles = () => {
     fileList.value = []
-    totalProgress.value = 0
   }
-  
-  /**
-   * 重试上传失败的文件
-   */
-  const retryFailed = async () => {
-    const failedFiles = fileList.value
-      .filter(item => item.status === 'error')
-      .map(item => item.file)
-    
-    if (failedFiles.length > 0) {
-      await upload(failedFiles)
-    }
+
+  const removeFile = (uid: string) => {
+    fileList.value = fileList.value.filter(item => item.uid !== uid)
   }
-  
+
   return {
     // 状态
-    uploading,
     fileList,
-    totalProgress,
-    fileCount,
+    uploading,
+    accept,
     hasFiles,
-    allSuccess,
-    hasError,
-    
+
+    // a-upload 接口
+    beforeUpload,
+    customRequest,
+
     // 方法
-    handleFileChange,
-    upload,
-    updateProgress,
-    removeFile,
+    runUpload,
     clearFiles,
-    retryFailed,
-    validateFile
+    removeFile,
   }
 }

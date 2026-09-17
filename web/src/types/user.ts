@@ -1,17 +1,19 @@
 import type { PageQueryParams } from './api'
+import type { AuthRole, PermissionTreeNode } from './authRole'
 
 /**
- * 用户信息接口
+ * 用户信息，字段对应后端 UserResp
+ * state / isAdmin 在库表里是 enum('1','0')，JSON 过来是字符串，不要用数字比较
  */
 export interface User {
   userId: string
-  name: string
   username?: string
+  name?: string
   email?: string
   tel?: string
   avatar?: string
-  state: number // 1-正常 0-禁用
-  isAdmin: number // 1-管理员 0-普通用户
+  state?: string // '1'-正常 '0'-禁用
+  isAdmin?: string // '1'-管理员 '0'-普通用户
   totalDevice?: number // 设备数量
   aliveNumber?: number // 在线设备数
   totalMessage?: number // 对话消息数
@@ -20,6 +22,20 @@ export interface User {
   authRoleId?: number // 后台权限角色ID
   authRoleName?: string // 后台权限角色名称
   editable?: boolean // 表格编辑状态
+}
+
+/**
+ * 登录 / 校验 token / 刷新 token 的响应体
+ */
+export interface LoginResponse {
+  token: string
+  refreshToken: string
+  expiresIn: number // 过期时间（秒）
+  userId: number
+  isNewUser: boolean
+  user: User
+  authRole: AuthRole
+  permissions: PermissionTreeNode[]
 }
 
 /**

@@ -1,21 +1,13 @@
-/* 全局主题样式 - 使用 Ant Design 官方 CSS 变量 */
+/* 全局主题样式 - 只允许使用 Ant Design 官方 CSS 变量（--ant-*），不再自带一套调色板 */
 
-/* 全局样式重置，使用 Ant Design 的 CSS 变量 */
 body {
   background-color: var(--ant-color-bg-base);
   color: var(--ant-color-text);
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #app {
   background-color: var(--ant-color-bg-base);
   min-height: 100vh;
-}
-
-/* 自定义组件样式，使用 Ant Design 变量 */
-.search-form {
-  background-color: var(--ant-color-bg-container);
-  border: 1px solid var(--ant-color-border);
 }
 
 .login-card,
@@ -25,25 +17,14 @@ body {
   border: 1px solid var(--ant-color-border);
 }
 
-
-
-
-
-/* 删除按钮统一样式 */
-.danger-link,
-.delete-link {
-  color: #ff4d4f !important;
-  text-decoration: none;
-  transition: color 0.3s ease;
-}
-
-.danger-link:hover,
-.delete-link:hover {
-  color: #ff7875 !important;
-  text-decoration: none;
-}
-
-/* 平滑过渡 */
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+/* 明暗切换的平滑过渡只加在容器层：加到 * 上会让表格每个单元格 hover 都带 300ms 淡入，划过时留拖影 */
+body,
+#app,
+.ant-layout,
+.ant-card,
+.ant-table-wrapper {
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease;
 }

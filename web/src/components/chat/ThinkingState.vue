@@ -13,6 +13,7 @@ const { t } = useI18n()
   font-size: 13px;
   line-height: 18px;
   font-weight: 500;
+  letter-spacing: -0.005em;
   color: transparent;
   -webkit-text-fill-color: transparent;
   background: linear-gradient(

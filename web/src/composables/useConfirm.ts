@@ -12,248 +12,144 @@ export interface ConfirmOptions {
    * 标题
    */
   title?: string
-  
+
   /**
    * 内容
    */
   content?: string
-  
+
   /**
    * 确定按钮文本
    */
   okText?: string
-  
+
   /**
    * 取消按钮文本
    */
   cancelText?: string
-  
+
   /**
    * 确定按钮类型
    */
   okType?: 'primary' | 'danger' | 'default' | 'dashed' | 'link' | 'text'
-  
+
   /**
-   * 确定按钮加载状态
+   * 确定按钮属性
    */
   okButtonProps?: {
     loading?: boolean
     disabled?: boolean
   }
-  
+
   /**
    * 图标
    */
-  icon?: any
-  
+  icon?: ModalFuncProps['icon']
+
   /**
    * 宽度
    */
   width?: string | number
-  
+
   /**
    * 是否显示取消按钮
    */
   showCancel?: boolean
 }
 
+/**
+ * 各方法在 options 未给值时使用的兜底文案
+ */
+interface ConfirmDefaults {
+  title: string
+  content: string
+  okText: string
+  okType: NonNullable<ConfirmOptions['okType']>
+}
+
 export function useConfirm() {
   const { t } = useI18n()
-  
+
+  /**
+   * 把 ConfirmOptions 折成 antd 的 ModalFuncProps
+   * 只在字段为 undefined 时才套兜底值，显式传入的空串/false 必须原样保留
+   */
+  const toModalProps = (options: ConfirmOptions, defaults: ConfirmDefaults): ModalFuncProps => ({
+    title: options.title ?? defaults.title,
+    content: options.content ?? defaults.content,
+    okText: options.okText ?? defaults.okText,
+    cancelText: options.cancelText ?? t('common.cancel'),
+    okType: options.okType ?? defaults.okType,
+    okButtonProps: options.okButtonProps,
+    icon: options.icon,
+    width: options.width,
+    okCancel: options.showCancel !== false,
+  })
+
+  /**
+   * 执行确认回调
+   * 回调抛错必须在这里吞掉：onOk 返回 rejected Promise 时 antd 只复位 loading 不关弹窗
+   */
+  const runAction = async (action: () => void | Promise<void>) => {
+    try {
+      await action()
+    } catch (error) {
+      console.error('confirm action failed:', error)
+    }
+  }
+
   /**
    * 通用确认对话框
    */
-  const confirm = (
-    onOk: () => void | Promise<void>,
-    options: ConfirmOptions = {}
-  ) => {
+  const confirm = (onOk: () => void | Promise<void>, options: ConfirmOptions = {}) => {
     return Modal.confirm({
-      title: options.title || t('common.confirm'),
-      content: options.content || t('common.confirmOperation'),
-      okText: options.okText || t('common.confirm'),
-      cancelText: options.cancelText || t('common.cancel'),
-      okType: options.okType || 'primary',
-      icon: options.icon,
-      width: options.width,
-      okButtonProps: options.okButtonProps,
-      class: options.showCancel === false ? 'hide-cancel-button' : undefined,
-      onOk: async () => {
-        await onOk()
-      }
+      ...toModalProps(options, {
+        title: t('common.confirm'),
+        content: t('common.confirmOperation'),
+        okText: t('common.confirm'),
+        okType: 'primary',
+      }),
+      onOk: () => runAction(onOk),
     })
   }
-  
+
   /**
-   * 删除确认
+   * 删除等破坏性操作确认对话框，确定按钮默认红色
    */
-  const confirmDelete = (
-    onConfirm: () => void | Promise<void>,
-    options: Partial<ConfirmOptions> = {}
-  ) => {
+  const confirmDelete = (onOk: () => void | Promise<void>, options: ConfirmOptions = {}) => {
     return Modal.confirm({
-      title: options.title || t('common.confirmDelete'),
-      content: options.content || t('common.confirmDeleteMessage'),
-      okText: options.okText || t('common.delete'),
-      cancelText: options.cancelText || t('common.cancel'),
-      okType: 'danger',
-      icon: options.icon,
-      width: options.width,
-      onOk: async () => {
-        await onConfirm()
-      }
+      ...toModalProps(options, {
+        title: t('common.confirmDelete'),
+        content: t('common.confirmDeleteMessage'),
+        okText: t('common.delete'),
+        okType: 'danger',
+      }),
+      onOk: () => runAction(onOk),
     })
   }
-  
+
   /**
-   * 警告确认
+   * 确认对话框的 Promise 形态，确定返回 true、取消返回 false
+   * 供调用方用「取消即中断后续流程」的写法
    */
-  const confirmWarning = (
-    onConfirm: () => void | Promise<void>,
-    options: Partial<ConfirmOptions> = {}
-  ) => {
-    return Modal.warning({
-      title: options.title || t('common.warning'),
-      content: options.content || t('common.warningMessage'),
-      okText: options.okText || t('common.confirm'),
-      okType: 'primary',
-      icon: options.icon,
-      width: options.width,
-      onOk: async () => {
-        await onConfirm()
-      }
-    } as ModalFuncProps)
-  }
-  
-  /**
-   * 信息确认
-   */
-  const confirmInfo = (
-    onConfirm: () => void | Promise<void>,
-    options: Partial<ConfirmOptions> = {}
-  ) => {
-    return Modal.info({
-      title: options.title || t('common.info'),
-      content: options.content || t('common.infoMessage'),
-      okText: options.okText || t('common.confirm'),
-      icon: options.icon,
-      width: options.width,
-      onOk: async () => {
-        await onConfirm()
-      }
-    } as ModalFuncProps)
-  }
-  
-  /**
-   * 成功确认
-   */
-  const confirmSuccess = (
-    onConfirm: () => void | Promise<void>,
-    options: Partial<ConfirmOptions> = {}
-  ) => {
-    return Modal.success({
-      title: options.title || t('common.success'),
-      content: options.content || t('common.successMessage'),
-      okText: options.okText || t('common.confirm'),
-      icon: options.icon,
-      width: options.width,
-      onOk: async () => {
-        await onConfirm()
-      }
-    } as ModalFuncProps)
-  }
-  
-  /**
-   * 错误确认
-   */
-  const confirmError = (
-    onConfirm: () => void | Promise<void>,
-    options: Partial<ConfirmOptions> = {}
-  ) => {
-    return Modal.error({
-      title: options.title || t('common.error'),
-      content: options.content || t('common.errorMessage'),
-      okText: options.okText || t('common.confirm'),
-      icon: options.icon,
-      width: options.width,
-      onOk: async () => {
-        await onConfirm()
-      }
-    } as ModalFuncProps)
-  }
-  
-  /**
-   * 保存确认
-   */
-  const confirmSave = (
-    onConfirm: () => void | Promise<void>,
-    options: Partial<ConfirmOptions> = {}
-  ) => {
-    return Modal.confirm({
-      title: options.title || t('common.confirmSave'),
-      content: options.content || t('common.confirmSaveMessage'),
-      okText: options.okText || t('common.save'),
-      cancelText: options.cancelText || t('common.cancel'),
-      okType: 'primary',
-      icon: options.icon,
-      width: options.width,
-      onOk: async () => {
-        await onConfirm()
-      }
+  const confirmAsync = (options: ConfirmOptions = {}) => {
+    return new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        ...toModalProps(options, {
+          title: t('common.confirm'),
+          content: t('common.confirmOperation'),
+          okText: t('common.confirm'),
+          okType: 'primary',
+        }),
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      })
     })
   }
-  
-  /**
-   * 取消确认
-   */
-  const confirmCancel = (
-    onConfirm: () => void | Promise<void>,
-    options: Partial<ConfirmOptions> = {}
-  ) => {
-    return Modal.confirm({
-      title: options.title || t('common.confirmCancel'),
-      content: options.content || t('common.confirmCancelMessage'),
-      okText: options.okText || t('common.confirm'),
-      cancelText: options.cancelText || t('common.cancel'),
-      okType: 'danger',
-      icon: options.icon,
-      width: options.width,
-      onOk: async () => {
-        await onConfirm()
-      }
-    })
-  }
-  
-  /**
-   * 提交确认
-   */
-  const confirmSubmit = (
-    onConfirm: () => void | Promise<void>,
-    options: Partial<ConfirmOptions> = {}
-  ) => {
-    return Modal.confirm({
-      title: options.title || t('common.confirmSubmit'),
-      content: options.content || t('common.confirmSubmitMessage'),
-      okText: options.okText || t('common.submit'),
-      cancelText: options.cancelText || t('common.cancel'),
-      okType: 'primary',
-      icon: options.icon,
-      width: options.width,
-      onOk: async () => {
-        await onConfirm()
-      }
-    })
-  }
-  
+
   return {
     confirm,
+    confirmAsync,
     confirmDelete,
-    confirmWarning,
-    confirmInfo,
-    confirmSuccess,
-    confirmError,
-    confirmSave,
-    confirmCancel,
-    confirmSubmit
   }
 }
-

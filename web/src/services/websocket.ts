@@ -13,9 +13,11 @@ export interface WebSocketConfig {
 }
 
 export interface WebSocketMessage {
-  type: 'stt' | 'tts' | 'listen' | 'audio' | 'system'
+  type: 'stt' | 'tts' | 'llm' | 'iot' | 'listen' | 'audio' | 'system'
   state?: 'start' | 'stop' | 'text' | 'sentence_start'
   text?: string
+  /** type=llm 时的情绪标签（neutral/happy/sad ...） */
+  emotion?: string
   session_id?: string
   [key: string]: unknown
 }
@@ -29,6 +31,8 @@ export interface ChatMessage {
   isLoading?: boolean
   duration?: string
   audioData?: ArrayBuffer | Blob
+  /** 服务端下发的情绪标签，随本句 AI 回复一起展示 */
+  emotion?: string
 }
 
 export interface ConnectionStatus {
@@ -48,6 +52,13 @@ let reconnectTimer: number | null = null
 let reconnectAttempts = 0
 const maxReconnectAttempts = 5
 const reconnectDelay = 2000
+
+// 建连等待上限
+const CONNECT_TIMEOUT = 5000
+
+// 心跳：服务端 websocket.max-session-idle-timeout 默认 60 秒，网页端不发音频时会被判空闲踢下线
+let heartbeatTimer: number | null = null
+const HEARTBEAT_INTERVAL = 30000
 
 // 打字机效果相关
 let typewriterTimer: number | null = null
@@ -70,6 +81,8 @@ export const messages: ChatMessage[] = reactive([])
 
 // 当前正在构建的AI回复消息
 let currentAIMessage: ChatMessage | null = null
+// 情绪消息早于 sentence_start 到达，先暂存，等消息创建时再挂上去
+let pendingEmotion: string | null = null
 
 // 回调函数
 type MessageHandler = (data: WebSocketMessage) => void
@@ -100,8 +113,9 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   error: 4
 }
 
-let currentLogLevel = LOG_LEVELS.debug
-let logHistory: LogEntry[] = []
+// 生产只留 warning 以上：下行音频每帧都会走这里，debug 级会把 console 和内存日志刷爆
+let currentLogLevel = import.meta.env.DEV ? LOG_LEVELS.debug : LOG_LEVELS.warning
+const logHistory: LogEntry[] = []
 const MAX_LOG_HISTORY = 500
 
 export function log(message: string, type: LogLevel = 'info'): LogEntry {
@@ -117,8 +131,9 @@ export function log(message: string, type: LogLevel = 'info'): LogEntry {
 
   logHistory.push(entry)
 
-  if (logHistory.length > MAX_LOG_HISTORY) {
-    logHistory = logHistory.slice(-MAX_LOG_HISTORY)
+  // 逐条淘汰，不要整体 slice 重建 500 条数组
+  while (logHistory.length > MAX_LOG_HISTORY) {
+    logHistory.shift()
   }
 
   switch (type) {
@@ -146,7 +161,7 @@ export function getLogs(): LogEntry[] {
 }
 
 export function clearLogs(): boolean {
-  logHistory = []
+  logHistory.length = 0
   return true
 }
 
@@ -189,6 +204,7 @@ export function addMessage(message: Partial<ChatMessage>): ChatMessage | null {
 export function clearMessages(): boolean {
   messages.splice(0, messages.length)
   currentAIMessage = null // 重置当前AI消息
+  pendingEmotion = null
   log('清空所有消息', 'info')
   return true
 }
@@ -224,6 +240,32 @@ export function unregisterStatusChangeCallback(callback: StatusChangeHandler): b
 export function registerBinaryHandler(handler: BinaryHandler): void {
   binaryHandler = handler
   log('✅ 二进制消息处理函数已注册', 'info')
+}
+
+/** 组件卸载时必须调，否则处理函数一直挂着，音频链路跟着不放 */
+export function unregisterBinaryHandler(handler: BinaryHandler): boolean {
+  if (binaryHandler !== handler) {
+    return false
+  }
+  binaryHandler = null
+  return true
+}
+
+/** 发送保活报文重置服务端空闲计时；服务端收下即丢弃，不回应答 */
+function startHeartbeat(): void {
+  stopHeartbeat()
+  heartbeatTimer = window.setInterval(() => {
+    if (webSocket?.readyState === WebSocket.OPEN) {
+      sendJsonMessage({ type: 'ping' })
+    }
+  }, HEARTBEAT_INTERVAL)
+}
+
+function stopHeartbeat(): void {
+  if (heartbeatTimer !== null) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+  }
 }
 
 // 通知状态变更
@@ -269,7 +311,7 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
     if (webSocket) {
       try {
         webSocket.close()
-      } catch (e) {
+      } catch {
         // 忽略关闭错误
       }
     }
@@ -310,6 +352,7 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
       connectionStatus.connectionStatus = '已连接'
       connectionStatus.connectionTime = new Date()
       reconnectAttempts = 0
+      startHeartbeat()
       log('WebSocket连接已建立', 'success')
       notifyStatusChange()
     }
@@ -323,6 +366,7 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
     webSocket.onclose = (event) => {
       isConnecting = false
       connectionStatus.isConnected = false
+      stopHeartbeat()
 
       if (event.wasClean) {
         connectionStatus.connectionStatus = '已断开'
@@ -340,40 +384,55 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
     webSocket.onerror = () => {
       isConnecting = false
       connectionStatus.isConnected = false
+      stopHeartbeat()
       connectionStatus.connectionStatus = '连接错误'
       log('WebSocket连接错误', 'error')
       notifyStatusChange()
     }
 
-    // 等待连接完成或超时
+    // 等待连接完成或超时。
+    // 超时定时器只对本轮的 socket 负责：本轮结束后 webSocket 已经换人，再去 close 会掐掉下一轮刚建好的连接
+    const pendingSocket = webSocket
     return new Promise((resolve) => {
+      let settled = false
+      // 定时器先声明：它的回调必定异步执行，此时 settle 已完成初始化
       const timeoutId = setTimeout(() => {
-        if (!connectionStatus.isConnected) {
-          log('WebSocket连接超时', 'error')
-          isConnecting = false
-          connectionStatus.connectionStatus = '连接超时'
-
-          try {
-            webSocket?.close()
-          } catch (e) {
-            // 忽略关闭错误
-          }
-
-          resolve(false)
+        if (webSocket !== pendingSocket || connectionStatus.isConnected) {
+          settle(false)
+          return
         }
-      }, 5000)
+        log('WebSocket连接超时', 'error')
+        isConnecting = false
+        connectionStatus.connectionStatus = '连接超时'
+
+        try {
+          pendingSocket.close()
+        } catch {
+          // 忽略关闭错误
+        }
+
+        settle(false)
+      }, CONNECT_TIMEOUT)
+
+      const settle = (result: boolean) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeoutId)
+        resolve(result)
+      }
 
       const checkConnected = () => {
-        if (connectionStatus.isConnected) {
-          clearTimeout(timeoutId)
-          resolve(true)
+        if (settled) return
+        if (webSocket !== pendingSocket) {
+          settle(false)
+        } else if (connectionStatus.isConnected) {
+          settle(true)
         } else if (
           connectionStatus.connectionStatus.includes('错误') ||
           connectionStatus.connectionStatus.includes('超时') ||
           connectionStatus.connectionStatus.includes('失败')
         ) {
-          clearTimeout(timeoutId)
-          resolve(false)
+          settle(false)
         } else {
           setTimeout(checkConnected, 100)
         }
@@ -423,7 +482,7 @@ function handleWebSocketMessage(event: MessageEvent): void {
     
     // 检查是否是二进制数据
     if (event.data instanceof ArrayBuffer) {
-      log(`🔢 收到二进制数据: ${event.data.byteLength}字节`, 'info')
+      log(`🔢 收到二进制数据: ${event.data.byteLength}字节`, 'debug')
       if (binaryHandler) {
         log('✅ 调用二进制处理函数', 'debug')
         binaryHandler(event.data)
@@ -435,7 +494,7 @@ function handleWebSocketMessage(event: MessageEvent): void {
 
     // 检查是否是Blob数据
     if (event.data instanceof Blob) {
-      log(`🔢 收到Blob数据: ${event.data.size}字节`, 'info')
+      log(`🔢 收到Blob数据: ${event.data.size}字节`, 'debug')
       event.data.arrayBuffer().then(buffer => {
         if (binaryHandler) {
           log('✅ 调用二进制处理函数 (Blob转ArrayBuffer)', 'debug')
@@ -451,8 +510,8 @@ function handleWebSocketMessage(event: MessageEvent): void {
     log(`📝 收到文本消息: ${event.data.substring(0, 100)}...`, 'debug')
     const data: WebSocketMessage = JSON.parse(event.data)
 
-    // 记录会话ID
-    if (data.session_id && !connectionStatus.sessionId) {
+    // 记录会话ID：重连后服务端会下发新的，必须覆盖旧值，否则后续消息还带着已失效的会话
+    if (data.session_id && data.session_id !== connectionStatus.sessionId) {
       connectionStatus.sessionId = data.session_id
       log(`会话ID: ${connectionStatus.sessionId}`, 'info')
       notifyStatusChange()
@@ -466,8 +525,15 @@ function handleWebSocketMessage(event: MessageEvent): void {
       case 'tts':
         handleTTSMessage(data)
         break
+      case 'llm':
+        handleEmotionMessage(data)
+        break
+      case 'iot':
+        // 网页端没有可控 IoT 设备，指令消息直接忽略
+        log('忽略 iot 指令消息', 'debug')
+        break
       default:
-        log(`收到未知类型的消息: ${data.type}`, 'warning')
+        log(`收到未处理类型的消息: ${data.type}`, 'debug')
     }
 
     // 调用所有注册的消息处理函数
@@ -492,6 +558,16 @@ function handleSTTMessage(data: WebSocketMessage): void {
       isUser: true
     })
     log(`语音识别结果: ${data.text}`, 'info')
+  }
+}
+
+// 处理情绪消息（每句 TTS 前下发一条）
+function handleEmotionMessage(data: WebSocketMessage): void {
+  if (!data.emotion) return
+  if (currentAIMessage) {
+    currentAIMessage.emotion = data.emotion
+  } else {
+    pendingEmotion = data.emotion
   }
 }
 
@@ -520,15 +596,18 @@ function processTypewriterQueue(): void {
   
   // 如果是第一次打字，创建消息
   if (!currentAIMessage) {
-    currentAIMessage = {
+    messages.push({
       id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       content: '',
       type: 'tts',
       isUser: false,
       timestamp: new Date(),
-      isLoading: false
-    }
-    messages.push(currentAIMessage)
+      isLoading: false,
+      emotion: pendingEmotion ?? undefined
+    })
+    pendingEmotion = null
+    // 必须回读 messages 里的响应式代理：直接留着原始对象改 content 不会触发视图更新
+    currentAIMessage = messages[messages.length - 1]!
     log(`📝 创建新的AI回复消息 (ID: ${currentAIMessage.id})`, 'info')
   }
   
@@ -537,13 +616,6 @@ function processTypewriterQueue(): void {
     if (currentIndex < chars.length) {
       currentAIMessage!.content += chars[currentIndex]
       currentIndex++
-      
-      // 强制触发响应式更新
-      const index = messages.findIndex(msg => msg.id === currentAIMessage!.id)
-      if (index !== -1) {
-        messages[index] = { ...currentAIMessage! }
-      }
-      
       typewriterTimer = window.setTimeout(typeNextChar, TYPING_SPEED)
     } else {
       // 当前文本打完，处理下一个
@@ -565,6 +637,18 @@ function stopTypewriter(): void {
   typewriterQueue = []
 }
 
+/**
+ * TTS 状态回调。音频流的开始/结束只由 tts 的 start/stop 表达，
+ * 服务端不会下发空音频帧，注册方需据此复位缓冲与结束播放。
+ */
+type TtsStateHandler = (state: 'start' | 'stop') => void
+
+let ttsStateHandler: TtsStateHandler | null = null
+
+export function registerTtsStateHandler(handler: TtsStateHandler | null): void {
+  ttsStateHandler = handler
+}
+
 // 处理TTS消息（文本转语音）
 function handleTTSMessage(data: WebSocketMessage): void {
   if (data.state === 'start') {
@@ -573,11 +657,9 @@ function handleTTSMessage(data: WebSocketMessage): void {
     // 重置打字机和当前AI消息
     stopTypewriter()
     currentAIMessage = null
-    
-    // 通知音频服务准备接收新的音频流
-    if (window.dispatchEvent) {
-      window.dispatchEvent(new CustomEvent('audio-stream-start'))
-    }
+    pendingEmotion = null
+
+    ttsStateHandler?.('start')
   } else if (data.state === 'sentence_start' && data.text) {
     // 将新句子加入打字机队列
     log(`📥 收到新句子: "${data.text}"`, 'info')
@@ -600,11 +682,8 @@ function handleTTSMessage(data: WebSocketMessage): void {
       }
     }
     waitForTyping()
-    
-    // 通知音频服务流已结束
-    if (window.dispatchEvent) {
-      window.dispatchEvent(new CustomEvent('audio-stream-end'))
-    }
+
+    ttsStateHandler?.('stop')
   }
 }
 
@@ -753,10 +832,13 @@ export function disconnectFromServer(): boolean {
     clearTimeout(reconnectTimer)
     reconnectTimer = null
   }
+
+  stopHeartbeat()
   
   // 停止打字机效果
   stopTypewriter()
   currentAIMessage = null
+  pendingEmotion = null
 
   if (!webSocket) {
     connectionStatus.sessionId = null

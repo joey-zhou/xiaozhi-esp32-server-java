@@ -14,8 +14,14 @@ export const ROUTES = {
   MEMORY_SUMMARY: '/memory/summary',
   AUTH_ROLE: '/auth-role',
   SETTING_ACCOUNT: '/setting/account',
-  SETTING_CONFIG: '/setting/config',
   ERROR_403: '/403',
   ERROR_404: '/404',
-  ABOUT: '/about',
 } as const
+
+/**
+ * 登录后的默认落地路由
+ * 管理员进仪表盘，普通用户进智能体列表
+ */
+export function defaultRouteFor(isAdmin: boolean): string {
+  return isAdmin ? ROUTES.DASHBOARD : ROUTES.DEVICE
+}

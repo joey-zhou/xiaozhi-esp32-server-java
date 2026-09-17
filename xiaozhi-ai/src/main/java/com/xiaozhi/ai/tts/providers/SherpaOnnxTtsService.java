@@ -27,9 +27,9 @@ public class SherpaOnnxTtsService implements TtsService {
     private static final String PROVIDER_NAME = "sherpa-onnx";
 
     // 缓存 OfflineTts 实例，避免重复加载模型（key = modelPath:modelType），进程内长期持有
-    // 硬约束：实例一旦放入就不再移除、不调用 release()。release() 会 delete native 指针，
+    // 实例一旦放入就不再移除、不调用 release()。release() 会 delete native 指针，
     // 与正在执行的 generate 并发即 use-after-free，直接 SIGSEGV 崩掉整个 JVM
-    // 硬约束：实例只能经由本 Map 发布，由 ConcurrentHashMap 保证 native 指针对其他线程可见
+    // 实例只能经由本 Map 发布，由 ConcurrentHashMap 保证 native 指针对其他线程可见
     // 模型文件被替换后需重启进程才生效
     private static final Map<String, OfflineTts> ttsCache = new ConcurrentHashMap<>();
 
