@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import zhCN from '../zh-CN'
 import enUS from '../en-US'
+import { CONNECTION_STATUS_KEYS } from '../../services/websocket'
 
 const SRC_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 
@@ -122,6 +123,25 @@ describe('locale 对齐', () => {
     expect(
       missing,
       '这些 key 只在代码里出现、语言包里没有，界面会直接显示裸 key；新增文案必须同时补进 zh-CN 和 en-US',
+    ).toEqual([])
+  })
+
+  /**
+   * FloatingChat 用 t(`chat.floating.status.${key}`) 这种反引号拼接的动态 key，
+   * 上面那个静态扫描按设计扫不到。状态码本身是可枚举的，这里逐个对账补上这个缺口。
+   */
+  it('每个连接状态码在两个语言包里都有文案', () => {
+    const missing = CONNECTION_STATUS_KEYS.flatMap((statusKey) => {
+      const fullKey = `chat.floating.status.${statusKey}`
+      return [
+        zhKeys.has(fullKey) ? [] : [`zh-CN 缺 ${fullKey}`],
+        enKeys.has(fullKey) ? [] : [`en-US 缺 ${fullKey}`],
+      ].flat()
+    })
+
+    expect(
+      missing,
+      '连接状态码新增后必须同时补文案，否则聊天窗标题栏会显示裸 key',
     ).toEqual([])
   })
 

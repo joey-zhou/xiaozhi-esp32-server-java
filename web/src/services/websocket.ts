@@ -35,9 +35,47 @@ export interface ChatMessage {
   emotion?: string
 }
 
+/**
+ * 连接状态码。这里刻意不放中文文案：
+ * 状态既要显示给用户，也参与 connectToServer 的成败判定与 stopAutoReconnect 的分支，
+ * 存文案会让「换个措辞或翻成英文」把控制流一起改坏。文案由视图层按状态码翻译。
+ */
+export const CONNECTION_STATUS_KEYS = [
+  'idle',
+  'connecting',
+  'connected',
+  'closed',
+  'dropped',
+  'error',
+  'timeout',
+  'failed',
+  'reconnecting',
+  'reconnectFailed',
+  'reconnectStopped',
+] as const
+
+export type ConnectionStatusKey = (typeof CONNECTION_STATUS_KEYS)[number]
+
+/** 这几种表示这一轮连接已经确定失败，不必再等 */
+const TERMINAL_FAILURE_KEYS: ReadonlySet<ConnectionStatusKey> = new Set([
+  'error',
+  'timeout',
+  'failed',
+  'reconnectFailed',
+])
+
+/** 这几种表示处在重连流程里（含已停止重连，与改造前 includes('重连') 的覆盖范围一致） */
+const RECONNECT_KEYS: ReadonlySet<ConnectionStatusKey> = new Set([
+  'reconnecting',
+  'reconnectFailed',
+  'reconnectStopped',
+])
+
 export interface ConnectionStatus {
   isConnected: boolean
-  connectionStatus: string
+  connectionStatus: ConnectionStatusKey
+  /** 仅在 connectionStatus 为 reconnecting 时有意义，供文案插值用 */
+  reconnectSeconds: number
   connectionTime: Date | null
   sessionId: string | null
 }
@@ -69,7 +107,8 @@ const TYPING_SPEED = 50 // 每个字的显示间隔（毫秒）
 // 连接状态
 const connectionStatus: ConnectionStatus = {
   isConnected: false,
-  connectionStatus: '未连接',
+  connectionStatus: 'idle',
+  reconnectSeconds: 0,
   connectionTime: null,
   sessionId: null
 }
@@ -298,7 +337,7 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
 
   try {
     isConnecting = true
-    connectionStatus.connectionStatus = '正在连接...'
+    connectionStatus.connectionStatus = 'connecting'
     connectionStatus.isConnected = false
 
     // 清除之前的重连计时器
@@ -349,7 +388,7 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
     webSocket.onopen = () => {
       isConnecting = false
       connectionStatus.isConnected = true
-      connectionStatus.connectionStatus = '已连接'
+      connectionStatus.connectionStatus = 'connected'
       connectionStatus.connectionTime = new Date()
       reconnectAttempts = 0
       startHeartbeat()
@@ -369,10 +408,10 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
       stopHeartbeat()
 
       if (event.wasClean) {
-        connectionStatus.connectionStatus = '已断开'
+        connectionStatus.connectionStatus = 'closed'
         log(`WebSocket连接已关闭: 代码=${event.code}, 原因=${event.reason}`, 'info')
       } else {
-        connectionStatus.connectionStatus = '连接已断开'
+        connectionStatus.connectionStatus = 'dropped'
         log('WebSocket连接意外断开', 'error')
         scheduleReconnect(config)
       }
@@ -385,7 +424,7 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
       isConnecting = false
       connectionStatus.isConnected = false
       stopHeartbeat()
-      connectionStatus.connectionStatus = '连接错误'
+      connectionStatus.connectionStatus = 'error'
       log('WebSocket连接错误', 'error')
       notifyStatusChange()
     }
@@ -403,7 +442,7 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
         }
         log('WebSocket连接超时', 'error')
         isConnecting = false
-        connectionStatus.connectionStatus = '连接超时'
+        connectionStatus.connectionStatus = 'timeout'
 
         try {
           pendingSocket.close()
@@ -427,11 +466,7 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
           settle(false)
         } else if (connectionStatus.isConnected) {
           settle(true)
-        } else if (
-          connectionStatus.connectionStatus.includes('错误') ||
-          connectionStatus.connectionStatus.includes('超时') ||
-          connectionStatus.connectionStatus.includes('失败')
-        ) {
+        } else if (TERMINAL_FAILURE_KEYS.has(connectionStatus.connectionStatus)) {
           settle(false)
         } else {
           setTimeout(checkConnected, 100)
@@ -443,7 +478,7 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
   } catch (error) {
     isConnecting = false
     connectionStatus.isConnected = false
-    connectionStatus.connectionStatus = '连接失败'
+    connectionStatus.connectionStatus = 'failed'
     log(`WebSocket连接失败: ${error}`, 'error')
     notifyStatusChange()
     return false
@@ -454,7 +489,7 @@ export async function connectToServer(config: WebSocketConfig): Promise<boolean>
 function scheduleReconnect(config: WebSocketConfig): void {
   if (reconnectAttempts >= maxReconnectAttempts) {
     log(`已达到最大重连次数(${maxReconnectAttempts})，停止重连`, 'warning')
-    connectionStatus.connectionStatus = '重连失败'
+    connectionStatus.connectionStatus = 'reconnectFailed'
     notifyStatusChange()
     return
   }
@@ -465,7 +500,8 @@ function scheduleReconnect(config: WebSocketConfig): void {
     `计划在${delay / 1000}秒后重新连接(尝试${reconnectAttempts + 1}/${maxReconnectAttempts})`,
     'info'
   )
-  connectionStatus.connectionStatus = `${Math.ceil(delay / 1000)}秒后重连...`
+  connectionStatus.reconnectSeconds = Math.ceil(delay / 1000)
+  connectionStatus.connectionStatus = 'reconnecting'
   notifyStatusChange()
 
   reconnectTimer = window.setTimeout(() => {
@@ -799,7 +835,7 @@ export async function reconnectToServer(config: WebSocketConfig): Promise<boolea
     return await connectToServer(config)
   } catch (error) {
     log(`手动重连失败: ${error}`, 'error')
-    connectionStatus.connectionStatus = '重连失败'
+    connectionStatus.connectionStatus = 'reconnectFailed'
     notifyStatusChange()
     return false
   }
@@ -815,8 +851,8 @@ export function stopAutoReconnect(): boolean {
 
     reconnectAttempts = 0
 
-    if (connectionStatus.connectionStatus.includes('重连')) {
-      connectionStatus.connectionStatus = '已停止重连'
+    if (RECONNECT_KEYS.has(connectionStatus.connectionStatus)) {
+      connectionStatus.connectionStatus = 'reconnectStopped'
       notifyStatusChange()
     }
 
@@ -852,7 +888,7 @@ export function disconnectFromServer(): boolean {
 
     webSocket = null
     connectionStatus.isConnected = false
-    connectionStatus.connectionStatus = '已断开'
+    connectionStatus.connectionStatus = 'closed'
     connectionStatus.sessionId = null
     log('WebSocket连接已断开', 'info')
     notifyStatusChange()

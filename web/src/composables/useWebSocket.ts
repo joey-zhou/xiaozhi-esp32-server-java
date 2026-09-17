@@ -20,7 +20,8 @@ import {
   clearMessages,
   type WebSocketConfig,
   type WebSocketMessage,
-  type ConnectionStatus
+  type ConnectionStatus,
+  type ConnectionStatusKey
 } from '@/services/websocket'
 import {
   initAudio,
@@ -34,7 +35,8 @@ import { startMicrophoneCapture, stopMicrophoneCapture } from '@/services/audioR
 export function useWebSocket() {
   // 连接状态
   const isConnected = ref(false)
-  const connectionStatus = ref('未连接')
+  const connectionStatus = ref<ConnectionStatusKey>('idle')
+  const reconnectSeconds = ref(0)
   const connectionTime = ref<Date | null>(null)
   const sessionId = ref<string | null>(null)
 
@@ -42,6 +44,7 @@ export function useWebSocket() {
   const handleStatusChange = (status: ConnectionStatus) => {
     isConnected.value = status.isConnected
     connectionStatus.value = status.connectionStatus
+    reconnectSeconds.value = status.reconnectSeconds
     connectionTime.value = status.connectionTime
     sessionId.value = status.sessionId
   }
@@ -184,6 +187,7 @@ export function useWebSocket() {
     // 状态
     isConnected,
     connectionStatus,
+    reconnectSeconds,
     connectionTime,
     sessionId,
     messages,

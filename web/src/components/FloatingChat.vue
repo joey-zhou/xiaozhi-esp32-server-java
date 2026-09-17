@@ -20,6 +20,7 @@ const { getAvatarUrl } = useAvatar()
 const {
   isConnected,
   connectionStatus,
+  reconnectSeconds,
   messages: wsMessages,
   connect,
   disconnect,
@@ -256,7 +257,10 @@ const connectionStatusText = computed(() => {
   if (isConnected.value) {
     return t('chat.floating.online')
   }
-  return connectionStatus.value
+  // websocket 层只报状态码，文案在这里翻译；重连倒计时要把秒数插进去
+  return t(`chat.floating.status.${connectionStatus.value}`, {
+    seconds: reconnectSeconds.value,
+  })
 })
 
 // 连接状态类型
