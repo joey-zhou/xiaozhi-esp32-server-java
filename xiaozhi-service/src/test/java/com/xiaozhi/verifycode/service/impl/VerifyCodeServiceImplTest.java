@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
+import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.support.MybatisPlusTestHelper;
 import com.xiaozhi.verifycode.convert.VerifyCodeConvert;
 import com.xiaozhi.verifycode.dal.mysql.dataobject.VerifyCodeDO;
@@ -22,6 +23,7 @@ import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +64,9 @@ class VerifyCodeServiceImplTest {
 
     @Mock
     private ValueOperations<String, String> valueOperations;
+
+    @Mock
+    private StorageServiceFactory storageServiceFactory;
 
     @InjectMocks
     private VerifyCodeServiceImpl verifyCodeService;
@@ -326,6 +331,24 @@ class VerifyCodeServiceImplTest {
             .contains("code =");
         assertThat(captor.getValue().getParamNameValuePairs().values())
             .contains("device-1", "session-1", "123456", "/a.wav");
+    }
+
+    @Test
+    void deleteByDeviceIdSkipsRowsWithoutAudio() {
+        // 只 select audioPath 一列，该列为 NULL 的行整行为空，MyBatis 给回的是 null 而不是空对象
+        when(verifyCodeMapper.selectList(any())).thenReturn(Arrays.asList(null, audioRow("/a.wav")));
+        when(verifyCodeMapper.delete(any())).thenReturn(2);
+
+        assertThat(verifyCodeService.deleteByDeviceId("device-1")).isEqualTo(2);
+
+        verify(storageServiceFactory).removeFrom("/a.wav");
+        verify(storageServiceFactory, times(1)).removeFrom(anyString());
+    }
+
+    private static VerifyCodeDO audioRow(String audioPath) {
+        VerifyCodeDO verifyCode = new VerifyCodeDO();
+        verifyCode.setAudioPath(audioPath);
+        return verifyCode;
     }
 
     private static VerifyCodeDO verifyCode(LocalDateTime createTime) {

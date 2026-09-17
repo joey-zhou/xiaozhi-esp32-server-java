@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -102,10 +103,15 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
         return deleted;
     }
 
-    /** 只取有音频的那些行的路径；验证码音频每次合成一个独立文件，不存在多行共用 */
+    /**
+     * 只取有音频的那些行的路径；验证码音频每次合成一个独立文件，不存在多行共用。
+     * <p>
+     * 只 select 了 audioPath 一列，该列为 NULL 时整行为空行，MyBatis 返回的是 null 对象而不是属性为 null 的对象。
+     */
     private List<String> audioPathsOf(LambdaQueryWrapper<VerifyCodeDO> scope) {
         return verifyCodeMapper.selectList(scope.select(VerifyCodeDO::getAudioPath))
             .stream()
+            .filter(Objects::nonNull)
             .map(VerifyCodeDO::getAudioPath)
             .filter(StringUtils::hasText)
             .toList();
