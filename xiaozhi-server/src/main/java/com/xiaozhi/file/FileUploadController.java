@@ -41,11 +41,12 @@ public class FileUploadController {
     /**
      * 允许的文件扩展名白名单。
      * <p>
-     * 不收 .html/.htm：uploads 目录由 WebMvcConfig 以静态资源同源直出且不带 Content-Disposition，
-     * 上传的 HTML 会在本站源里执行脚本。知识库要解析网页内容时应由后端抓取，而不是让用户传 HTML。
+     * 不收 .html/.htm/.svg：uploads 目录由 WebMvcConfig 以静态资源同源直出且不带 Content-Disposition，
+     * 这几类文件会被浏览器当页面渲染，内嵌脚本跑在本站源里；
+     * SVG 的 image/svg+xml 能通过下面按 image/ 前缀做的 MIME 校验，只能靠扩展名白名单拦。
      */
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg",
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp",
             ".mp3", ".wav", ".ogg", ".opus", ".flac", ".aac", ".m4a",
             ".mp4", ".avi", ".mov", ".mkv", ".webm",
             ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv",
@@ -148,7 +149,7 @@ public class FileUploadController {
     private boolean isContentTypeMatchExtension(String contentType, String extension) {
         String ct = contentType.toLowerCase();
         return switch (extension) {
-            case ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg" -> ct.startsWith("image/");
+            case ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" -> ct.startsWith("image/");
             case ".mp3", ".wav", ".ogg", ".opus", ".flac", ".aac", ".m4a" -> ct.startsWith("audio/") || ct.equals("application/ogg");
             case ".mp4", ".avi", ".mov", ".mkv", ".webm" -> ct.startsWith("video/");
             case ".pdf" -> ct.equals("application/pdf");

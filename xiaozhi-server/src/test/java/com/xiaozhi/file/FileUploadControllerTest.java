@@ -89,6 +89,28 @@ class FileUploadControllerTest extends ControllerTestSupport {
             .andExpect(jsonPath("$.message").value("不支持的文件类型分类: script"));
     }
 
+    /** SVG 的 image/svg+xml 能过 MIME 校验，扩展名白名单是唯一闸口 */
+    @Test
+    void uploadFileRejectsSvgBecauseItCanCarryScript() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "avatar.svg", "image/svg+xml",
+            "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>".getBytes());
+
+        mockMvc.perform(multipart("/api/file/upload").file(file).param("type", "image"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("不支持的文件扩展名: .svg"));
+    }
+
+    @Test
+    void uploadFileRejectsHtmlBecauseItRunsInSameOrigin() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "page.html", "text/html", "<script>alert(1)</script>".getBytes());
+
+        mockMvc.perform(multipart("/api/file/upload").file(file).param("type", "image"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("不支持的文件扩展名: .html"));
+    }
+
     @Test
     void uploadFileWrapsStorageIOException() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", "png".getBytes());
