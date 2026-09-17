@@ -50,6 +50,8 @@ public class RedisCacheConfig {
         cacheConfigurations.put("XiaoZhi:SysConfig",     buildConfig(serializer, Duration.ofDays(7)));
         cacheConfigurations.put("XiaoZhi:McpToolExclude",buildConfig(serializer, Duration.ofDays(7)));
 
+        // transactionAware：事务回滚时不能把已经写进去的淘汰/回填算数，所以推迟到提交后执行。
+        // 代价是事务内的 evict 当次不生效，写完立刻回读会命中旧值——写路径一律走 CacheHelper.evictNow。
         return RedisCacheManager.builder(factory)
             .cacheDefaults(defaultConfig)
             .withInitialCacheConfigurations(cacheConfigurations)

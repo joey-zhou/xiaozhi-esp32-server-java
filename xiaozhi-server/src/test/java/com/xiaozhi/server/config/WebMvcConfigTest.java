@@ -42,7 +42,7 @@ class WebMvcConfigTest {
         ReflectionTestUtils.setField(webMvcConfig, "localFileAccessInterceptor", localFileAccessInterceptor);
     }
 
-    /** 匿名可达的账号端点、设备绑定与 OTA 都要挂上限流 */
+    /** 匿名可达的账号端点、账号存在性查询、配置试拨、设备绑定与 OTA 都要挂上限流 */
     @Test
     void rateLimitCoversAuthDeviceBindAndOtaEndpoints() {
         assertThat(rateLimitPathPatterns()).contains(
@@ -53,6 +53,8 @@ class WebMvcConfigTest {
             "/api/user/resetPassword",
             "/api/user/sendEmailCaptcha",
             "/api/user/sendSmsCaptcha",
+            "/api/user/checkUser",
+            "/api/config/test",
             "/api/device",
             "/api/device/scan-bind",
             "/api/device/ota",

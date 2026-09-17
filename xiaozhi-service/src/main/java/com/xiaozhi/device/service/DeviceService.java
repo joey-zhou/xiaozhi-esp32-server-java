@@ -20,6 +20,9 @@ public interface DeviceService extends DeviceWriter {
 
     DeviceBO getBO(String deviceId);
 
+    /** 按主键批量查询，供需要一次性拿一批设备状态的场景使用，避免逐台查询。 */
+    List<DeviceBO> listByDeviceIds(List<String> deviceIds);
+
     List<DeviceBO> listByStateAndType(String state, String type);
 
     DeviceProjection get(String deviceId);

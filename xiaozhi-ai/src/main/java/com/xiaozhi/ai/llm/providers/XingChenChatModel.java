@@ -21,12 +21,16 @@ import lombok.extern.slf4j.Slf4j;
 public class XingChenChatModel implements ChatModel {
 
     private XingChenClient chatClient;
+    private final ToolCallingManager toolCallingManager;
 
     /**
      * 构造函数
+     *
+     * @param toolCallingManager 应用统一装配的工具调用管理器，保证走本仓的工具链记录、事件与观测
      */
-    public XingChenChatModel(String endpoint, String apiKey, String secret) {
+    public XingChenChatModel(String endpoint, String apiKey, String secret, ToolCallingManager toolCallingManager) {
         chatClient = new XingChenClient(endpoint, apiKey, secret);
+        this.toolCallingManager = toolCallingManager;
     }
 
     public String getProviderName() {
@@ -104,6 +108,7 @@ public class XingChenChatModel implements ChatModel {
             
             // 发送流式消息
             try {
+                // 用户打断时取消上游请求，不让已经不需要的响应继续占用星辰的连接和算力配额
                 chatClient.sendChatMessageStream(message, new XingChenChatStreamCallback() {
                     @Override
                     public void onMessage(XingChenResponse event) {
@@ -202,8 +207,7 @@ public class XingChenChatModel implements ChatModel {
                                 .generations(List.of(generation))
                                 .build();
 
-                        var toolExecutionResult = ToolCallingManager.builder().build()
-                                .executeToolCalls(prompt, chatResponse);
+                        var toolExecutionResult = toolCallingManager.executeToolCalls(prompt, chatResponse);
                         
                         if (toolExecutionResult.returnDirect()) {
                             // Return tool execution result directly to the client.
@@ -234,7 +238,7 @@ public class XingChenChatModel implements ChatModel {
                         log.error("异常: {}", throwable.getMessage());
                         sink.error(throwable);
                     }
-                });
+                }, call -> sink.onCancel(call::cancel));
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -299,7 +303,7 @@ public class XingChenChatModel implements ChatModel {
                     log.error("Resume异常: {}", throwable.getMessage());
                     sink.error(throwable);
                 }
-            });
+            }, call -> sink.onCancel(call::cancel));
         } catch (IOException e) {
             log.error("发送resume请求失败", e);
             sink.error(e);

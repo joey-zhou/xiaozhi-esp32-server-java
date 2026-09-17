@@ -161,9 +161,8 @@ export function useChatSession() {
       connecting.value = true
       try {
         const resp = await openChatSession(roleId, sessionId.value || undefined)
-        const data = resp as unknown as { sessionId: string }
-        sessionId.value = data.sessionId
-        activeSessionId.value = data.sessionId
+        sessionId.value = resp.sessionId
+        activeSessionId.value = resp.sessionId
         openedNow = true
       } catch (e: unknown) {
         antMessage.error(t('chat.openSessionFailed', { error: errorText(e) }))

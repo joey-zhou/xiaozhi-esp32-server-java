@@ -26,9 +26,11 @@ export interface ChatMemory {
   deviceId: string
   roleId: number
   message: string
-  sender: 'user' | 'assistant'
+  // 工具调用回执的行 sender 是 tool，后端 MessageResp.sender 三种取值都会出现
+  sender: 'user' | 'assistant' | 'tool'
   createTime: string
   audioPath?: string
+  // NORMAL / TOOL_CALL / TOOL_RESPONSE，决定 toolCalls 里是哪一种负载
   messageType?: string
 }
 

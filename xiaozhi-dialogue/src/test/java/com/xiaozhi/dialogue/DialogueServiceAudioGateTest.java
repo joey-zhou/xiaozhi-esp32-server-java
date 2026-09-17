@@ -130,16 +130,33 @@ class DialogueServiceAudioGateTest {
     }
 
     @Test
-    void continueDoesNotFeedAudioStreamWhenNotListening() {
+    void continueDoesNotFeedAudioStreamAfterPreviousTurnEnded() {
         when(vadService.processAudio(eq(SESSION_ID), any(), anyLong()))
                 .thenReturn(new VadResult(VadStatus.SPEECH_CONTINUE, new byte[] {9, 8, 7}));
-        // 上一轮 TTS 还在播，本轮音频不能串进识别流
-        session.transitionTo(DeviceState.SPEAKING);
         List<byte[]> received = subscribeAudioStream();
+        // 上一轮已收句、TTS 正在播，此时漏进来的音频不得再串进上一轮的识别流：
+        // 拦住它的是已终结的音频流本身，不是设备状态
+        session.completeAudioStream();
+        session.transitionTo(DeviceState.SPEAKING);
 
         dialogueService.processAudioData(session, opusFrame());
 
         assertThat(received).isEmpty();
+    }
+
+    @Test
+    void continueStillFeedsAudioStreamWhenPlaybackFlipsStateBackToSpeaking() {
+        byte[] processed = {9, 8, 7};
+        when(vadService.processAudio(eq(SESSION_ID), any(), anyLong()))
+                .thenReturn(new VadResult(VadStatus.SPEECH_CONTINUE, processed));
+        List<byte[]> received = subscribeAudioStream();
+        // 打断瞬间上一轮的 Player.sendStart() 才把状态改回 SPEAKING，本轮音频流其实已经就绪，
+        // 按状态丢帧会让打断后说的这句话识别不全
+        session.transitionTo(DeviceState.SPEAKING);
+
+        dialogueService.processAudioData(session, opusFrame());
+
+        assertThat(received).containsExactly(processed);
     }
 
     @Test

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import lombok.extern.slf4j.Slf4j;
@@ -84,7 +85,18 @@ public class RedisBroadcast {
     }
 
     public void closeDeviceSession(String deviceId) {
-        publish(CHANNEL_CLOSE_SESSION, deviceId);
+        closeDeviceSession(deviceId, null);
+    }
+
+    /**
+     * 关闭设备在其它实例上的会话。excludeSessionId 传新会话自己的 sessionId，
+     * 接收方命中该 sessionId 时跳过，避免新连接建立过程中收到自己发出的广播而误关自己
+     */
+    public void closeDeviceSession(String deviceId, String excludeSessionId) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("deviceId", deviceId);
+        payload.put("excludeSessionId", excludeSessionId);
+        publish(CHANNEL_CLOSE_SESSION, JsonUtil.toJson(payload));
     }
 
     public void roleUpdated(Integer roleId) {

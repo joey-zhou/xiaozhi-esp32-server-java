@@ -9,6 +9,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 钉住临时配置的构造入口不碰缓存：配置测试用的是表单里还没保存的凭据，

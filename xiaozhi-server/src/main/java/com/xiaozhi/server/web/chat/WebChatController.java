@@ -3,6 +3,8 @@ package com.xiaozhi.server.web.chat;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.model.req.ChatStreamReq;
+import com.xiaozhi.common.model.resp.ChatSessionClosedResp;
+import com.xiaozhi.common.model.resp.ChatSessionOpenedResp;
 import com.xiaozhi.common.model.resp.ChatTokenResp;
 import com.xiaozhi.server.web.chat.convert.WebChatConvert;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,8 +14,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
-
-import java.util.Map;
 
 /**
  * Web 聊天 API：通过 SSE 提供流式文本对话。
@@ -40,11 +40,10 @@ public class WebChatController {
     @PostMapping("/open")
     @SaCheckPermission("system:chat:api:open")
     @Operation(summary = "开启聊天会话", description = "创建或续接 Web 聊天会话并返回 sessionId")
-    public Map<String, String> open(@RequestParam Integer roleId,
-                                    @RequestParam(required = false) String sessionId) {
+    public ChatSessionOpenedResp open(@RequestParam Integer roleId,
+                                     @RequestParam(required = false) String sessionId) {
         Integer userId = StpUtil.getLoginIdAsInt();
-        String openedSessionId = webChatService.openSession(userId, roleId, sessionId);
-        return Map.of("sessionId", openedSessionId);
+        return ChatSessionOpenedResp.of(webChatService.openSession(userId, roleId, sessionId));
     }
 
     /**
@@ -58,7 +57,8 @@ public class WebChatController {
     @SaCheckPermission("system:chat:api:stream")
     @Operation(summary = "流式聊天", description = "通过 SSE 返回 AI 回复 Token 流，包含 thinking 和 content 两种类型")
     public Flux<ChatTokenResp> stream(@Valid @RequestBody ChatStreamReq req) {
-        return webChatService.chatStream(req.getSessionId(), req.getText()).map(webChatConvert::toResp);
+        Integer userId = StpUtil.getLoginIdAsInt();
+        return webChatService.chatStream(req.getSessionId(), req.getText(), userId).map(webChatConvert::toResp);
     }
 
     /**
@@ -67,8 +67,9 @@ public class WebChatController {
     @PostMapping("/close")
     @SaCheckPermission("system:chat:api:close")
     @Operation(summary = "关闭聊天会话", description = "关闭 Web 聊天会话并释放资源")
-    public Map<String, String> close(@RequestParam String sessionId) {
-        webChatService.closeSession(sessionId);
-        return Map.of("status", "closed");
+    public ChatSessionClosedResp close(@RequestParam String sessionId) {
+        Integer userId = StpUtil.getLoginIdAsInt();
+        webChatService.closeSession(sessionId, userId);
+        return ChatSessionClosedResp.closed();
     }
 }

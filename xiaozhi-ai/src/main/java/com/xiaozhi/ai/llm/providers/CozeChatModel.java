@@ -82,20 +82,6 @@ public class CozeChatModel implements ChatModel, AutoCloseable {
                 .messages(cozeMessages)
                 .build();
 
-        CreateChatResp chatResp = coze.chat().create(req);
-        // Chat chat = chatResp.getChat();
-        // get chat id and conversationID
-        // String chatID = chat.getID();
-        // String conversationID = chat.getConversationID();
-        /*
-         * Step two, poll the result of chat
-         * Assume the development allows at most one chat to run for 10 seconds. If it
-         * exceeds 10 seconds,
-         * the chat will be cancelled.
-         * And when the chat status is not completed, poll the status of the chat once
-         * every second.
-         * After the chat is completed, retrieve all messages in the chat.
-         */
         long timeout = 10L;
         long start = System.currentTimeMillis();
 

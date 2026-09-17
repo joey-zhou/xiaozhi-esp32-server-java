@@ -24,11 +24,6 @@
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-jsqlparser</artifactId>
         </dependency>
-        <!-- 分页 -->
-        <dependency>
-            <groupId>com.github.pagehelper</groupId>
-            <artifactId>pagehelper-spring-boot-starter</artifactId>
-        </dependency>
         <!-- MySQL -->
         <dependency>
             <groupId>com.mysql</groupId>

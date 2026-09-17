@@ -42,20 +42,20 @@ const queryForm = reactive({
   state: '',
 })
 
-// 查询过滤器配置
-const queryFilters = [
+// 查询过滤器配置：文案跟着 i18n key 走，切换语言后要能刷新，不能是 setup 期一次性求值的普通数组
+const queryFilters = computed(() => [
   { label: t('device.deviceId'), key: 'deviceId' as const, placeholder: t('device.deviceId') },
   { label: t('device.deviceName'), key: 'deviceName' as const, placeholder: t('device.deviceName') },
   { label: t('role.roleName'), key: 'roleName' as const, placeholder: t('role.roleName') },
-]
+])
 
 // 设备状态选项
-const stateOptions = [
+const stateOptions = computed(() => [
   { label: t('common.all'), value: '' },
   { label: t('device.onlineStatus'), value: DeviceState.ONLINE },
   { label: t('device.standbyStatus'), value: DeviceState.STANDBY },
   { label: t('device.offlineStatus'), value: DeviceState.OFFLINE },
-]
+])
 
 // 角色列表
 const roleItems = ref<Role[]>([])

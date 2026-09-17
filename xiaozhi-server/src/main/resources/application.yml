@@ -1,48 +1,23 @@
 # ============================================================
-# 通用配置（所有环境共享）
+# server 独立配置
+# 与 dialogue 共用的部分见 xiaozhi-common 的 application-common.yml
+# （下面 spring.config.import 引入），本文件只放 server 独有或与
+# dialogue 取值不同的项
 # ============================================================
 
 server:
   port: 8091
-  tomcat:
-    mbeanregistry:
-      enabled: true  # 启用 Tomcat MBean，自动获得 tomcat_global_sent/received_bytes_total
-
-# ============================================================
-# MyBatis 配置
-# ============================================================
-mybatis:
-  mapper-locations: classpath*:mapper/*.xml,classpath*:mapper/**/*.xml
-  configuration:
-    map-underscore-to-camel-case: false
-
-mybatis-plus:
-  configuration:
-    map-underscore-to-camel-case: false
 
 # ============================================================
 # 数据源配置
 # ============================================================
 spring:
-  datasource:
-    type: com.zaxxer.hikari.HikariDataSource
-    hikari:
-      minimum-idle: 5
-      maximum-pool-size: 20
-      auto-commit: true
-      idle-timeout: 300000
-      pool-name: DatebookHikariCP
-      max-lifetime: 1800000
-      connection-timeout: 30000
-      connection-test-query: SELECT 1
-      validation-timeout: 5000
-      leak-detection-threshold: 60000
-      keepalive-time: 30000
-      register-mbeans: true
+  config:
+    import: classpath:application-common.yml
 
-  # Redis 缓存配置
-  cache:
-    type: redis
+  datasource:
+    hikari:
+      pool-name: DatebookHikariCP
 
   # Flyway 数据库版本管理
   flyway:
@@ -53,40 +28,17 @@ spring:
     encoding: UTF-8
     validate-on-migrate: false
 
-  data:
-    redis:
-      # Redis 服务器地址（Spring Data Redis 和 Redisson 自动共享此配置）
-      host: localhost
-      port: 6379
-      database: 0
-      # Redis 开启 requirepass 后用环境变量 SPRING_DATA_REDIS_PASSWORD 提供口令。
-      # 此处不能写 password: 空值——Redisson 会把空串当口令发出 AUTH ""，无口令的 Redis 直接报错拒连。
-      # Lettuce 连接池配置（默认不开池，所有线程共享单连接，高并发下会成为瓶颈）
-      lettuce:
-        pool:
-          max-active: 16    # 最大活跃连接数
-          max-idle: 8       # 最大空闲连接数
-          min-idle: 2       # 最小空闲连接数
-          max-wait: 3s      # 获取连接最大等待时间
-      # Redisson 高级配置文件（用于分布式锁、布隆过滤器等高级功能）
-      redisson:
-        config: classpath:redisson-config.yml
-
-  # 文件上传配置
-  servlet:
-    multipart:
-      enabled: true
-      max-file-size: 100MB
-      max-request-size: 100MB
-
   # JMX 配置
   jmx:
     enabled: false
 
-  # 虚拟线程
-  threads:
-    virtual:
-      enabled: true
+  # Session 配置
+  session:
+    cookie:
+      http-only: true
+      secure: false
+      same-site: lax
+      path: /
 
   # 静态资源配置
   web:
@@ -97,23 +49,12 @@ spring:
   profiles:
     active: dev
 
-  # MCP 客户端配置
-  ai:
-    mcp:
-      client:
-        name: XiaoZhi-MCP-Client
-        version: 1.0.0
-        request-timeout: 60s
-
 # ============================================================
 # 日志配置
 # ============================================================
 logging:
   level:
-    root: INFO
-    org.springframework: INFO
     io.github.imfangs.dify.client.impl.StreamEventDispatcher: ERROR
-    io.netty.handler: ERROR
 
 # ============================================================
 # 邮件（注册与找回密码的验证码）
@@ -125,25 +66,9 @@ email:
     password: ${EMAIL_SMTP_PASSWORD:}
 
 # ============================================================
-# MQTT 接入（xiaozhi.communication.protocol 含 mqtt 时生效）
-# ============================================================
-mqtt:
-  server:
-    # OTA 下发的 MQTT 口令签名密钥：server 用它签、dialogue 用它验，两端必须同值
-    # 默认值仅供本地联调与运维测试，正式部署用环境变量 MQTT_SIGNATURE_KEY 覆盖
-    # 改这个值会让已下发的 MQTT 口令全部失效，设备需重走 OTA 取新口令
-    signatureKey: ${MQTT_SIGNATURE_KEY:xz@2025}
-
-# ============================================================
 # 小智扩展配置
 # ============================================================
 xiaozhi:
-  # 设备接入鉴权：OTA 下发签名 token，WS 握手校验。留空不鉴权，生产部署必须配。
-  # 由环境变量 XIAOZHI_DEVICE_AUTH_SECRET 提供，server 与 dialogue 必须同值。
-  device-auth:
-    secret: ${XIAOZHI_DEVICE_AUTH_SECRET:xz-2026}
-    expire-seconds: 2592000
-    allowed-devices:  # 逗号分隔的设备MAC，白名单免 token
   # 安全用途（限流、封禁、登录审计）的客户端 IP 判定
   security:
     # 反向代理的 IP 或 CIDR，逗号分隔或 YAML 列表（如 172.16.0.0/12,10.0.0.0/8）
@@ -153,14 +78,6 @@ xiaozhi:
   communication:
     # OTA 下发的 WS 二进制帧版本：1=裸Opus，2=带时间戳(服务端AEC需要)，3=带长度头无时间戳
     websocket-protocol-version: 2
-  runtime:
-    # 生产环境建议改成绝对路径，避免模型目录和原生库目录依赖启动工作目录
-    native-lib-dir: lib
-    vosk-model-dir: models/vosk-model
-    tts-models-dir: models/tts
-  vad:
-    model:
-      path: models/silero_vad.onnx
 
 # ============================================================
 # SpringDoc OpenAPI 配置
@@ -174,39 +91,9 @@ springdoc:
     url: /v3/api-docs
 
 # ============================================================
-# Sa-Token 认证框架配置
+# Sa-Token：JWT 秘钥（使用JWT Simple模式时必须配置，至少32位）
+# 其余共用字段见 application-common.yml
 # ============================================================
 sa-token:
-  # Token名称 (同时也是cookie名称)
-  token-name: Authorization
-
-  # Token有效期 (单位:秒) 30天 = 2592000秒, -1表示永不过期
-  timeout: 2592000
-
-  # Token最低活跃频率 (单位:秒), 如果token超过此时间没有访问系统就会被冻结, -1 表示不限制
-  active-timeout: -1
-
-  # 是否允许同一账号多地同时登录 (为true时允许一起登录, 为false时新登录挤掉旧登录)
-  is-concurrent: true
-
-  # 在多人登录同一账号时,是否共用一个token (为true时所有登录共用一个token, 为false时每次登录新建一个token)
-  is-share: false
-
-  # Token风格 (uuid、simple-uuid、random-32、random-64、random-128、tik)
-  token-style: uuid
-
-  # 是否输出操作日志
-  is-log: false
-
-  # 是否从cookie中读取token
-  is-read-cookie: true
-
-  # 是否从header中读取token
-  is-read-header: true
-
-  # token前缀, 例如填写 Bearer 之后客户端应该发送: Bearer {token}
-  token-prefix: Bearer
-
-  # JWT秘钥 (使用JWT Simple模式时必须配置，至少32位)
   jwt-secret-key: xiaozhi-esp32-server-java-jwt-secret-key
 

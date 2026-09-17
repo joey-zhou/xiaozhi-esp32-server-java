@@ -180,12 +180,32 @@ public class DeviceMcpService {
             return collectedNames;
         }
 
-        List<Map<String, Object>> tools = (List<Map<String, Object>>) result.getPayload().getResult().get("tools");
-        Object nextCursor = result.getPayload().getResult().get("nextCursor");
-        int toolsCount = chatSession.getToolCallbacks().size();
-
-        if (tools.isEmpty() || (toolsCount + tools.size()) > maxToolsCount) {
+        Map<String, Object> payloadResult = result.getPayload().getResult();
+        if (payloadResult == null) {
+            log.warn("SessionId: {}, MCP tools/list 返回错误应答，跳过本次工具注册: {}",
+                    chatSession.getSessionId(), result.getPayload().getError());
             return collectedNames;
+        }
+
+        List<Map<String, Object>> tools = (List<Map<String, Object>>) payloadResult.get("tools");
+        Object nextCursor = payloadResult.get("nextCursor");
+        if (tools == null || tools.isEmpty()) {
+            return collectedNames;
+        }
+
+        int toolsCount = chatSession.getToolCallbacks().size();
+        int remaining = maxToolsCount - toolsCount;
+        if (remaining <= 0) {
+            log.warn("SessionId: {}, 工具数已达上限({})，本页 {} 个工具全部丢弃",
+                    chatSession.getSessionId(), maxToolsCount, tools.size());
+            return collectedNames;
+        }
+        // 超出上限时只截断到剩余额度，尽量装下能装的部分，而不是整页丢弃
+        boolean truncated = tools.size() > remaining;
+        if (truncated) {
+            log.warn("SessionId: {}, 工具数超过上限({})，本页仅保留前 {} 个，丢弃 {} 个",
+                    chatSession.getSessionId(), maxToolsCount, remaining, tools.size() - remaining);
+            tools = tools.subList(0, remaining);
         }
 
         // 按原名长度倒序构建 original -> sanitized 映射：
@@ -238,7 +258,8 @@ public class DeviceMcpService {
             collectedNames.add(name);
         }
 
-        if (nextCursor != null && !nextCursor.toString().isEmpty()) {
+        // 本页已经截断到上限，再取下一页也装不下，不必继续翻页
+        if (!truncated && nextCursor != null && !nextCursor.toString().isEmpty()) {
             chatSession.getDeviceMcpHolder().setMcpCursor(nextCursor.toString());
             collectedNames.addAll(sendToolsList(chatSession, null));
         } else {

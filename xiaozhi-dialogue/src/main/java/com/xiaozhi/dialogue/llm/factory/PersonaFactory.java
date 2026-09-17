@@ -191,6 +191,10 @@ public class PersonaFactory {
             log.error("无法获取STT服务配置 - Id: {}", sttId);
             return null;
         }
+        if (ConfigBO.STATE_DISABLED.equals(sttConfig.getState())) {
+            log.error("STT服务配置已停用，无法使用 - Id: {}", sttId);
+            return null;
+        }
         SttService sttService;
         try {
             sttService = sttFactory.getSttService(sttConfig);
@@ -212,6 +216,10 @@ public class PersonaFactory {
         ConfigBO ttsConfig = null;
         if (role.getTtsId() != null && role.getTtsId() > 0) {
             ttsConfig = configService.getBO(role.getTtsId());
+            if (ttsConfig != null && ConfigBO.STATE_DISABLED.equals(ttsConfig.getState())) {
+                log.warn("TTS服务配置已停用，回退默认TTS - Id: {}", role.getTtsId());
+                ttsConfig = null;
+            }
         }
         String voiceName = role.getVoiceName();
         TtsService ttsService = ttsFactory.getTtsService(ttsConfig, voiceName, role.getTtsPitch(), role.getTtsSpeed());

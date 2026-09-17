@@ -7,6 +7,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # ---- 版本配置 ----
+# SHERPA_VERSION 是 native 库版本，需与 pom.xml 里 sherpa-onnx.version 的 Java 绑定版本保持兼容，
+# 两边升级要一起做，否则 JNI 符号对不上会在运行时报 UnsatisfiedLinkError
 SHERPA_VERSION="1.12.23"
 ONNXRUNTIME_VERSION="1.23.2"
 VOSK_VERSION="0.3.45"

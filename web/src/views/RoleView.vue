@@ -24,7 +24,7 @@ import { queryRoles, addRole, updateRole, deleteRole, testVoice, updateToolsStat
 import { queryTemplates } from '@/services/template'
 import { getResourceUrl } from '@/utils/resource'
 import { useAvatar } from '@/composables/useAvatar'
-import { uploadFile, type UploadResponse } from '@/services/upload'
+import { uploadFile } from '@/services/upload'
 import type { ModelOption, PromptTemplate, Role, RoleFormData } from '@/types/role'
 import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
@@ -619,7 +619,7 @@ const beforeAvatarUpload: UploadProps['beforeUpload'] = (file) => {
 
 // 上传头像文件
 const uploadAvatarFile = async (file: File): Promise<string> => {
-  const res = await uploadFile(file, 'avatar', { fullResponse: true }) as UploadResponse
+  const res = await uploadFile(file, 'avatar', { fullResponse: true })
   // 本地存储用相对路径入库（避免把主机名写死进库）；云存储无 relativePath，用签名 URL，后端剥签名/重签名
   return res.relativePath || res.url
 }

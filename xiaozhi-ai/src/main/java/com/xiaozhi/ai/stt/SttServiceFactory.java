@@ -98,17 +98,11 @@ public class SttServiceFactory {
 
         // 对于API服务，使用"provider:configId"作为缓存键，确保每个配置使用独立的服务实例
         var cacheKey = config.getProvider() + ":" + config.getConfigId();
+        final ConfigBO finalConfig = config;
 
-        // 检查是否已有该配置的服务实例
-        if (serviceCache.containsKey(cacheKey)) {
-            return serviceCache.get(cacheKey);
-        }
-
-        // 创建新的API服务实例
-        var service = createApiService(config);
-        serviceCache.put(cacheKey, service);
-
-        return service;
+        // 使用 computeIfAbsent 确保原子性操作，避免并发创建多个实例
+        // 经 self 调用，让 @Counted 走 Spring 代理，否则同类内自调用会绕过 AOP
+        return serviceCache.computeIfAbsent(cacheKey, k -> createApiService(finalConfig));
     }
 
     /**
@@ -125,26 +119,24 @@ public class SttServiceFactory {
     /**
      * 根据配置创建API类型的STT服务
      */
-    private SttService createApiService(@Nonnull ConfigBO config) {
-        return switch (config.getProvider()) {
+    public SttService createApiService(@Nonnull ConfigBO config) {
+        SttService service = switch (config.getProvider()) {
             case "tencent" -> new TencentSttService(config);
             case "aliyun" -> new AliyunSttService(config);
-            case "aliyun-nls" -> {
-                // 为NLS创建阿里云Token服务
-                yield new AliyunNlsSttService(config, tokenResolver);
-            }
+            case "aliyun-nls" -> new AliyunNlsSttService(config, tokenResolver);
             case "funasr" -> new FunASRSttService(config);
             case "xfyun" -> new XfyunSttService(config);
             case "volcengine" -> new VolcengineSttService(config);
             default -> {
-                var service = initializeVosk();
-                if (service == null) {
+                var vosk = initializeVosk();
+                if (vosk == null) {
                     // 不得回退到其它配置创建出的实例，那会把别的租户的第三方凭据借出去
                     throw new IllegalStateException("默认语音识别服务(Vosk)不可用，请为该角色配置第三方 STT");
                 }
-                yield service;
+                yield vosk;
             }
         };
+        return service;
     }
 
     public void removeCache(ConfigBO config) {

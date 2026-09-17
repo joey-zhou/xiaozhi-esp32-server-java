@@ -7,6 +7,8 @@ import com.xiaozhi.ai.tts.providers.*;
 import com.xiaozhi.common.model.bo.ConfigBO;
 
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
@@ -50,7 +52,15 @@ public class TtsServiceFactory {
         if (config != null && config.getConfigId() != null) {
             configId = config.getConfigId();
         }
-        return provider + ":" + configId + ":" + voiceName + ":" + pitch + ":" + speed;
+        return provider + ":" + configId + ":" + voiceName + ":" + normalizeRate(pitch) + ":" + normalizeRate(speed);
+    }
+
+    /**
+     * 音调/语速归一化到 1 位小数再入键。合成效果分不出比这更细的差异，
+     * 不归一化的话每个小数位都会占一条缓存；同一档内复用先建好的实例。
+     */
+    private static String normalizeRate(Double rate) {
+        return rate == null ? "-" : Double.toString(Math.round(rate * 10) / 10.0);
     }
 
     /**
@@ -68,12 +78,12 @@ public class TtsServiceFactory {
     /**
      * 根据配置创建API类型的TTS服务（带pitch和speed参数）
      */
-    private TtsService createApiService(ConfigBO config, String voiceName, Double pitch, Double speed) {
+    public TtsService createApiService(ConfigBO config, String voiceName, Double pitch, Double speed) {
         // Make sure output dir exists
         String outputPath = AudioUtils.AUDIO_PATH;
         ensureOutputPath(outputPath);
 
-        return switch (config.getProvider()) {
+        TtsService ttsService = switch (config.getProvider()) {
             case "aliyun" -> new AliyunTtsService(config, voiceName, pitch, speed, outputPath);
             case "aliyun-nls" -> {
                 yield new AliyunNlsTtsService(config, voiceName, pitch, speed, outputPath, tokenResolver);
@@ -92,6 +102,7 @@ public class TtsServiceFactory {
             );
             default -> new EdgeTtsService(voiceName, pitch, speed, outputPath);
         };
+        return ttsService;
     }
 
     private void ensureOutputPath(String outputPath) {

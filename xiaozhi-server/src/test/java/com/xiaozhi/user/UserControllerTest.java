@@ -121,6 +121,7 @@ class UserControllerTest extends ControllerTestSupport {
             .andExpect(jsonPath("$.message").value("该邮箱未注册"));
     }
 
+    /** 提示不区分字段，否则这个匿名端点就是逐字段确认注册状态的预言机 */
     @Test
     void checkUserReturnsConflictWhenTelExists() throws Exception {
         when(userService.getByTel("13800138000")).thenReturn(new UserBO());
@@ -128,7 +129,7 @@ class UserControllerTest extends ControllerTestSupport {
         mockMvc.perform(get("/api/user/checkUser").param("tel", "13800138000"))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value(ResultStatus.CONFLICT))
-            .andExpect(jsonPath("$.message").value("手机已注册"));
+            .andExpect(jsonPath("$.message").value("该手机号、邮箱或用户名已被注册"));
     }
 
     /** loginIp 是安全审计字段，取值必须来自可信代理判定，不能由请求头决定 */

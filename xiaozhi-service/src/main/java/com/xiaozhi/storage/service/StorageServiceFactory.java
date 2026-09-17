@@ -69,7 +69,7 @@ public class StorageServiceFactory {
      * 根据配置创建对应的存储服务
      */
     public StorageService createStorageService(ConfigBO config) {
-        return switch (config.getProvider()) {
+        StorageService service = switch (config.getProvider()) {
             case "tencent" -> new TencentCosStorageService(config);
             case "aliyun" -> new AliyunOssStorageService(config);
             // S3 兼容存储：前端按厂商分列，底层统一走 S3StorageService（仅 endpoint 不同）
@@ -80,6 +80,7 @@ public class StorageServiceFactory {
                 yield localStorageService;
             }
         };
+        return service;
     }
 
     private ConfigBO getDefaultOssConfig() {

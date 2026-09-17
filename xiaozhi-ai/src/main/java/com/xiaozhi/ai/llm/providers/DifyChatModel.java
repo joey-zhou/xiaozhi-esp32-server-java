@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -92,19 +93,34 @@ public class DifyChatModel implements ChatModel {
 
             // inputs 必须为非 null（即使没有 App 变量也要传空对象），否则 Dify 服务端会拒绝请求。
             // conversationId 用上一轮 Dify 返回的会话 ID，使智能体能延续上下文记忆。
+            String userId = resolveUserId(prompt);
             ChatMessage message = ChatMessage.builder()
-                    .user(resolveUserId(prompt))
+                    .user(userId)
                     .query(prompt.getUserMessage().getText())
                     .inputs(Map.of())
                     .conversationId(getCurrentConversationId(prompt))
                     .responseMode(ResponseMode.STREAMING)
                     .build();
 
+            // 用户打断时调用 Dify 的停止生成接口，不让已经不需要的响应继续占用上游的算力配额
+            AtomicReference<String> taskId = new AtomicReference<>();
+            sink.onCancel(() -> {
+                String id = taskId.get();
+                if (id != null) {
+                    try {
+                        chatClient.stopChatMessage(id, userId);
+                    } catch (Exception e) {
+                        log.warn("停止Dify对话失败: taskId={}", id, e);
+                    }
+                }
+            });
+
             // 发送流式消息
             try {
                 chatClient.sendChatMessageStream(message, new ChatStreamCallback() {
                     @Override
                     public void onMessage(MessageEvent event) {
+                        taskId.set(event.getTaskId());
                         sink.next(ChatResponse.builder()
                                 .generations(
                                         List.of(new Generation(AssistantMessage.builder()
@@ -117,6 +133,7 @@ public class DifyChatModel implements ChatModel {
 
                     @Override
                     public void onAgentMessage(AgentMessageEvent event) {
+                        taskId.set(event.getTaskId());
                         sink.next(ChatResponse.builder()
                                 .generations(
                                         List.of(new Generation(AssistantMessage.builder()

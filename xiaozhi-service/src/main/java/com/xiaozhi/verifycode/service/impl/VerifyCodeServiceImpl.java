@@ -167,4 +167,24 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
     private LocalDateTime validSince() {
         return LocalDateTime.now().minusMinutes(VALID_MINUTES);
     }
+
+    @Override
+    public int deleteExpired(int expiredBeforeMinutes, int batchSize) {
+        LocalDateTime expireBefore = LocalDateTime.now().minusMinutes(expiredBeforeMinutes);
+        int deleted = 0;
+        while (true) {
+            List<VerifyCodeDO> batch = verifyCodeMapper.selectList(new LambdaQueryWrapper<VerifyCodeDO>()
+                .select(VerifyCodeDO::getCodeId)
+                .lt(VerifyCodeDO::getCreateTime, expireBefore)
+                .orderByAsc(VerifyCodeDO::getCodeId)
+                .last("LIMIT " + batchSize));
+            if (batch.isEmpty()) {
+                break;
+            }
+            List<Integer> codeIds = batch.stream().map(VerifyCodeDO::getCodeId).toList();
+            verifyCodeMapper.delete(new LambdaQueryWrapper<VerifyCodeDO>().in(VerifyCodeDO::getCodeId, codeIds));
+            deleted += codeIds.size();
+        }
+        return deleted;
+    }
 }

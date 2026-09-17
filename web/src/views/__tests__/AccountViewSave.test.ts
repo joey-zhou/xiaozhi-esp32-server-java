@@ -22,6 +22,7 @@ interface AccountViewState {
     name: string
     tel: string
     email: string
+    oldPassword: string
     password: string
     confirmPassword: string
   }
@@ -50,7 +51,7 @@ describe('AccountView 保存账号资料', () => {
     localStorage.clear()
     pinia = createPinia()
     setActivePinia(pinia)
-    useUserStore().setUserInfo({ userId: '1', username: 'joey', name: 'Joey' } as User)
+    useUserStore().setUserInfo({ userId: 1, username: 'joey', name: 'Joey' } as User)
   })
 
   // store 里的 useStorage 会监听 storage 事件，上一个用例的实例不销毁就会把旧身份同步回来
@@ -63,16 +64,19 @@ describe('AccountView 保存账号资料', () => {
     // 写接口的成功响应体是 ApiResponse<Void>，data 恒为 null
     userApiMock.updateUser.mockResolvedValue({ code: 200, message: '', data: null })
     const view = mountView()
+    view.formData.oldPassword = 'oldpass1'
     view.formData.password = 'newpass1'
     view.formData.confirmPassword = 'newpass1'
 
     await view.handleSubmit()
     await flushPromises()
 
+    // 原密码要跟着一起提交，后端凭它校验，漏传等于登录态一被窃就能改密码
     expect(userApiMock.updateUser).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: '1', password: 'newpass1' }),
+      expect.objectContaining({ userId: 1, oldPassword: 'oldpass1', password: 'newpass1' }),
     )
     expect(message.success).toHaveBeenCalledWith('account.updateSuccess')
+    expect(view.formData.oldPassword).toBe('')
     expect(view.formData.password).toBe('')
     expect(view.formData.confirmPassword).toBe('')
   })
@@ -80,6 +84,7 @@ describe('AccountView 保存账号资料', () => {
   it('保存失败时原样弹后端提示，密码框保持不清空', async () => {
     userApiMock.updateUser.mockResolvedValue({ code: 500, message: '邮箱已注册' })
     const view = mountView()
+    view.formData.oldPassword = 'oldpass1'
     view.formData.password = 'newpass1'
     view.formData.confirmPassword = 'newpass1'
 
@@ -88,6 +93,7 @@ describe('AccountView 保存账号资料', () => {
 
     expect(message.error).toHaveBeenCalledWith('邮箱已注册')
     expect(message.success).not.toHaveBeenCalled()
+    expect(view.formData.oldPassword).toBe('oldpass1')
     expect(view.formData.password).toBe('newpass1')
     expect(view.formData.confirmPassword).toBe('newpass1')
   })

@@ -3,6 +3,7 @@ package com.xiaozhi.user.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.bo.UserBO;
@@ -14,7 +15,7 @@ import com.xiaozhi.user.model.UserProjection;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
-import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,9 @@ public class UserServiceImpl implements UserService {
 
     @Resource
     private VerifyCodeService verifyCodeService;
+
+    @Resource
+    private CacheManager cacheManager;
 
     @Override
     public PageResult<UserProjection> page(int pageNo, int pageSize, String name, String email,
@@ -130,7 +134,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    @CacheEvict(value = CACHE_NAME, key = "'bo:' + #user.userId", condition = "#user != null && #user.userId != null")
     public void update(UserBO user) {
         if (user == null || user.getUserId() == null) {
             throw new IllegalArgumentException("用户信息不完整");
@@ -163,6 +166,9 @@ public class UserServiceImpl implements UserService {
         if (userMapper.updateById(existing) <= 0) {
             throw new IllegalStateException("更新用户失败");
         }
+        // 不用 @CacheEvict：缓存是事务感知的，注解那次淘汰要等提交后才生效，
+        // 同一个事务里写完紧接着 getBO 会读到旧值，接口返回给前端的就是改动前的资料
+        CacheHelper.evictNow(cacheManager.getCache(CACHE_NAME), "bo:" + user.getUserId());
     }
 
     @Override

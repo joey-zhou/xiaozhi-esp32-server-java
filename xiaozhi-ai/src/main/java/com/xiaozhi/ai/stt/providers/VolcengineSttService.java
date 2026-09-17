@@ -91,7 +91,7 @@ public class VolcengineSttService implements SttService {
         // 检查配置是否已设置
         if (apiKey == null || apiKey.isBlank()) {
             log.error("火山引擎语音识别配置未设置，无法进行识别");
-            return null;
+            return SttResult.failure(SttResult.FAILURE_LOCAL_ERROR);
         }
 
         String connectId = UUID.randomUUID().toString();

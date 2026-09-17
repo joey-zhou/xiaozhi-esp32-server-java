@@ -5,7 +5,7 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   // 加载环境变量
   const env = loadEnv(mode, process.cwd(), '')
 
@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => {
       vue(),
       vueDevTools(),
     ],
+    // 生产构建剥离 console/debugger，避免内部状态和调试信息随产物暴露到浏览器控制台；
+    // dev server 保留，不影响本地调试
+    esbuild: command === 'build' ? { drop: ['console', 'debugger'] } : undefined,
     // vue-i18n 的编译期特性开关，不给值时它会在运行时全部按 true 兜底，把用不到的代码打进产物。
     // locales/index.ts 用的是 legacy: false 的 Composition API，模板里也没有 <i18n-t> / v-t，
     // 所以整包安装（内置组件 + v-t 指令）和 legacy 兼容层都能摇掉；

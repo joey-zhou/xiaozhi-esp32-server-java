@@ -21,6 +21,7 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -244,9 +245,9 @@ class WebSocketHandshakeProtocolTest {
         FakeDevice ghost = harness.connect(DEVICE_ID);
         FakeDevice local = harness.connect(OTHER_DEVICE_ID);
 
-        verify(harness.redisBroadcast()).closeDeviceSession(DEVICE_ID);
+        verify(harness.redisBroadcast()).closeDeviceSession(DEVICE_ID, ghost.sessionId());
         // 设备上一次就绑在本实例时不广播，否则会把自己刚建的会话关掉
-        verify(harness.redisBroadcast(), never()).closeDeviceSession(OTHER_DEVICE_ID);
+        verify(harness.redisBroadcast(), never()).closeDeviceSession(eq(OTHER_DEVICE_ID), anyString());
 
         // 广播只针对旧实例，本实例这两条连接照常握手收发
         ghost.hello();

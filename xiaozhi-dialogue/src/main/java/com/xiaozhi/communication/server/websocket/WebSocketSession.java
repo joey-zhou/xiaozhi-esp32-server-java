@@ -66,7 +66,7 @@ public class WebSocketSession extends ChatSession {
         } catch (SessionLimitExceededException e) {
             handleSendLimitExceeded(e);
         } catch (Exception e) {
-            log.error("发送Text消息失败, message: {}", message, e);
+            handleSendFailure("Text", e);
         }
     }
 
@@ -78,7 +78,7 @@ public class WebSocketSession extends ChatSession {
         } catch (SessionLimitExceededException e) {
             handleSendLimitExceeded(e);
         } catch (Exception e) {
-            log.error("发送Binary消息失败", e);
+            handleSendFailure("Binary", e);
         }
     }
 
@@ -88,6 +88,15 @@ public class WebSocketSession extends ChatSession {
      */
     private void handleSendLimitExceeded(SessionLimitExceededException e) {
         log.warn("下行发送超出限制，关闭会话 - SessionId: {}, 原因: {}", getSessionId(), e.getMessage());
+        close();
+    }
+
+    /**
+     * 其余发送异常（连接已被对端断开等）同样代表这条连接不能再用，
+     * 只打日志不关闭的话，播放循环感知不到断连，会对着一个死连接持续发送。
+     */
+    private void handleSendFailure(String messageType, Exception e) {
+        log.error("发送{}消息失败，关闭会话 - SessionId: {}", messageType, getSessionId(), e);
         close();
     }
 }

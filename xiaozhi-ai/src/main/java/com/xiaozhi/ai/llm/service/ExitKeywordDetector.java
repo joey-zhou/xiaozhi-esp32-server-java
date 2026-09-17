@@ -51,13 +51,21 @@ class ExitKeywordDetector {
     /**
      * 排除的短语模式
      * 包含这些短语时不应该触发退出
-     * 例如："不要退出"、"别走"、"不离开" 等
+     * 例如："不要退出"、"别走"、"不离开"、"他走了"（说的是别人）等
      */
     private static final Pattern EXCLUDE_PATTERN = Pattern.compile(
             ".*(?:不|别|不要|为什么|怎么|如何|能否|可以|会|什么).*(?:退出|离开|走|退下|结束).*"
+            + "|.*(?:他|她|它|别人|同事|朋友|同学|老师|家人|孩子|某人|有人|大家).*(?:走了|离开|下线|退出|再见|拜拜|结束).*"
             + "|.*(?:don't|not).*(?:leave|exit|quit|bye).*",
             Pattern.CASE_INSENSITIVE
     );
+
+    /**
+     * 明确的告别用语通常是简短的独立表达；超过这个长度更可能是在叙述别的事情
+     * （比如聊到别人离开、结束某件事），此时不再当作退出意图，避免把整句里
+     * 顺带出现的"走了""结束""离开"等字词误判成用户自己要挂断对话
+     */
+    private static final int SHORT_INPUT_MAX_LENGTH = 15;
 
     /**
      * 检测输入文本是否包含退出意图
@@ -78,18 +86,20 @@ class ExitKeywordDetector {
             return false;
         }
 
+        // 长句更可能是在叙述而非表达退出意图，两种匹配方式统一按短消息处理
+        if (normalizedInput.length() > SHORT_INPUT_MAX_LENGTH) {
+            return false;
+        }
+
         // 检查精确匹配模式
         if (EXIT_PATTERN.matcher(normalizedInput).matches()) {
             return true;
         }
 
         // 检查简单关键词（适用于单独的短消息）
-        // 只有当输入很短（少于15个字符）时才使用简单关键词匹配
-        if (normalizedInput.length() <= 15) {
-            for (String keyword : EXIT_KEYWORDS) {
-                if (normalizedInput.contains(keyword.toLowerCase())) {
-                    return true;
-                }
+        for (String keyword : EXIT_KEYWORDS) {
+            if (normalizedInput.contains(keyword.toLowerCase())) {
+                return true;
             }
         }
 

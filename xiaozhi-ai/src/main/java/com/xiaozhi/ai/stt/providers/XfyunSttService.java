@@ -67,23 +67,28 @@ public class XfyunSttService implements SttService {
 
     /**
      * 处理返回结果（包括全量返回与流式返回（结果修正））
+     * <p>
+     * resultSegments 由 WebSocket 回调线程写、可能被主线程（识别超时/异常兜底分支）并发读，
+     * 这里和 {@link #getFinalResult} 用同一把锁保证互斥，避免可见性问题和并发修改异常。
      */
     private void handleResultText(Text textObject, List<Text> resultSegments) {
-        // 处理流式返回的替换结果
-        if ("rpl".equals(textObject.getPgs()) && textObject.getRg() != null && textObject.getRg().length == 2) {
-            // 返回结果序号sn字段的最小值为1
-            int start = textObject.getRg()[0] - 1;
-            int end = textObject.getRg()[1] - 1;
+        synchronized (resultSegments) {
+            // 处理流式返回的替换结果
+            if ("rpl".equals(textObject.getPgs()) && textObject.getRg() != null && textObject.getRg().length == 2) {
+                // 返回结果序号sn字段的最小值为1
+                int start = textObject.getRg()[0] - 1;
+                int end = textObject.getRg()[1] - 1;
 
-            // 将指定区间的结果设置为删除状态
-            for (int i = start; i <= end && i < resultSegments.size(); i++) {
-                resultSegments.get(i).setDeleted(true);
+                // 将指定区间的结果设置为删除状态
+                for (int i = start; i <= end && i < resultSegments.size(); i++) {
+                    resultSegments.get(i).setDeleted(true);
+                }
+                // log.info("替换操作，服务端返回结果为：" + textObject);
             }
-            // log.info("替换操作，服务端返回结果为：" + textObject);
-        }
 
-        // 通用逻辑，添加当前文本到结果列表
-        resultSegments.add(textObject);
+            // 通用逻辑，添加当前文本到结果列表
+            resultSegments.add(textObject);
+        }
     }
 
     /**
@@ -91,9 +96,11 @@ public class XfyunSttService implements SttService {
      */
     private String getFinalResult(List<Text> resultSegments) {
         StringBuilder finalResult = new StringBuilder();
-        for (Text text : resultSegments) {
-            if (text != null && !text.isDeleted()) {
-                finalResult.append(text.getText());
+        synchronized (resultSegments) {
+            for (Text text : resultSegments) {
+                if (text != null && !text.isDeleted()) {
+                    finalResult.append(text.getText());
+                }
             }
         }
         return finalResult.toString();
@@ -155,7 +162,7 @@ public class XfyunSttService implements SttService {
         // 检查配置是否已设置
         if (secretId == null || secretKey == null || appId == null) {
             log.error("讯飞云语音识别配置未设置，无法进行识别");
-            return null;
+            return SttResult.failure(SttResult.FAILURE_LOCAL_ERROR);
         }
 
         // 构建鉴权URL

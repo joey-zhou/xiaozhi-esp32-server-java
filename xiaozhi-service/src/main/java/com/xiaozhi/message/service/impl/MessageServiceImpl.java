@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -68,8 +69,12 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public PageResult<ConversationProjection> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source) {
         Page<ConversationProjection> page = new Page<>(pageNo, pageSize);
+        // 主查询是 GROUP BY + 相关子查询，MyBatis-Plus 自动 COUNT 会把整段再跑一遍；
+        // 关掉自动 COUNT，改用不带子查询的轻量统计
+        page.setSearchCount(false);
+        long total = conversationMapper.selectConversationCount(userId, roleId, source);
         IPage<ConversationProjection> iPage = conversationMapper.selectConversationPage(page, userId, roleId, source);
-        return new PageResult<>(iPage.getRecords(), iPage.getTotal(), pageNo, pageSize);
+        return new PageResult<>(iPage.getRecords(), total, pageNo, pageSize);
     }
 
     @Override
@@ -102,6 +107,14 @@ public class MessageServiceImpl implements MessageService {
             return 0;
         }
 
+        // 先改数据库，成功后再做本地文件删除、发事件这些不可逆/不可回滚的副作用，
+        // 避免数据库更新失败时文件已删、下游已收到清空事件，但消息记录仍在
+        LambdaUpdateWrapper<MessageDO> updateWrapper = new LambdaUpdateWrapper<MessageDO>()
+            .eq(MessageDO::getDeviceId, deviceId)
+            .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
+            .set(MessageDO::getState, MessageBO.STATE_DELETED);
+        int updated = messageMapper.update(null, updateWrapper);
+
         String audioDeviceId = deviceId.replace(":", "-");
         LocalDate today = LocalDate.now();
         for (int i = 0; i <= AudioUtils.AUDIO_RETENTION_DAYS; i++) {
@@ -110,11 +123,7 @@ public class MessageServiceImpl implements MessageService {
             AudioUtils.deleteDirectory(deviceDir);
         }
         eventPublisher.publishEvent(new ConversationHistoryClearedEvent(this, deviceId));
-        LambdaUpdateWrapper<MessageDO> updateWrapper = new LambdaUpdateWrapper<MessageDO>()
-            .eq(MessageDO::getDeviceId, deviceId)
-            .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
-            .set(MessageDO::getState, MessageBO.STATE_DELETED);
-        return messageMapper.update(null, updateWrapper);
+        return updated;
     }
 
     @Override
@@ -157,11 +166,42 @@ public class MessageServiceImpl implements MessageService {
             if (messageDO.getStatDate() == null) {
                 messageDO.setStatDate(today);
             }
+            // message/toolCalls 是 text 列，超长会导致这条 insert 报错、整个事务连同同一轮的其它消息一起回滚
+            messageDO.setMessage(truncateToTextColumn(messageDO.getMessage()));
+            messageDO.setToolCalls(truncateToTextColumn(messageDO.getToolCalls()));
             if (messageMapper.insert(messageDO) > 0) {
                 rows++;
             }
         }
         return rows;
+    }
+
+    // 略低于 MySQL text 列 65535 字节上限，留出安全余量
+    private static final int TEXT_COLUMN_MAX_BYTES = 65000;
+    private static final String TRUNCATE_SUFFIX = "...(内容过长已截断)";
+
+    /**
+     * 按 UTF-8 字节数截断到 text 列容量内，避免超长内容让整条 insert 报错、拖累整个事务回滚。
+     */
+    private static String truncateToTextColumn(String value) {
+        if (value == null) {
+            return null;
+        }
+        if (value.getBytes(StandardCharsets.UTF_8).length <= TEXT_COLUMN_MAX_BYTES) {
+            return value;
+        }
+        int budget = TEXT_COLUMN_MAX_BYTES - TRUNCATE_SUFFIX.getBytes(StandardCharsets.UTF_8).length;
+        int low = 0;
+        int high = value.length();
+        while (low < high) {
+            int mid = (low + high + 1) / 2;
+            if (value.substring(0, mid).getBytes(StandardCharsets.UTF_8).length <= budget) {
+                low = mid;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return value.substring(0, low) + TRUNCATE_SUFFIX;
     }
 
     @Override
@@ -201,22 +241,30 @@ public class MessageServiceImpl implements MessageService {
         return desc;
     }
 
+    // 摘要一旦长期卡住会攒下无限量未摘要消息，这里兜底只取最近这么多条，避免一次性
+    // 全部读进内存、整体格式化进主 LLM 提示词
+    private static final int MAX_HISTORY_AFTER_ROWS = 500;
+
     @Override
     public List<MessageBO> listHistoryAfter(String deviceId, Integer roleId, Instant time) {
         if (!StringUtils.hasText(deviceId) || roleId == null || time == null) {
             return Collections.emptyList();
         }
         LocalDateTime createTime = LocalDateTime.ofInstant(time, ZoneId.systemDefault());
-        return messageMapper.selectList(new LambdaQueryWrapper<MessageDO>()
+        // 按时间倒序取最近 N 条再翻正序：积压超限时优先保留离当前对话最近的历史
+        List<MessageBO> desc = messageMapper.selectList(new LambdaQueryWrapper<MessageDO>()
                 .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
                 .eq(MessageDO::getDeviceId, deviceId)
                 .eq(MessageDO::getRoleId, roleId)
                 .gt(MessageDO::getCreateTime, createTime)
-                .orderByAsc(MessageDO::getCreateTime)
-                .orderByAsc(MessageDO::getMessageId))
+                .orderByDesc(MessageDO::getCreateTime)
+                .orderByDesc(MessageDO::getMessageId)
+                .last("LIMIT " + MAX_HISTORY_AFTER_ROWS))
             .stream()
             .map(messageConvert::toBO)
-            .toList();
+            .collect(Collectors.toCollection(ArrayList::new));
+        Collections.reverse(desc);
+        return desc;
     }
 
     @Override

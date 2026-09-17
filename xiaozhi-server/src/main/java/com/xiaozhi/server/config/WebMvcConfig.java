@@ -57,6 +57,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/user/resetPassword",
                         "/api/user/sendEmailCaptcha",
                         "/api/user/sendSmsCaptcha",
+                        "/api/user/checkUser",          // 匿名可调，不限速就是账号存在性预言机
+                        "/api/config/test",             // 每次试拨都是一次计费外呼
                         "/api/device",                  // 验证码绑定 POST
                         "/api/device/scan-bind",
                         "/api/device/ota",

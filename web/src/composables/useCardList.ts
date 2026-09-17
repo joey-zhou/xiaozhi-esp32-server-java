@@ -1,6 +1,7 @@
 import { shallowRef, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
+import { shouldIgnoreRequestError } from '@/services/request'
 
 /**
  * 卡片列表管理 Composable
@@ -93,12 +94,20 @@ export function useCardList<T extends object>(options: UseCardListOptions<T>) {
       const data = await options.fetchData()
       allItems.value = data
     } catch (error) {
+      // 切页/组件卸载导致的请求取消不是真错误，不弹提示
+      if (shouldIgnoreRequestError(error)) {
+        if (error instanceof Error) {
+          options.onError?.(error)
+        }
+        return
+      }
       console.error('加载数据失败:', error)
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : t('common.loadDataFailed')
-      message.error(errorMessage)
-      
+      // 传输层错误由 request.ts 的拦截器统一弹提示，这里用同一个 key 覆盖，不叠第二条
+      message.error({ content: errorMessage, key: 'request-error' })
+
       // 触发错误回调
       if (error instanceof Error) {
         options.onError?.(error)

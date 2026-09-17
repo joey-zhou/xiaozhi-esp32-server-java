@@ -8,7 +8,9 @@ import com.xiaozhi.common.port.ConfigLookup;
 
 import java.util.List;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import lombok.extern.slf4j.Slf4j;
@@ -18,10 +20,14 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 public class XingChenModelProvider implements ChatModelProvider {
-    
+
     @Autowired
     private ConfigLookup configLookup;
-    
+
+    @Lazy
+    @Autowired
+    private ToolCallingManager toolCallingManager;
+
     @Override
     public String getProviderName() {
         return "xingchen";
@@ -46,7 +52,7 @@ public class XingChenModelProvider implements ChatModelProvider {
         String apiKey = queryConfig.getApiKey();
         String apiSecret = queryConfig.getApiSecret();
         
-        var chatModel = new XingChenChatModel(endpoint, apiKey, apiSecret);
+        var chatModel = new XingChenChatModel(endpoint, apiKey, apiSecret, toolCallingManager);
         
         log.info("Created XingChen ChatModel: endpoint={}", endpoint);
         return chatModel;

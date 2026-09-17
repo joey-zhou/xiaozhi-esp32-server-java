@@ -143,7 +143,11 @@ public class DialogueService{
 
                 case SPEECH_CONTINUE:
                     // 语音继续，发送数据到流式识别
-                    if (session.getDeviceState() == DeviceState.LISTENING) {
+                    // SPEECH_START 已同步把状态切到 LISTENING 并建好音频流；这里放行 SPEAKING 是因为
+                    // Player.sendStart() 可能在打断瞬间才把上一轮播放的状态改回 SPEAKING，与此处发生竞态，
+                    // 此时音频流已经就绪，不该把这几帧静默丢掉导致打断后的这句话识别不全
+                    if (session.getDeviceState() == DeviceState.LISTENING
+                            || session.getDeviceState() == DeviceState.SPEAKING) {
                         session.sendAudioData(vadResult.getProcessedData());
                     }
                     break;
@@ -365,7 +369,6 @@ public class DialogueService{
             session.transitionTo(DeviceState.IDLE);
         }
     }
-
 
     /**
      * 处理语音唤醒

@@ -1,6 +1,7 @@
 package com.xiaozhi.role.impl;
 
 import com.xiaozhi.common.config.RuntimePathConfig;
+import com.xiaozhi.common.model.resp.SherpaVoiceResp;
 import com.xiaozhi.role.SherpaVoiceService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -23,8 +24,8 @@ public class SherpaVoiceServiceImpl implements SherpaVoiceService {
     private RuntimePathConfig runtimePathConfig;
 
     @Override
-    public List<Map<String, Object>> listVoices() {
-        List<Map<String, Object>> voices = new ArrayList<>();
+    public List<SherpaVoiceResp> listVoices() {
+        List<SherpaVoiceResp> voices = new ArrayList<>();
         File ttsDir = runtimePathConfig.resolveTtsModelsDir().toFile();
         if (!ttsDir.exists() || !ttsDir.isDirectory()) {
             return voices;
@@ -39,8 +40,8 @@ public class SherpaVoiceServiceImpl implements SherpaVoiceService {
         return voices;
     }
 
-    private List<Map<String, Object>> buildVoicesForModel(File modelDir) {
-        List<Map<String, Object>> voices = new ArrayList<>();
+    private List<SherpaVoiceResp> buildVoicesForModel(File modelDir) {
+        List<SherpaVoiceResp> voices = new ArrayList<>();
         String dirName = modelDir.getName();
 
         // 检测模型类型
@@ -87,13 +88,8 @@ public class SherpaVoiceServiceImpl implements SherpaVoiceService {
         return voices;
     }
 
-    private Map<String, Object> buildVoice(String modelDir, String modelType, int speakerId, String label) {
-        Map<String, Object> voice = new LinkedHashMap<>();
-        voice.put("label", label);
-        voice.put("value", modelDir + ":" + modelType + ":" + speakerId);
-        voice.put("provider", "sherpa-onnx");
-        voice.put("model", modelDir);
-        return voice;
+    private SherpaVoiceResp buildVoice(String modelDir, String modelType, int speakerId, String label) {
+        return new SherpaVoiceResp(label, modelDir + ":" + modelType + ":" + speakerId, "sherpa-onnx", modelDir);
     }
 
     /**

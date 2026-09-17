@@ -2,11 +2,14 @@ package com.xiaozhi.communication.common;
 
 import jakarta.annotation.Resource;
 import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -48,10 +51,19 @@ public class DeviceRegistry {
     }
 
     /**
-     * 刷新心跳（由 InactiveSessionChecker 定期调用）
+     * 批量刷新心跳（由 InactiveSessionChecker 定期调用）。
+     * 走 pipeline 把所有设备的 EXPIRE 合并成一次网络往返，避免会话数变多后逐个同步请求拖慢调度线程。
      */
-    public void refresh(String deviceId) {
-        stringRedisTemplate.expire(KEY_PREFIX + deviceId, TTL);
+    public void refreshAll(Collection<String> deviceIds) {
+        if (deviceIds.isEmpty()) {
+            return;
+        }
+        stringRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (String deviceId : deviceIds) {
+                connection.expire((KEY_PREFIX + deviceId).getBytes(StandardCharsets.UTF_8), TTL.getSeconds());
+            }
+            return null;
+        });
     }
 
     /**

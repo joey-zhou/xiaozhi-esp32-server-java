@@ -20,6 +20,8 @@ export interface RequestError extends Error {
   isAuthExpired?: boolean
   isRequestCanceled?: boolean
   isForbidden?: boolean
+  /** 拦截器已经弹过一条提示，全局的兜底错误处理器不用再弹第二条 */
+  isToasted?: boolean
 }
 
 /** 接口前缀，全站唯一来源；SSE / keepalive fetch 这类绕开 axios 的链路也从这里取 */
@@ -166,6 +168,7 @@ request.interceptors.response.use(
         createRequestError(forbiddenMessage, {
           code: 'ERR_FORBIDDEN',
           isForbidden: true,
+          isToasted: true,
         })
       )
     }
@@ -190,6 +193,7 @@ request.interceptors.response.use(
         content: i18n.global.t('error.timeout'),
         key: 'timeout-error',
       })
+      error.isToasted = true
       return Promise.reject(error)
     }
 
@@ -209,24 +213,28 @@ request.interceptors.response.use(
         const requestError = toRequestError(error, forbiddenMessage)
         requestError.code = 'ERR_FORBIDDEN'
         requestError.isForbidden = true
+        requestError.isToasted = true
         return Promise.reject(requestError)
       } else {
         message.error({
           content: error.response.data?.message || `${i18n.global.t('error.serverError')} (${status})`,
           key: 'request-error',
         })
+        error.isToasted = true
       }
     } else if (error.request) {
       message.error({
         content: i18n.global.t('error.networkError'),
         key: 'network-error',
       })
+      error.isToasted = true
     } else {
       // 其他错误（如请求配置错误等）
       message.error({
         content: error.message || i18n.global.t('error.unknown'),
         key: 'unknown-error',
       })
+      error.isToasted = true
     }
     return Promise.reject(error)
   },

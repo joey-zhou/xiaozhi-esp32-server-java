@@ -1,124 +1,32 @@
 # ============================================================
 # Dialogue 独立部署配置
-# 仅包含与 server 不同的部分，其余沿用各模块默认值
+# 与 server 共用的部分见 xiaozhi-common 的 application-common.yml
+# （下面 spring.config.import 引入），本文件只放 dialogue 独有或与
+# server 取值不同的项
 # ============================================================
 
 server:
   port: 8092
 
 spring:
+  config:
+    import: classpath:application-common.yml
+
   # Flyway Migration 只在 server 执行，dialogue 不执行，避免多实例重复迁移
   flyway:
     enabled: false
 
   # 数据源配置（与 server 共享同一数据库）
   datasource:
-    type: com.zaxxer.hikari.HikariDataSource
     hikari:
-      minimum-idle: 5
-      maximum-pool-size: 20
-      auto-commit: true
-      idle-timeout: 300000
       pool-name: DialogueHikariCP
-      max-lifetime: 1800000
-      connection-timeout: 30000
-      connection-test-query: SELECT 1
-      validation-timeout: 5000
-      leak-detection-threshold: 60000
-      keepalive-time: 30000
-
-  cache:
-    type: redis
-
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      database: 0
-      # Redis 开启 requirepass 后用环境变量 SPRING_DATA_REDIS_PASSWORD 提供口令。
-      # 此处不能写 password: 空值——Redisson 会把空串当口令发出 AUTH ""，无口令的 Redis 直接报错拒连。
-      lettuce:
-        pool:
-          max-active: 16
-          max-idle: 8
-          min-idle: 2
-          max-wait: 3s
-      redisson:
-        config: classpath:redisson-config.yml
-
-  servlet:
-    multipart:
-      enabled: true
-      max-file-size: 100MB
-      max-request-size: 100MB
-
-  threads:
-    virtual:
-      enabled: true
 
   # 激活开发环境，覆盖此处配置使用 application-dev.yml
   profiles:
     active: dev
 
-mybatis:
-  mapper-locations: classpath*:mapper/*.xml,classpath*:mapper/**/*.xml
-  configuration:
-    map-underscore-to-camel-case: false
-
-mybatis-plus:
-  configuration:
-    map-underscore-to-camel-case: false
-
 # ============================================================
-# 日志配置
-# ============================================================
-logging:
-  level:
-    root: INFO
-    org.springframework: INFO
-    io.netty.handler: ERROR
-
-# ============================================================
-# MQTT 接入（本进程负责验签，设备走 MQTT+UDP 时生效）
-# ============================================================
-mqtt:
-  server:
-    # OTA 下发的 MQTT 口令签名密钥：server 用它签、dialogue 用它验，两端必须同值
-    # 默认值仅供本地联调与运维测试，正式部署用环境变量 MQTT_SIGNATURE_KEY 覆盖
-    # 改这个值会让已下发的 MQTT 口令全部失效，设备需重走 OTA 取新口令
-    signatureKey: ${MQTT_SIGNATURE_KEY:xz@2025}
-
-# ============================================================
-# 小智扩展配置
-# ============================================================
-xiaozhi:
-  # 设备接入鉴权：token 由 OTA 签发、此处握手校验。留空不鉴权，生产部署必须配。
-  # 由环境变量 XIAOZHI_DEVICE_AUTH_SECRET 提供，必须与 server 同值。
-  device-auth:
-    secret: ${XIAOZHI_DEVICE_AUTH_SECRET:xz-2026}
-    expire-seconds: 2592000
-    allowed-devices:
-  runtime:
-    native-lib-dir: lib
-    vosk-model-dir: models/vosk-model
-    tts-models-dir: models/tts
-  vad:
-    model:
-      path: models/silero_vad.onnx
-
-# ============================================================
-# Sa-Token（仅用于 @SaIgnore 和无状态接口校验，token 验证依赖 Redis）
-# 本模块不注册 JWT 版 StpLogic，走默认的 token→loginId 查表，因此没有 jwt-secret-key
+# Sa-Token（共用字段见 application-common.yml）
 # ============================================================
 sa-token:
-  token-name: Authorization
-  timeout: 2592000
-  active-timeout: -1
-  is-concurrent: true
-  is-share: false
-  token-style: uuid
-  is-log: false
-  is-read-cookie: true
-  is-read-header: true
-  token-prefix: Bearer
   jwt-secret-key: xiaozhi-esp32-server-java-jwt-secret-key

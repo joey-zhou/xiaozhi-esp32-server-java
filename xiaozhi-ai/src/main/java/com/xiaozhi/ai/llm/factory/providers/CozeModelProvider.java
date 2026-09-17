@@ -25,7 +25,7 @@ public class CozeModelProvider implements ChatModelProvider {
     
     @Autowired
     private TokenResolver tokenResolver;
-    
+
     @Override
     public String getProviderName() {
         return "coze";

@@ -11,7 +11,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,8 +25,12 @@ import lombok.extern.slf4j.Slf4j;
 public class CmsUtils {
 
     // 缓存服务器IP地址 - 只在第一次调用getServerIp时初始化
-    private String serverIp = null;
-    private boolean initializing = false;
+    // 双检锁读的这两个字段，不加 volatile 的话另一个线程在同步块外的首次判断可能看不到已经写完的值
+    private volatile String serverIp = null;
+    private volatile boolean initializing = false;
+
+    /** 探测公网IP的总耗时上限（毫秒），超时直接走本地IP兜底，避免拖慢应用启动 */
+    private static final long SERVER_IP_DETECT_TIMEOUT_MS = 2000;
 
     // 以下是 IP 检测相关代码
 
@@ -198,8 +205,8 @@ public class CmsUtils {
                 return hostIp;
             }
 
-            // 2. 获取公网IP信息
-            IPInfo ipInfo = getIPInfo();
+            // 2. 获取公网IP信息（有超时上限，探测服务响应慢也不会拖住应用启动）
+            IPInfo ipInfo = getIPInfoWithTimeout();
 
             // 3. 如果获取到了公网IP信息：
             //    - Docker环境中直接使用公网IP（容器内无法可靠获取宿主机LAN IP）
@@ -813,6 +820,29 @@ public class CmsUtils {
             return false;
         } catch (NumberFormatException e) {
             return false;
+        }
+    }
+
+    /**
+     * 有超时上限地获取公网IP信息。
+     * getIPInfo() 本身按服务数量顺序探测，每个服务最多 3 秒连接 + 3 秒读取，
+     * 探测服务集体响应慢时会把这里的等待拖到很久，而这条调用链是应用启动路径的一部分
+     * （ServerAddressProvider 的 @PostConstruct 同步调用）。这里另起线程执行探测，
+     * 只等 SERVER_IP_DETECT_TIMEOUT_MS，超时就放弃并落到调用方已有的本地IP兜底，
+     * 后台线程会按自身超时自然结束，结果直接丢弃。
+     */
+    private static IPInfo getIPInfoWithTimeout() {
+        Future<IPInfo> future = IP_INFO_EXECUTOR.submit(CmsUtils::getIPInfo);
+        try {
+            return future.get(SERVER_IP_DETECT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            log.warn("探测公网IP超过{}ms未返回，改用本地IP兜底", SERVER_IP_DETECT_TIMEOUT_MS);
+            return null;
+        } catch (Exception e) {
+            log.warn("探测公网IP失败: {}", e.getMessage());
+            return null;
+        } finally {
+            future.cancel(true);
         }
     }
 

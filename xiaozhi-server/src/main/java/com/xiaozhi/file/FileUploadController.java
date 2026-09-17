@@ -2,6 +2,7 @@ package com.xiaozhi.file;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.xiaozhi.common.exception.OperationFailedException;
+import com.xiaozhi.common.model.resp.FileUploadResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.communication.ServerAddressProvider;
 import com.xiaozhi.storage.service.StorageService;
@@ -19,8 +20,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -72,7 +71,7 @@ public class FileUploadController {
     @ResponseBody
     @SaCheckPermission("system:file:api:upload")
     @Operation(summary = "文件上传", description = "如果有配置腾讯云对象存储的话默认会存储到对象存储中")
-    public ApiResponse<Map<String, Object>> uploadFile(
+    public ApiResponse<FileUploadResp> uploadFile(
             @Parameter(description = "上传的文件") @RequestParam("file") MultipartFile file,
             @Parameter(description = "文件类型") @RequestParam(value = "type", required = false, defaultValue = "common") String type) {
 
@@ -116,7 +115,6 @@ public class FileUploadController {
         try {
             filePathOrUrl = storageService.upload(file, relativePath, fileName);
         } catch (IOException e) {
-            log.error("文件上传失败: {}", e.getMessage(), e);
             throw new OperationFailedException("文件上传失败，请稍后重试", e);
         }
 
@@ -125,19 +123,19 @@ public class FileUploadController {
         // 计算文件哈希值
         String fileHash = FileHashUtil.calculateSha256(file);
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("fileName", originalFilename);
-        data.put("newFileName", fileName);
-        data.put("hash", fileHash);
+        FileUploadResp data = new FileUploadResp();
+        data.setFileName(originalFilename);
+        data.setNewFileName(fileName);
+        data.setHash(fileHash);
 
         // 判断是否是完整 URL（云存储返回 https URL，本地返回相对路径）
         if (filePathOrUrl.startsWith("http://") || filePathOrUrl.startsWith("https://")) {
             // 云存储私有桶下裸 URL 无法直接访问，返回带签名的临时 URL 供前端即时预览
-            data.put("url", storageService.getAccessUrl(filePathOrUrl));
+            data.setUrl(storageService.getAccessUrl(filePathOrUrl));
         } else {
             // url 供前端即时预览，受保护目录下必须带签名才访问得到；relativePath 是入库用的裸路径
-            data.put("url", serverAddressProvider.getServerAddress() + "/" + storageService.getAccessUrl(filePathOrUrl));
-            data.put("relativePath", filePathOrUrl);
+            data.setUrl(serverAddressProvider.getServerAddress() + "/" + storageService.getAccessUrl(filePathOrUrl));
+            data.setRelativePath(filePathOrUrl);
         }
 
         return ApiResponse.success("上传成功", data);

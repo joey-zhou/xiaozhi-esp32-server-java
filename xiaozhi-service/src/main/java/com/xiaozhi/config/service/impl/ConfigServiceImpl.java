@@ -121,7 +121,7 @@ public class ConfigServiceImpl implements ConfigService {
             return;
         }
         // 清除无 modelType 的默认缓存；llm 的各 modelType 变体由各自变更时清理
-        cache.evict("default:" + configType);
+        CacheHelper.evictNow(cache, "default:" + configType);
     }
 
     @Override

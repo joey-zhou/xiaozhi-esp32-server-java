@@ -137,8 +137,15 @@ public class UserAppService {
         if (existing == null) {
             throw new ResourceNotFoundException("无此用户，更新失败");
         }
+        // updateBO 忽略 password，改密码前拿到的仍是库里那份密文
+        String storedPassword = existing.getPassword();
         userConvert.updateBO(req, existing);
         if (StringUtils.hasText(req.getPassword())) {
+            // 改密码必须先证明知道原密码：登录态被短暂窃取时，这是账号被接管前的最后一道关
+            if (!StringUtils.hasText(req.getOldPassword())
+                    || !authenticationService.isPasswordValid(req.getOldPassword(), storedPassword)) {
+                throw new UserPasswordNotMatchException();
+            }
             existing.setPassword(authenticationService.encryptPassword(req.getPassword()));
         }
         existing.setUserId(userId);

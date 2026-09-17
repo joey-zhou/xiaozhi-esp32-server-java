@@ -1,3 +1,10 @@
+# 所有服务共用的日志驱动上限，避免容器 stdout/stderr 无限增长撑满宿主机磁盘
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   mysql:
     image: mysql:8.0-debian
@@ -21,6 +28,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    logging: *default-logging
 
   node:
     build:
@@ -33,6 +41,7 @@ services:
       - "8084:8084"
     networks:
       - app-network
+    logging: *default-logging
 
   server:
     build:
@@ -49,6 +58,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8091:8091"
     networks:
@@ -62,12 +73,16 @@ services:
       # 设备接入鉴权密钥，未导出则不鉴权；.env 被 git 跟踪，不要把真实值写进去
       # 生产部署前 export XIAOZHI_DEVICE_AUTH_SECRET=$(openssl rand -hex 16)
       - XIAOZHI_DEVICE_AUTH_SECRET=${XIAOZHI_DEVICE_AUTH_SECRET:-}
-      # 镜像内跑的是 dev profile，logback dev 段把 com.xiaozhi 开到 DEBUG，这里压回 INFO
-      - LOGGING_LEVEL_COM_XIAOZHI=INFO
-      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AI=INFO
-      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB_REACTIVE=INFO
-      - LOGGING_LEVEL_REACTOR_NETTY_HTTP_CLIENT=INFO
+      # 容器化部署统一走 prod profile：application.yml 里的 dev 只用于本地直接跑 jar/IDE 调试
+      - SPRING_PROFILES_ACTIVE=prod
+    # 与 dialogue 共用同一份本地文件存储：TTS 缓存索引在共享 MySQL/Redis，
+    # 文件本身也必须共享，否则缓存命中率会因请求落到另一个容器而失效
+    volumes:
+      - audio_data:/app/audio
+      - uploads_data:/app/uploads
+      - server_logs:/app/logs
     restart: always  # 自动重启
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -91,6 +106,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8092:8092"
     networks:
@@ -104,13 +121,15 @@ services:
       # 设备接入鉴权密钥，未导出则不鉴权；.env 被 git 跟踪，不要把真实值写进去
       # 生产部署前 export XIAOZHI_DEVICE_AUTH_SECRET=$(openssl rand -hex 16)
       - XIAOZHI_DEVICE_AUTH_SECRET=${XIAOZHI_DEVICE_AUTH_SECRET:-}
-      # 镜像内跑的是 dev profile，logback dev 段把 com.xiaozhi 开到 DEBUG，这里压回 INFO
-      - LOGGING_LEVEL_COM_XIAOZHI=INFO
-      - LOGGING_LEVEL_COM_XIAOZHI_DIALOGUE=INFO
-      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AI=INFO
-      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB_REACTIVE=INFO
-      - LOGGING_LEVEL_REACTOR_NETTY_HTTP_CLIENT=INFO
+      # 容器化部署统一走 prod profile：application.yml 里的 dev 只用于本地直接跑 jar/IDE 调试
+      - SPRING_PROFILES_ACTIVE=prod
+    # 与 server 共用同一份本地文件存储，见 server 服务同名 volumes 注释
+    volumes:
+      - audio_data:/app/audio
+      - uploads_data:/app/uploads
+      - dialogue_logs:/app/logs
     restart: always
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -138,6 +157,7 @@ services:
     networks:
       - app-network
       - xiaozhi-network
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -157,3 +177,7 @@ networks:
 volumes:
   mysql_data:  # 持久化数据卷
   redis_data:  # 持久化Redis数据
+  audio_data:  # server/dialogue 共享的对话录音与TTS缓存文件
+  uploads_data:  # server/dialogue 共享的用户上传文件（音乐、头像等）
+  server_logs:  # xiaozhi-server 日志，容器重建不丢
+  dialogue_logs:  # xiaozhi-dialogue 日志，容器重建不丢

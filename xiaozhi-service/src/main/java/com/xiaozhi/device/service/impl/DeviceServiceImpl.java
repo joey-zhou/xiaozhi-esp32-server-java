@@ -85,6 +85,18 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
     @Override
+    public List<DeviceBO> listByDeviceIds(List<String> deviceIds) {
+        if (deviceIds == null || deviceIds.isEmpty()) {
+            return List.of();
+        }
+        return deviceMapper.selectList(new LambdaQueryWrapper<DeviceDO>()
+                .in(DeviceDO::getDeviceId, deviceIds))
+            .stream()
+            .map(deviceConvert::toBO)
+            .toList();
+    }
+
+    @Override
     public List<DeviceBO> listByStateAndType(String state, String type) {
         LambdaQueryWrapper<DeviceDO> queryWrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(state)) {

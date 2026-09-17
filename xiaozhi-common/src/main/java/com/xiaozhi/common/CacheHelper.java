@@ -2,6 +2,7 @@ package com.xiaozhi.common;
 
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.cache.Cache;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.Resource;
@@ -43,8 +44,9 @@ public class CacheHelper {
         RLock lock = redissonClient.getLock("lock:" + lockKey);
 
         try {
-            // 尝试获取锁,最多等待3秒,锁10秒后自动释放
-            if (lock.tryLock(3, 10, TimeUnit.SECONDS)) {
+            // 尝试获取锁,最多等待3秒；不传租期，交给 Redisson 看门狗按持锁线程存活自动续期，
+            // 避免固定租期短于查库耗时（如 Hikari 连接池排队）导致锁提前失效
+            if (lock.tryLock(3, TimeUnit.SECONDS)) {
                 try {
                     // 3. 双重检查,避免重复查询数据库
                     cached = cacheGetter.get();
@@ -82,6 +84,26 @@ public class CacheHelper {
     }
 
     /**
+     * 写路径的缓存淘汰：先立刻淘汰一次，再登记一次事务提交后的淘汰。
+     * <p>
+     * CacheManager 开了 transactionAware，单调 {@code evict} 会被推迟到事务提交后才真正执行，
+     * 同一个事务里写完紧接着回读就会命中没淘汰掉的旧值，接口返回给前端的是改动前的数据。
+     * {@code evictIfPresent} 不走这层推迟，直接打到底层缓存，先解决「本次事务内读到旧值」。
+     * <p>
+     * 提交后的那一次不能省：事务执行期间的并发读会把旧值重新回填，只淘汰一次的话旧值会一直留到自然过期。
+     *
+     * @param cache 缓存实例，为 null 时什么都不做
+     * @param key   缓存键
+     */
+    public static void evictNow(Cache cache, Object key) {
+        if (cache == null || key == null) {
+            return;
+        }
+        cache.evictIfPresent(key);
+        cache.evict(key);
+    }
+
+    /**
      * 简化版 - 带分布式锁的操作
      *
      * @param lockKey 锁的key
@@ -93,7 +115,8 @@ public class CacheHelper {
         RLock lock = redissonClient.getLock("lock:" + lockKey);
 
         try {
-            if (lock.tryLock(3, 10, TimeUnit.SECONDS)) {
+            // 同上：不传租期，交给看门狗续期，避免与查库耗时的固定租期错配
+            if (lock.tryLock(3, TimeUnit.SECONDS)) {
                 try {
                     return supplier.get();
                 } finally {

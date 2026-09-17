@@ -138,7 +138,7 @@ bin/all.sh status              # 查看状态
 
 成功运行后按[固件编译文档](./docs/FIRMWARE-BUILD.md)让设备接入。两个地址分属两个进程，不要写混：
 **WebSocket** 是 dialogue 进程的 `ws://<内网IP>:8092/ws/xiaozhi/v1/`，
-**OTA** 是 server 进程的 `http://<内网IP>:8091/api/device/ota`（dialogue 启动横幅里那行 OTA 地址带的是自己的 8092 端口，照抄会 404）。
+**OTA** 是 server 进程的 `http://<内网IP>:8091/api/device/ota`（若把 server 的端口改成非 8091，需要同步改 dialogue 的 `xiaozhi.server.ota-port`，否则 dialogue 启动横幅和服务注册上报的 OTA 地址会跟着错）。
 
 ---
 

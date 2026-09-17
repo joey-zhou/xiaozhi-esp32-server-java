@@ -1,6 +1,7 @@
 package com.xiaozhi.config.infrastructure;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.config.dal.mysql.dataobject.ConfigDO;
 import com.xiaozhi.config.dal.mysql.mapper.ConfigMapper;
 import com.xiaozhi.config.domain.AiConfig;
@@ -101,8 +102,14 @@ public class ConfigRepositoryImpl implements ConfigRepository {
                 .eq(ConfigDO::getState, AiConfig.STATE_ENABLED)
                 .eq(ConfigDO::getIsDefault, "1")
                 .set(ConfigDO::getIsDefault, "0");
-        if ("llm".equals(configType) && StringUtils.hasText(modelType)) {
-            w.eq(ConfigDO::getModelType, modelType);
+        if ("llm".equals(configType)) {
+            // 唯一约束键是 IFNULL(modelType,'')，null 和空串同属一个默认桶，
+            // 必须一起圈进过滤条件，否则未带 modelType 的默认会把其他 modelType 的默认全部清空
+            if (StringUtils.hasText(modelType)) {
+                w.eq(ConfigDO::getModelType, modelType);
+            } else {
+                w.and(q -> q.isNull(ConfigDO::getModelType).or().eq(ConfigDO::getModelType, ""));
+            }
         }
         if (excludeId != null) {
             w.ne(ConfigDO::getConfigId, excludeId);
@@ -110,16 +117,17 @@ public class ConfigRepositoryImpl implements ConfigRepository {
         configMapper.update(null, w);
     }
 
+    /** 走 evictNow：本方法在事务里跑，单调 evict 会被推迟到提交后，调用方写完回读会命中旧值 */
     private void evictCache(AiConfig config) {
         Cache cache = cacheManager.getCache(ConfigService.CACHE_NAME);
         if (cache == null) return;
         if (config.getConfigId() != null) {
-            cache.evict(String.valueOf(config.getConfigId()));
+            CacheHelper.evictNow(cache, String.valueOf(config.getConfigId()));
         }
         if (StringUtils.hasText(config.getConfigType())) {
-            cache.evict("default:" + config.getConfigType());
+            CacheHelper.evictNow(cache, "default:" + config.getConfigType());
             if (StringUtils.hasText(config.getModelType())) {
-                cache.evict("default:" + config.getConfigType() + ":" + config.getModelType());
+                CacheHelper.evictNow(cache, "default:" + config.getConfigType() + ":" + config.getModelType());
             }
         }
     }

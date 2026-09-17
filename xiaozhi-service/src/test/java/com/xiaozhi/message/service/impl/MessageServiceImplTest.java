@@ -98,14 +98,19 @@ class MessageServiceImplTest {
 
         Page<ConversationProjection> page = new Page<>(1, 10);
         page.setRecords(List.of(projection));
-        page.setTotal(1);
 
         when(conversationMapper.selectConversationPage(any(Page.class), eq(7), eq(3), eq("web"))).thenReturn(page);
+        when(conversationMapper.selectConversationCount(7, 3, "web")).thenReturn(42L);
 
         PageResult<ConversationProjection> result = messageService.conversationPage(1, 10, 7, 3, "web");
 
         assertThat(result.getList()).containsExactly(projection);
-        assertThat(result.getTotal()).isEqualTo(1);
+        // 总数走轻量 count 查询，不能再依赖 MyBatis-Plus 对带子查询的主查询自动 COUNT
+        assertThat(result.getTotal()).isEqualTo(42);
+
+        ArgumentCaptor<Page<ConversationProjection>> pageCaptor = ArgumentCaptor.forClass(Page.class);
+        verify(conversationMapper).selectConversationPage(pageCaptor.capture(), eq(7), eq(3), eq("web"));
+        assertThat(pageCaptor.getValue().searchCount()).isFalse();
     }
 
     /**
@@ -124,13 +129,14 @@ class MessageServiceImplTest {
         MessageBO toolResultBO = new MessageBO();
         toolResultBO.setMessageId(2L);
 
-        when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(toolCall, toolResult));
+        // 查询取的是倒序最近 N 条，服务层再翻回正序
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(toolResult, toolCall));
         when(messageConvert.toBO(toolCall)).thenReturn(toolCallBO);
         when(messageConvert.toBO(toolResult)).thenReturn(toolResultBO);
 
         List<MessageBO> history = messageService.listHistoryAfter("dev-1", 3, after);
 
-        // 数据库给什么顺序就用什么顺序，服务层不得再翻转
+        // 喂给模型的历史必须是时间正序，工具调用要排在工具响应前面
         assertThat(history).containsExactly(toolCallBO, toolResultBO);
 
         ArgumentCaptor<LambdaQueryWrapper<MessageDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
@@ -141,7 +147,9 @@ class MessageServiceImplTest {
         // 严格大于：用 >= 会把上一次已经喂过的那条重复带进上下文
         assertThat(sql).contains("createTime > ?").doesNotContain("createTime >= ?");
         assertThat(sql).contains("deviceId = ?").contains("roleId = ?").contains("state = ?");
-        assertThat(sql).contains("ORDER BY createTime ASC,messageId ASC");
+        // 倒序 + LIMIT：积压过多时保留离当前对话最近的那批，而不是最老的
+        assertThat(sql).contains("ORDER BY createTime DESC,messageId DESC");
+        assertThat(sql).contains("LIMIT 500");
         assertThat(sql)
             .as("按 sender 排序会打乱工具调用与工具响应的先后")
             .doesNotContain("sender");

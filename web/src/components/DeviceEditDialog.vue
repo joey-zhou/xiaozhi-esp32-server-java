@@ -81,13 +81,12 @@ watch(
 
     <template #footer>
       <a-popconfirm
-        v-permission="'system:device:memory'"
         :title="t('device.confirmClearMemory')"
         :ok-text="t('common.confirm')"
         :cancel-text="t('common.cancel')"
         @confirm="handleClearMemory"
       >
-        <a-button key="clear" type="primary" danger :loading="clearMemoryLoading">
+        <a-button v-permission="'system:device:memory'" key="clear" type="primary" danger :loading="clearMemoryLoading">
           {{ t('device.clearMemory') }}
         </a-button>
       </a-popconfirm>

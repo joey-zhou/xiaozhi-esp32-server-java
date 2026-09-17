@@ -38,7 +38,8 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 登录限流拦截器
  * <p>
- * 对登录、注册、验证码、设备绑定、OTA 等端点按请求主体做频率限制，超出后返回 429 (Too Many Requests)。
+ * 对登录、注册、验证码、账号存在性查询、配置试拨、设备绑定、OTA 等端点按请求主体做频率限制，
+ * 超出后返回 429 (Too Many Requests)。
  * <p>
  * 限流主体：已登录请求按用户 ID 计数，OTA 按 Device-Id 计数，其余按客户端 IP 计数；
  * 匿名的账号类端点再叠加一维「账号」（用户名/手机号/邮箱），两维任一超限即拒——
@@ -69,6 +70,12 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     /** 设备绑定端点：绑定码只有 6 位，必须比登录更严，每分钟最多 5 次 */
     private static final int MAX_BIND_REQUESTS = 5;
+
+    /** 账号存在性查询：注册一次只查一次，够用即可，宽了就成了枚举通道 */
+    private static final int MAX_CHECK_USER_REQUESTS = 10;
+
+    /** 配置试拨：每次都是一次计费外呼，按人来回改参数试的节奏留量 */
+    private static final int MAX_CONFIG_TEST_REQUESTS = 20;
 
     /** OTA 端点按设备计数：设备每次开机只需请求一次，留 10 倍余量 */
     private static final int MAX_OTA_DEVICE_REQUESTS = 10;
@@ -171,6 +178,12 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         }
         if (uri.startsWith("/api/device")) {
             return MAX_BIND_REQUESTS;
+        }
+        if (uri.startsWith("/api/user/checkUser")) {
+            return MAX_CHECK_USER_REQUESTS;
+        }
+        if (uri.startsWith("/api/config/test")) {
+            return MAX_CONFIG_TEST_REQUESTS;
         }
         return MAX_AUTH_REQUESTS;
     }

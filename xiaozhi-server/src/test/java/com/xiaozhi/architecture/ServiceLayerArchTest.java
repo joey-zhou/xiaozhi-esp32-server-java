@@ -28,7 +28,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>
  * Req 只允许出现在 Controller，进入 Service 之前必须先拆成独立入参或转成 BO；
  * Resp 的组装只发生在 server 模块，读侧 Service 返回 BO 或包内只读投影；
- * Controller 的 public 方法出参只允许 Resp、PageResult、ApiResponse、原语与 java/jakarta/spring/reactor 类型；
+ * Controller 的 public 方法出参只允许 Resp、PageResult、ApiResponse、原语与 java/jakarta/spring/reactor 类型，
+ * 其中 java.util.Map 系列不算放行类型（裸 Map 出参没有字段契约），确需返回无固定 schema 的外部协议负载时
+ * 逐个加进 {@link #DYNAMIC_PAYLOAD_ALLOWLIST} 并写明原因；
  * 投影类只放 {pkg}/model 且只许本顶层业务包引用。
  * <p>
  * 扫描范围是整个 com.xiaozhi，新增业务模块自动纳管，不维护包白名单。
@@ -43,6 +45,14 @@ class ServiceLayerArchTest {
 
     private static final String API_RESPONSE = "com.xiaozhi.common.web.ApiResponse";
     private static final String PAGE_RESULT = "com.xiaozhi.common.model.PageResult";
+
+    /** 出参本身就是无固定 schema 的外部协议负载，没有 DTO 可收口，逐个显式豁免而非放宽通用规则。 */
+    private static final Set<String> DYNAMIC_PAYLOAD_ALLOWLIST = Set.of(
+        // MCP 工具调用结果的结构由被调用的第三方工具自行定义，无法用固定 DTO 表达
+        "com.xiaozhi.device.DeviceMcpController#callMcpTool",
+        // 设备端 MCP 识图回调，响应结构随视觉模型返回内容变化，且是设备固件直接解析的协议负载
+        "com.xiaozhi.communication.controller.VLChatController#vlChat"
+    );
 
     private static JavaClasses xiaozhiClasses;
 
@@ -148,18 +158,27 @@ class ServiceLayerArchTest {
             || method.getModifiers().contains(JavaModifier.SYNTHETIC)) {
             return Set.of();
         }
+        if (DYNAMIC_PAYLOAD_ALLOWLIST.contains(method.getOwner().getName() + "#" + method.getName())) {
+            return Set.of();
+        }
         return method.getReturnType().getAllInvolvedRawTypes().stream()
             .filter(type -> !isWebType(type))
             .map(JavaClass::getName)
             .collect(Collectors.toCollection(TreeSet::new));
     }
 
+    /** 出参一旦含 Map，字段契约就退化成裸 key/value，前后端只能靠人工对齐——不属于放行的 java.* 类型。 */
+    private static final Set<String> UNTYPED_JAVA_TYPES = Set.of(
+        "java.util.Map", "java.util.HashMap", "java.util.LinkedHashMap",
+        "java.util.TreeMap", "java.util.SortedMap", "java.util.NavigableMap"
+    );
+
     private static boolean isWebType(JavaClass type) {
         String name = type.getName();
         String pkg = type.getPackageName() + ".";
         return type.isPrimitive()
             || "void".equals(name)
-            || name.startsWith("java.")
+            || (name.startsWith("java.") && !UNTYPED_JAVA_TYPES.contains(name))
             || name.startsWith("jakarta.")
             || name.startsWith("org.springframework.")
             || name.startsWith("reactor.")

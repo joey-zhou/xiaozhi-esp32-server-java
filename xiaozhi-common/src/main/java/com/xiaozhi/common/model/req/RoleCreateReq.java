@@ -3,6 +3,9 @@ package com.xiaozhi.common.model.req;
 import com.xiaozhi.common.annotation.SignedFileUrl;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.Data;
@@ -26,9 +29,13 @@ public class RoleCreateReq {
     private String voiceName;
 
     @Schema(description = "语音音调")
+    @DecimalMin(value = "0.5", message = "语音音调不能小于0.5")
+    @DecimalMax(value = "2.0", message = "语音音调不能大于2.0")
     private Double ttsPitch;
 
     @Schema(description = "语音语速")
+    @DecimalMin(value = "0.5", message = "语音语速不能小于0.5")
+    @DecimalMax(value = "2.0", message = "语音语速不能大于2.0")
     private Double ttsSpeed;
 
     @Schema(description = "状态(1启用 0禁用)")
@@ -37,28 +44,41 @@ public class RoleCreateReq {
     @Schema(description = "TTS服务ID")
     private Integer ttsId;
 
-    @Schema(description = "模型ID")
+    @Schema(description = "模型ID", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "模型ID不能为空")
     private Integer modelId;
 
     @Schema(description = "STT服务ID")
     private Integer sttId;
 
     @Schema(description = "温度参数")
+    @DecimalMin(value = "0.0", message = "温度参数不能小于0")
+    @DecimalMax(value = "2.0", message = "温度参数不能大于2")
     private Double temperature;
 
     @Schema(description = "Top-P参数")
+    @DecimalMin(value = "0.0", message = "Top-P参数不能小于0")
+    @DecimalMax(value = "1.0", message = "Top-P参数不能大于1")
     private Double topP;
 
     @Schema(description = "语音活动检测-能量阈值")
+    @DecimalMin(value = "0.0", message = "能量阈值不能小于0")
+    @DecimalMax(value = "1.0", message = "能量阈值不能大于1")
     private Float vadEnergyTh;
 
     @Schema(description = "语音活动检测-语音阈值")
+    @DecimalMin(value = "0.0", message = "语音阈值不能小于0")
+    @DecimalMax(value = "1.0", message = "语音阈值不能大于1")
     private Float vadSpeechTh;
 
     @Schema(description = "语音活动检测-静音阈值")
+    @DecimalMin(value = "0.0", message = "静音阈值不能小于0")
+    @DecimalMax(value = "1.0", message = "静音阈值不能大于1")
     private Float vadSilenceTh;
 
     @Schema(description = "语音活动检测-静音毫秒数")
+    @Min(value = 0, message = "静音毫秒数不能小于0")
+    @Max(value = 5000, message = "静音毫秒数不能大于5000")
     private Integer vadSilenceMs;
 
     @Schema(description = "会话空闲自动结束秒数，0表示关闭")

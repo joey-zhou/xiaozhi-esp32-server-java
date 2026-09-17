@@ -53,16 +53,19 @@ public class XingHuoChatModel implements ChatModel {
     private final String apiPassword;
     private final String model;
     private final String baseUrl;
+    private final ToolCallingManager toolCallingManager;
 
     /**
      * 构造函数
-     * 
+     *
      * @param apiPassword API密码,从控制台获取
      * @param model 模型名称,如: generalv4, generalv3.5, generalv3, general
+     * @param toolCallingManager 应用统一装配的工具调用管理器，保证走本仓的工具链记录、事件与观测
      */
-    public XingHuoChatModel(String apiPassword, String model) {
+    public XingHuoChatModel(String apiPassword, String model, ToolCallingManager toolCallingManager) {
         this.apiPassword = apiPassword;
         this.model = model;
+        this.toolCallingManager = toolCallingManager;
         // 根据模型选择API地址: X1模型使用v2接口,其他使用v1接口
         this.baseUrl = "x1".equalsIgnoreCase(model) ? SPARK_X1_API_URL : SPARK_V1_API_URL;
         this.httpClient = new OkHttpClient.Builder()
@@ -70,7 +73,7 @@ public class XingHuoChatModel implements ChatModel {
                 .readTimeout(300, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build();
-        
+
     }
 
     public String getProviderName() {
@@ -143,8 +146,11 @@ public class XingHuoChatModel implements ChatModel {
                 
                 // 发送流式请求
                 Request request = buildRequest(requestBody);
-                
-                httpClient.newCall(request).enqueue(new Callback() {
+
+                Call call = httpClient.newCall(request);
+                // 用户打断时取消上游请求，不让已经不需要的响应继续占用星火的连接和算力配额
+                sink.onCancel(call::cancel);
+                call.enqueue(new Callback() {
                     @Override
                     public void onFailure(Call call, IOException e) {
                         log.error("星火API流式请求失败", e);
@@ -458,8 +464,7 @@ public class XingHuoChatModel implements ChatModel {
                         .build();
                 
                 // 执行工具调用
-                var toolExecutionResult = ToolCallingManager.builder().build()
-                        .executeToolCalls(prompt, chatResponse);
+                var toolExecutionResult = toolCallingManager.executeToolCalls(prompt, chatResponse);
                 
                 if (toolExecutionResult.returnDirect()) {
                     // 直接返回工具执行结果

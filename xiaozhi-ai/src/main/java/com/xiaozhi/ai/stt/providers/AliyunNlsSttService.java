@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import lombok.extern.slf4j.Slf4j;
@@ -42,14 +43,41 @@ public class AliyunNlsSttService implements SttService {
 
     /**
      * 缓存的NlsClient包装类
+     * 用引用计数追踪正在使用它的识别会话数：token 轮换时旧client可能仍被并发请求占用，
+     * 不能立即shutdown，只标记退休，等最后一个使用者释放引用后再真正关闭
      */
     private static class CachedNlsClient {
         final NlsClient client;
         final int tokenHash;
+        final AtomicInteger refCount = new AtomicInteger(0);
+        volatile boolean retiring = false;
+        private boolean shutdownDone = false;
 
         CachedNlsClient(NlsClient client, int tokenHash) {
             this.client = client;
             this.tokenHash = tokenHash;
+        }
+
+        synchronized void retireWhenIdle() {
+            retiring = true;
+            shutdownIfIdle();
+        }
+
+        synchronized void release() {
+            if (refCount.decrementAndGet() <= 0) {
+                shutdownIfIdle();
+            }
+        }
+
+        private void shutdownIfIdle() {
+            if (retiring && refCount.get() <= 0 && !shutdownDone) {
+                shutdownDone = true;
+                try {
+                    client.shutdown();
+                } catch (Exception e) {
+                    log.warn("关闭旧NlsClient失败", e);
+                }
+            }
         }
     }
 
@@ -65,9 +93,10 @@ public class AliyunNlsSttService implements SttService {
     }
 
     /**
-     * 获取或创建NlsClient实例（支持连接复用）
+     * 获取或创建NlsClient实例（支持连接复用），并占用一次引用计数。
+     * 用完必须调用 releaseClient 归还，否则该client永远不会被判定为空闲而关闭。
      */
-    private NlsClient getOrCreateClient() throws Exception {
+    private CachedNlsClient acquireClient() throws Exception {
         String currentToken = tokenResolver.getToken(config);
         if (currentToken == null) {
             throw new RuntimeException("无法获取阿里云Token");
@@ -76,25 +105,27 @@ public class AliyunNlsSttService implements SttService {
         Integer configId = config.getConfigId();
         int currentHash = currentToken.hashCode();
 
-        CachedNlsClient cached = globalClientCache.get(configId);
-        if (cached != null && cached.tokenHash == currentHash) {
-            return cached.client;
-        }
-
+        // 整个判断+占用过程都放进 compute 的重映射函数里，靠 ConcurrentHashMap 按 key 加锁的特性
+        // 保证不会跟同一 configId 的“标记退休”动作交错，避免引用计数和退休标记的竞态
         return globalClientCache.compute(configId, (k, existing) -> {
             if (existing != null && existing.tokenHash == currentHash) {
+                existing.refCount.incrementAndGet();
                 return existing;
             }
             if (existing != null) {
-                try {
-                    existing.client.shutdown();
-                } catch (Exception e) {
-                    log.warn("关闭旧NlsClient失败", e);
-                }
+                existing.retireWhenIdle();
             }
             NlsClient newClient = new NlsClient(NLS_URL, currentToken);
-            return new CachedNlsClient(newClient, currentHash);
-        }).client;
+            CachedNlsClient created = new CachedNlsClient(newClient, currentHash);
+            created.refCount.incrementAndGet();
+            return created;
+        });
+    }
+
+    private static void releaseClient(CachedNlsClient cached) {
+        if (cached != null) {
+            cached.release();
+        }
     }
 
     /**
@@ -168,10 +199,12 @@ public class AliyunNlsSttService implements SttService {
 
         NlsClient client = null;
         SpeechTranscriber transcriber = null;
+        CachedNlsClient cachedClient = null;
 
         try {
             // 获取或复用NlsClient
-            client = getOrCreateClient();
+            cachedClient = acquireClient();
+            client = cachedClient.client;
 
             // 创建识别监听器
             SpeechTranscriberListener listener = new SpeechTranscriberListener() {
@@ -313,6 +346,8 @@ public class AliyunNlsSttService implements SttService {
                     log.warn("关闭SpeechTranscriber失败", e);
                 }
             }
+            // transcriber已关闭，归还引用计数；若client已被标记退休且无人再用，这里会触发真正的shutdown
+            releaseClient(cachedClient);
         }
     }
 }

@@ -11,7 +11,7 @@ import { useFormValidation } from '@/composables/useFormValidation'
 import { useRequest } from '@/composables/useRequest'
 import { PASSWORD_MIN_LENGTH } from '@/constants/api'
 import { updateUser } from '@/services/user'
-import { uploadFile, type UploadResponse } from '@/services/upload'
+import { uploadFile } from '@/services/upload'
 import type { User, UpdateUserParams } from '@/types/user'
 import type { UploadProps } from 'ant-design-vue'
 
@@ -37,6 +37,7 @@ const formData = reactive({
   name: userInfo.value?.name || '',
   tel: userInfo.value?.tel || '',
   email: userInfo.value?.email || '',
+  oldPassword: '',
   password: '',
   confirmPassword: '',
 })
@@ -92,6 +93,10 @@ const rules = computed<Record<string, Rule[]>>(() => {
   // 只有填了新密码才要求二次确认，否则确认框留空就能改掉密码
   if (formData.password) {
     baseRules.confirmPassword = confirmPasswordRules(toRef(formData, 'password'))
+    // 后端同样强制校验原密码，这里只是提前把提示给出来
+    baseRules.oldPassword = [
+      { required: true, message: t('account.oldPasswordRequired'), trigger: ['blur', 'change'] }
+    ]
   }
 
   return baseRules
@@ -125,8 +130,9 @@ const handleSubmit = async () => {
       email: formData.email,
     }
 
-    // 只有填写了密码才传递密码字段
+    // 只有填写了密码才传递密码字段，原密码跟着一起传，后端凭它校验
     if (formData.password) {
+      updateData.oldPassword = formData.oldPassword
       updateData.password = formData.password
     }
     
@@ -138,6 +144,7 @@ const handleSubmit = async () => {
       message.success(t('account.updateSuccess'))
       
       // 清空密码字段（强度条跟着 formData.password 自动回到 0）
+      formData.oldPassword = ''
       formData.password = ''
       formData.confirmPassword = ''
     } else {
@@ -166,8 +173,7 @@ const beforeAvatarUpload: UploadProps['beforeUpload'] = (file) => {
 
   avatarLoading.value = true
   uploadFile(file, 'avatar', { fullResponse: true })
-    .then(res => {
-      const data = res as UploadResponse
+    .then(data => {
       // 本地存储返回 relativePath（相对路径，避免把主机名写死进库）；
       // 云存储（MinIO/S3）无 relativePath，存签名 URL，后端会剥签名入库、读取时自动重签
       updateUserAvatar(data.relativePath || data.url)
@@ -237,6 +243,14 @@ const updateUserAvatar = async (avatarPath: string) => {
               <a-input
                 v-model:value="formData.email"
                 :placeholder="t('account.enterEmail')"
+                allow-clear
+              />
+            </a-form-item>
+
+            <a-form-item :label="t('account.oldPassword')" name="oldPassword">
+              <a-input-password
+                v-model:value="formData.oldPassword"
+                :placeholder="t('account.oldPasswordPlaceholder')"
                 allow-clear
               />
             </a-form-item>

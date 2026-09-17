@@ -10,7 +10,6 @@ import com.xiaozhi.role.domain.repository.RoleRepository;
 import com.xiaozhi.role.infrastructure.convert.RoleConverter;
 import com.xiaozhi.role.service.RoleService;
 import jakarta.annotation.Resource;
-import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Repository;
@@ -42,9 +41,6 @@ public class RoleRepositoryImpl implements RoleRepository {
 
     @Resource
     private CacheManager cacheManager;
-
-    @Resource
-    private CacheHelper cacheHelper;
 
     @Resource
     private ApplicationEventPublisher eventPublisher;
@@ -109,10 +105,10 @@ public class RoleRepositoryImpl implements RoleRepository {
                 .set(RoleDO::getIsDefault, "0"));
     }
 
+    /** 走 evictNow：本方法在事务里跑，单调 evict 会被推迟到提交后，调用方写完回读会命中旧值 */
     private void evictCache(Integer roleId) {
         if (roleId == null) return;
-        Cache cache = cacheManager.getCache(RoleService.CACHE_NAME);
-        if (cache != null) cache.evict(String.valueOf(roleId));
+        CacheHelper.evictNow(cacheManager.getCache(RoleService.CACHE_NAME), String.valueOf(roleId));
     }
 
     private Role toRole(RoleDO d) {

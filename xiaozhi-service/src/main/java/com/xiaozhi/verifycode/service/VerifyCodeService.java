@@ -32,4 +32,12 @@ public interface VerifyCodeService {
      * 同一账号连续失败达上限后，剩余未过期的码全部作废，必须重新获取。
      */
     boolean consumeByAccount(String account, String code);
+
+    /**
+     * 清理早已过期的验证码行：设备码/邮箱码一旦过了有效期就不再被任何查询命中，
+     * 只增不删会让 sys_code 无限堆积，定时任务按创建时间批量删除。
+     *
+     * @return 本次删除的行数
+     */
+    int deleteExpired(int expiredBeforeMinutes, int batchSize);
 }

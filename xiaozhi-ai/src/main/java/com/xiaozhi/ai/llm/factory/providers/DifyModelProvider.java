@@ -21,7 +21,7 @@ public class DifyModelProvider implements ChatModelProvider {
     
     @Autowired
     private ConfigLookup configLookup;
-    
+
     @Override
     public String getProviderName() {
         return "dify";

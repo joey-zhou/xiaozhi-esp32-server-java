@@ -5,11 +5,14 @@ import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
+import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.dialogue.runtime.TimeoutMessageSupplier;
 import com.xiaozhi.enums.DeviceState;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -113,14 +116,17 @@ public class InactiveSessionChecker {
     }
 
     void refreshDeviceRegistry() {
-        sessionManager.getAllSessions().forEach(session -> {
-            try {
-                if (session.getDevice() != null && session.getDevice().getDeviceId() != null) {
-                    deviceRegistry.refresh(session.getDevice().getDeviceId());
-                }
-            } catch (Exception e) {
-                log.error("刷新设备注册心跳失败 - SessionId: {}", session.getSessionId(), e);
-            }
-        });
+        List<String> deviceIds = sessionManager.getAllSessions().stream()
+                .map(ChatSession::getDevice)
+                .filter(Objects::nonNull)
+                .map(DeviceBO::getDeviceId)
+                .filter(Objects::nonNull)
+                .toList();
+        try {
+            // 走 pipeline 一次性刷新，避免会话数变多后逐个同步请求 Redis 拖慢调度线程
+            deviceRegistry.refreshAll(deviceIds);
+        } catch (Exception e) {
+            log.error("批量刷新设备注册心跳失败，设备数: {}", deviceIds.size(), e);
+        }
     }
 }

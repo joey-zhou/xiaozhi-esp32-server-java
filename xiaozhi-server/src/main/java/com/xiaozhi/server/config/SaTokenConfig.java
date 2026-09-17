@@ -31,6 +31,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         // 注册Sa-Token拦截器，拦截所有API请求
         // 不需要登录的接口请使用 @SaIgnore 注解标注
+        // /actuator/**、接口文档这些不在 /api/** 之下的运维端点由 OpsEndpointAccessConfig 单独收口
         registry.addInterceptor(new SaInterceptor(handle -> StpUtil.checkLogin()) {
                     @Override
                     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {

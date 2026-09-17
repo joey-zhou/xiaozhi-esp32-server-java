@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 import com.xiaozhi.ai.tts.TtsService;
@@ -112,6 +113,7 @@ public class XfyunTtsService implements TtsService {
      */
     private boolean sendRequest(String text, File file) throws Exception {
         CountDownLatch recognitionLatch = new CountDownLatch(1);
+        AtomicBoolean succeeded = new AtomicBoolean(false);
         try {
             // 将我们的参数（0.5-2.0）非线性映射到讯飞的参数（0-100）
             // 映射规则：0.5→0，1.0→50（讯飞默认），2.0→100
@@ -166,7 +168,8 @@ public class XfyunTtsService implements TtsService {
                         if (!file.exists() || file.length() == 0) {
                             throw new RuntimeException("音频文件写入失败");
                         }
-                        
+                        succeeded.set(true);
+
                     } catch (Exception e) {
                         log.error("写入音频文件失败", e);
                         throw new RuntimeException(e);
@@ -199,8 +202,9 @@ public class XfyunTtsService implements TtsService {
         boolean recognized = recognitionLatch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         if (!recognized) {
             log.warn("讯飞云语音合成超时");
+            return false;
         }
-        return true;
+        return succeeded.get();
     }
 
 }

@@ -25,4 +25,24 @@
         GROUP BY m.sessionId, m.roleId, r.roleName
         ORDER BY updateTime DESC
     </select>
+
+    <!-- 只统计会话组数，不关联 sys_role、不跑 title 相关子查询，供分页跳过自动 COUNT 时使用 -->
+    <select id="selectConversationCount" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM (
+            SELECT 1
+            FROM sys_message m
+            WHERE m.state = '1'
+            AND m.sessionId IS NOT NULL AND m.sessionId != ''
+            <if test="userId != null">
+                AND m.userId = #{userId}
+            </if>
+            <if test="roleId != null">
+                AND m.roleId = #{roleId}
+            </if>
+            <if test="source != null and source != ''">
+                AND m.source = #{source}
+            </if>
+            GROUP BY m.sessionId, m.roleId
+        ) t
+    </select>
 </mapper>

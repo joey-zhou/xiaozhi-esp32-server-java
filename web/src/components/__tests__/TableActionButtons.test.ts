@@ -38,7 +38,7 @@ describe('TableActionButtons', () => {
     localStorage.clear()
     pinia = createPinia()
     setActivePinia(pinia)
-    useUserStore().setUserInfo({ userId: '1', isAdmin: '1' })
+    useUserStore().setUserInfo({ userId: 1, isAdmin: '1' })
   })
 
   // store 里的 useStorage 会监听 storage 事件，上一个用例的实例不销毁就会把旧身份同步回来
@@ -99,7 +99,7 @@ describe('TableActionButtons', () => {
 
   it('permissionPrefix 按 update/delete 后缀查按钮权限', () => {
     const store = useUserStore()
-    store.setUserInfo({ userId: '2', isAdmin: '0' })
+    store.setUserInfo({ userId: 2, isAdmin: '0' })
     store.setPermissions([buttonPermission('system:role:update')])
 
     const wrapper = mount(TableActionButtons, {
@@ -121,7 +121,7 @@ describe('TableActionButtons', () => {
 
   it('permissions 显式覆盖优先于 permissionPrefix 推导', () => {
     const store = useUserStore()
-    store.setUserInfo({ userId: '2', isAdmin: '0' })
+    store.setUserInfo({ userId: 2, isAdmin: '0' })
     store.setPermissions([buttonPermission('system:role:update')])
 
     const wrapper = mount(TableActionButtons, {
@@ -139,7 +139,7 @@ describe('TableActionButtons', () => {
 
   it('moreActions 过滤掉 visible=false 与无权限项', () => {
     const store = useUserStore()
-    store.setUserInfo({ userId: '2', isAdmin: '0' })
+    store.setUserInfo({ userId: 2, isAdmin: '0' })
     store.setPermissions([buttonPermission('system:role:memory')])
 
     const wrapper = mount(TableActionButtons, {

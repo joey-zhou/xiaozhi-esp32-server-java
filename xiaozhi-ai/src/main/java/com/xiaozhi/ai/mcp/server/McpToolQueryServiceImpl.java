@@ -1,5 +1,6 @@
 package com.xiaozhi.ai.mcp.server;
 
+import com.xiaozhi.common.model.resp.McpToolSummaryResp;
 import com.xiaozhi.ai.tool.GlobalToolRedisRegistry;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import jakarta.annotation.Resource;
@@ -7,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -25,9 +25,9 @@ public class McpToolQueryServiceImpl implements McpToolQueryService {
     private GlobalToolRedisRegistry globalToolRedisRegistry;
 
     @Override
-    public List<Map<String, String>> getSystemGlobalToolSummaries() {
+    public List<McpToolSummaryResp> getSystemGlobalToolSummaries() {
         // 优先使用本进程已注册的 GlobalFunction（dialogue 进程 / 单体部署）
-        List<Map<String, String>> inMemory = toolsGlobalRegistry.getGlobalToolSummaries();
+        List<McpToolSummaryResp> inMemory = toolsGlobalRegistry.getGlobalToolSummaries();
         if (!inMemory.isEmpty()) {
             return inMemory;
         }
@@ -36,7 +36,7 @@ public class McpToolQueryServiceImpl implements McpToolQueryService {
             return inMemory;
         }
         return globalToolRedisRegistry.getAll().stream()
-                .map(t -> Map.of("name", t.getName(), "description", t.getDescription()))
+                .map(t -> new McpToolSummaryResp(t.getName(), t.getDescription()))
                 .toList();
     }
 }

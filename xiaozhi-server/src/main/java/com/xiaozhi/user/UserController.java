@@ -286,14 +286,13 @@ public class UserController extends BaseController {
     @ResponseBody
     @Operation(summary = "检查用户名和手机号是否已存在", description = "返回检查结果")
     public ApiResponse<Void> checkUser(@Valid UserCheckReq req) {
-        if (StringUtils.hasText(req.getTel()) && userService.getByTel(req.getTel()) != null) {
-            throw new IllegalStateException("手机已注册");
-        }
-        if (StringUtils.hasText(req.getEmail()) && userService.getByEmail(req.getEmail()) != null) {
-            throw new IllegalStateException("邮箱已注册");
-        }
-        if (StringUtils.hasText(req.getUsername()) && userService.getByUsername(req.getUsername()) != null) {
-            throw new IllegalStateException("用户名已存在");
+        // 三个字段共用一句提示：分字段报「手机已注册」「邮箱已注册」「用户名已存在」等于逐字段确认注册状态，
+        // 这个端点匿名可调，会被用来枚举平台已注册的手机号/邮箱/用户名
+        boolean taken = (StringUtils.hasText(req.getTel()) && userService.getByTel(req.getTel()) != null)
+                || (StringUtils.hasText(req.getEmail()) && userService.getByEmail(req.getEmail()) != null)
+                || (StringUtils.hasText(req.getUsername()) && userService.getByUsername(req.getUsername()) != null);
+        if (taken) {
+            throw new IllegalStateException("该手机号、邮箱或用户名已被注册");
         }
         return ApiResponse.success();
     }

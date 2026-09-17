@@ -16,6 +16,21 @@ _warn() { echo -e "${YELLOW}[xiaozhi]${NC} $*"; }
 _err()  { echo -e "${RED}[xiaozhi]${NC} $*" >&2; }
 _ok()   { echo -e "${GREEN}[xiaozhi]${NC} ${BOLD}$*${NC}"; }
 
+# ---- 控制台重定向文件轮转 ----
+# Logback 自己的 FILE/ERROR_FILE 有 rollingPolicy，但 nohup 重定向出去的 .out 是纯 append，
+# 长期运行会无限增长。这里只在每次启动时做一次按大小轮转，够用且不引入 logrotate 依赖。
+rotate_console_log() {
+  local file="$1" max_bytes=$((50 * 1024 * 1024)) keep=5
+  [[ -f "$file" ]] || return 0
+  local size
+  size=$(wc -c < "$file" 2>/dev/null || echo 0)
+  if (( size > max_bytes )); then
+    mv "$file" "$file.$(date +%Y%m%d%H%M%S)"
+    # 只留最近 $keep 份，按文件名（含时间戳）倒序排，多出来的删掉
+    ls -1 "$file".* 2>/dev/null | sort -r | tail -n +$((keep + 1)) | xargs -r rm -f
+  fi
+}
+
 # ---- 部署模式检测 ----
 # 部署模式：$ROOT_DIR 下没有 pom.xml（纯 jar 部署）或没有 mvn 命令
 # 此时跳过编译，直接使用现成的 jar
@@ -124,6 +139,7 @@ start_service() {
   _info "启动 $name (port $port)..."
   _info "  java: $java_bin"
   mkdir -p "$LOGS_DIR"
+  rotate_console_log "$LOGS_DIR/$name.out"
 
   # cd 到 ROOT_DIR 启动，确保:
   #   1. Logback 配置中的 ./logs 写到 $ROOT_DIR/logs/

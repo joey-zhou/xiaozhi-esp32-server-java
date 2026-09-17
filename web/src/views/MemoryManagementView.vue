@@ -339,13 +339,29 @@ const onTableChange = (pag: TablePaginationConfig) => {
  * 获取发送方显示文本
  */
 function getSenderText(sender: string) {
-  return sender === 'user' ? t('message.user') : t('message.assistant')
+  if (sender === 'user') return t('message.user')
+  // 工具回执的行 sender 是 tool，混进「助手」会让人以为是模型自己说的
+  if (sender === 'tool') return t('message.tool')
+  return t('message.assistant')
 }
 
+/** 展开行与工具列统一按这三个字段渲染 */
 interface ToolCall {
   name: string
   arguments: string
   result: string
+}
+
+/**
+ * 后端 toolCalls 有两种负载：
+ * TOOL_CALL 存 {id, name, arguments}，TOOL_RESPONSE 存 {toolCallId, toolName}、结果文本在 message 列。
+ * 只认第一种的话，回执行的工具名与结果都是空的。
+ */
+interface RawToolCall {
+  name?: string
+  toolName?: string
+  arguments?: string
+  result?: string
 }
 
 /** 展开行是一张 a-table，_key 只用来当 row-key */
@@ -354,7 +370,7 @@ type ToolCallRow = ToolCall & { _key: number }
 /**
  * 解析 toolCalls JSON 字符串为数组
  */
-function parseToolCalls(toolCalls: string | undefined | null): ToolCall[] {
+function parseToolCalls(toolCalls: string | undefined | null): RawToolCall[] {
   if (!toolCalls) return []
   try {
     const parsed = JSON.parse(toolCalls)
@@ -362,6 +378,15 @@ function parseToolCalls(toolCalls: string | undefined | null): ToolCall[] {
   } catch {
     return []
   }
+}
+
+/** 把两种负载拍平成统一形状；回执行的结果文本取自本行的 message */
+function normalizeToolCalls(record: ChatMemoryRow): ToolCall[] {
+  return parseToolCalls(record.toolCalls).map((raw) => ({
+    name: raw.name || raw.toolName || '',
+    arguments: raw.arguments || '',
+    result: raw.result || (record.messageType === 'TOOL_RESPONSE' ? record.message || '' : ''),
+  }))
 }
 
 const EMPTY_TOOL_CALLS: ToolCallRow[] = []
@@ -376,7 +401,7 @@ const toolCallsByMessage = computed(() => {
     if (!record.toolCalls) continue
     rows.set(
       record.messageId,
-      parseToolCalls(record.toolCalls).map((tool, index) => ({ ...tool, _key: index })),
+      normalizeToolCalls(record).map((tool, index) => ({ ...tool, _key: index })),
     )
   }
   return rows

@@ -1,8 +1,8 @@
 package com.xiaozhi.ai.mcp.server;
 
+import com.xiaozhi.common.model.resp.McpToolSummaryResp;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * MCP 工具查询服务。
@@ -14,5 +14,5 @@ public interface McpToolQueryService {
     /**
      * 获取系统全局内置工具摘要（name + description）
      */
-    List<Map<String, String>> getSystemGlobalToolSummaries();
+    List<McpToolSummaryResp> getSystemGlobalToolSummaries();
 }

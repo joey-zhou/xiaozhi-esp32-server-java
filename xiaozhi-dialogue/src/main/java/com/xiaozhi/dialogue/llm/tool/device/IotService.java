@@ -183,6 +183,11 @@ public class IotService {
     private void registerFunctionTools(String sessionId, IotDescriptor iotDescriptor) {
         ChatSession chatSession = sessionManager.getSession(sessionId);
         ToolsSessionHolder toolsSessionHolder = chatSession != null ? chatSession.getToolsSessionHolder() : null;
+        if (toolsSessionHolder == null) {
+            // 设备还没绑定角色时 ToolsSessionHolder 未初始化，这种设备上报的 IoT 描述先不注册工具，等绑定后再报一次
+            log.warn("[{}] - SessionId: {}, 会话尚未绑定角色，跳过 IoT 设备 {} 的工具注册", TAG, sessionId, iotDescriptor.getName());
+            return;
+        }
         registerPropertiesFunctionTools(sessionId, toolsSessionHolder, iotDescriptor);
         registerMethodFunctionTools(sessionId, toolsSessionHolder, iotDescriptor);
     }

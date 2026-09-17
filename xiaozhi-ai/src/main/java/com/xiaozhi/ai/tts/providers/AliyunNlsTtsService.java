@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -45,14 +46,41 @@ public class AliyunNlsTtsService implements TtsService {
 
     /**
      * 缓存的NlsClient包装类
+     * 用引用计数追踪正在使用它的合成会话数：token 轮换时旧client可能仍被并发请求占用，
+     * 不能立即shutdown，只标记退休，等最后一个使用者释放引用后再真正关闭
      */
     private static class CachedNlsClient {
         final NlsClient client;
         final int tokenHash;
+        final AtomicInteger refCount = new AtomicInteger(0);
+        volatile boolean retiring = false;
+        private boolean shutdownDone = false;
 
         CachedNlsClient(NlsClient client, int tokenHash) {
             this.client = client;
             this.tokenHash = tokenHash;
+        }
+
+        synchronized void retireWhenIdle() {
+            retiring = true;
+            shutdownIfIdle();
+        }
+
+        synchronized void release() {
+            if (refCount.decrementAndGet() <= 0) {
+                shutdownIfIdle();
+            }
+        }
+
+        private void shutdownIfIdle() {
+            if (retiring && refCount.get() <= 0 && !shutdownDone) {
+                shutdownDone = true;
+                try {
+                    client.shutdown();
+                } catch (Exception e) {
+                    log.warn("关闭旧NlsClient失败", e);
+                }
+            }
         }
     }
 
@@ -72,10 +100,10 @@ public class AliyunNlsTtsService implements TtsService {
     }
 
     /**
-     * 获取或创建NlsClient实例（支持连接复用）
-     * 使用全局缓存，按configId共享NlsClient
+     * 获取或创建NlsClient实例（支持连接复用），并占用一次引用计数。
+     * 使用全局缓存，按configId共享NlsClient；用完必须调用 releaseClient 归还
      */
-    private NlsClient getOrCreateClient() throws Exception {
+    private CachedNlsClient acquireClient() throws Exception {
         String currentToken = tokenResolver.getToken(config);
         if (currentToken == null) {
             throw new RuntimeException("无法获取阿里云Token");
@@ -84,39 +112,29 @@ public class AliyunNlsTtsService implements TtsService {
         Integer configId = config.getConfigId();
         int currentHash = currentToken.hashCode();
 
-        // 获取当前缓存的client
-        CachedNlsClient cached = globalClientCache.get(configId);
-
-        // 检查是否可以复用
-        if (cached != null && cached.tokenHash == currentHash) {
-            return cached.client;
-        }
-
-        // 需要创建新的client
+        // 整个判断+占用过程都放进 compute 的重映射函数里，靠 ConcurrentHashMap 按 key 加锁的特性
+        // 保证不会跟同一 configId 的“标记退休”动作交错，避免引用计数和退休标记的竞态
         return globalClientCache.compute(configId, (k, existing) -> {
-            // 双重检查：可能在等待期间已被其他线程创建
             if (existing != null && existing.tokenHash == currentHash) {
+                existing.refCount.incrementAndGet();
                 return existing;
             }
-
-            // 检查是否是token变化（首次创建existing为null，视为变化）
-            boolean tokenChanged = (existing == null || existing.tokenHash != currentHash);
-
-            if (tokenChanged) {
-                // 关闭旧的client（如果有）
-                if (existing != null) {
-                    try {
-                        existing.client.shutdown();
-                    } catch (Exception e) {
-                        log.warn("关闭旧NlsClient失败", e);
-                    }
-                }
+            if (existing != null) {
+                existing.retireWhenIdle();
             }
 
             // 创建新client
             NlsClient newClient = new NlsClient(NLS_URL, currentToken);
-            return new CachedNlsClient(newClient, currentHash);
-        }).client;
+            CachedNlsClient created = new CachedNlsClient(newClient, currentHash);
+            created.refCount.incrementAndGet();
+            return created;
+        });
+    }
+
+    private static void releaseClient(CachedNlsClient cached) {
+        if (cached != null) {
+            cached.release();
+        }
     }
 
     @Override
@@ -142,10 +160,12 @@ public class AliyunNlsTtsService implements TtsService {
             CountDownLatch latch = new CountDownLatch(1);
             NlsClient client = null;
             SpeechSynthesizer synthesizer = null;
+            CachedNlsClient cachedClient = null;
 
             try {
                 // 获取或复用NlsClient（连接复用）
-                client = getOrCreateClient();
+                cachedClient = acquireClient();
+                client = cachedClient.client;
 
                 synthesizer = new SpeechSynthesizer(client, new SpeechSynthesizerListener() {
                     @Override
@@ -227,14 +247,6 @@ public class AliyunNlsTtsService implements TtsService {
                 throw e;
             } catch (Exception e) {
                 attempts++;
-                // 只关闭 synthesizer，client 由缓存统一管理复用，不在此处 shutdown
-                if (synthesizer != null) {
-                    try {
-                        synthesizer.close();
-                    } catch (Exception ex) {
-                        log.warn("关闭SpeechSynthesizer失败", ex);
-                    }
-                }
 
                 if (attempts < MAX_RETRY_ATTEMPTS) {
                     log.warn("阿里云NLS语音合成失败，正在重试 ({}/{}): {}", attempts, MAX_RETRY_ATTEMPTS, e.getMessage());
@@ -253,6 +265,17 @@ public class AliyunNlsTtsService implements TtsService {
                     evictClient(config.getConfigId());
                     throw e;
                 }
+            } finally {
+                // 不论成功、失败还是被中断都要关闭synthesizer，否则成功路径的连接永远不会释放；
+                // client 由缓存统一管理复用，这里只归还引用计数
+                if (synthesizer != null) {
+                    try {
+                        synthesizer.close();
+                    } catch (Exception ex) {
+                        log.warn("关闭SpeechSynthesizer失败", ex);
+                    }
+                }
+                releaseClient(cachedClient);
             }
         }
         throw new Exception("语音合成失败");

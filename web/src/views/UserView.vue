@@ -7,6 +7,7 @@ import { useExport } from '@/composables/useExport'
 import { queryAuthRoles } from '@/services/authRole'
 import { useLoadingStore } from '@/store/loading'
 import { queryUsers } from '@/services/user'
+import { shouldIgnoreRequestError } from '@/services/request'
 import { useAvatar } from '@/composables/useAvatar'
 import type { AuthRole } from '@/types/authRole'
 import type { User, UserQueryParams } from '@/types/user'
@@ -38,12 +39,12 @@ const queryForm = reactive({
   authRoleId: undefined as number | undefined,
 })
 
-// 查询过滤器配置
-const queryFilters = [
+// 查询过滤器配置：文案跟着 i18n key 走，切换语言后要能刷新，不能是 setup 期一次性求值的普通数组
+const queryFilters = computed(() => [
   { label: t('common.name'), key: 'name' as const, placeholder: t('common.name') },
   { label: t('user.email'), key: 'email' as const, placeholder: t('user.email') },
   { label: t('user.phone'), key: 'tel' as const, placeholder: t('user.phone') },
-]
+])
 
 // 表格列配置
 const columns = computed<TableColumnsType>(() => [
@@ -146,9 +147,16 @@ async function fetchData() {
 }
 
 async function loadAuthRoleOptions() {
-  const res = await queryAuthRoles({ pageNo: 1, pageSize: 100 })
-  if (res.code === 200 && res.data?.list) {
-    authRoleOptions.value = res.data.list
+  try {
+    const res = await queryAuthRoles({ pageNo: 1, pageSize: 100 })
+    if (res.code === 200 && res.data?.list) {
+      authRoleOptions.value = res.data.list
+    }
+  } catch (error) {
+    // 只是筛选项加载失败，不打断页面；传输层错误已由 request.ts 拦截器弹过提示
+    if (!shouldIgnoreRequestError(error)) {
+      console.error('加载角色选项失败:', error)
+    }
   }
 }
 

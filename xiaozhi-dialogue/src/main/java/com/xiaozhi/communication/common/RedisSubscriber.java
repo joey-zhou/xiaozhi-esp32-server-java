@@ -18,25 +18,29 @@ import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
+import jakarta.annotation.PreDestroy;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import lombok.extern.slf4j.Slf4j;
 /**
- * Redis 消息订阅配置。
+ * Redis 消息订阅处理。
  * 监听跨实例广播，在本实例执行对应操作。
+ * <p>本类只是业务逻辑的集合，不是纯配置类，用 @Component 而非 @Configuration，
+ * 避免被 CGLIB 增强（本类也没有 @Bean 方法互相调用，无需要保留的场景）。
  */
 @Slf4j
-@Configuration
+@Component
 public class RedisSubscriber {
 
     @Resource
@@ -82,10 +86,32 @@ public class RedisSubscriber {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * 默认不设 taskExecutor 时，容器会退化成每条消息起一条 SimpleAsyncTaskExecutor 线程，
+     * 广播量大时线程数没有上限；换成有界线程池做隔离和背压。只在 bean 方法里按需创建，
+     * 避免脱离 Spring 容器直接 new RedisSubscriber()（如单测）时也起一堆线程。
+     */
+    private ThreadPoolTaskExecutor listenerTaskExecutor;
+
+    @PreDestroy
+    public void shutdownListenerTaskExecutor() {
+        if (listenerTaskExecutor != null) {
+            listenerTaskExecutor.shutdown();
+        }
+    }
+
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
+
+        listenerTaskExecutor = new ThreadPoolTaskExecutor();
+        listenerTaskExecutor.setCorePoolSize(2);
+        listenerTaskExecutor.setMaxPoolSize(8);
+        listenerTaskExecutor.setQueueCapacity(200);
+        listenerTaskExecutor.setThreadNamePrefix("redis-sub-");
+        listenerTaskExecutor.initialize();
+        container.setTaskExecutor(listenerTaskExecutor);
 
         addListener(container, "onClearConversation", RedisBroadcast.CHANNEL_CLEAR_CONVERSATION);
         addListener(container, "onRoleChanged", RedisBroadcast.CHANNEL_ROLE_CHANGED);
@@ -173,11 +199,27 @@ public class RedisSubscriber {
     }
 
     /**
-     * 关闭设备会话：只有设备在本实例时才处理
+     * 关闭设备会话：只有设备在本实例时才处理。
+     * excludeSessionId 命中时跳过——新连接建立过程中可能先于 registerDevice 收到自己发出的
+     * 幽灵会话清理广播，此时本地还查不到设备；若时序不巧晚到，得靠这个字段而不是查询时序来避免误关新连接
      */
-    public void onCloseSession(String deviceId) {
+    public void onCloseSession(String message) {
+        String deviceId = message;
+        String excludeSessionId = null;
+        try {
+            Map<String, Object> payload = JsonUtil.fromJson(message, new TypeReference<>() {});
+            if (payload != null && payload.containsKey("deviceId")) {
+                deviceId = (String) payload.get("deviceId");
+                excludeSessionId = (String) payload.get("excludeSessionId");
+            }
+        } catch (Exception e) {
+            // 兼容旧格式：payload 直接就是 deviceId 字符串
+        }
+        if (deviceId == null) {
+            return;
+        }
         ChatSession session = sessionManager.getSessionByDeviceId(deviceId);
-        if (session != null) {
+        if (session != null && !session.getSessionId().equals(excludeSessionId)) {
             sessionManager.closeSession(session);
             log.info("已关闭设备会话（来自跨实例广播） - deviceId: {}", deviceId);
         }

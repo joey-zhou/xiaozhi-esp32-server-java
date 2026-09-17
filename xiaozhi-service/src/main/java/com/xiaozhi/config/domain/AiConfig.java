@@ -133,6 +133,8 @@ public class AiConfig {
     public void update(String configName, String configDesc, String modelType, String provider,
                        String appId, String apiKey, String apiSecret, String ak, String sk,
                        String apiUrl, Boolean enableThinking, Boolean isDefault) {
+        String oldModelType = this.modelType;
+        boolean oldIsDefault = this.isDefault;
         this.configName = merge(configName, this.configName);
         this.configDesc = merge(configDesc, this.configDesc);
         this.modelType  = merge(modelType,  this.modelType);
@@ -144,8 +146,11 @@ public class AiConfig {
         this.sk         = merge(sk,         this.sk);
         this.apiUrl     = merge(apiUrl,     this.apiUrl);
         this.enableThinking = merge(enableThinking, this.enableThinking);
-        boolean mergedDefault = merge(isDefault, this.isDefault);
-        if (mergedDefault && !this.isDefault) {
+        boolean mergedDefault = merge(isDefault, oldIsDefault);
+        // 保持默认不变但改了 modelType 时，llm 的默认约束键会跟着变（configType:modelType），
+        // 必须一并触发 resetDefault，否则会撞上新 modelType 下已有的默认，报唯一索引冲突
+        boolean modelTypeChanged = !java.util.Objects.equals(this.modelType, oldModelType);
+        if (mergedDefault && (!oldIsDefault || modelTypeChanged)) {
             signals.add(DomainSignal.DEFAULT_CHANGED);
         }
         this.isDefault = mergedDefault;

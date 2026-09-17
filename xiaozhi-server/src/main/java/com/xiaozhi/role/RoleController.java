@@ -14,6 +14,7 @@ import com.xiaozhi.common.model.req.RoleUpdateReq;
 import com.xiaozhi.common.model.req.TestVoiceReq;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.RoleResp;
+import com.xiaozhi.common.model.resp.SherpaVoiceResp;
 import com.xiaozhi.common.model.resp.TestVoiceResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
@@ -31,7 +32,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 角色管理
@@ -136,7 +136,7 @@ public class RoleController extends BaseController {
     @ResponseBody
     @SaCheckPermission("system:role:api:list")
     @Operation(summary = "获取本地 sherpa-onnx 音色列表", description = "扫描配置的本地 TTS 模型目录，自动识别模型类型和 speaker")
-    public ApiResponse<List<Map<String, Object>>> listSherpaVoices() {
+    public ApiResponse<List<SherpaVoiceResp>> listSherpaVoices() {
         return ApiResponse.success(sherpaVoiceService.listVoices());
     }
 

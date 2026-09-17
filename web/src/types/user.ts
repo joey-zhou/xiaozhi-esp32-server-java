@@ -6,7 +6,7 @@ import type { AuthRole, PermissionTreeNode } from './authRole'
  * state / isAdmin 在库表里是 enum('1','0')，JSON 过来是字符串，不要用数字比较
  */
 export interface User {
-  userId: string
+  userId: number
   username?: string
   name?: string
   email?: string
@@ -52,11 +52,12 @@ export interface UserQueryParams extends PageQueryParams {
  * 更新用户信息参数
  */
 export interface UpdateUserParams {
-  userId?: string
+  userId?: number
   username?: string
   name?: string
   email?: string
   tel?: string
+  oldPassword?: string // 原密码，改密码时必传，后端凭它校验
   password?: string // 密码字段
   avatar?: string // 头像字段
 }

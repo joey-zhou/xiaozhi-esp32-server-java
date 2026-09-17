@@ -103,22 +103,34 @@ public class XingChenClient {
      * 发送流式聊天消息
      */
     public void sendChatMessageStream(XingChenRequest request, XingChenChatStreamCallback callback) throws IOException {
+        sendChatMessageStream(request, callback, call -> { });
+    }
+
+    /**
+     * 发送流式聊天消息
+     *
+     * @param onCallCreated 请求发出前回调，调用方可以拿到 Call 在外部取消（如用户打断对话）
+     */
+    public void sendChatMessageStream(XingChenRequest request, XingChenChatStreamCallback callback,
+                                       java.util.function.Consumer<Call> onCallCreated) throws IOException {
         log.debug("发送流式对话消息: flowId={}, uid={}", request.getFlowId(), request.getUid());
-        
+
         // 确保流式模式
         request.setStream(true);
-        
+
         String jsonBody = JsonUtil.toJson(request);
         log.debug("请求体: {}", jsonBody);
-        
+
         Request httpRequest = new Request.Builder()
                 .url(baseUrl + CHAT_COMPLETIONS_PATH)
                 .post(RequestBody.create(jsonBody, JSON))
                 .addHeader("Authorization", "Bearer " + bearerToken)
                 .addHeader("Content-Type", "application/json")
                 .build();
-        
-        try (Response response = httpClient.newCall(httpRequest).execute()) {
+
+        Call call = httpClient.newCall(httpRequest);
+        onCallCreated.accept(call);
+        try (Response response = call.execute()) {
             if (!response.isSuccessful()) {
                 String errorBody = response.body() != null ? response.body().string() : "无响应体";
                 log.error("API请求失败: code={}, body={}", response.code(), errorBody);
@@ -200,18 +212,30 @@ public class XingChenClient {
      * 发送Resume请求(用于工具调用后继续对话)
      */
     public void resume(XingChenResume resume, XingChenChatStreamCallback callback) throws IOException {
+        resume(resume, callback, call -> { });
+    }
+
+    /**
+     * 发送Resume请求(用于工具调用后继续对话)
+     *
+     * @param onCallCreated 请求发出前回调，调用方可以拿到 Call 在外部取消（如用户打断对话）
+     */
+    public void resume(XingChenResume resume, XingChenChatStreamCallback callback,
+                        java.util.function.Consumer<Call> onCallCreated) throws IOException {
         log.debug("发送Resume请求: {}", JsonUtil.toJson(resume));
-        
+
         String jsonBody = JsonUtil.toJson(resume);
-        
+
         Request httpRequest = new Request.Builder()
                 .url(baseUrl + RESUME_PATH)
                 .post(RequestBody.create(jsonBody, JSON))
                 .addHeader("Authorization", "Bearer " + bearerToken)
                 .addHeader("Content-Type", "application/json")
                 .build();
-        
-        try (Response response = httpClient.newCall(httpRequest).execute()) {
+
+        Call call = httpClient.newCall(httpRequest);
+        onCallCreated.accept(call);
+        try (Response response = call.execute()) {
             if (!response.isSuccessful()) {
                 String errorBody = response.body() != null ? response.body().string() : "无响应体";
                 log.error("Resume请求失败: code={}, body={}", response.code(), errorBody);

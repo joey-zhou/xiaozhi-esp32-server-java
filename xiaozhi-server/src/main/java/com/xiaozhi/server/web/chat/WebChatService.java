@@ -8,6 +8,7 @@ import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.memory.ConversationContext;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.ai.llm.memory.MessageWindowConversation;
+import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.RoleBO;
@@ -32,9 +33,11 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -53,7 +56,8 @@ public class WebChatService {
     @Resource
     private MessageService messageService;
 
-    @Value("${conversation.max-messages:16}")
+    // 独立的 key：Web 聊天场景单独调优，不和设备侧窗口/长期/摘要三种记忆策略的 max-messages 共用配置项
+    @Value("${conversation.web-chat.max-messages:16}")
     private int maxMessages;
 
     /**
@@ -165,12 +169,16 @@ public class WebChatService {
      *
      * @param sessionId 会话 ID
      * @param text      用户输入文本
+     * @param userId    当前登录用户 ID，须与会话创建者一致，防止跨用户会话劫持
      * @return ChatToken 流，前端可根据 type 区分 thinking/content
      */
-    public Flux<ChatToken> chatStream(String sessionId, String text) {
+    public Flux<ChatToken> chatStream(String sessionId, String text, Integer userId) {
         WebChatSession session = sessions.get(sessionId);
         if (session == null) {
             return Flux.error(new IllegalStateException("会话不存在或已过期: " + sessionId));
+        }
+        if (!Objects.equals(session.conversation.getUserId(), userId)) {
+            return Flux.error(new UnauthorizedException("会话不属于当前用户: " + sessionId));
         }
         session.touch();
         Conversation conversation = session.conversation;
@@ -191,6 +199,7 @@ public class WebChatService {
         Prompt prompt = new Prompt(messages);
 
         StringBuilder fullResponse = new StringBuilder();
+        AtomicBoolean turnCompleted = new AtomicBoolean(false);
 
         return chatModel.stream(prompt)
                 .mapNotNull(ChatResponse::getResult)
@@ -219,12 +228,21 @@ public class WebChatService {
                     }
                     String reply = fullResponse.toString();
                     conversation.add(new AssistantMessage(reply));
+                    turnCompleted.set(true);
                     // 持久化裸文本（元数据由 Conversation 投影层按需拼前缀，DB 保持干净）
                     LocalDateTime assistantCreatedAt = LocalDateTime.now();
                     SerialTaskRegistry.submit(sessionId,
                             () -> persistTurn(conversation, text, userCreatedAt, reply, assistantCreatedAt));
                 })
-                .doOnError(e -> log.error("Web 聊天流式响应失败: sessionId={}", sessionId, e));
+                .doOnError(e -> log.error("Web 聊天流式响应失败: sessionId={}", sessionId, e))
+                .doFinally(signalType -> {
+                    // 正常完成且配上 AssistantMessage 才算一轮完整对话；客户端中途 abort、
+                    // LLM 报错、或者拿到空回复，都要把孤立的 UserMessage 摘掉，
+                    // 否则下一轮拼 Prompt 时会带着这条没有回复的历史消息，污染上下文。
+                    if (!turnCompleted.get()) {
+                        conversation.remove(userMessage);
+                    }
+                });
     }
 
     /**
@@ -257,9 +275,17 @@ public class WebChatService {
     }
 
     /**
-     * 关闭 Web 聊天会话，释放资源
+     * 关闭 Web 聊天会话，释放资源。
+     * userId 须与会话创建者一致，防止跨用户关闭他人会话（拒绝服务）。
      */
-    public void closeSession(String sessionId) {
+    public void closeSession(String sessionId, Integer userId) {
+        WebChatSession session = sessions.get(sessionId);
+        if (session == null) {
+            return;
+        }
+        if (!Objects.equals(session.conversation.getUserId(), userId)) {
+            throw new UnauthorizedException("会话不属于当前用户: " + sessionId);
+        }
         sessions.remove(sessionId);
         log.info("Web 聊天会话已关闭: sessionId={}", sessionId);
     }

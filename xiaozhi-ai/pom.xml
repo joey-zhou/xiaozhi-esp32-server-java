@@ -75,6 +75,15 @@
             <groupId>io.github.whitemagic2014</groupId>
             <artifactId>tts-edge-java</artifactId>
         </dependency>
+        <!-- FunASRSttService/EdgeTtsService 直接用到，原来只靠讯飞SDK/tts-edge-java传递引入，显式声明避免版本失控 -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.java-websocket</groupId>
+            <artifactId>Java-WebSocket</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.alphacephei</groupId>
             <artifactId>vosk</artifactId>
@@ -117,9 +126,10 @@
             <groupId>com.k2fsa</groupId>
             <artifactId>sherpa-onnx</artifactId>
         </dependency>
+        <!-- Caffeine (EmbeddingService 短 TTL 缓存) -->
         <dependency>
-            <groupId>com.litongjava</groupId>
-            <artifactId>sherpa-onnx-java-api</artifactId>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
         </dependency>
         <!-- Lombok -->
         <dependency>

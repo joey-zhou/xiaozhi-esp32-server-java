@@ -26,6 +26,7 @@ import com.xiaozhi.common.model.req.DevicePageReq;
 import com.xiaozhi.common.model.req.DeviceScanBindReq;
 import com.xiaozhi.common.model.req.DeviceUpdateReq;
 import com.xiaozhi.common.model.req.OtaReq;
+import com.xiaozhi.common.model.resp.DeviceBatchUpdateResp;
 import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
@@ -81,9 +82,9 @@ public class DeviceController extends BaseController {
     @CheckOwner(resource = "device", id = "#param.deviceIds != null ? #param.deviceIds.split(',') : null")
     @CheckOwner(resource = "role", id = "#param.roleId")
     @Operation(summary = "批量更新设备", description = "批量更新多个设备的角色")
-    public ApiResponse<Map<String, Object>> batchUpdate(@Valid @RequestBody DeviceBatchUpdateReq param) {
-        Map<String, Object> data = deviceAppService.batchUpdate(param);
-        return ApiResponse.success("成功更新" + data.get("successCount") + "个设备", data);
+    public ApiResponse<DeviceBatchUpdateResp> batchUpdate(@Valid @RequestBody DeviceBatchUpdateReq param) {
+        DeviceBatchUpdateResp data = deviceAppService.batchUpdate(param);
+        return ApiResponse.success("成功更新" + data.getSuccessCount() + "个设备", data);
     }
 
     /**

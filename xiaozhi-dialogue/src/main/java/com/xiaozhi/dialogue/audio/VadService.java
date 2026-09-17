@@ -31,8 +31,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 public class VadService {
+    // VadState 自身即为该会话的锁对象，避免锁对象与状态分别存放在两张 map 里导致的错锁竞态
     private final ConcurrentHashMap<String, VadState> states = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Object> locks = new ConcurrentHashMap<>();
 
     @Value("${vad.prebuffer.ms:500}")
     private int preBufferMs;
@@ -45,6 +45,9 @@ public class VadService {
     private static final int VAD_CONTEXT_SIZE = SileroVadModel.CONTEXT_SIZE;
     // 连续静音帧数阈值，超过时重置GRU状态，防止长时间静音后GRU深度收敛（30帧 ≈ 约2秒）
     private static final int SILENCE_RESET_FRAMES = 30;
+    // 单轮语音最长缓存时长：异常场景（持续噪音、迟迟不触发静音结束）下 pcmData 不再无限增长，
+    // 超过这个时长的部分直接丢弃，只保留这轮语音最早的一段
+    private static final int MAX_PCM_MS = 60_000;
 
     // 角色未配置时的 VAD 阈值默认值
     private static final float DEFAULT_SPEECH_THRESHOLD = 0.4f;
@@ -75,7 +78,6 @@ public class VadService {
     public void cleanup() {
         log.info("VAD服务资源已释放");
         states.clear();
-        locks.clear();
     }
 
     private class VadState {
@@ -105,12 +107,15 @@ public class VadService {
         private final int maxPreBufferSize;
 
         private final List<byte[]> pcmData = new ArrayList<>();
+        private int pcmDataSize = 0;
+        private final int maxPcmSize;
 
         // 每个 session 复用同一个 OpusProcessor，避免每帧重新创建 native 编解码器
         private final OpusProcessor opusProcessor = new OpusProcessor();
 
         public VadState() {
             this.maxPreBufferSize = preBufferMs * 32; // 16kHz, 16bit, mono = 32 bytes/ms
+            this.maxPcmSize = MAX_PCM_MS * 32;
         }
 
         public boolean isSpeaking() { return speaking; }
@@ -182,10 +187,26 @@ public class VadService {
         }
 
         public void addPcm(byte[] pcm) {
-            if (pcm != null && pcm.length > 0) pcmData.add(pcm.clone());
+            if (pcm == null || pcm.length == 0) return;
+            // 已达上限：异常场景（持续噪音、迟迟不触发静音结束）不再继续累积，防止内存无限增长
+            if (pcmDataSize >= maxPcmSize) return;
+            pcmData.add(pcm.clone());
+            pcmDataSize += pcm.length;
+        }
+
+        /** 按静音尾帧比例裁剪时从末尾丢帧，与 addPcm 共用同一个大小计数器 */
+        public void removeLastPcmFrame() {
+            if (pcmData.isEmpty()) return;
+            byte[] removed = pcmData.remove(pcmData.size() - 1);
+            pcmDataSize -= removed.length;
         }
 
         public List<byte[]> getPcmData() { return new ArrayList<>(pcmData); }
+
+        public void clearPcm() {
+            pcmData.clear();
+            pcmDataSize = 0;
+        }
 
         public void reset() {
             speaking = false;
@@ -199,7 +220,7 @@ public class VadService {
             vadContext = new float[VAD_CONTEXT_SIZE];
             preBuffer.clear();
             preBufferSize = 0;
-            pcmData.clear();
+            clearPcm();
         }
     }
 
@@ -213,19 +234,14 @@ public class VadService {
     public void initSession(String sessionId, boolean autoSegment) {
         // 阈值读放在锁外，不占着 session 锁等缓存/数据库
         RoleThresholds thresholds = readRoleThresholds(sessionId);
-        Object lock = getLock(sessionId);
-        synchronized (lock) {
-            VadState state = states.get(sessionId);
-            if (state == null) {
-                state = new VadState();
-                states.put(sessionId, state);
-            } else {
-                state.reset();
-            }
+        // 新建的 VadState 各字段本就是 reset() 之后的值，复用同一个方法不用区分新建/复用两条路径
+        VadState state = states.computeIfAbsent(sessionId, k -> new VadState());
+        synchronized (state) {
+            state.reset();
             state.autoSegment = autoSegment;
             state.thresholds = thresholds;
-            log.info("VAD会话已初始化: {}, 自动断句: {}", sessionId, autoSegment);
         }
+        log.info("VAD会话已初始化: {}, 自动断句: {}", sessionId, autoSegment);
     }
 
     /**
@@ -253,28 +269,21 @@ public class VadService {
      * 不调用时阈值在下一次 listen/start 的 initSession 里刷新。会话未初始化 VAD 时什么都不做。
      */
     public void refreshRoleThresholds(String sessionId) {
-        if (!states.containsKey(sessionId)) {
+        VadState state = states.get(sessionId);
+        if (state == null) {
             return;
         }
         RoleThresholds thresholds = readRoleThresholds(sessionId);
-        Object lock = getLock(sessionId);
-        synchronized (lock) {
-            VadState state = states.get(sessionId);
-            if (state != null) {
+        synchronized (state) {
+            // 读阈值期间可能被 resetSession 摘除，摘除后不再对同一个 state 对象生效
+            if (states.get(sessionId) == state) {
                 state.thresholds = thresholds;
             }
         }
     }
 
     public boolean isSessionInitialized(String sessionId) {
-        Object lock = getLock(sessionId);
-        synchronized (lock) {
-            return states.containsKey(sessionId);
-        }
-    }
-
-    private Object getLock(String sessionId) {
-        return locks.computeIfAbsent(sessionId, k -> new Object());
+        return states.containsKey(sessionId);
     }
 
     public VadResult processAudio(String sessionId, byte[] opusData) {
@@ -285,15 +294,13 @@ public class VadService {
      * @param echoTimestamp 设备回显的下行帧时间戳，0 表示无；透传给 AEC 做参考对齐
      */
     public VadResult processAudio(String sessionId, byte[] opusData, long echoTimestamp) {
-        if (!isSessionInitialized(sessionId)) return null;
+        VadState state = states.get(sessionId);
+        if (state == null) return null;
 
-        Object lock = getLock(sessionId);
-
-        synchronized (lock) {
+        synchronized (state) {
             try {
-                // 会话已被 resetSession 摘除时不再复活，按未初始化处理
-                VadState state = states.get(sessionId);
-                if (state == null) {
+                // 加锁等待期间可能被 resetSession 摘除，摘除后不再对同一个 state 对象继续处理，避免残帧复活已关闭的会话
+                if (states.get(sessionId) != state) {
                     return null;
                 }
 
@@ -316,7 +323,7 @@ public class VadService {
                 // manual 模式跳过 Silero：首帧起流，其余持续喂流，收句由 listen/stop 触发
                 if (!state.autoSegment) {
                     if (!state.isSpeaking()) {
-                        state.pcmData.clear();
+                        state.clearPcm();
                         state.setSpeaking(true);
                         state.addPcm(pcmData);
                         return new VadResult(VadStatus.SPEECH_START, pcmData);
@@ -361,7 +368,7 @@ public class VadService {
                 //         hasEnergy ? "+E" : "");
 
                 if (!state.isSpeaking() && isSpeech && speechStartAllowed) {
-                    state.pcmData.clear();
+                    state.clearPcm();
                     state.setSpeaking(true);
                     state.resetSilenceFrameCount();
 
@@ -387,8 +394,8 @@ public class VadService {
                                     (int) Math.ceil((double) totalSilenceFrames * silenceToRemoveMs / silenceDuration),
                                     totalSilenceFrames
                                 );
-                                for (int i = 0; i < framesToRemove && !state.pcmData.isEmpty(); i++) {
-                                    state.pcmData.remove(state.pcmData.size() - 1);
+                                for (int i = 0; i < framesToRemove; i++) {
+                                    state.removeLastPcmFrame();
                                 }
                             }
                         }
@@ -481,10 +488,12 @@ public class VadService {
     }
 
     public void resetVadModelState(String sessionId) {
-        Object lock = getLock(sessionId);
-        synchronized (lock) {
-            VadState state = states.get(sessionId);
-            if (state != null) {
+        VadState state = states.get(sessionId);
+        if (state == null) {
+            return;
+        }
+        synchronized (state) {
+            if (states.get(sessionId) == state) {
                 state.sileroState = new float[2][1][128];
                 state.sampleCarryOver = new float[0];
                 state.vadContext = new float[VAD_CONTEXT_SIZE];
@@ -494,12 +503,16 @@ public class VadService {
     }
 
     public void resetSession(String sessionId) {
-        Object lock = getLock(sessionId);
-        synchronized (lock) {
-            VadState state = states.get(sessionId);
-            if (state != null) state.reset();
-            states.remove(sessionId);
-            locks.remove(sessionId);
+        VadState state = states.get(sessionId);
+        if (state == null) {
+            return;
+        }
+        synchronized (state) {
+            // remove 放在锁内跟其它所有加锁点共用同一个 state 对象做互斥，不会出现摘除和处理各拿到不同锁的情况
+            if (states.get(sessionId) == state) {
+                state.reset();
+                states.remove(sessionId);
+            }
         }
     }
 
@@ -509,10 +522,12 @@ public class VadService {
      * @return 本轮是否确有语音在进行中
      */
     public boolean finishSegment(String sessionId) {
-        Object lock = getLock(sessionId);
-        synchronized (lock) {
-            VadState state = states.get(sessionId);
-            if (state == null || !state.isSpeaking()) {
+        VadState state = states.get(sessionId);
+        if (state == null) {
+            return false;
+        }
+        synchronized (state) {
+            if (states.get(sessionId) != state || !state.isSpeaking()) {
                 return false;
             }
             state.setSpeaking(false);
@@ -521,10 +536,12 @@ public class VadService {
     }
 
     public List<byte[]> getPcmData(String sessionId) {
-        Object lock = getLock(sessionId);
-        synchronized (lock) {
-            VadState state = states.get(sessionId);
-            return state != null ? state.getPcmData() : new ArrayList<>();
+        VadState state = states.get(sessionId);
+        if (state == null) {
+            return new ArrayList<>();
+        }
+        synchronized (state) {
+            return state.getPcmData();
         }
     }
 

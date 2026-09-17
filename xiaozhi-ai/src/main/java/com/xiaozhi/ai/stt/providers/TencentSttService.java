@@ -88,7 +88,7 @@ public class TencentSttService implements SttService {
         // 检查配置是否已设置
         if (secretId == null || secretKey == null || appId == null) {
             log.error("腾讯云语音识别配置未设置，无法进行识别");
-            return null;
+            return SttResult.failure(SttResult.FAILURE_LOCAL_ERROR);
         }
 
         // 使用阻塞队列存储音频数据
@@ -311,6 +311,8 @@ public class TencentSttService implements SttService {
         } catch (Exception e) {
             log.error("创建语音识别会话时发生错误", e);
             failureReason.set(SttResult.FAILURE_UPSTREAM_ERROR);
+            // recognizer.start() 抛异常前它可能已经放进了 activeRecognizers，不清理会永久占位
+            activeRecognizers.remove(voiceId);
         }
 
         SttResult result = SttResult.textOnly(finalResult.get()).withFailure(failureReason.get());

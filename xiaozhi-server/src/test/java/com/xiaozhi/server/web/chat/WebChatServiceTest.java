@@ -2,6 +2,7 @@ package com.xiaozhi.server.web.chat;
 
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.ai.llm.memory.ChatMemory;
+import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
@@ -87,11 +88,30 @@ class WebChatServiceTest {
     void chatStreamOnClosedSessionFailsFast() {
         String sessionId = openSession();
 
-        webChatService.closeSession(sessionId);
+        webChatService.closeSession(sessionId, 9);
 
         assertThat(webChatService.hasSession(sessionId)).isFalse();
-        assertThatThrownBy(() -> webChatService.chatStream(sessionId, "在吗").blockFirst())
+        assertThatThrownBy(() -> webChatService.chatStream(sessionId, "在吗", 9).blockFirst())
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("会话不存在或已过期");
+    }
+
+    /** 拿到别人的 sessionId 也不能读/写别人的会话或把它关掉。 */
+    @Test
+    void chatStreamRejectsMismatchedUser() {
+        String sessionId = openSession();
+
+        assertThatThrownBy(() -> webChatService.chatStream(sessionId, "在吗", 999).blockFirst())
+            .isInstanceOf(UnauthorizedException.class);
+        assertThat(webChatService.hasSession(sessionId)).isTrue();
+    }
+
+    @Test
+    void closeSessionRejectsMismatchedUser() {
+        String sessionId = openSession();
+
+        assertThatThrownBy(() -> webChatService.closeSession(sessionId, 999))
+            .isInstanceOf(UnauthorizedException.class);
+        assertThat(webChatService.hasSession(sessionId)).isTrue();
     }
 }

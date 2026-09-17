@@ -9,12 +9,14 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import lombok.extern.slf4j.Slf4j;
 @SpringBootApplication
 @EnableCaching
 @EnableScheduling
+@EnableAsync
 @ComponentScan(basePackages = {
     // xiaozhi-common
     "com.xiaozhi.common",

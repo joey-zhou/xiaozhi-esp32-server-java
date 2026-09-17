@@ -1,7 +1,8 @@
 package com.xiaozhi.role;
 
+import com.xiaozhi.common.model.resp.SherpaVoiceResp;
+
 import java.util.List;
-import java.util.Map;
 
 /**
  * Sherpa-ONNX 本地音色扫描服务。
@@ -13,5 +14,5 @@ public interface SherpaVoiceService {
     /**
      * 扫描本地 TTS 模型目录，返回所有可用的 sherpa-onnx 音色列表。
      */
-    List<Map<String, Object>> listVoices();
+    List<SherpaVoiceResp> listVoices();
 }

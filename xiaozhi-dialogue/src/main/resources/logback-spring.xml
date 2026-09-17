@@ -47,12 +47,32 @@
         </encoder>
     </appender>
     
+    <!-- 异步化三个 appender，落盘/刷屏的 IO 挪到独立线程，不占对话业务线程；
+         队列写满按 Logback 默认策略丢 INFO 及以下级别，WARN/ERROR 永不丢 -->
+    <appender name="ASYNC_CONSOLE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="CONSOLE" />
+        <queueSize>1024</queueSize>
+        <includeCallerData>true</includeCallerData>
+    </appender>
+
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FILE" />
+        <queueSize>1024</queueSize>
+        <includeCallerData>true</includeCallerData>
+    </appender>
+
+    <appender name="ASYNC_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="ERROR_FILE" />
+        <queueSize>1024</queueSize>
+        <includeCallerData>true</includeCallerData>
+    </appender>
+
     <!-- 开发环境配置 -->
     <springProfile name="dev">
         <root level="INFO">
-            <appender-ref ref="CONSOLE" />
-            <appender-ref ref="FILE" />
-            <appender-ref ref="ERROR_FILE" />
+            <appender-ref ref="ASYNC_CONSOLE" />
+            <appender-ref ref="ASYNC_FILE" />
+            <appender-ref ref="ASYNC_ERROR_FILE" />
         </root>
         <logger name="com.xiaozhi" level="DEBUG" />
         <logger name="com.xiaozhi.dialogue" level="DEBUG" />
@@ -63,20 +83,20 @@
     <!-- 生产环境配置 -->
     <springProfile name="prod">
         <root level="INFO">
-            <appender-ref ref="FILE" />
-            <appender-ref ref="ERROR_FILE" />
-            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="ASYNC_FILE" />
+            <appender-ref ref="ASYNC_ERROR_FILE" />
+            <appender-ref ref="ASYNC_CONSOLE" />
         </root>
         <logger name="com.xiaozhi" level="INFO" />
         <logger name="org.springframework.web" level="ERROR" />
         <logger name="com.alibaba.dashscope.protocol.okhttp" level="WARN" />
         <logger name="io.modelcontextprotocol.client" level="INFO" />
     </springProfile>
-    
+
     <!-- 默认配置（如果没有指定profile） -->
     <root level="INFO">
-        <appender-ref ref="CONSOLE" />
-        <appender-ref ref="FILE" />
-        <appender-ref ref="ERROR_FILE" />
+        <appender-ref ref="ASYNC_CONSOLE" />
+        <appender-ref ref="ASYNC_FILE" />
+        <appender-ref ref="ASYNC_ERROR_FILE" />
     </root>
 </configuration>

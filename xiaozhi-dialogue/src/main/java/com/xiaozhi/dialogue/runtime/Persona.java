@@ -310,6 +310,9 @@ public class Persona {
         listener.onDialogueTurn(dialogueTurn);
         List<Message> tail = new ArrayList<>();
         for (ToolChainPair chain : modelChains) {
+            // 真实工具链没有独立时间戳，用本轮口播/用户消息时间兜底，避免摘要时被当成 now()
+            MessageTimeMetadata.setTimeMillis(chain.toolCallMessage(), dialogueTurn.toolChainCreatedAt());
+            MessageTimeMetadata.setTimeMillis(chain.toolResponseMessage(), dialogueTurn.toolChainCreatedAt());
             tail.add(chain.toolCallMessage());
             tail.add(chain.toolResponseMessage());
         }

@@ -101,7 +101,7 @@ class InactiveSessionCheckerTest {
 
         checker.refreshDeviceRegistry();
 
-        verify(deviceRegistry).refresh("device-1");
+        verify(deviceRegistry).refreshAll(List.of("device-1"));
     }
 
     private ChatSession inactiveSession(String sessionId, int timeoutSeconds, long inactiveSeconds) {

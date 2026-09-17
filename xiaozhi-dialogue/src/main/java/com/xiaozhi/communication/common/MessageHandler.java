@@ -109,13 +109,13 @@ public class MessageHandler {
         // 注册会话
         sessionManager.registerSession(sessionId, chatSession);
 
-        // 跨实例幽灵会话清理：如果设备之前绑定在其他实例，通知旧实例关闭会话
-        // 此时 registerDevice 尚未调用，本实例的 deviceIdToSessionId 无此设备，
-        // 所以广播到达本实例时 getSessionByDeviceId 返回 null，不会误关自己
+        // 跨实例幽灵会话清理：如果设备之前绑定在其他实例，通知旧实例关闭会话。
+        // 带上本次新会话的sessionId作为排除项，即使广播晚到、本实例已完成registerDevice，
+        // 接收方也能识别出这就是刚建立的新会话而跳过，不依赖处理时序
         String previousInstance = deviceRegistry.getInstance(deviceId);
         if (previousInstance != null && !previousInstance.equals(instanceIdHolder.getInstanceId())) {
             log.info("设备 {} 之前在实例 {} 上，通知旧实例清理幽灵会话", deviceId, previousInstance);
-            redisBroadcast.closeDeviceSession(deviceId);
+            redisBroadcast.closeDeviceSession(deviceId, sessionId);
         }
 
         log.info("开始查询设备信息 - DeviceId: {}", deviceId);

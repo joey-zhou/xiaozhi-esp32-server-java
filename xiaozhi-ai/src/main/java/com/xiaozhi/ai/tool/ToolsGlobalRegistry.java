@@ -1,6 +1,7 @@
 package com.xiaozhi.ai.tool;
 
 import com.xiaozhi.ai.tool.session.ToolSession;
+import com.xiaozhi.common.model.resp.McpToolSummaryResp;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ai.tool.ToolCallback;
@@ -100,9 +101,9 @@ public class ToolsGlobalRegistry implements ToolCallbackResolver {
     /**
      * 获取所有已注册 GlobalFunction 的工具摘要（name + description）
      */
-    public List<Map<String, String>> getGlobalToolSummaries() {
+    public List<McpToolSummaryResp> getGlobalToolSummaries() {
         return globalFunctions.stream()
-                .map(f -> Map.of("name", f.getToolName(), "description", f.getToolDescription()))
+                .map(f -> new McpToolSummaryResp(f.getToolName(), f.getToolDescription()))
                 .toList();
     }
 

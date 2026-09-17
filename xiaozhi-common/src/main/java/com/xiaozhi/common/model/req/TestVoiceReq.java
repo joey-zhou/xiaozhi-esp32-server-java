@@ -1,7 +1,10 @@
 package com.xiaozhi.common.model.req;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
@@ -23,8 +26,12 @@ public class TestVoiceReq {
     private String voiceName;
 
     @Schema(description = "语音音调(0.5-2.0)")
+    @DecimalMin(value = "0.5", message = "语音音调不能小于0.5")
+    @DecimalMax(value = "2.0", message = "语音音调不能大于2.0")
     private Double ttsPitch;
 
     @Schema(description = "语音语速(0.5-2.0)")
+    @DecimalMin(value = "0.5", message = "语音语速不能小于0.5")
+    @DecimalMax(value = "2.0", message = "语音语速不能大于2.0")
     private Double ttsSpeed;
 }

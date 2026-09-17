@@ -4,6 +4,8 @@ import com.xiaozhi.ai.tool.session.ToolSession;
 import com.xiaozhi.ai.tool.session.ToolSessionProvider;
 import com.xiaozhi.event.ToolCallCompletedEvent;
 
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -124,6 +126,23 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
     @Override
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         XiaoZhiToolCallingManager.applicationContext = applicationContext;
+        registerConcurrencyGauge(applicationContext);
+    }
+
+    /**
+     * 暴露当前并发执行的工具调用数（TOOL_CALL_PERMITS 已占用的许可数），
+     * 用于观察设备 MCP 等同步阻塞工具是否逼近 MAX_CONCURRENT_TOOL_CALLS 上限。
+     */
+    private static void registerConcurrencyGauge(ApplicationContext applicationContext) {
+        try {
+            MeterRegistry meterRegistry = applicationContext.getBean(MeterRegistry.class);
+            Gauge.builder("xiaozhi.tool.execution.active", TOOL_CALL_PERMITS,
+                            permits -> MAX_CONCURRENT_TOOL_CALLS - permits.availablePermits())
+                    .description("Tool calls currently executing (permits held out of the concurrency cap)")
+                    .register(meterRegistry);
+        } catch (Exception e) {
+            log.debug("注册工具调用并发数指标失败: {}", e.getMessage());
+        }
     }
 
     /**

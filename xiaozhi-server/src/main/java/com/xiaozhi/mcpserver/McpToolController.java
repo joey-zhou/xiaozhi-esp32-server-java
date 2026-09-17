@@ -6,6 +6,8 @@ import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.McpGlobalToolStatusReq;
 import com.xiaozhi.common.model.req.McpRoleExcludeToolsReq;
 import com.xiaozhi.common.model.req.McpRoleToolStatusReq;
+import com.xiaozhi.common.model.resp.McpDisabledToolsResp;
+import com.xiaozhi.common.model.resp.McpToolSummaryResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.ai.mcp.server.McpToolQueryService;
 import com.xiaozhi.mcptoolexclude.service.McpToolExcludeService;
@@ -15,9 +17,7 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/mcpTool")
@@ -63,21 +63,17 @@ public class McpToolController {
     @SaCheckPermission("system:role:mcp-tools:api:list")
     @CheckOwner(resource = "role", id = "#roleId != null && #roleId > 0 ? #roleId : null")
     @Operation(summary = "获取禁用的工具列表", description = "获取指定角色和全局禁用的工具列表")
-    public ApiResponse<Map<String, List<String>>> getDisabledTools(@PathVariable Integer roleId) {
+    public ApiResponse<McpDisabledToolsResp> getDisabledTools(@PathVariable Integer roleId) {
         List<String> roleDisabled = roleId != null && roleId > 0 ? mcpToolExcludeService.getRoleDisabledTools(roleId) : List.of();
         List<String> globalDisabled = mcpToolExcludeService.getGlobalDisabledTools();
 
-        Map<String, List<String>> result = new HashMap<>();
-        result.put("roleDisabled", roleDisabled);
-        result.put("globalDisabled", globalDisabled);
-
-        return ApiResponse.success(result);
+        return ApiResponse.success(new McpDisabledToolsResp(roleDisabled, globalDisabled));
     }
 
     @GetMapping("/system-global")
     @SaCheckPermission("system:role:mcp-tools:api:system-global")
     @Operation(summary = "获取系统全局工具列表", description = "获取系统中所有可用的全局工具列表")
-    public ApiResponse<List<Map<String, String>>> getSystemGlobalTools() {
+    public ApiResponse<List<McpToolSummaryResp>> getSystemGlobalTools() {
         return ApiResponse.success(mcpToolQueryService.getSystemGlobalToolSummaries());
     }
 }

@@ -63,13 +63,14 @@ describe('UserView 权限角色下拉', () => {
     expect(message.error).not.toHaveBeenCalled()
   })
 
-  it('请求抛错时不吞异常，选项保持原样且不额外弹提示', async () => {
+  it('请求抛错时不外抛、选项保持原样且不额外弹提示', async () => {
     queryAuthRoles.mockResolvedValue({ code: 200, data: { list: [], total: 0 }, message: '' })
     const view = await mountView()
 
-    // 传输层错误由 axios 拦截器统一提示，这里原样往上抛
+    // setup 里是不带 await 的浮动调用，往上抛会变成 unhandled rejection；
+    // 传输层错误已由 axios 拦截器统一提示，这里只吞掉不重复弹
     queryAuthRoles.mockRejectedValue(new Error('network down'))
-    await expect(view.loadAuthRoleOptions()).rejects.toThrow('network down')
+    await expect(view.loadAuthRoleOptions()).resolves.toBeUndefined()
 
     expect(view.authRoleOptions).toEqual([])
     expect(message.error).not.toHaveBeenCalled()

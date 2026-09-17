@@ -674,7 +674,7 @@ fetchData()
             <a-form-item
               v-if="configType !== 'tts'"
               v-permission="`${configTypeInfo.permissionPrefix}:update`"
-              :label="`${t('common.setAsDefault')}${t(configTypeInfo.label)}`"
+              :label="t('config.setAsDefault', { type: t(configTypeInfo.label) })"
               name="isDefault"
             >
               <a-switch v-model:checked="formData.isDefault" />

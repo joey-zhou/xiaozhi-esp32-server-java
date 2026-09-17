@@ -161,7 +161,7 @@ public class VoskSttService implements SttService {
     public SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText) {
         if (!isModelLoaded()) {
             log.error("Vosk模型未加载，无法进行流式识别！");
-            return null;
+            return SttResult.failure(SttResult.FAILURE_LOCAL_ERROR);
         }
 
         // 使用阻塞队列存储音频数据

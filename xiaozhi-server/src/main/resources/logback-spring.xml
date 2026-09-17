@@ -9,7 +9,7 @@
     <!-- 控制台输出配置 -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %cyan(%logger{30}:%line) - %msg%n</pattern>
+            <pattern>%d{MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %highlight(%-5level) %cyan(%logger{30}:%line) - %msg%n</pattern>
             <charset>UTF-8</charset>
         </encoder>
     </appender>
@@ -24,7 +24,7 @@
             <totalSizeCap>2GB</totalSizeCap>
         </rollingPolicy>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{30}:%line - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{30}:%line - %msg%n</pattern>
             <charset>UTF-8</charset>
         </encoder>
     </appender>
@@ -42,20 +42,40 @@
             <totalSizeCap>1GB</totalSizeCap>
         </rollingPolicy>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{30}:%line - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{30}:%line - %msg%n</pattern>
             <charset>UTF-8</charset>
         </encoder>
     </appender>
     
+    <!-- 异步化三个 appender，落盘/刷屏的 IO 挪到独立线程，不占业务线程；
+         队列写满按 Logback 默认策略丢 INFO 及以下级别，WARN/ERROR 永不丢 -->
+    <appender name="ASYNC_CONSOLE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="CONSOLE" />
+        <queueSize>1024</queueSize>
+        <includeCallerData>true</includeCallerData>
+    </appender>
+
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FILE" />
+        <queueSize>1024</queueSize>
+        <includeCallerData>true</includeCallerData>
+    </appender>
+
+    <appender name="ASYNC_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="ERROR_FILE" />
+        <queueSize>1024</queueSize>
+        <includeCallerData>true</includeCallerData>
+    </appender>
+
     <!-- 抑制 Spring Data 仓库扫描 INFO 日志 -->
     <logger name="org.springframework.data.repository.config.RepositoryConfigurationDelegate" level="WARN" />
-    
+
     <!-- 开发环境配置 -->
     <springProfile name="dev">
         <root level="INFO">
-            <appender-ref ref="CONSOLE" />
-            <appender-ref ref="FILE" />
-            <appender-ref ref="ERROR_FILE" />
+            <appender-ref ref="ASYNC_CONSOLE" />
+            <appender-ref ref="ASYNC_FILE" />
+            <appender-ref ref="ASYNC_ERROR_FILE" />
         </root>
         <logger name="com.xiaozhi" level="DEBUG" />
         <logger name="com.xiaozhi.dao" level="DEBUG" />
@@ -67,21 +87,21 @@
     <!-- 生产环境配置 -->
     <springProfile name="prod">
         <root level="INFO">
-            <appender-ref ref="FILE" />
-            <appender-ref ref="ERROR_FILE" />
+            <appender-ref ref="ASYNC_FILE" />
+            <appender-ref ref="ASYNC_ERROR_FILE" />
             <!-- 生产环境通常也保留控制台输出，以便在容器环境中查看日志 -->
-            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="ASYNC_CONSOLE" />
         </root>
         <logger name="com.xiaozhi" level="INFO" />
         <logger name="org.springframework.web" level="ERROR" />
         <logger name="io.github.imfangs.dify.client.impl.StreamEventDispatcher" level="ERROR" />
         <logger name="com.alibaba.dashscope.protocol.okhttp" level="WARN" />
     </springProfile>
-    
+
     <!-- 默认配置（如果没有指定profile） -->
     <root level="INFO">
-        <appender-ref ref="CONSOLE" />
-        <appender-ref ref="FILE" />
-        <appender-ref ref="ERROR_FILE" />
+        <appender-ref ref="ASYNC_CONSOLE" />
+        <appender-ref ref="ASYNC_FILE" />
+        <appender-ref ref="ASYNC_ERROR_FILE" />
     </root>
 </configuration>

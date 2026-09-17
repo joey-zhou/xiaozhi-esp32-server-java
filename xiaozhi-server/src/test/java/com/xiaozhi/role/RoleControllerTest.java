@@ -6,6 +6,7 @@ import com.xiaozhi.common.model.req.RolePageReq;
 import com.xiaozhi.common.model.req.RoleUpdateReq;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.RoleResp;
+import com.xiaozhi.common.model.resp.SherpaVoiceResp;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +20,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -88,6 +88,7 @@ class RoleControllerTest extends ControllerTestSupport {
     void createUsesCurrentUserAndReturnsCreatedRole() throws Exception {
         RoleCreateReq req = new RoleCreateReq();
         req.setRoleName("新角色");
+        req.setModelId(1);
 
         RoleResp roleResp = new RoleResp();
         roleResp.setRoleId(9);
@@ -113,8 +114,9 @@ class RoleControllerTest extends ControllerTestSupport {
         try (var ignored = mockLoginUser(7)) {
             mockMvc.perform(post("/api/role")
                     .contentType(MediaType.APPLICATION_JSON)
+                    // modelId 必填，这里只留 roleName 一处违规，断言才咬得住它自己的报错文案
                     .content("""
-                        {"roleName":""}
+                        {"roleName":"","modelId":1}
                         """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(ResultStatus.BAD_REQUEST))
@@ -151,8 +153,8 @@ class RoleControllerTest extends ControllerTestSupport {
     @Test
     void sherpaVoicesDelegatesToService() throws Exception {
         when(sherpaVoiceService.listVoices()).thenReturn(List.of(
-            Map.of("label", "Alice", "value", "kokoro-demo:kokoro:0"),
-            Map.of("label", "Bob", "value", "kokoro-demo:kokoro:1")
+            new SherpaVoiceResp("Alice", "kokoro-demo:kokoro:0", "sherpa-onnx", "kokoro-demo"),
+            new SherpaVoiceResp("Bob", "kokoro-demo:kokoro:1", "sherpa-onnx", "kokoro-demo")
         ));
 
         mockMvc.perform(get("/api/role/sherpaVoices"))

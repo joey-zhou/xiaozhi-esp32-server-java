@@ -84,10 +84,7 @@ public class TencentTtsService implements TtsService {
             int voiceType = Integer.parseInt(getVoiceName());
             request.setVoiceType(voiceType);
 
-            // 将我们的参数（0.5-2.0）映射到腾讯云的参数（-2到6）
-            float tencentSpeed = (float) ((getSpeed() - 0.5) * (4.0 / 1.5) - 2.0);
-            tencentSpeed = Math.max(-2.0f, Math.min(6.0f, tencentSpeed));
-            request.setSpeed(tencentSpeed);
+            request.setSpeed((float) mapSpeed(getSpeed()));
 
             request.setVolume(0f);
             request.setCodec("pcm");
@@ -197,6 +194,15 @@ public class TencentTtsService implements TtsService {
             }
         }
         throw new Exception("语音合成失败");
+    }
+
+
+    /**
+     * 将语速参数（0.5-2.0）映射到腾讯云的语速参数（-2 到 2）：tencent_speed = (our_speed - 1.0) * 2.0
+     */
+    private double mapSpeed(double speed) {
+        double tencentSpeed = (speed - 1.0) * 2.0;
+        return Math.max(-2.0, Math.min(2.0, tencentSpeed));
     }
 
 }

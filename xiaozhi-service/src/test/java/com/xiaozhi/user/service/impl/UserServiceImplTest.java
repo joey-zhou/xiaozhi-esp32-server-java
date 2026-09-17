@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.CacheManager;
 
 import java.util.List;
 
@@ -51,6 +52,9 @@ class UserServiceImplTest {
 
     @Mock
     private VerifyCodeService verifyCodeService;
+
+    @Mock
+    private CacheManager cacheManager;
 
     @InjectMocks
     private UserServiceImpl userService;

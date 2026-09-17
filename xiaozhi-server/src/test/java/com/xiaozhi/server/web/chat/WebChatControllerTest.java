@@ -43,15 +43,17 @@ class WebChatControllerTest extends ControllerTestSupport {
 
     @Test
     void streamTakesSessionIdAndTextFromBody() throws Exception {
-        when(webChatService.chatStream("s-1", "你好")).thenReturn(Flux.just(ChatToken.content("在的")));
+        when(webChatService.chatStream("s-1", "你好", 9)).thenReturn(Flux.just(ChatToken.content("在的")));
 
-        mockMvc.perform(post("/api/chat/stream")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {"sessionId":"s-1","text":"你好"}
-                    """));
+        try (var ignored = mockLoginUser(9)) {
+            mockMvc.perform(post("/api/chat/stream")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"sessionId":"s-1","text":"你好"}
+                        """));
+        }
 
-        verify(webChatService).chatStream("s-1", "你好");
+        verify(webChatService).chatStream("s-1", "你好", 9);
     }
 
     @Test

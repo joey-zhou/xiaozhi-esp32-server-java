@@ -232,6 +232,14 @@ public class AudioUtils {
         byte[] pcmData = new byte[dataSize];
         System.arraycopy(wavData, dataOffset, pcmData, 0, dataSize);
 
+        int wavChannels = readWavChannels(wavData);
+        if (wavChannels == 2) {
+            log.warn("WAV是双声道，左右声道取均值下混为单声道");
+            pcmData = downmixStereoToMono(pcmData);
+        } else if (wavChannels > 2) {
+            log.warn("WAV声道数{}暂不支持下混，按原始数据处理，可能导致解析异常", wavChannels);
+        }
+
         int wavSampleRate = readWavSampleRate(wavData);
         if (wavSampleRate > 0 && wavSampleRate != SAMPLE_RATE) {
             log.warn("WAV采样率{}Hz与服务端{}Hz不一致，已重采样", wavSampleRate, SAMPLE_RATE);
@@ -252,6 +260,35 @@ public class AudioUtils {
             }
         }
         return 0;
+    }
+
+    /**
+     * 读取 WAV 头 fmt 子块中的声道数，读不到返回 0（视为单声道，不做下混）
+     */
+    private static int readWavChannels(byte[] wavData) {
+        for (int i = 12; i + 16 <= wavData.length; i++) {
+            if (wavData[i] == 'f' && wavData[i + 1] == 'm' && wavData[i + 2] == 't' && wavData[i + 3] == ' ') {
+                int off = i + 10;
+                return (wavData[off] & 0xFF) | ((wavData[off + 1] & 0xFF) << 8);
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 双声道16位PCM左右声道取均值下混为单声道
+     */
+    private static byte[] downmixStereoToMono(byte[] stereoPcm) {
+        int frames = stereoPcm.length / 4;
+        byte[] mono = new byte[frames * 2];
+        for (int i = 0; i < frames; i++) {
+            short left = (short) ((stereoPcm[i * 4] & 0xFF) | (stereoPcm[i * 4 + 1] << 8));
+            short right = (short) ((stereoPcm[i * 4 + 2] & 0xFF) | (stereoPcm[i * 4 + 3] << 8));
+            int mixed = (left + right) / 2;
+            mono[i * 2] = (byte) (mixed & 0xFF);
+            mono[i * 2 + 1] = (byte) ((mixed >> 8) & 0xFF);
+        }
+        return mono;
     }
 
     /**

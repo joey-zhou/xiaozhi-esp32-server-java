@@ -10,6 +10,7 @@ import com.xiaozhi.common.model.req.DevicePageReq;
 import com.xiaozhi.common.model.req.DeviceScanBindReq;
 import com.xiaozhi.common.model.req.DeviceUpdateReq;
 import com.xiaozhi.common.model.req.OtaReq;
+import com.xiaozhi.common.model.resp.DeviceBatchUpdateResp;
 import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.communication.ServerAddressProvider;
@@ -22,7 +23,9 @@ import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.domain.vo.VerifyCode;
 import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
+import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
+import com.xiaozhi.summary.service.SummaryService;
 import com.xiaozhi.utils.CmsUtils;
 import com.xiaozhi.utils.CommonUtils;
 import jakarta.annotation.Resource;
@@ -33,6 +36,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -71,6 +75,12 @@ public class DeviceAppService {
 
     @Resource
     private DeviceAuthService deviceAuthService;
+
+    @Resource
+    private MessageService messageService;
+
+    @Resource
+    private SummaryService summaryService;
 
     /**
      * 下发给设备的 WebSocket 二进制帧版本：v2 带时间戳，是服务端 AEC 回声对齐的前提
@@ -196,7 +206,7 @@ public class DeviceAppService {
     }
 
     @Transactional
-    public Map<String, Object> batchUpdate(DeviceBatchUpdateReq req) {
+    public DeviceBatchUpdateResp batchUpdate(DeviceBatchUpdateReq req) {
         if (!StringUtils.hasText(req.getDeviceIds()) || req.getRoleId() == null) {
             throw new IllegalArgumentException("更新失败，请检查设备ID是否正确");
         }
@@ -220,10 +230,7 @@ public class DeviceAppService {
             throw new IllegalArgumentException("更新失败，请检查设备ID是否正确");
         }
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("successCount", successCount);
-        data.put("totalCount", req.getDeviceIds().split(",").length);
-        return data;
+        return new DeviceBatchUpdateResp(successCount, req.getDeviceIds().split(",").length);
     }
 
     public DeviceResp generateCode(String deviceId, String sessionId, String type) {
@@ -250,6 +257,11 @@ public class DeviceAppService {
             throw new ResourceNotFoundException("设备不存在或无权访问");
         }
         deviceRepository.delete(deviceId);
+        // 设备本身删完后，其他聚合根挂在这个 deviceId 下的数据不会被自动清理，
+        // 不主动清的话历史消息、验证码、记忆摘要都会变成永久孤儿
+        deviceRepository.invalidateVerifyCodes(deviceId);
+        messageService.deleteByDeviceId(deviceId);
+        summaryService.deleteByDeviceId(deviceId);
     }
 
     /**
@@ -260,19 +272,6 @@ public class DeviceAppService {
      * @throws IllegalArgumentException 设备ID不正确
      * @throws IllegalStateException    生成验证码失败等内部错误
      */
-    /**
-     * 设备直接 HTTP GET 下载固件，拿到相对路径无法定位，本地存储下补上服务地址前缀。
-     * 云端返回的已是完整 URL，原样返回。
-     */
-    private String absoluteDownloadUrl(String url) {
-        if (!StringUtils.hasText(url) || url.startsWith("http://") || url.startsWith("https://")) {
-            return url;
-        }
-        String base = serverAddressProvider.getServerAddress();
-        String path = url.startsWith("/") ? url.substring(1) : url;
-        return base.endsWith("/") ? base + path : base + "/" + path;
-    }
-
     public Map<String, Object> handleOta(OtaReq req) {
         if (!StringUtils.hasText(req.getDeviceId()) || !CommonUtils.isMacAddressValid(req.getDeviceId())) {
             throw new IllegalArgumentException("设备ID不正确");

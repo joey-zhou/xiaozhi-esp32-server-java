@@ -17,7 +17,9 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class DefaultConversationFactory implements ConversationFactory {
 
-    @Value("${conversation.max-messages:16}")
+    // 独立的 key：避免和 LongTerm/Summary 各自的 max-messages 共用同一个配置项，
+    // 配置其中一种记忆策略的窗口大小不会牵连另外两种
+    @Value("${conversation.window.max-messages:16}")
     private int maxMessages;
 
     @Autowired

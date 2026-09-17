@@ -27,9 +27,12 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
+import org.springframework.http.HttpStatus;
 import org.springframework.util.MimeTypeUtils;
+import org.springframework.web.client.HttpClientErrorException;
 import reactor.core.publisher.Flux;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -227,6 +230,36 @@ class ConfigConnectionCheckerTest {
 
         assertThat(sentUserMessage().getMedia()).isEmpty();
         assertThat(response.getCode()).isEqualTo(ResultStatus.SUCCESS);
+    }
+
+    /** 下游报文可能带内部地址、账号线索甚至密钥片段，只按状态码给结论，原文不出前端 */
+    @Test
+    void upstreamResponseBodyIsNotEchoedToCaller() {
+        when(configConvert.toBO(any(ConfigTestReq.class))).thenReturn(llmConfig("chat"));
+        when(chatModelFactory.createChatModel(any(ConfigBO.class), any(RoleBO.class))).thenReturn(chatModel);
+        when(chatModel.call(any(Prompt.class))).thenThrow(new HttpClientErrorException(
+                HttpStatus.UNAUTHORIZED, "Unauthorized",
+                "{\"error\":{\"message\":\"invalid key sk-internal-secret\"}}".getBytes(StandardCharsets.UTF_8),
+                StandardCharsets.UTF_8));
+
+        ApiResponse<Void> response = configConnectionChecker.test(request("llm"), CURRENT_USER_ID);
+
+        assertThat(response.getCode()).isEqualTo(ResultStatus.ERROR);
+        assertThat(response.getMessage()).doesNotContain("sk-internal-secret");
+        assertThat(response.getMessage()).contains("401");
+    }
+
+    /** 试拨的接口地址由表单直接给，HTTP 与 WebSocket 之外的协议一律不发起请求 */
+    @Test
+    void nonHttpEndpointIsRejectedBeforeDialing() {
+        when(configConvert.toBO(any(ConfigTestReq.class)))
+                .thenReturn(llmConfig("chat").setConfigId(null).setApiUrl("file:///etc/passwd"));
+
+        ApiResponse<Void> response = configConnectionChecker.test(request("llm"), CURRENT_USER_ID);
+
+        assertThat(response.getCode()).isEqualTo(ResultStatus.ERROR);
+        assertThat(response.getMessage()).isEqualTo("接口地址只支持 http/https/ws/wss");
+        verifyNoInteractions(chatModelFactory);
     }
 
     @Test

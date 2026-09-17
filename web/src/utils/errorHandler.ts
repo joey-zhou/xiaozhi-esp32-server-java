@@ -77,6 +77,13 @@ export function setupErrorHandler(app: App) {
       return
     }
 
+    // request.ts 的拦截器已经按具体状态码弹过一条本地化提示，这里只记日志，不再叠第二条、
+    // 也不把 reason.message 这种未翻译的原始英文错误拼给用户看
+    if (reason?.isToasted === true) {
+      recordError({ message: reason?.message || i18n.global.t('error.unknown'), stack: reason?.stack })
+      return
+    }
+
     // 忽略音频文件加载失败的错误（404）
     if (
       reason?.message?.includes('Failed to fetch') &&

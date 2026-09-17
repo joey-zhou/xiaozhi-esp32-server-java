@@ -39,7 +39,8 @@ public class SummaryConversationFactory implements ConversationFactory{
     @Autowired
     private  ChatModelFactory chatModelFactory;
 
-    @Value("${conversation.max-messages:8}")
+    // 独立的 key：避免和窗口/长期两种记忆策略的 max-messages 共用同一个配置项
+    @Value("${conversation.summary.max-messages:8}")
     private int maxMessages;
     @Value("${conversation.batch-size:4}")
     private int batchSize;

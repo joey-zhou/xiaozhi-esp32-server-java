@@ -43,7 +43,7 @@ describe('useUserStore', () => {
 
   describe('setUserInfo / updateUserInfo / clearUserInfo', () => {
     const mockUser: User = {
-      userId: '1',
+      userId: 1,
       username: 'admin',
       name: '管理员',
       isAdmin: '1',
@@ -83,17 +83,17 @@ describe('useUserStore', () => {
 
   describe('isAdmin 计算属性', () => {
     it('管理员用户返回 true', () => {
-      store.setUserInfo({ userId: '1', isAdmin: '1' })
+      store.setUserInfo({ userId: 1, isAdmin: '1' })
       expect(store.isAdmin).toBe(true)
     })
 
     it('普通用户返回 false', () => {
-      store.setUserInfo({ userId: '2', isAdmin: '0' })
+      store.setUserInfo({ userId: 2, isAdmin: '0' })
       expect(store.isAdmin).toBe(false)
     })
 
     it('isAdmin 未设置时返回 false', () => {
-      store.setUserInfo({ userId: '3' })
+      store.setUserInfo({ userId: 3 })
       expect(store.isAdmin).toBe(false)
     })
   })
@@ -107,13 +107,13 @@ describe('useUserStore', () => {
 
     describe('hasPermission', () => {
       it('管理员拥有所有权限', () => {
-        store.setUserInfo({ userId: '1', isAdmin: '1' })
+        store.setUserInfo({ userId: 1, isAdmin: '1' })
         expect(store.hasPermission('any:permission')).toBe(true)
         expect(store.hasPermission('nonexistent')).toBe(true)
       })
 
       it('普通用户检查具体权限', () => {
-        store.setUserInfo({ userId: '2', isAdmin: '0' })
+        store.setUserInfo({ userId: 2, isAdmin: '0' })
         store.setPermissions(mockPermissions)
 
         expect(store.hasPermission('device:list')).toBe(true)
@@ -122,7 +122,7 @@ describe('useUserStore', () => {
       })
 
       it('无权限时返回 false', () => {
-        store.setUserInfo({ userId: '2', isAdmin: '0' })
+        store.setUserInfo({ userId: 2, isAdmin: '0' })
         store.setPermissions([])
         expect(store.hasPermission('device:list')).toBe(false)
       })
@@ -153,7 +153,7 @@ describe('useUserStore', () => {
       ]
 
       it('第三层的按钮/接口权限也能查到', () => {
-        store.setUserInfo({ userId: '2', isAdmin: '0' })
+        store.setUserInfo({ userId: 2, isAdmin: '0' })
         store.setPermissions(treePermissions)
 
         expect(store.hasPermission('system')).toBe(true)
@@ -164,7 +164,7 @@ describe('useUserStore', () => {
       })
 
       it('没有 permissionKey 的中间节点不会污染集合', () => {
-        store.setUserInfo({ userId: '2', isAdmin: '0' })
+        store.setUserInfo({ userId: 2, isAdmin: '0' })
         store.setPermissions([
           {
             permissionId: 10,
@@ -182,7 +182,7 @@ describe('useUserStore', () => {
       })
 
       it('换一批权限后旧的立即失效', () => {
-        store.setUserInfo({ userId: '2', isAdmin: '0' })
+        store.setUserInfo({ userId: 2, isAdmin: '0' })
         store.setPermissions(treePermissions)
         expect(store.hasPermission('system:device:create')).toBe(true)
 
@@ -193,12 +193,12 @@ describe('useUserStore', () => {
 
     describe('hasAnyPermission', () => {
       it('管理员始终返回 true', () => {
-        store.setUserInfo({ userId: '1', isAdmin: '1' })
+        store.setUserInfo({ userId: 1, isAdmin: '1' })
         expect(store.hasAnyPermission(['nonexistent'])).toBe(true)
       })
 
       it('有任一权限即返回 true', () => {
-        store.setUserInfo({ userId: '2', isAdmin: '0' })
+        store.setUserInfo({ userId: 2, isAdmin: '0' })
         store.setPermissions(mockPermissions)
 
         expect(store.hasAnyPermission(['device:list', 'device:delete'])).toBe(true)
@@ -208,12 +208,12 @@ describe('useUserStore', () => {
 
     describe('hasAllPermissions', () => {
       it('管理员始终返回 true', () => {
-        store.setUserInfo({ userId: '1', isAdmin: '1' })
+        store.setUserInfo({ userId: 1, isAdmin: '1' })
         expect(store.hasAllPermissions(['a', 'b', 'c'])).toBe(true)
       })
 
       it('需全部具备才返回 true', () => {
-        store.setUserInfo({ userId: '2', isAdmin: '0' })
+        store.setUserInfo({ userId: 2, isAdmin: '0' })
         store.setPermissions(mockPermissions)
 
         expect(store.hasAllPermissions(['device:list', 'device:add'])).toBe(true)

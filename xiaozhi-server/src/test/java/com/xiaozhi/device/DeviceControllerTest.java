@@ -5,6 +5,7 @@ import com.xiaozhi.common.model.req.DevicePageReq;
 import com.xiaozhi.common.model.req.DeviceScanBindReq;
 import com.xiaozhi.common.model.req.DeviceUpdateReq;
 import com.xiaozhi.common.model.req.OtaReq;
+import com.xiaozhi.common.model.resp.DeviceBatchUpdateResp;
 import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ResultStatus;
@@ -82,7 +83,7 @@ class DeviceControllerTest extends ControllerTestSupport {
     @Test
     void batchUpdateReturnsSuccessCountAndTotalCount() throws Exception {
         when(deviceAppService.batchUpdate(any(DeviceBatchUpdateReq.class)))
-            .thenReturn(Map.of("successCount", 2, "totalCount", 2));
+            .thenReturn(new DeviceBatchUpdateResp(2, 2));
 
         mockMvc.perform(post("/api/device/batchUpdate")
                 .contentType(MediaType.APPLICATION_JSON)

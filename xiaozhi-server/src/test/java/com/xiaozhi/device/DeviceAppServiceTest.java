@@ -1,5 +1,6 @@
 package com.xiaozhi.device;
 
+import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
@@ -16,7 +17,9 @@ import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.domain.vo.VerifyCode;
 import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
+import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
+import com.xiaozhi.summary.service.SummaryService;
 import com.xiaozhi.utils.CmsUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -60,6 +64,10 @@ class DeviceAppServiceTest {
     private DialogueServerRegistry dialogueServerRegistry;
     @Mock
     private DeviceAuthService deviceAuthService;
+    @Mock
+    private MessageService messageService;
+    @Mock
+    private SummaryService summaryService;
 
     @InjectMocks
     private DeviceAppService deviceAppService;
@@ -252,6 +260,17 @@ class DeviceAppServiceTest {
         assertThatThrownBy(() -> deviceAppService.scanBind(scanBindReq("not-a-mac"), 7))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("设备ID不正确");
+    }
+
+    @Test
+    void deleteThrowsWhenDeviceNotFoundWithoutTouchingRelatedData() {
+        when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> deviceAppService.delete(DEVICE_ID))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(deviceRepository, never()).delete(any());
+        verify(messageService, never()).deleteByDeviceId(any());
     }
 
     private DeviceScanBindReq scanBindReq(String deviceId) {

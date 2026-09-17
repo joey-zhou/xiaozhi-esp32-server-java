@@ -1,5 +1,7 @@
 package com.xiaozhi.ai.llm.factory;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.port.ConfigLookup;
@@ -31,14 +33,21 @@ public class ChatModelFactory {
     
     @Autowired
     private ConfigLookup configLookup;
+
     
     /**
      * 所有的ChatModel提供者,Spring会自动注入所有实现了ChatModelProvider接口的Bean
      */
     private final Map<String, ChatModelProvider> providers;
 
-    /** key 见 cacheKey()，配置或角色参数变更时失效 */
-    private final Map<String, ChatModel> chatModelCache = new ConcurrentHashMap<>();
+    /**
+     * key 见 cacheKey()，配置或角色参数变更时失效。
+     * temperature/topP 是角色自由填写的数值，组合数没有上限，用 maximumSize 兜底防止无限增长；
+     * 容量淘汰只从 Map 里摘除引用交给 GC，不会主动 close，避免误伤正在使用该实例的会话。
+     */
+    private final Cache<String, ChatModel> chatModelCache = Caffeine.newBuilder()
+            .maximumSize(256)
+            .build();
 
     /** key 为 configId，配置变更时失效 */
     private final Map<Integer, EmbeddingModel> embeddingModelCache = new ConcurrentHashMap<>();
@@ -66,7 +75,7 @@ public class ChatModelFactory {
         // 每轮重建会连带新建 HttpClient，等于每次对话都重新做一次 TCP+TLS 握手。
         // temperature/topP 烘焙在模型的 defaultOptions 里，必须进 key，否则改了角色参数不生效
         String cacheKey = cacheKey(modelId, effectiveRole);
-        return chatModelCache.computeIfAbsent(cacheKey,
+        return chatModelCache.get(cacheKey,
                 k -> createChatModel(configLookup.getConfig(modelId), effectiveRole));
     }
 
@@ -81,7 +90,7 @@ public class ChatModelFactory {
         if (configId == null) {
             return;
         }
-        chatModelCache.entrySet().removeIf(entry -> {
+        chatModelCache.asMap().entrySet().removeIf(entry -> {
             if (!entry.getKey().startsWith(configId + ":")) {
                 return false;
             }
@@ -107,7 +116,9 @@ public class ChatModelFactory {
     public ChatModel getVisionModel() {
         ConfigBO config = configLookup.getDefaultConfig("llm", ConfigBO.ModelType.vision.getValue());
         Assert.notNull(config, "未配置多模态模型");
-        return createChatModel(config, new RoleBO());
+        // 走同一份缓存，避免每次多模态调用都新建 ChatModel(连带新建 HttpClient)
+        String cacheKey = config.getConfigId() + ":vision";
+        return chatModelCache.get(cacheKey, k -> createChatModel(config, new RoleBO()));
     }
 
     public ChatModel getIntentModel() {
@@ -149,26 +160,19 @@ public class ChatModelFactory {
      */
     public ChatModel createChatModel(ConfigBO config, RoleBO role) {
         String providerName = config.getProvider().toLowerCase();
-        
-        // 从providers Map中获取对应的Provider
+
         ChatModelProvider provider = providers.get(providerName);
-        
-        if (provider != null) {
-            return provider.createChatModel(config, role);
+        if (provider == null) {
+            // 没有对应的 Provider 时回退到 OpenAI(兼容 OpenAI 协议)
+            provider = providers.get("openai");
         }
-        
-        // 如果没有找到对应的Provider,尝试使用OpenAI Provider作为默认(兼容OpenAI协议)
-        provider = providers.get("openai");
-        
-        if (provider != null) {
-            return provider.createChatModel(config, role);
+        if (provider == null) {
+            throw new IllegalArgumentException(
+                    String.format("不支持的Provider: %s, 可用的Providers: %s",
+                            providerName,
+                            providers.keySet())
+            );
         }
-        
-        // 如果连OpenAI Provider都没有,抛出异常
-        throw new IllegalArgumentException(
-                String.format("不支持的Provider: %s, 可用的Providers: %s", 
-                        providerName, 
-                        providers.keySet())
-        );
+        return provider.createChatModel(config, role);
     }
 }

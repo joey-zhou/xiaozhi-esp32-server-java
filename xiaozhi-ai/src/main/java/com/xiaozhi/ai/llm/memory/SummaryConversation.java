@@ -52,9 +52,17 @@ public class SummaryConversation extends Conversation {
     // 运行时不应该发生变化，避免计算错误
     private final int batchSize;
 
+    // 摘要连续失败的退避：每次失败后按 2^n 递增等待时间，避免每轮对话都重试打爆大模型
+    private static final Duration SUMMARY_RETRY_BASE_DELAY = Duration.ofSeconds(30);
+    private static final Duration SUMMARY_RETRY_MAX_DELAY = Duration.ofMinutes(30);
+    // 摘要持续失败时，未摘要消息允许堆积的硬上限（超过则丢弃最旧的一组，避免上下文无限膨胀）
+    private static final int MAX_PENDING_BATCH_MULTIPLIER = 4;
+
     // 消息摘要，与 messages 一样由 this 锁保护
     private SummaryBO lastSummary = null;
     private boolean summarizing = false;
+    private int consecutiveFailures = 0;
+    private Instant nextRetryAt = Instant.EPOCH;
 
     @Builder
     public SummaryConversation(String ownerId, Integer roleId, String sessionId, String roleDesc, Integer userId,
@@ -157,6 +165,22 @@ public class SummaryConversation extends Conversation {
             if (size == 0 || (!force && size < maxMessages)) {
                 return;
             }
+            // 允许失败后立即重试一次（单次抖动很常见），连续失败到第二次才开始退避
+            if (!force && consecutiveFailures > 1 && Instant.now().isBefore(nextRetryAt)) {
+                // 处于失败退避窗口内，跳过本次触发，避免每轮对话都重新调用大模型
+                return;
+            }
+            // 摘要连续失败、未摘要消息堆到硬上限时，丢弃最旧的一组，防止送给主 LLM 的上下文无限膨胀
+            int hardCap = maxMessages * MAX_PENDING_BATCH_MULTIPLIER;
+            if (consecutiveFailures > 0 && size > hardCap) {
+                int dropSize = MessageGroups.alignedPrefixSize(messages, size - hardCap);
+                if (dropSize > 0) {
+                    log.error("{}摘要连续失败{}次，未摘要消息堆积到{}条已超过硬上限{}，丢弃最旧{}条防止上下文无限膨胀",
+                            getOwnerId(), consecutiveFailures, size, hardCap, dropSize);
+                    messages.subList(0, dropSize).clear();
+                    size = messages.size();
+                }
+            }
             // 批次补齐到对话组边界，工具链整组摘要，不能留下孤儿 tool 消息
             actualBatchSize = MessageGroups.alignedPrefixSize(messages, Math.min(batchSize, size));
             // 当前这轮还没收尾时凑不出完整的一组，等收尾后再摘
@@ -217,6 +241,8 @@ public class SummaryConversation extends Conversation {
                 removed = removeByIdentity(needSummaryMessages);
                 this.lastSummary = newSummary;
                 summarizing = false;
+                consecutiveFailures = 0;
+                nextRetryAt = Instant.EPOCH;
             }
             // 一条都没移除时不再递归，避免同一批次反复摘要
             if (removed > 0) {
@@ -226,6 +252,12 @@ public class SummaryConversation extends Conversation {
             log.error("{}对话摘要失败", getOwnerId(), e);
             synchronized (this) {
                 summarizing = false;
+                consecutiveFailures++;
+                long delaySeconds = Math.min(
+                        SUMMARY_RETRY_BASE_DELAY.getSeconds() << Math.min(consecutiveFailures - 1, 10),
+                        SUMMARY_RETRY_MAX_DELAY.getSeconds());
+                nextRetryAt = Instant.now().plusSeconds(delaySeconds);
+                log.warn("{}对话摘要连续失败{}次，{}秒后才允许下一次重试", getOwnerId(), consecutiveFailures, delaySeconds);
             }
         }
     }

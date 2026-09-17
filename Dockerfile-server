@@ -41,8 +41,9 @@ COPY xiaozhi-ai/src      ./xiaozhi-ai/src
 COPY xiaozhi-dialogue/src ./xiaozhi-dialogue/src
 COPY xiaozhi-server/src  ./xiaozhi-server/src
 
-# 构建整个多模块项目
-RUN mvn -Dmaven.repo.local=/root/.m2/repository package -DskipTests
+# 构建整个多模块项目：镜像构建没有接到 CI 门禁，这里不跳过测试，
+# 避免测试不过的提交也能被直接打包成可运行镜像
+RUN mvn -Dmaven.repo.local=/root/.m2/repository package
 
 # 提取项目版本号（从根 pom 的 xiaozhi-parent）
 RUN APP_VERSION=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec 2>/dev/null || \
@@ -83,6 +84,8 @@ RUN mkdir -p /build/models /build/lib && \
 # ============================================================
 FROM eclipse-temurin:21-jre AS runtime-base
 
+# document_engine（Python，OCR 靠 tesseract）没有打进这个镜像，这里只是 Java 服务的运行时，
+# 装 tesseract 也用不上；真要在这个镜像里跑 OCR，需要另外把 document_engine 连同 python3/uv 一起打包
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libxcomposite1 \
     libxdamage1 \
