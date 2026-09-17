@@ -10,6 +10,7 @@ import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.ai.stt.SttResult;
+import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.MessageMetadataBO;
 import org.springframework.ai.chat.messages.UserMessage;
 import com.xiaozhi.dialogue.audio.VadService.VadStatus;
@@ -32,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import jakarta.annotation.Resource;
@@ -40,6 +42,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -293,9 +296,13 @@ public class DialogueService{
                 }
 
                 AtomicBoolean bargeIn = new AtomicBoolean(false);
-                var sttResult = persona.getSttService().stream(
-                        turnSink.asFlux(),
-                        partialText -> onSttPartialText(session, partialText, bargeIn));
+                Consumer<String> onPartialText = partialText -> onSttPartialText(session, partialText, bargeIn);
+                SttService sttService = persona.getSttService();
+                SttResult sttResult = sttService.stream(turnSink.asFlux(), onPartialText);
+                // 识别失败与用户没说话是两回事：失败的这句还在 VAD 缓冲里，原样重放一次
+                if (sttResult != null && sttResult.operationFailed() && session.getAudioSinks() == turnSink) {
+                    sttResult = retryWithReplay(session, sttService, sttResult, onPartialText);
+                }
 
                 // 本轮已被新一轮或 abort 取代，结果作废，否则过期文本会触发一轮多余对话；
                 // 暂停的播放仍由本轮终稿决定去留
@@ -353,6 +360,33 @@ public class DialogueService{
                 releaseDiscardedTurn(session, turnSink);
             }
         });
+    }
+
+    /**
+     * 识别失败时把 VAD 缓存的整句 PCM 原样重放一次。
+     * 只能整句重放：流内从出错点续传只拿得到出错之后的音频，句子开头找不回来。
+     * 重试也失败时保留带文本的那份结果，失败前识别到的部分文本总比整句丢掉好。
+     */
+    private SttResult retryWithReplay(ChatSession session, SttService sttService, SttResult failed,
+                                      Consumer<String> onPartialText) {
+        String sessionId = session.getSessionId();
+        List<byte[]> pcmFrames = vadService.getPcmData(sessionId);
+        if (pcmFrames.isEmpty()) {
+            log.warn("识别失败({})且没有可重放的音频 - SessionId: {}", failed.failureReason(), sessionId);
+            return failed;
+        }
+        log.warn("识别失败({})，重放整句音频重试 - SessionId: {}, 帧数: {}",
+                failed.failureReason(), sessionId, pcmFrames.size());
+        SttResult retried = sttService.stream(Flux.fromIterable(pcmFrames), onPartialText);
+        if (retried != null && !retried.operationFailed()) {
+            return retried;
+        }
+        log.warn("重放重试仍失败({}) - SessionId: {}",
+                retried != null ? retried.failureReason() : failed.failureReason(), sessionId);
+        if (StringUtils.hasText(failed.text()) || retried == null) {
+            return failed;
+        }
+        return retried;
     }
 
     /**
