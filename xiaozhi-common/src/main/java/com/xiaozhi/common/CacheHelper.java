@@ -42,44 +42,44 @@ public class CacheHelper {
 
         // 2. 缓存未命中,使用分布式锁
         RLock lock = redissonClient.getLock("lock:" + lockKey);
-
+        boolean locked;
         try {
             // 尝试获取锁,最多等待3秒；不传租期，交给 Redisson 看门狗按持锁线程存活自动续期，
             // 避免固定租期短于查库耗时（如 Hikari 连接池排队）导致锁提前失效
-            if (lock.tryLock(3, TimeUnit.SECONDS)) {
-                try {
-                    // 3. 双重检查,避免重复查询数据库
-                    cached = cacheGetter.get();
-                    if (cached != null) {
-                        log.debug("获取锁后从缓存命中: {}", lockKey);
-                        return cached;
-                    }
-
-                    // 4. 查询数据库
-                    log.debug("从数据库查询: {}", lockKey);
-                    T result = dbGetter.get();
-
-                    // 5. 结果会通过@Cacheable自动写入缓存
-                    return result;
-
-                } finally {
-                    lock.unlock();
-                }
-            } else {
-                // 获取锁失败,直接查询数据库(降级策略)
-                log.warn("获取锁超时,直接查询数据库: {}", lockKey);
-                return dbGetter.get();
-            }
-
+            locked = lock.tryLock(3, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("获取锁被中断: {}", lockKey, e);
             // 降级: 直接查询数据库
             return dbGetter.get();
-        } catch (Exception e) {
-            log.error("分布式锁异常: {}", lockKey, e);
-            // 降级: 直接查询数据库
+        }
+
+        if (!locked) {
+            // 获取锁失败,直接查询数据库(降级策略)
+            log.warn("获取锁超时,直接查询数据库: {}", lockKey);
             return dbGetter.get();
+        }
+
+        // 锁只包获取/释放本身，dbGetter 的异常原样上抛，不在这里当成锁异常吞掉再查一次
+        try {
+            // 3. 双重检查,避免重复查询数据库
+            cached = cacheGetter.get();
+            if (cached != null) {
+                log.debug("获取锁后从缓存命中: {}", lockKey);
+                return cached;
+            }
+
+            // 4. 查询数据库
+            log.debug("从数据库查询: {}", lockKey);
+            return dbGetter.get();
+            // 5. 结果会通过@Cacheable自动写入缓存
+        } finally {
+            try {
+                lock.unlock();
+            } catch (IllegalMonitorStateException e) {
+                // 业务耗时超过看门狗续期窗口导致锁已自动释放时会抛出，此时锁已不在自己手里，忽略即可
+                log.warn("释放锁时锁已失效: {}", lockKey);
+            }
         }
     }
 

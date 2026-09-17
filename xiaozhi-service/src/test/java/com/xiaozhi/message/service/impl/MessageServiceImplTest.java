@@ -205,7 +205,6 @@ class MessageServiceImplTest {
 
     @Test
     void purgeExpiredAudioRemovesFromStorageThenClearsColumn() {
-        when(storageServiceFactory.getStorageService()).thenReturn(storageService);
         when(messageMapper.selectList(any(LambdaQueryWrapper.class)))
             .thenReturn(List.of(messageWithAudio(1L, "audio/2026-01-01/a.opus"),
                                 messageWithAudio(2L, "https://oss.example.com/audio/2026-01-01/b.opus")))
@@ -215,8 +214,9 @@ class MessageServiceImplTest {
 
         assertThat(purged).isEqualTo(2);
         // 本地路径与云端 URL 两种形态都原样交给 StorageService，由它各自解析
-        verify(storageService).remove("audio/2026-01-01/a.opus");
-        verify(storageService).remove("https://oss.example.com/audio/2026-01-01/b.opus");
+        // 一批里既有本地相对路径又有云地址，各自按形态路由删除
+        verify(storageServiceFactory).removeFrom("audio/2026-01-01/a.opus");
+        verify(storageServiceFactory).removeFrom("https://oss.example.com/audio/2026-01-01/b.opus");
 
         ArgumentCaptor<LambdaUpdateWrapper<MessageDO>> captor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
         verify(messageMapper).update(isNull(), captor.capture());
@@ -246,7 +246,6 @@ class MessageServiceImplTest {
 
     @Test
     void purgeExpiredAudioKeepsBatchingUntilNoRowsLeft() {
-        when(storageServiceFactory.getStorageService()).thenReturn(storageService);
         when(messageMapper.selectList(any(LambdaQueryWrapper.class)))
             .thenReturn(List.of(messageWithAudio(1L, "a.opus")))
             .thenReturn(List.of(messageWithAudio(2L, "b.opus")))

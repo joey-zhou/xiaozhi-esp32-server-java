@@ -83,7 +83,7 @@ class ConfigControllerTest extends ControllerTestSupport {
     void updateReturnsUpdatedConfig() throws Exception {
         ConfigResp updated = new ConfigResp();
         updated.setConfigId(11);
-        when(configAppService.update(eq(11), any(ConfigUpdateReq.class))).thenReturn(updated);
+        when(configAppService.update(eq(11), any(ConfigUpdateReq.class), eq(false))).thenReturn(updated);
 
         mockMvc.perform(put("/api/config/11")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -134,7 +134,7 @@ class ConfigControllerTest extends ControllerTestSupport {
     @Test
     void deleteReturnsNotFoundWhenConfigMissing() throws Exception {
         doThrow(new ResourceNotFoundException("配置不存在或无权访问"))
-            .when(configAppService).delete(9);
+            .when(configAppService).delete(9, false);
 
         mockMvc.perform(delete("/api/config/9"))
             .andExpect(status().isNotFound())

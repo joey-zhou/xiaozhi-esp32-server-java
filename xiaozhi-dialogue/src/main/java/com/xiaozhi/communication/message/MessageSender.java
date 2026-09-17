@@ -7,7 +7,6 @@ import com.xiaozhi.event.TtsPlaybackCompletedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -27,7 +26,7 @@ public class MessageSender {
 
     public void sendTtsMessage(ChatSession session, String text, String state) {
         if (session == null || !session.isOpen()) {
-            log.error("ChatSession为null 或者已关闭，请检查！{}", Arrays.toString(Thread.currentThread().getStackTrace()));
+            log.debug("sendTtsMessage无法发送消息 - 会话已关闭或为null");
             return;
         }
         ObjectNode messageJson = objectMapper.createObjectNode();
@@ -38,7 +37,8 @@ public class MessageSender {
         }
 
         String jsonMessage = messageJson.toString();
-        log.info("sendTtsMessage发送消息 - SessionId: {}, Message: {}", session.getSessionId(), jsonMessage);
+        log.debug("sendTtsMessage发送消息 - SessionId: {}, state: {}, 文本长度: {}", session.getSessionId(), state,
+                text == null ? 0 : text.length());
         sendTextMessage(session, jsonMessage);
 
         if ("stop".equals(state)) {
@@ -56,7 +56,8 @@ public class MessageSender {
         messageJson.put("text", text);
 
         String jsonMessage = messageJson.toString();
-        log.info("sendSttMessage发送消息 - SessionId: {}, Message: {}", session.getSessionId(), jsonMessage);
+        log.debug("sendSttMessage发送消息 - SessionId: {}, 文本长度: {}", session.getSessionId(),
+                text == null ? 0 : text.length());
         sendTextMessage(session, jsonMessage);
     }
 
@@ -86,7 +87,7 @@ public class MessageSender {
         messageJson.put("emotion", emotion);
         messageJson.put("text", emotion);
         String jsonMessage = messageJson.toString();
-        log.info("sendEmotion发送Emotion消息 - SessionId: {}, Message: {}", session.getSessionId(), jsonMessage);
+        log.debug("sendEmotion发送Emotion消息 - SessionId: {}, emotion: {}", session.getSessionId(), emotion);
         sendTextMessage(session, jsonMessage);
     }
 

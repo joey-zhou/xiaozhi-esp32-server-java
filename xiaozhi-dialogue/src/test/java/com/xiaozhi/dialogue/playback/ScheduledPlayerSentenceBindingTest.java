@@ -128,6 +128,33 @@ class ScheduledPlayerSentenceBindingTest {
     }
 
     @Test
+    void cachedOpusSentenceFlushesPreviousPcmTail() {
+        // 缓存命中句是预编码 Opus，与未命中的 PCM 句在同一轮里交替出现：
+        // 命中句入队前也要收上一句的残留，否则残留会被拖到再下一句才吐出来
+        player.play(Flux.just(
+                new Speech(pcm(FRAME_SAMPLES + FRAME_SAMPLES / 2), "第一句。"),
+                Speech.ofOpus(new byte[]{1, 2, 3}, "第二句。")), true);
+
+        verify(sender, timeout(5000)).sendTtsMessage(any(), isNull(), eq("stop"));
+
+        assertThat(audioTimeline())
+                .containsExactly("text:第一句。", "frame", "frame", "text:第二句。", "frame");
+    }
+
+    @Test
+    void carriedTextIsBoundToTailBeforeCachedOpusSentence() {
+        // 上一句凑不满一帧就来了缓存命中句：上一句的字幕补绑到它自己的收尾帧，不能被命中句顶掉
+        player.play(Flux.just(
+                new Speech(pcm(FRAME_SAMPLES / 2), "第一句。"),
+                Speech.ofOpus(new byte[]{1, 2, 3}, "第二句。")), true);
+
+        verify(sender, timeout(5000)).sendTtsMessage(any(), isNull(), eq("stop"));
+
+        assertThat(audioTimeline())
+                .containsExactly("text:第一句。", "frame", "text:第二句。", "frame");
+    }
+
+    @Test
     void lateFrameAfterStopIsDiscarded() throws InterruptedException {
         LateCallbackPublisher upstream = new LateCallbackPublisher();
         player.play(Flux.from(upstream), true);

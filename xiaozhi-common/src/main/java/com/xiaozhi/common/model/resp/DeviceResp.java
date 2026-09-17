@@ -29,9 +29,6 @@ public class DeviceResp {
     @Schema(description = "设备状态")
     private String state;
 
-    @Schema(description = "消息总数")
-    private Integer totalMessage;
-
     @Schema(description = "验证码")
     private String code;
 

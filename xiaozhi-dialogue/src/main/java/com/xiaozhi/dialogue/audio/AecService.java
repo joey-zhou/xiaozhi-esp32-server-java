@@ -193,6 +193,7 @@ public class AecService {
         state.framesSinceStatsLog = 0;
         try {
             AudioProcessingStats stats = state.apm.getStatistics();
+            state.recordStats(stats);
             ReferenceFeed feed = state.feed;
             // lead：最近喂入的参考帧相对设备回显点的提前量，负数即非因果
             Long lead = feed.leadMs();
@@ -241,6 +242,12 @@ public class AecService {
         // 统计日志节流
         int framesSinceStatsLog = 0;
 
+        // 最近一次统计采样，在 apmLock 内写入，Gauge 无锁读取
+        volatile boolean statsSampled = false;
+        volatile double lastErl = 0;
+        volatile double lastErle = 0;
+        volatile double lastDelayMs = 0;
+
         AecState() {
             apm = new AudioProcessing();
 
@@ -271,6 +278,13 @@ public class AecService {
 
             refDecoder = new OpusProcessor();
             streamConfig = new AudioProcessingStreamConfig(16000, 1);
+        }
+
+        void recordStats(AudioProcessingStats stats) {
+            lastErl = stats.echoReturnLoss;
+            lastErle = stats.echoReturnLossEnhancement;
+            lastDelayMs = stats.delayMs;
+            statsSampled = true;
         }
 
         void dispose() {

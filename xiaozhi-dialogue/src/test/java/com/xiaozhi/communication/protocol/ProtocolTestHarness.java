@@ -18,6 +18,7 @@ import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.dialogue.DialogueService;
 import com.xiaozhi.communication.server.websocket.DeviceAuthHandshakeInterceptor;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
+import com.xiaozhi.dialogue.llm.handler.PersonaCleanup;
 import com.xiaozhi.dialogue.llm.tool.device.IotService;
 import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpService;
 import com.xiaozhi.dialogue.playback.OpusRecorder;
@@ -36,6 +37,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
@@ -99,6 +102,7 @@ class ProtocolTestHarness {
     };
     private final TestEventBus eventBus = new TestEventBus();
     private final MessageSender messageSender = new MessageSender(eventBus.publisher());
+    private final PersonaCleanup personaCleanup = new PersonaCleanup();
 
     // ===== 假体 =====
     private final ScriptedVadService vadService = new ScriptedVadService();
@@ -143,7 +147,8 @@ class ProtocolTestHarness {
                 "deviceRegistry", deviceRegistry,
                 "instanceIdHolder", instanceIdHolder,
                 "vadService", vadService,
-                "aecService", aecService);
+                "aecService", aecService,
+                "personaCleanup", personaCleanup);
 
         inject(dialogueService,
                 "personaFactory", personaFactory,
@@ -173,7 +178,8 @@ class ProtocolTestHarness {
                 "aecService", aecService,
                 "deviceRegistry", deviceRegistry,
                 "instanceIdHolder", instanceIdHolder,
-                "redisBroadcast", redisBroadcast);
+                "redisBroadcast", redisBroadcast,
+                "storageServiceFactory", storageServiceFactory);
 
         inject(webSocketHandler,
                 "sessionManager", sessionManager,
@@ -201,6 +207,11 @@ class ProtocolTestHarness {
                 .thenAnswer(invocation -> buildPersona(invocation.getArgument(0)));
         lenient().when(personaFactory.buildPersona(any(ChatSession.class), any(), any()))
                 .thenAnswer(invocation -> buildPersona(invocation.getArgument(0)));
+        // 按本地存储的语义读取：相对路径直接当本地文件读，读不到返回 null
+        lenient().when(storageServiceFactory.downloadFrom(anyString())).thenAnswer(invocation -> {
+            Path path = Path.of(invocation.<String>getArgument(0));
+            return Files.exists(path) ? Files.readAllBytes(path) : null;
+        });
         roleProfiles.put(defaultRole().getRoleId(), defaultRole());
     }
 

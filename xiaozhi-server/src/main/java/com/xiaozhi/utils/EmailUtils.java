@@ -48,7 +48,7 @@ public class EmailUtils {
         try {
             // 验证邮箱格式
             if (!isValidEmail(to)) {
-                log.error("邮箱格式不正确: {}", to);
+                log.error("邮箱格式不正确: {}", maskEmail(to));
                 return false;
             }
             
@@ -68,12 +68,12 @@ public class EmailUtils {
                     .html(content)
                     .send();
             
-            log.info("邮件发送成功: {} -> {}", fromName, to);
+            log.info("邮件发送成功: {} -> {}", fromName, maskEmail(to));
             return true;
-            
+
         } catch (Exception e) {
             String errorMsg = getErrorMessage(e);
-            log.error("邮件发送失败: {} -> {}, 错误: {}", fromName, to, errorMsg, e);
+            log.error("邮件发送失败: {} -> {}, 错误: {}", fromName, maskEmail(to), errorMsg, e);
             return false;
         }
     }
@@ -128,5 +128,21 @@ public class EmailUtils {
         }
         
         return "发送失败: " + message;
+    }
+
+    /**
+     * 日志脱敏：邮箱只保留 @ 前最多 2 位，其余用 *** 代替
+     */
+    private String maskEmail(String email) {
+        if (email == null || email.isEmpty()) {
+            return "***";
+        }
+        int at = email.indexOf('@');
+        if (at <= 0) {
+            return "***";
+        }
+        String local = email.substring(0, at);
+        String visible = local.length() <= 2 ? local.substring(0, 1) : local.substring(0, 2);
+        return visible + "***" + email.substring(at);
     }
 }

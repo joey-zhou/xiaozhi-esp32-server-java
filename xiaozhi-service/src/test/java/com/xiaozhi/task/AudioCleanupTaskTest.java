@@ -1,5 +1,6 @@
 package com.xiaozhi.task;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.utils.AudioUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -45,6 +46,9 @@ class AudioCleanupTaskTest {
 
     private final AudioCleanupTask task = new AudioCleanupTask();
 
+    /** audio-dir 跟着用例改，data-dir 留空即按工作目录解析 */
+    private final RuntimePathConfig runtimePathConfig = new RuntimePathConfig();
+
     private String originalAudioPath;
 
     @AfterEach
@@ -57,6 +61,7 @@ class AudioCleanupTaskTest {
         originalAudioPath = AudioUtils.AUDIO_PATH;
         ReflectionTestUtils.setField(task, "messageService", messageService);
         ReflectionTestUtils.setField(task, "redissonClient", redissonClient);
+        ReflectionTestUtils.setField(task, "runtimePathConfig", runtimePathConfig);
     }
 
     /**
@@ -65,6 +70,7 @@ class AudioCleanupTaskTest {
     @Test
     void cleanupExpiredAudioTakesNoDistributedLock(@TempDir Path audioDir) {
         AudioUtils.AUDIO_PATH = audioDir.toString();
+        runtimePathConfig.setAudioDir(audioDir.toString());
 
         task.cleanupExpiredAudio();
 
@@ -75,6 +81,7 @@ class AudioCleanupTaskTest {
     void cleanupExpiredAudioDeletesOnlyDirectoriesPastRetention(@TempDir Path audioDir) throws IOException {
         AudioUtils.AUDIO_PATH = audioDir.toString();
         int retentionDays = AudioUtils.AUDIO_RETENTION_DAYS;
+        runtimePathConfig.setAudioDir(audioDir.toString());
 
         Path expired = dateDir(audioDir, LocalDate.now().minusDays(retentionDays + 1));
         Path onBoundary = dateDir(audioDir, LocalDate.now().minusDays(retentionDays));

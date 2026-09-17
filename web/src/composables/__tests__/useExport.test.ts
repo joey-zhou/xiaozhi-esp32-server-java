@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useExport, type ExportColumn } from '../useExport'
+import { convertToCSV, useExport, type ExportColumn } from '../useExport'
 
 type Row = { name: string; total: number | null }
 
 function csvRows(data: Row[], columns?: ExportColumn<Row>[]): string[] {
-  return useExport().convertToCSV(data, columns).split('\n')
+  return convertToCSV(data, columns).split('\n')
 }
 
 describe('convertToCSV 公式注入转义', () => {
@@ -59,15 +59,6 @@ describe('convertToCSV 公式注入转义', () => {
   })
 })
 
-describe('parseCSVToTable', () => {
-  it('单元格内容按文本转义，标签不会被当标记渲染', () => {
-    const html = useExport().parseCSVToTable('name\n<img src=x onerror=alert(1)>')
-
-    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
-    expect(html).not.toContain('<img')
-  })
-})
-
 describe('下载内容的 BOM', () => {
   const blobs: Blob[] = []
   const originalCreate = URL.createObjectURL
@@ -89,18 +80,13 @@ describe('下载内容的 BOM', () => {
     vi.restoreAllMocks()
   })
 
-  // BOM 是给 Excel 认 UTF-8 用的，JSON 带上它会让 JSON.parse 直接失败
-  it('JSON 导出不带 BOM，CSV 仍带', async () => {
+  // BOM 是给 Excel 认 UTF-8 用的，必须按字节看：Blob.text() 走 UTF-8 解码，
+  // 标准行为会把开头的 BOM 当标记剥掉，用它永远验证不到
+  it('CSV 导出带 BOM', async () => {
     const data = [{ name: 'a', total: 1 }]
 
-    await useExport().exportToJSON(data, { showLoading: false })
-    const json = await blobs[0]!.text()
-    expect(json).toBe(JSON.stringify(data, null, 2))
-    expect(() => JSON.parse(json)).not.toThrow()
-
-    // 必须按字节看：Blob.text() 走 UTF-8 解码，标准行为会把开头的 BOM 当标记剥掉，用它永远验证不到
     await useExport().exportToCSV(data, { showLoading: false })
-    const csvBytes = new Uint8Array(await blobs[1]!.arrayBuffer())
+    const csvBytes = new Uint8Array(await blobs[0]!.arrayBuffer())
     expect([csvBytes[0], csvBytes[1], csvBytes[2]]).toEqual([0xef, 0xbb, 0xbf])
   })
 })

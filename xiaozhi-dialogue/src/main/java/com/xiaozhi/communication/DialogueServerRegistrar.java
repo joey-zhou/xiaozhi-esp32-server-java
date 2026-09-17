@@ -3,10 +3,12 @@ package com.xiaozhi.communication;
 import com.xiaozhi.communication.common.InstanceIdHolder;
 import com.xiaozhi.communication.registry.DialogueServerInfo;
 import com.xiaozhi.communication.registry.DialogueServerRegistry;
+import com.xiaozhi.storage.StorageSharingSelfCheck;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.Executors;
@@ -16,9 +18,13 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 /**
  * Dialogue服务器自动注册器 — 启动时注册，定时心跳，关闭时注销
+ * <p>
+ * 存储共享性自检排在本实例注册之前完成：自检不通过的实例马上就会退出，
+ * 先注册会让 server 在这段窗口里把设备分配到一个即将消失的实例上。
  */
 @Slf4j
 @Component
+@DependsOn(StorageSharingSelfCheck.BEAN_NAME)
 public class DialogueServerRegistrar {
 
     @Resource

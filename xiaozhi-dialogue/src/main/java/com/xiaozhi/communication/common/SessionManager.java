@@ -6,6 +6,7 @@ import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.common.port.DeviceWriter;
 import com.xiaozhi.dialogue.audio.AecService;
 import com.xiaozhi.dialogue.audio.VadService;
+import com.xiaozhi.dialogue.llm.handler.PersonaCleanup;
 import com.xiaozhi.event.ChatAudioOpenedEvent;
 import com.xiaozhi.event.ChatSessionClosedEvent;
 import com.xiaozhi.event.DeviceOnlineEvent;
@@ -13,20 +14,21 @@ import com.xiaozhi.event.DeviceUpdatedEvent;
 import com.xiaozhi.event.ChatSessionOpenedEvent;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -47,8 +49,8 @@ public class SessionManager {
     // 存储验证码生成状态
     private final ConcurrentHashMap<String, Boolean> captchaState = new ConcurrentHashMap<>();
 
-    // 用于启动时延迟重置设备状态
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    /** 上一次运行遗留在本实例名下的设备，容器就绪后据此补偿状态 */
+    private volatile Set<String> staleDeviceIds = Set.of();
 
     // 服务关闭标志，关闭期间跳过设备状态写库（启动时会 bulk reset，无需重复写）
     private volatile boolean shuttingDown = false;
@@ -75,25 +77,48 @@ public class SessionManager {
     @Resource
     private InstanceIdHolder instanceIdHolder;
 
+    @Resource
+    private PersonaCleanup personaCleanup;
+
     @PostConstruct
     public void init() {
-        // 项目启动时，只重置属于本实例的设备为离线（延迟执行避免循环依赖）
-        scheduler.schedule(() -> {
-            try {
-                Set<String> ownDeviceIds = deviceRegistry.getOwnDeviceIds();
-                if (!ownDeviceIds.isEmpty()) {
-                    int updated = deviceWriter.batchUpdateState(ownDeviceIds, DeviceBO.DEVICE_STATE_OFFLINE);
-                    log.info("项目启动，重置本实例 {} 个设备状态为离线", updated);
-                    // 清理本实例旧的 Redis 映射
-                    for (String deviceId : ownDeviceIds) {
-                        deviceRegistry.unbind(deviceId);
-                    }
-                }
-                log.info("项目启动，instanceId: {}", instanceIdHolder.getInstanceId());
-            } catch (Exception e) {
-                log.error("项目启动时重置设备状态失败", e);
+        // 快照取在容器开始接客之前：此刻还挂在本实例名下的，只可能是上一次运行的遗留
+        try {
+            staleDeviceIds = deviceRegistry.getOwnDeviceIds();
+        } catch (Exception e) {
+            log.error("读取本实例遗留设备失败", e);
+        }
+        log.info("项目启动，instanceId: {}, 本实例遗留设备 {} 个",
+                instanceIdHolder.getInstanceId(), staleDeviceIds.size());
+    }
+
+    /**
+     * 把上一次运行遗留的设备补写成离线并清掉旧路由。
+     * 放在容器就绪后执行：DeviceWriter 是懒加载代理，在 @PostConstruct 里调用会把它的依赖链拉进
+     * 构造期而成环。Web 容器那段更早的窗口则靠
+     * deviceIdToSessionId 兜底——真连上来的设备已经登记在册，这里必须跳过，
+     * 否则会把在线设备写成离线，还会解掉它刚建好的 device→instance 路由。
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    public void resetStaleDevices() {
+        try {
+            Set<String> pending = new HashSet<>(staleDeviceIds);
+            staleDeviceIds = Set.of();
+            pending.removeAll(deviceIdToSessionId.keySet());
+            if (pending.isEmpty()) {
+                return;
             }
-        }, 1, TimeUnit.SECONDS);
+            int updated = deviceWriter.batchUpdateState(pending, DeviceBO.DEVICE_STATE_OFFLINE);
+            log.info("项目启动，重置本实例 {} 个遗留设备状态为离线", updated);
+            for (String deviceId : pending) {
+                if (!deviceIdToSessionId.containsKey(deviceId)) {
+                    deviceRegistry.unbind(deviceId);
+                }
+            }
+        } catch (Exception e) {
+            log.error("项目启动时重置设备状态失败", e);
+        }
     }
 
     public boolean isShuttingDown() {
@@ -107,7 +132,6 @@ public class SessionManager {
     @EventListener(ContextClosedEvent.class)
     public void onContextClosed() {
         shuttingDown = true;
-        scheduler.shutdown();
     }
 
     /**
@@ -229,6 +253,9 @@ public class SessionManager {
             // 状态写库要赶在会话被摘出注册表之前，否则设备主动 goodbye、超时关闭、
             // 退出意图这几条路径的连接回调都取不到会话，离线状态永远写不进去
             updateDeviceStateOnClose(chatSession);
+            // 先断上游合成、停播放器，再往下释放音频资源。同样要在这里做而不是挂事件：
+            // 硬断线时连接已关，事件发不出去，上游 LLM/TTS 订阅会一路跑到本轮结束
+            personaCleanup.cleanup(chatSession);
             // VAD 状态与 AEC 的原生 APM 每条关闭路径都要释放：
             // WebSocket 的连接回调取不到已摘除的会话，留在回调里会漏掉超时告别、退出意图这些路径
             vadService.resetSession(chatSession.getSessionId());
@@ -241,9 +268,10 @@ public class SessionManager {
             if (chatSession.getDevice() != null) {
                 String deviceId = chatSession.getDevice().getDeviceId();
                 ChatSession bound = getSessionByDeviceId(deviceId);
-                // 设备已在新连接上重连时绑定归新会话，旧连接收尾不能解掉
+                // 设备已在本实例的新连接上重连时绑定归新会话，旧连接收尾不能解掉。
+                // 跨实例重连本地映射查不到，只能靠 Redis 里的实例标识比对
                 if (bound == null || bound.getSessionId().equals(chatSession.getSessionId())) {
-                    deviceRegistry.unbind(deviceId);
+                    deviceRegistry.unbindIfOwned(deviceId);
                 }
             }
             if (chatSession.isAudioChannelOpen()) {

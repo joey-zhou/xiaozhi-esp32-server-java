@@ -23,6 +23,15 @@ uploads/
 logs/
 data/
 
+# 本地下载的模型/原生库与交付物：构建时由 scripts/download_*.sh 重新下载，不需要从上下文带入
+models/
+lib/
+delivery/
+delivery.zip
+
+# 架构审计输出，与镜像构建无关
+outputs/
+
 # 杂项
 *.md
 *.log

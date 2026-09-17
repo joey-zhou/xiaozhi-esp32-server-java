@@ -277,6 +277,7 @@ public class AliyunSttService implements SttService {
 
         // 初始化流式识别服务
         TranslationRecognizerRealtime translator = new TranslationRecognizerRealtime();
+        boolean completed = false;
 
         try {
             // 启动流式语音识别
@@ -303,7 +304,7 @@ public class AliyunSttService implements SttService {
             );
 
             // 等待识别完成，最多90秒
-            boolean completed = latch.await(90, TimeUnit.SECONDS);
+            completed = latch.await(90, TimeUnit.SECONDS);
 
             if (!completed) {
                 log.warn("语音识别超时({})", model);
@@ -321,11 +322,12 @@ public class AliyunSttService implements SttService {
             }
         }
 
+        SttResult sttResult = SttResult.textOnly(result.toString());
         if (hasError.get()) {
-            return SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR);
+            sttResult = sttResult.withFailure(SttResult.FAILURE_UPSTREAM_ERROR);
         }
-
-        return SttResult.textOnly(result.toString());
+        // 超时且没有已识别文本时才记超时失败，已有部分文本按部分结果返回
+        return completed ? sttResult : sttResult.withFailureIfEmpty(SttResult.FAILURE_TIMEOUT);
     }
 
     /**
@@ -337,6 +339,7 @@ public class AliyunSttService implements SttService {
         AtomicBoolean hasError = new AtomicBoolean(false);
         AtomicBoolean isCompleted = new AtomicBoolean(false);
         AtomicReference<OmniRealtimeConversation> conversationRef = new AtomicReference<>(null);
+        boolean completed = false;
         // 初始化请求参数
         OmniRealtimeParam param = OmniRealtimeParam.builder()
                 .model(model)
@@ -458,7 +461,7 @@ public class AliyunSttService implements SttService {
             );
 
             // 等待识别完成，最多90秒
-            boolean completed = latch.await(90, TimeUnit.SECONDS);
+            completed = latch.await(90, TimeUnit.SECONDS);
 
             if (!completed) {
                 log.warn("语音识别超时({})", model);
@@ -482,10 +485,11 @@ public class AliyunSttService implements SttService {
             }
         }
 
+        SttResult sttResult = SttResult.textOnly(result.toString());
         if (hasError.get()) {
-            return SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR);
+            sttResult = sttResult.withFailure(SttResult.FAILURE_UPSTREAM_ERROR);
         }
-
-        return SttResult.textOnly(result.toString());
+        // 超时且没有已识别文本时才记超时失败，已有部分文本按部分结果返回
+        return completed ? sttResult : sttResult.withFailureIfEmpty(SttResult.FAILURE_TIMEOUT);
     }
 }

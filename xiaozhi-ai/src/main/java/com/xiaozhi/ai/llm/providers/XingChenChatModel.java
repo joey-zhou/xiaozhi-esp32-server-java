@@ -26,10 +26,12 @@ public class XingChenChatModel implements ChatModel {
     /**
      * 构造函数
      *
+     * @param bearerToken 控制台配置的授权码(APIKey:APISecret)，直接作为 Bearer token 使用
+     * @param flowId 工作流ID
      * @param toolCallingManager 应用统一装配的工具调用管理器，保证走本仓的工具链记录、事件与观测
      */
-    public XingChenChatModel(String endpoint, String apiKey, String secret, ToolCallingManager toolCallingManager) {
-        chatClient = new XingChenClient(endpoint, apiKey, secret);
+    public XingChenChatModel(String endpoint, String bearerToken, String flowId, ToolCallingManager toolCallingManager) {
+        chatClient = new XingChenClient(endpoint, bearerToken, flowId);
         this.toolCallingManager = toolCallingManager;
     }
 
@@ -46,7 +48,7 @@ public class XingChenChatModel implements ChatModel {
                     "AGENT_USER_INPUT", prompt.getUserMessage().getText(),
                     "func_call", chatOptions.getToolCallbacks()
             );
-            log.info("工具支持如下：{}", JsonUtil.toJson(chatOptions.getToolCallbacks()));
+            log.debug("工具数量: {}", chatOptions.getToolCallbacks().size());
         } else {
             input = Map.of(
                     "AGENT_USER_INPUT", prompt.getUserMessage().getText(),
@@ -68,6 +70,12 @@ public class XingChenChatModel implements ChatModel {
         try {
             // 发送消息并获取响应
             XingChenResponse response = chatClient.sendChatMessage(message);
+            // 安全检查: 确保 choices 不为空,与 stream() 保持一致
+            if (response.getChoices() == null || response.getChoices().isEmpty()
+                    || response.getChoices().get(0).getDelta() == null) {
+                log.warn("收到空的 choices/delta,跳过此消息");
+                return ChatResponse.builder().generations(Collections.emptyList()).build();
+            }
             return new ChatResponse(List.of(new Generation(
                     AssistantMessage.builder()
                             .content(response.getChoices().get(0).getDelta().getContent())
@@ -252,8 +260,6 @@ public class XingChenChatModel implements ChatModel {
             chatClient.resume(resume, new XingChenChatStreamCallback() {
                 @Override
                 public void onMessage(XingChenResponse event) {
-                    log.info("Resume onMessage: {}", JsonUtil.toJson(event));
-                    
                     // 安全检查: 确保 choices 不为空
                     if (event.getChoices() == null || event.getChoices().isEmpty()) {
                         log.warn("Resume 收到空的 choices,跳过此消息");
@@ -280,7 +286,8 @@ public class XingChenChatModel implements ChatModel {
 
                 @Override
                 public void onMessageEnd(XingChenResponse event) {
-                    log.info("Resume onMessageEnd,流程完成: {}", JsonUtil.toJson(event));
+                    // [DONE] 结束时 event 为 null
+                    log.debug("Resume onMessageEnd,流程完成: messageId={}", event != null ? event.getId() : null);
                     // Resume流程结束,通知完成
                     sink.complete();
                 }

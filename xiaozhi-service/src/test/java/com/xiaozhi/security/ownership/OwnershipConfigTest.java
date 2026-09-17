@@ -47,13 +47,14 @@ class OwnershipConfigTest {
         List<String> resources = List.of(
             config.roleOwnershipChecker(mock(RoleMapper.class)).getResource(),
             config.configOwnershipChecker(mock(ConfigService.class)).getResource(),
+            config.configWriteOwnershipChecker(mock(ConfigService.class)).getResource(),
             config.templateOwnershipChecker(mock(TemplateMapper.class)).getResource(),
             config.deviceOwnershipChecker(mock(DeviceService.class)).getResource(),
             config.messageOwnershipChecker(mock(MessageService.class)).getResource(),
             config.userOwnershipChecker(mock(UserService.class)).getResource());
 
         assertThat(resources).doesNotHaveDuplicates()
-            .containsExactly("role", "config", "template", "device", "message", "user");
+            .containsExactly("role", "config", "configWrite", "template", "device", "message", "user");
     }
 
     @Nested
@@ -145,6 +146,53 @@ class OwnershipConfigTest {
             when(configService.getBO(3)).thenReturn(configBO(OWNER));
 
             assertThatThrownBy(() -> config.configOwnershipChecker(configService).check(3, OTHER))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("配置不归属当前用户");
+        }
+
+        private ConfigBO configBO(Integer userId) {
+            ConfigBO configBO = new ConfigBO();
+            configBO.setConfigId(3);
+            configBO.setUserId(userId);
+            return configBO;
+        }
+    }
+
+    /** 写路径（改配置、删配置）用的检查器。 */
+    @Nested
+    @ExtendWith(MockitoExtension.class)
+    class ConfigWriteChecker {
+
+        @Mock
+        private ConfigService configService;
+
+        @Test
+        void resourceNameIsConfigWrite() {
+            assertThat(config.configWriteOwnershipChecker(configService).getResource()).isEqualTo("configWrite");
+        }
+
+        @Test
+        void passesWhenOwnedByUser() {
+            when(configService.getBO(3)).thenReturn(configBO(OWNER));
+
+            assertThatCode(() -> config.configWriteOwnershipChecker(configService).check(3, OWNER))
+                .doesNotThrowAnyException();
+        }
+
+        @Test
+        void rejectsMissingConfigAsNotFound() {
+            when(configService.getBO(3)).thenReturn(null);
+
+            assertThatThrownBy(() -> config.configWriteOwnershipChecker(configService).check(3, OWNER))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("配置不存在");
+        }
+
+        @Test
+        void rejectsOtherUsersConfigAsUnauthorized() {
+            when(configService.getBO(3)).thenReturn(configBO(OWNER));
+
+            assertThatThrownBy(() -> config.configWriteOwnershipChecker(configService).check(3, OTHER))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("配置不归属当前用户");
         }

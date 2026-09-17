@@ -151,6 +151,11 @@ public class S3StorageService implements StorageService {
     }
 
     @Override
+    public String urlPrefix() {
+        return urlPrefix;
+    }
+
+    @Override
     public String getProvider() {
         return "s3";
     }

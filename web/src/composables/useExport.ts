@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 /**
  * 数据导出 Composable
- * 支持 CSV、JSON、Excel 等格式导出
+ * 支持 CSV、Excel 导出
  */
 
 export interface ExportColumn<T = unknown> {
@@ -12,12 +12,12 @@ export interface ExportColumn<T = unknown> {
    * 列键名
    */
   key: string
-  
+
   /**
    * 列标题
    */
   title: string
-  
+
   /**
    * 自定义格式化函数
    */
@@ -29,12 +29,12 @@ export interface ExportOptions<T = unknown> {
    * 文件名（不含扩展名）
    */
   filename?: string
-  
+
   /**
    * 列配置（如果不指定，则导出所有字段）
    */
   columns?: ExportColumn<T>[]
-  
+
   /**
    * 是否显示加载提示
    */
@@ -48,15 +48,6 @@ const CSV_FORMULA_PREFIX = /^[=+\-@\t\r]/
  * 转义单个 CSV 单元格：公式前缀加单引号强制成文本，引号翻倍，整体加引号
  * 纯数字（含负数）不加单引号，避免把数值列变成文本
  */
-/** 转义 HTML 文本节点，防止 CSV 内容里的标签被当标记渲染 */
-function escapeHTML(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
 function escapeCSVCell(value: unknown): string {
   if (value === null || value === undefined) {
     return '""'
@@ -66,67 +57,69 @@ function escapeCSVCell(value: unknown): string {
   return `"${safe.replace(/"/g, '""')}"`
 }
 
+/**
+ * 转换为 CSV 格式
+ * 纯函数，独立导出供单测直接调用；组件侧统一走 exportToCSV
+ */
+export function convertToCSV<T>(data: T[], columns?: ExportColumn<T>[]): string {
+  if (data.length === 0) return ''
+
+  // 如果没有指定列，使用第一行的所有键
+  const firstItem = data[0] as object
+  const cols: ExportColumn<T>[] = columns || Object.keys(firstItem).map(key => ({
+    key,
+    title: key,
+  }))
+
+  // CSV 头部
+  const headers = cols.map(col => escapeCSVCell(col.title)).join(',')
+
+  // CSV 数据行
+  const rows = data.map(record => {
+    const recordObj = record as { [key: string]: unknown }
+    return cols.map(col => {
+      let value: unknown = recordObj[col.key]
+
+      // 使用自定义格式化
+      if (col.format) {
+        value = col.format(value, record)
+      }
+
+      return escapeCSVCell(value)
+    }).join(',')
+  })
+
+  return [headers, ...rows].join('\n')
+}
+
+/**
+ * 触发浏览器下载：造一个隐藏的 <a download> 元素点击后立即回收
+ * withBom 只给 CSV 用：Excel 靠 BOM 认 UTF-8，而 JSON/二进制内容带 BOM 会解析失败
+ */
+function downloadFile(content: BlobPart, filename: string, mimeType: string, withBom = false) {
+  const part = withBom && typeof content === 'string' ? `\uFEFF${content}` : content
+  const blob = new Blob([part], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.style.display = 'none'
+
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+
+  // 释放 URL 对象
+  setTimeout(() => URL.revokeObjectURL(url), 100)
+}
+
 export function useExport() {
   const { t } = useI18n()
-  
+
   // 导出状态
   const exporting = ref(false)
-  
-  /**
-   * 转换为 CSV 格式
-   */
-  const convertToCSV = <T>(data: T[], columns?: ExportColumn<T>[]): string => {
-    if (data.length === 0) return ''
-    
-    // 如果没有指定列，使用第一行的所有键
-    const firstItem = data[0] as object
-    const cols: ExportColumn<T>[] = columns || Object.keys(firstItem).map(key => ({
-      key,
-      title: key,
-    }))
-    
-    // CSV 头部
-    const headers = cols.map(col => escapeCSVCell(col.title)).join(',')
-    
-    // CSV 数据行
-    const rows = data.map(record => {
-      const recordObj = record as { [key: string]: unknown }
-      return cols.map(col => {
-        let value: unknown = recordObj[col.key]
-        
-        // 使用自定义格式化
-        if (col.format) {
-          value = col.format(value, record)
-        }
-        
-        return escapeCSVCell(value)
-      }).join(',')
-    })
-    
-    return [headers, ...rows].join('\n')
-  }
-  
-  /**
-   * 下载文件
-   * withBom 只给 CSV 用：Excel 靠 BOM 认 UTF-8，而 JSON 带 BOM 会解析失败
-   */
-  const downloadFile = (content: string, filename: string, mimeType: string, withBom = true) => {
-    const blob = new Blob([withBom ? `\uFEFF${content}` : content], { type: `${mimeType};charset=utf-8;` })
-    const url = URL.createObjectURL(blob)
-    
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    link.style.display = 'none'
-    
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    
-    // 释放 URL 对象
-    setTimeout(() => URL.revokeObjectURL(url), 100)
-  }
-  
+
   /**
    * 导出为 CSV
    */
@@ -138,19 +131,19 @@ export function useExport() {
       message.warning(t('export.noData'))
       return false
     }
-    
+
     exporting.value = true
-    
+
     try {
       if (options.showLoading !== false) {
         message.loading(t('export.exporting'))
       }
-      
+
       const csv = convertToCSV(data, options.columns)
       const filename = `${options.filename || 'export'}.csv`
-      
-      downloadFile(csv, filename, 'text/csv')
-      
+
+      downloadFile(csv, filename, 'text/csv;charset=utf-8;', true)
+
       // 只在启用内部提示时显示成功消息
       if (options.showLoading !== false) {
         message.success(t('export.success'))
@@ -167,65 +160,7 @@ export function useExport() {
       exporting.value = false
     }
   }
-  
-  /**
-   * 导出为 JSON
-   */
-  const exportToJSON = async <T>(
-    data: T[],
-    options: ExportOptions<T> = {}
-  ): Promise<boolean> => {
-    if (data.length === 0) {
-      message.warning(t('export.noData'))
-      return false
-    }
-    
-    exporting.value = true
-    
-    try {
-      if (options.showLoading !== false) {
-        message.loading(t('export.exporting'))
-      }
-      
-      // 如果指定了列，只导出指定的字段
-      let exportData = data
-      if (options.columns && options.columns.length > 0) {
-        exportData = data.map(record => {
-          const recordObj = record as { [key: string]: unknown }
-          const newRecord: { [key: string]: unknown } = {}
-          options.columns?.forEach(col => {
-            let value = recordObj[col.key]
-            if (col.format) {
-              value = col.format(value, record)
-            }
-            newRecord[col.title || col.key] = value
-          })
-          return newRecord as T
-        })
-      }
-      
-      const json = JSON.stringify(exportData, null, 2)
-      const filename = `${options.filename || 'export'}.json`
-      
-      downloadFile(json, filename, 'application/json', false)
-      
-      // 只在启用内部提示时显示成功消息
-      if (options.showLoading !== false) {
-        message.success(t('export.success'))
-      }
-      return true
-    } catch (error) {
-      console.error('JSON 导出失败:', error)
-      // 只在启用内部提示时显示错误消息
-      if (options.showLoading !== false) {
-        message.error(t('export.failed'))
-      }
-      return false
-    } finally {
-      exporting.value = false
-    }
-  }
-  
+
   /**
    * 导出为 Excel（生成真实的 .xlsx 文件）
    */
@@ -237,14 +172,14 @@ export function useExport() {
       message.warning(t('export.noData'))
       return false
     }
-    
+
     exporting.value = true
-    
+
     try {
       if (options.showLoading !== false) {
         message.loading(t('export.exporting'))
       }
-      
+
       // 确定列配置（未指定时使用首行所有字段）
       const firstItem = data[0] as object
       const cols: ExportColumn<T>[] = options.columns || Object.keys(firstItem).map(key => ({
@@ -286,22 +221,9 @@ export function useExport() {
       // 生成 xlsx 二进制并触发下载
       const buffer = await workbook.xlsx.writeBuffer()
       const filename = `${options.filename || 'export'}.xlsx`
-      const blob = new Blob([buffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      })
-      const url = URL.createObjectURL(blob)
-      
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      link.style.display = 'none'
-      
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      
-      setTimeout(() => URL.revokeObjectURL(url), 100)
-      
+
+      downloadFile(buffer, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
       // 只在启用内部提示时显示成功消息
       if (options.showLoading !== false) {
         message.success(t('export.success'))
@@ -318,131 +240,13 @@ export function useExport() {
       exporting.value = false
     }
   }
-  
-  /**
-   * 自动选择导出格式
-   */
-  const exportData = async <T>(
-    data: T[],
-    format: 'csv' | 'json' | 'excel',
-    options: ExportOptions<T> = {}
-  ): Promise<boolean> => {
-    switch (format) {
-      case 'csv':
-        return await exportToCSV(data, options)
-      case 'json':
-        return await exportToJSON(data, options)
-      case 'excel':
-        return await exportToExcel(data, options)
-      default:
-        message.error(t('export.unsupportedFormat'))
-        return false
-    }
-  }
-  
-  /**
-   * 从 CSV 文本解析为 HTML 表格（用于预览）
-   */
-  const parseCSVToTable = (csvText: string): string => {
-    if (!csvText.trim()) {
-      return ''
-    }
-    
-    const lines = csvText.split(/\r?\n/).filter(line => line.trim())
-    if (lines.length === 0) {
-      return ''
-    }
-    
-    const headerRow = lines[0]
-    const dataRows = lines.slice(1)
-    
-    // 简单的 CSV 解析（处理引号）
-    const parseCSVRow = (row: string): string[] => {
-      const values: string[] = []
-      let current = ''
-      let inQuotes = false
-      
-      for (let i = 0; i < row.length; i++) {
-        const char = row[i]
-        const nextChar = row[i + 1]
-        
-        if (char === '"') {
-          if (inQuotes && nextChar === '"') {
-            current += '"'
-            i++
-          } else {
-            inQuotes = !inQuotes
-          }
-        } else if (char === ',' && !inQuotes) {
-          values.push(current.trim())
-          current = ''
-        } else {
-          current += char
-        }
-      }
-      
-      values.push(current)
-      return values
-    }
-    
-    const headers = parseCSVRow(headerRow || '')
-    const headerHTML = `<tr>${headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr>`
-    
-    const rowsHTML = dataRows.map(row => {
-      const cells = parseCSVRow(row)
-      return `<tr>${cells.map(c => `<td>${escapeHTML(c)}</td>`).join('')}</tr>`
-    }).join('')
-    
-    return `<thead>${headerHTML}</thead><tbody>${rowsHTML}</tbody>`
-  }
-  
-  /**
-   * 从剪贴板导入 CSV 数据
-   */
-  const importFromClipboard = async <T = { [key: string]: string }>(): Promise<T[]> => {
-    try {
-      const text = await navigator.clipboard.readText()
-      
-      if (!text.trim()) {
-        message.warning(t('export.noData'))
-        return []
-      }
-      
-      // 简单解析 CSV（假设以 tab 或逗号分隔）
-      const lines = text.split(/\r?\n/).filter(line => line.trim())
-      const headers = lines[0]?.split(/\t|,/).map(h => h.trim()) || []
-      
-      const data: T[] = []
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i]?.split(/\t|,/).map(v => v.trim()) || []
-        const row: { [key: string]: string } = {}
-        headers.forEach((header, index) => {
-          row[header] = values[index] || ''
-        })
-        data.push(row as T)
-      }
-      
-      message.success(t('export.importSuccess'))
-      return data
-    } catch (error) {
-      console.error('导入失败:', error)
-      message.error(t('export.importFailed'))
-      return []
-    }
-  }
-  
+
   return {
     // 状态
     exporting,
-    
+
     // 方法
     exportToCSV,
-    exportToJSON,
     exportToExcel,
-    exportData,
-    parseCSVToTable,
-    importFromClipboard,
-    convertToCSV,
-    downloadFile
   }
 }

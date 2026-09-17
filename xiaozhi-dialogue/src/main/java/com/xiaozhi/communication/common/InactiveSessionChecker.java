@@ -29,7 +29,9 @@ public class InactiveSessionChecker {
     private static final int INACTIVE_CHECK_INTERVAL_SECONDS = 2;
     private static final int DEVICE_REGISTRY_REFRESH_INTERVAL_SECONDS = 60;
 
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    // 两个周期任务各占一条线程：refreshDeviceRegistry 的 Redis 往返一旦变慢，
+    // 不能拖住 checkInactiveSessions 的 2 秒节奏
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     @Resource
     private SessionManager sessionManager;
@@ -103,16 +105,26 @@ public class InactiveSessionChecker {
                 session.getSessionId(), inactiveDuration.getSeconds());
         session.clearAudioSinks();
 
-        var persona = session.getPersona();
-        if (persona != null && session.isAudioChannelOpen()) {
-            try {
-                persona.sendFarewell(timeoutMessages.get());
-                return;
-            } catch (Exception e) {
-                log.warn("会话 {} 发送超时提示失败，直接关闭会话", session.getSessionId(), e);
+        // 告别语要查 TTS 缓存（可能连带 MySQL/OSS 下载），挪到虚拟线程；
+        // tryBeginInactiveClose 的 CAS 已经保证同一会话不会被重复触发
+        Thread.startVirtualThread(() -> closeInactiveSession(session));
+    }
+
+    private void closeInactiveSession(ChatSession session) {
+        try {
+            var persona = session.getPersona();
+            if (persona != null && session.isAudioChannelOpen()) {
+                try {
+                    persona.sendFarewell(timeoutMessages.get());
+                    return;
+                } catch (Exception e) {
+                    log.warn("会话 {} 发送超时提示失败，直接关闭会话", session.getSessionId(), e);
+                }
             }
+            sessionManager.closeSession(session);
+        } catch (Exception e) {
+            log.error("关闭不活跃会话失败 - SessionId: {}", session.getSessionId(), e);
         }
-        sessionManager.closeSession(session);
     }
 
     void refreshDeviceRegistry() {

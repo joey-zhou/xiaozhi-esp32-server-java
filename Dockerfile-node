@@ -2,12 +2,15 @@ FROM node:22-alpine AS builder
 
 WORKDIR /node
 
-COPY . .
-
-# 安装所有依赖并构建
+# 先只复制锁文件装依赖，源码变更时命中缓存不用重装；npm ci 严格按 package-lock.json 安装，
+# 不会像 npm install 那样在版本漂移时静默改写锁文件
+COPY package.json package-lock.json ./
 RUN npm config set registry https://registry.npmmirror.com && \
-    npm install && \
-    npm run build
+    npm ci
+
+# 构建产物含子工程 xiaozhi-assets-generator（build 脚本里的 build:tools 步骤）
+COPY . .
+RUN npm run build
 
 # 生产阶段
 FROM nginx:alpine
@@ -19,6 +22,7 @@ RUN echo 'server { \
     listen 8084; \
     root /usr/share/nginx/html; \
     index index.html; \
+    client_max_body_size 100M; \
     location / { \
         try_files $uri $uri/ /index.html; \
     } \

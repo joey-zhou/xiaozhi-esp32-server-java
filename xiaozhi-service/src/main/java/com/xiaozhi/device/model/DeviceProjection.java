@@ -13,7 +13,6 @@ public class DeviceProjection {
     private Integer roleId;
     private String roleName;
     private String state;
-    private Integer totalMessage;
     private String wifiName;
     private String ip;
     private String chipModelName;

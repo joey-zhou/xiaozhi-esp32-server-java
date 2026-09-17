@@ -117,6 +117,11 @@ public class AliyunOssStorageService implements StorageService {
     }
 
     @Override
+    public String urlPrefix() {
+        return urlPrefix;
+    }
+
+    @Override
     public String getProvider() {
         return "aliyun";
     }

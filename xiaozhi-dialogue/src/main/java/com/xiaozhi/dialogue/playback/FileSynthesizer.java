@@ -56,29 +56,33 @@ public class FileSynthesizer extends Synthesizer {
      * @param reply 是否本轮 LLM 回复，决定播放器是否把句子计入打断截断
      */
     private void synthesize(Flux<String> stringFlux, boolean reply) {
-        llmDisposable = new SentenceHelper().convert(stringFlux).subscribe(result -> {
-            String text = result.text();
-            String mood = result.mood();
-            Flux<Speech> lazyTtsFlux = Flux.create(sink -> {
-                try {
-                    Path audioPath = ttsService.textToSpeech(text);
-                    if (audioPath != null) {
-                        List<byte[]> chunks = AudioUtils.readAsPcmChunks(audioPath.toString());
-                        boolean first = true;
-                        for (byte[] chunk : chunks) {
-                            sink.next(first ? new Speech(chunk, text).withMood(mood) : new Speech(chunk));
-                            first = false;
+        llmDisposable = new SentenceHelper().convert(stringFlux).subscribe(
+            result -> {
+                String text = result.text();
+                String mood = result.mood();
+                Flux<Speech> lazyTtsFlux = Flux.create(sink -> {
+                    try {
+                        Path audioPath = ttsService.textToSpeech(text);
+                        if (audioPath != null) {
+                            // 分块读取PCM，避免全量加载进内存
+                            List<byte[]> chunks = AudioUtils.readAsPcmChunks(audioPath.toString());
+                            boolean first = true;
+                            for (byte[] chunk : chunks) {
+                                sink.next(first ? new Speech(chunk, text).withMood(mood) : new Speech(chunk));
+                                first = false;
+                            }
+                        } else {
+                            log.error("TTS服务返回空音频文件 - SessionId: {}", chatSession.getSessionId());
                         }
-                    } else {
-                        log.error("TTS服务返回空音频文件 - SessionId: {}", chatSession.getSessionId());
+                    } catch (Exception e) {
+                        log.error("TTS合成出错: {} - SessionId: {}", e.getMessage(), chatSession.getSessionId());
                     }
-                } catch (Exception e) {
-                    log.error("TTS合成出错: {} - SessionId: {}", e.getMessage(), chatSession.getSessionId());
-                }
-                sink.complete();
-            });
-            player.play(lazyTtsFlux, reply);
-        });
+                    sink.complete();
+                });
+                player.play(lazyTtsFlux, reply);
+            },
+            // 上游分句流出错时接住，否则 Reactor 会把异常丢回 LLM 的投递线程
+            error -> log.error("分句流异常，本轮TTS合成中止 - SessionId: {}", chatSession.getSessionId(), error));
     }
 
     /**

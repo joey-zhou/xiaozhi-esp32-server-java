@@ -7,8 +7,9 @@ import { useConfigManager } from '@/composables/useConfigManager'
 import { useUserStore } from '@/store/user'
 import { useConfirm } from '@/composables/useConfirm'
 import TableActionButtons from '@/components/TableActionButtons.vue'
-import type { ConfigType, Config, ConfigField, LLMModel, ModelOption } from '@/types/config'
+import type { ConfigType, Config, ConfigField, LLMModel, LlmModelOption } from '@/types/config'
 import { addConfig, updateConfig, testConfig } from '@/services/config'
+import { CODE_CONFIRM_REQUIRED } from '@/constants/api'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -341,19 +342,7 @@ async function handleSubmit() {
     }
 
     submitLoading.value = true
-
-    const res = editingConfigId.value
-      ? await updateConfig(submitData)
-      : await addConfig(submitData)
-
-    if (res.code === 200) {
-      antMessage.success(editingConfigId.value ? t('config.updateSuccess') : t('config.createSuccess'))
-      resetForm()
-      activeTabKey.value = '1'
-      await fetchData()
-    } else {
-      antMessage.error(res.message || t('common.operationFailed'))
-    }
+    await submitConfig(submitData, false)
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'errorFields' in error) {
       antMessage.error(t('config.fillRequiredFields'))
@@ -364,6 +353,41 @@ async function handleSubmit() {
   } finally {
     submitLoading.value = false
   }
+}
+
+/**
+ * 发一次提交请求。
+ * 后端判定这次改动会换掉当前生效的对象存储时不直接执行，先带存量条数回一个待确认，
+ * 由这里把后果原样问给用户，确认后带确认参数原样重发一次。
+ */
+async function submitConfig(submitData: Partial<Config>, confirmStorageSwitch: boolean) {
+  const isEditing = !!editingConfigId.value
+  const res = isEditing
+    ? await updateConfig(submitData, confirmStorageSwitch)
+    : await addConfig(submitData, confirmStorageSwitch)
+
+  if (res.code === 200) {
+    antMessage.success(isEditing ? t('config.updateSuccess') : t('config.createSuccess'))
+    resetForm()
+    activeTabKey.value = '1'
+    await fetchData()
+    return
+  }
+
+  if (res.code === CODE_CONFIRM_REQUIRED) {
+    const confirmed = await confirmAsync({
+      title: t('config.storageSwitchTitle'),
+      content: res.message,
+      okText: t('config.storageSwitchOk'),
+      okType: 'danger',
+    })
+    if (confirmed) {
+      await submitConfig(submitData, true)
+    }
+    return
+  }
+
+  antMessage.error(res.message || t('common.operationFailed'))
 }
 
 /**
@@ -636,7 +660,7 @@ fetchData()
                     :placeholder="t('config.enterName', { type: t(configTypeInfo.label) })"
                     :options="modelOptions"
                     :filter-option="
-                      (input: string, option: ModelOption) =>
+                      (input: string, option: LlmModelOption) =>
                         option.label.toLowerCase().includes(input.toLowerCase())
                     "
                   />

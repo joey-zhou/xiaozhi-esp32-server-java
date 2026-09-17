@@ -12,7 +12,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -21,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -58,7 +56,6 @@ class WebChatServiceTest {
         role.setRoleDesc("测试角色");
         when(roleService.getBO(1)).thenReturn(role);
         when(chatMemory.find(anyString(), anyInt())).thenReturn(List.of());
-        when(chatModelFactory.getChatModel(role)).thenReturn(mock(ChatModel.class));
         return webChatService.openSession(9, 1);
     }
 

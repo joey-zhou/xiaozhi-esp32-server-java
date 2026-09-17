@@ -97,6 +97,11 @@ xiaozhi:
     expire-seconds: 2592000
     allowed-devices:  # 逗号分隔的设备MAC，白名单免 token
   runtime:
+    # 本地存储的数据根目录，决定 audio/、uploads/ 这些文件实际落在哪里；入库的路径始终是相对的，不受影响。
+    # server 与 dialogue 各自 cd 到自己的目录再启动时，audio/ 会落到两个地方，一边写的录音另一边读不到——
+    # 把这里配成两个进程都能访问的同一个绝对路径即可（如 /opt/xiaozhi/data）。
+    # 留空表示按各进程的工作目录，与历史行为一致；跨机部署解决不了共享问题，必须改用对象存储。
+    data-dir: ${XIAOZHI_DATA_DIR:}
     # 生产环境建议改成绝对路径，避免模型目录和原生库目录依赖启动工作目录
     native-lib-dir: lib
     vosk-model-dir: models/vosk-model

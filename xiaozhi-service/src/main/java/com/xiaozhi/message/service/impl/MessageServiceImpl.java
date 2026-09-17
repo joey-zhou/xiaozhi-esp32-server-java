@@ -1,5 +1,6 @@
 package com.xiaozhi.message.service.impl;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -40,6 +41,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class MessageServiceImpl implements MessageService {
+
+    @Resource
+    private RuntimePathConfig runtimePathConfig;
 
     @Resource
     private StorageServiceFactory storageServiceFactory;
@@ -119,7 +123,8 @@ public class MessageServiceImpl implements MessageService {
         LocalDate today = LocalDate.now();
         for (int i = 0; i <= AudioUtils.AUDIO_RETENTION_DAYS; i++) {
             String date = today.minusDays(i).format(DateTimeFormatter.ISO_LOCAL_DATE);
-            Path deviceDir = Path.of(AudioUtils.AUDIO_PATH, date, audioDeviceId);
+            Path deviceDir = runtimePathConfig.resolveStorageKey(
+                    Path.of(AudioUtils.AUDIO_PATH, date, audioDeviceId).toString());
             AudioUtils.deleteDirectory(deviceDir);
         }
         eventPublisher.publishEvent(new ConversationHistoryClearedEvent(this, deviceId));
@@ -345,10 +350,10 @@ public class MessageServiceImpl implements MessageService {
                 break;
             }
 
-            StorageService storage = storageServiceFactory.getStorageService();
             List<Long> messageIds = new ArrayList<>(batch.size());
             for (MessageDO message : batch) {
-                storage.remove(message.getAudioPath());
+                // 按每行自己的路径形态删：换过存储之后，同一批里可能既有本地文件又有云对象
+                storageServiceFactory.removeFrom(message.getAudioPath());
                 messageIds.add(message.getMessageId());
             }
 
@@ -360,5 +365,15 @@ public class MessageServiceImpl implements MessageService {
             purged += messageIds.size();
         }
         return purged;
+    }
+
+    @Override
+    public long countStoredPathsWithPrefix(String prefix) {
+        if (!StringUtils.hasText(prefix)) {
+            return 0;
+        }
+        return messageMapper.selectCount(new LambdaQueryWrapper<MessageDO>()
+            .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
+            .likeRight(MessageDO::getAudioPath, prefix));
     }
 }

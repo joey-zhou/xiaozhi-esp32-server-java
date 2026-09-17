@@ -1,12 +1,13 @@
 import { ref, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
-import type { ConfigType, Config, ConfigField, ModelOption, LLMModel, LLMFactory } from '@/types/config'
+import type { ConfigType, Config, ConfigField, LlmModelOption, LLMModel, LLMFactory } from '@/types/config'
 import { queryConfigs, updateConfig, deleteConfig as deleteConfigRequest } from '@/services/config'
 import { configTypeMap } from '@/config/providerConfig'
+import { CODE_CONFIRM_REQUIRED } from '@/constants/api'
 import llmFactoriesData from '@/config/llm_factories.json'
 import { useTable } from './useTable'
-import { useRequest } from './useRequest'
+import { useConfirm } from './useConfirm'
 
 /** 按模型类型分组的工厂模型表 */
 interface LLMFactoryModelInfo {
@@ -107,6 +108,7 @@ function getLlmFactoryIndex(): LLMFactoryIndex {
 
 export function useConfigManager(configType: ConfigType) {
   const { t } = useI18n()
+  const { confirmAsync } = useConfirm()
 
   // 使用统一的表格管理
   const {
@@ -118,14 +120,11 @@ export function useConfigManager(configType: ConfigType) {
     createDebouncedSearch,
   } = useTable<Config>()
 
-  // 删除沿用表格 loading，useRequest 自己的 loading 不用
-  const { executeOk: executeDelete } = useRequest()
-
   // 状态
   const currentType = ref('')
   const editingConfigId = ref<number>()
   const activeTabKey = ref('1')
-  const modelOptions = ref<ModelOption[]>([])
+  const modelOptions = ref<LlmModelOption[]>([])
 
   // LLM 工厂数据（常量索引，非 llm 类型不构建）
   const llmFactory = configType === 'llm' ? getLlmFactoryIndex() : EMPTY_LLM_FACTORY_INDEX
@@ -248,18 +247,39 @@ export function useConfigManager(configType: ConfigType) {
   async function deleteConfig(configId: number) {
     loading.value = true
     try {
-      const ok = await executeDelete(() => deleteConfigRequest(configId), {
-        showSuccess: true,
-        successText: t('common.deleteSuccess'),
-        errorText: t('common.deleteFailed'),
-      })
-
-      if (ok) {
-        await fetchData()
-      }
+      await submitDelete(configId, false)
     } finally {
       loading.value = false
     }
+  }
+
+  /**
+   * 删掉当前生效的对象存储配置会让历史文件不可访问，后端先拒一次，
+   * 这里弹确认框、确认后带标记重发，与「设为默认」走同一套交互
+   */
+  async function submitDelete(configId: number, confirmStorageSwitch: boolean) {
+    const res = await deleteConfigRequest(configId, confirmStorageSwitch)
+
+    if (res.code === 200) {
+      message.success(t('common.deleteSuccess'))
+      await fetchData()
+      return
+    }
+
+    if (res.code === CODE_CONFIRM_REQUIRED) {
+      const confirmed = await confirmAsync({
+        title: t('config.storageSwitchTitle'),
+        content: res.message,
+        okText: t('config.storageSwitchOk'),
+        okType: 'danger',
+      })
+      if (confirmed) {
+        await submitDelete(configId, true)
+      }
+      return
+    }
+
+    message.error(res.message || t('common.deleteFailed'))
   }
 
   /**
@@ -270,25 +290,47 @@ export function useConfigManager(configType: ConfigType) {
 
     loading.value = true
     try {
-      const res = await updateConfig({
-        configId: record.configId,
-        configType,
-        modelType: configType === 'llm' ? record.modelType : undefined,
-        isDefault: '1',
-      })
-
-      if (res.code === 200) {
-        message.success(t('common.setDefaultSuccess', { name: record.configName }))
-        await fetchData()
-      } else {
-        message.error(res.message || t('common.setDefaultFailed'))
-      }
+      await submitAsDefault(record, false)
     } catch (error) {
       console.error('设置默认配置失败:', error)
       message.error(t('common.serverMaintenance'))
     } finally {
       loading.value = false
     }
+  }
+
+  /**
+   * 发一次设为默认的请求。
+   * 换掉当前生效的对象存储时后端先回待确认并带上存量条数，问过用户再带确认参数重发。
+   */
+  async function submitAsDefault(record: Config, confirmStorageSwitch: boolean) {
+    const res = await updateConfig({
+      configId: record.configId,
+      configType,
+      modelType: configType === 'llm' ? record.modelType : undefined,
+      isDefault: '1',
+    }, confirmStorageSwitch)
+
+    if (res.code === 200) {
+      message.success(t('common.setDefaultSuccess', { name: record.configName }))
+      await fetchData()
+      return
+    }
+
+    if (res.code === CODE_CONFIRM_REQUIRED) {
+      const confirmed = await confirmAsync({
+        title: t('config.storageSwitchTitle'),
+        content: res.message,
+        okText: t('config.storageSwitchOk'),
+        okType: 'danger',
+      })
+      if (confirmed) {
+        await submitAsDefault(record, true)
+      }
+      return
+    }
+
+    message.error(res.message || t('common.setDefaultFailed'))
   }
 
   return {

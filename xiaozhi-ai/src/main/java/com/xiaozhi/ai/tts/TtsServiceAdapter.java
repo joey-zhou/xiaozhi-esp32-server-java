@@ -39,6 +39,10 @@ public class TtsServiceAdapter implements TextToSpeechModel {
         String text = prompt.getInstructions().getText();
         try {
             Path audioPath = ttsService.textToSpeech(text);
+            if (audioPath == null) {
+                // Provider 的失败契约是返回 null，不判空会在下一行退化成一条看不出原因的 NPE
+                throw new IllegalStateException("TTS 未生成音频: " + ttsService.getProviderName());
+            }
             byte[] audioBytes = Files.readAllBytes(audioPath);
             // 清理临时文件
             Files.deleteIfExists(audioPath);

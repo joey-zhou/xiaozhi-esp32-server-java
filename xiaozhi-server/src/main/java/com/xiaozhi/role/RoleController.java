@@ -17,6 +17,7 @@ import com.xiaozhi.common.model.resp.RoleResp;
 import com.xiaozhi.common.model.resp.SherpaVoiceResp;
 import com.xiaozhi.common.model.resp.TestVoiceResp;
 import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.ai.tts.SherpaVoiceProbe;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.config.service.ConfigService;
@@ -50,7 +51,7 @@ public class RoleController extends BaseController {
     private RoleAppService roleAppService;
 
     @Resource
-    private SherpaVoiceService sherpaVoiceService;
+    private SherpaVoiceProbe sherpaVoiceProbe;
 
     @Resource
     private TtsServiceFactory ttsService;
@@ -137,7 +138,7 @@ public class RoleController extends BaseController {
     @SaCheckPermission("system:role:api:list")
     @Operation(summary = "获取本地 sherpa-onnx 音色列表", description = "扫描配置的本地 TTS 模型目录，自动识别模型类型和 speaker")
     public ApiResponse<List<SherpaVoiceResp>> listSherpaVoices() {
-        return ApiResponse.success(sherpaVoiceService.listVoices());
+        return ApiResponse.success(sherpaVoiceProbe.listVoices());
     }
 
     @GetMapping("/testVoice")

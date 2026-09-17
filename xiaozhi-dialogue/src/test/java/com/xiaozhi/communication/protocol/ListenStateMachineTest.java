@@ -247,9 +247,8 @@ class ListenStateMachineTest {
 
         device.listenDetect("小智");
 
-        // 唤醒响应期间忽略 VAD，状态先切 SPEAKING
+        // 唤醒响应期间忽略 VAD，状态先切 SPEAKING —— 这一步必须留在读线程上同步完成
         assertThat(session.getDeviceState()).isEqualTo(DeviceState.SPEAKING);
-        assertThat(session.drainWakeWordAudio()).isEmpty();
 
         // 唤醒词与文本输入走同一条对话链路，回复经合成器替身下发
         JsonNode sentenceStart = device.transport().awaitJson("tts:sentence_start");

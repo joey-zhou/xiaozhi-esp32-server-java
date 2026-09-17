@@ -22,7 +22,6 @@ class DeviceConvertTest {
         projection.setRoleId(3);
         projection.setRoleName("小智");
         projection.setState("1");
-        projection.setTotalMessage(42);
         projection.setWifiName("home");
         projection.setIp("10.0.0.8");
         projection.setChipModelName("esp32s3");

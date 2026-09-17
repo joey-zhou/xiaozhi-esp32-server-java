@@ -68,6 +68,13 @@ class PermissionServiceImplTest {
         return permission;
     }
 
+    private static PermissionDO permissionDO(Integer permissionId, String permissionKey) {
+        PermissionDO permission = new PermissionDO();
+        permission.setPermissionId(permissionId);
+        permission.setPermissionKey(permissionKey);
+        return permission;
+    }
+
     private static UserBO userWithAuthRole(Integer authRoleId) {
         UserBO user = new UserBO();
         user.setAuthRoleId(authRoleId);
@@ -120,15 +127,26 @@ class PermissionServiceImplTest {
     @Test
     void listKeysByUserIdSkipsBlankKeys() {
         when(userService.getBO(1)).thenReturn(userWithAuthRole(2));
-        when(self.listByAuthRoleId(2)).thenReturn(List.of(
-            permission(10, 0, "system:user:list"),
-            permission(11, 0, null),
-            permission(12, 0, " "),
-            permission(13, 0, "system:user:detail")));
+        when(self.listKeysByAuthRoleId(2)).thenReturn(List.of("system:user:list", "system:user:detail"));
 
         List<String> result = permissionService.listKeysByUserId(1);
 
         assertThat(result).containsExactly("system:user:list", "system:user:detail");
+    }
+
+    @Test
+    void listKeysByAuthRoleIdOnlySelectsPermissionKeyColumn() {
+        when(self.listIdsByAuthRoleId(2)).thenReturn(List.of(10));
+        when(permissionMapper.selectList(any())).thenReturn(List.of(
+            permissionDO(10, "system:user:list"),
+            permissionDO(11, null),
+            permissionDO(12, " "),
+            permissionDO(13, "system:user:detail")));
+
+        List<String> result = permissionService.listKeysByAuthRoleId(2);
+
+        assertThat(result).containsExactly("system:user:list", "system:user:detail");
+        verifyNoInteractions(permissionConvert);
     }
 
     @Test

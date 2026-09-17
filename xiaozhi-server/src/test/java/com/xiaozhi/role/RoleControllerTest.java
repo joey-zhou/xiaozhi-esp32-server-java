@@ -1,5 +1,6 @@
 package com.xiaozhi.role;
 
+import com.xiaozhi.ai.tts.SherpaVoiceProbe;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.req.RoleCreateReq;
 import com.xiaozhi.common.model.req.RolePageReq;
@@ -47,7 +48,7 @@ class RoleControllerTest extends ControllerTestSupport {
     private RoleAppService roleAppService;
 
     @Mock
-    private SherpaVoiceService sherpaVoiceService;
+    private SherpaVoiceProbe sherpaVoiceProbe;
 
     private RoleController roleController;
 
@@ -55,7 +56,7 @@ class RoleControllerTest extends ControllerTestSupport {
     void setUp() {
         roleController = new RoleController();
         ReflectionTestUtils.setField(roleController, "roleAppService", roleAppService);
-        ReflectionTestUtils.setField(roleController, "sherpaVoiceService", sherpaVoiceService);
+        ReflectionTestUtils.setField(roleController, "sherpaVoiceProbe", sherpaVoiceProbe);
         mockMvc = buildMockMvc(roleController);
     }
 
@@ -152,7 +153,7 @@ class RoleControllerTest extends ControllerTestSupport {
 
     @Test
     void sherpaVoicesDelegatesToService() throws Exception {
-        when(sherpaVoiceService.listVoices()).thenReturn(List.of(
+        when(sherpaVoiceProbe.listVoices()).thenReturn(List.of(
             new SherpaVoiceResp("Alice", "kokoro-demo:kokoro:0", "sherpa-onnx", "kokoro-demo"),
             new SherpaVoiceResp("Bob", "kokoro-demo:kokoro:1", "sherpa-onnx", "kokoro-demo")
         ));

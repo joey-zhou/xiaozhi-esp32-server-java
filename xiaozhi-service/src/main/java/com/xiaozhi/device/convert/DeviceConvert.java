@@ -11,6 +11,7 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface DeviceConvert {
 
+    /** sessionId/roleName 是 dialogue 运行期字段，DO 里没有对应列，转换后恒为 null */
     @Mapping(target = "sessionId", ignore = true)
     @Mapping(target = "roleName", ignore = true)
     DeviceBO toBO(DeviceDO deviceDO);
@@ -19,7 +20,6 @@ public interface DeviceConvert {
     @Mapping(target = "roleId", ignore = true)
     @Mapping(target = "roleName", ignore = true)
     @Mapping(target = "state", ignore = true)
-    @Mapping(target = "totalMessage", ignore = true)
     @Mapping(target = "wifiName", ignore = true)
     @Mapping(target = "ip", ignore = true)
     @Mapping(target = "chipModelName", ignore = true)

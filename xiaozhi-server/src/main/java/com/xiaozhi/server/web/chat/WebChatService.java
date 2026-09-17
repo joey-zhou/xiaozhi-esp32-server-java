@@ -74,15 +74,17 @@ public class WebChatService {
     /**
      * 一个 Web 聊天会话的进程内状态。
      * lastAccessMillis 每次取用时刷新，空闲回收只看它。
+     * 这里只记 roleId 不缓存 ChatModel：模型实例的缓存与失效都归 {@link ChatModelFactory}，
+     * 会话再存一份就没有人能在配置变更后把它换掉。
      */
     private static final class WebChatSession {
         private final Conversation conversation;
-        private final ChatModel chatModel;
+        private final Integer roleId;
         private volatile long lastAccessMillis;
 
-        private WebChatSession(Conversation conversation, ChatModel chatModel) {
+        private WebChatSession(Conversation conversation, Integer roleId) {
             this.conversation = conversation;
-            this.chatModel = chatModel;
+            this.roleId = roleId;
             this.lastAccessMillis = System.currentTimeMillis();
         }
 
@@ -129,9 +131,7 @@ public class WebChatService {
                 .sessionScoped(true)
                 .build();
 
-        // 初始化 ChatModel
-        ChatModel chatModel = chatModelFactory.getChatModel(role);
-        sessions.put(sessionId, new WebChatSession(conversation, chatModel));
+        sessions.put(sessionId, new WebChatSession(conversation, role.getRoleId()));
 
         log.info("Web 聊天会话已创建: sessionId={}, userId={}, roleId={}, resume={}",
                 sessionId, userId, roleId, StringUtils.hasText(resumeSessionId));
@@ -182,7 +182,13 @@ public class WebChatService {
         }
         session.touch();
         Conversation conversation = session.conversation;
-        ChatModel chatModel = session.chatModel;
+
+        // 每轮重新取模型：角色改了模型/温度、或配置改了 apiKey，下一轮就生效
+        RoleBO role = roleService.getBO(session.roleId);
+        if (role == null) {
+            return Flux.error(new IllegalArgumentException("角色不存在: " + session.roleId));
+        }
+        ChatModel chatModel = chatModelFactory.getChatModel(role);
 
         // Web 场景：裸文本 UserMessage + 时间戳 metadata；
         // Conversation 投影层会在送 LLM 前拼出 [时间戳] 文本 的前缀。

@@ -165,9 +165,6 @@ export default {
     exporting: 'Exporting...',
     success: 'Export successful',
     failed: 'Export failed',
-    unsupportedFormat: 'Unsupported export format',
-    importSuccess: 'Import successful',
-    importFailed: 'Import failed',
   },
   
   clipboard: {
@@ -690,6 +687,8 @@ export default {
     fillRequiredFields: 'Please fill in required fields',
     modelNameNoChinese: 'Model name cannot contain Chinese characters, please enter a valid model name',
     modelNameInvalid: 'Model name "{name}" is not in the valid list',
+    storageSwitchTitle: 'Confirm object storage switch',
+    storageSwitchOk: 'Switch anyway',
   },
 
   message: {

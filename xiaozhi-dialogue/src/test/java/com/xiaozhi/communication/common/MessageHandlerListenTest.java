@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +41,8 @@ import static org.mockito.Mockito.when;
 class MessageHandlerListenTest {
 
     private static final String SESSION_ID = "listen-session";
+    /** Text/Detect 的重活跑在虚拟线程上，断言要留出调度时间 */
+    private static final long ASYNC_TIMEOUT_MS = 2000;
 
     @Mock
     private SessionManager sessionManager;
@@ -160,7 +163,19 @@ class MessageHandlerListenTest {
 
         messageHandler.handleMessage(message, SESSION_ID);
 
-        verify(dialogueService).handleWakeWord(session, "小智小智");
+        verify(dialogueService, timeout(ASYNC_TIMEOUT_MS)).handleWakeWord(session, "小智小智");
+    }
+
+    // 唤醒响应期间要屏蔽 VAD，状态切换必须在读线程上同步完成，不能等虚拟线程调度
+    @Test
+    void detectMarksSpeakingBeforeReturningFromReadThread() {
+        ListenMessage message = listen(ListenState.Detect, null);
+        message.setText("小智小智");
+
+        messageHandler.handleMessage(message, SESSION_ID);
+
+        assertThat(session.getDeviceState()).isEqualTo(DeviceState.SPEAKING);
+        verify(dialogueService, timeout(ASYNC_TIMEOUT_MS)).handleWakeWord(session, "小智小智");
     }
 
     @Test
@@ -171,6 +186,7 @@ class MessageHandlerListenTest {
         messageHandler.handleMessage(message, SESSION_ID);
 
         // AEC 必须在唤醒响应的 TTS 开始前就绪，否则首句回声进不了参考
+        verify(dialogueService, timeout(ASYNC_TIMEOUT_MS)).handleWakeWord(session, "小智小智");
         InOrder order = inOrder(aecService, dialogueService);
         order.verify(aecService).initSession(SESSION_ID);
         order.verify(dialogueService).handleWakeWord(session, "小智小智");
@@ -183,6 +199,9 @@ class MessageHandlerListenTest {
 
         messageHandler.handleMessage(message, SESSION_ID);
 
+        // stt 回执在读线程上同步发出，建 Persona 与 LLM 启动挪到了虚拟线程
+        verify(messageService).sendSttMessage(session, "讲个笑话");
+        verify(dialogueService, timeout(ASYNC_TIMEOUT_MS)).handleText(any(), any());
         InOrder order = inOrder(aecService, messageService, dialogueService);
         order.verify(aecService).initSession(SESSION_ID);
         order.verify(messageService).sendSttMessage(session, "讲个笑话");

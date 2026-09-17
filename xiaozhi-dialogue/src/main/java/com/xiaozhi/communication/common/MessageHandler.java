@@ -26,12 +26,15 @@ import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.enums.ListenState;
 import com.xiaozhi.event.ChatAbortedEvent;
 import com.xiaozhi.role.service.RoleService;
+import com.xiaozhi.storage.service.StorageServiceFactory;
+import com.xiaozhi.utils.AudioUtils;
 import jakarta.annotation.Resource;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
@@ -93,6 +96,12 @@ public class MessageHandler {
 
     @Resource
     private RedisBroadcast redisBroadcast;
+
+    @Resource
+    private StorageServiceFactory storageServiceFactory;
+
+    /** 验证码语音的存储目录，落在音频目录下单独一层，便于与对话录音区分 */
+    private static final String VERIFY_CODE_AUDIO_DIR = "verifycode/";
 
     // 用于存储设备ID和验证码生成状态的映射
     private final Map<String, Boolean> captchaGenerationInProgress = new ConcurrentHashMap<>();
@@ -276,6 +285,12 @@ public class MessageHandler {
                     String message = "设备未配置角色，请到角色配置页面完成配置后开始对话";
 
                     Path audioFilePath = ttsFactory.getDefaultTtsService().textToSpeech(message);
+                    if (audioFilePath == null) {
+                        // TTS 失败返回 null，标记立刻放开，设备下一条消息还能再试一次
+                        log.error("未配置角色的提示语音合成失败，设备收不到提示 - DeviceId: {}", deviceId);
+                        captchaGenerationInProgress.remove(deviceId);
+                        return;
+                    }
 
                     player.play(message, audioFilePath);
 
@@ -292,16 +307,41 @@ public class MessageHandler {
                 // 设备未命名，生成验证码
                 // 生成新验证码
                 VerifyCodeBO codeResult = deviceService.generateCode(deviceId, sessionId, device.getType());
-                Path audioPath;
-                if (!StringUtils.hasText(codeResult.getAudioPath())) {
+                byte[] audioData;
+                // 判断音频格式用，本次合成的取文件名，命中记录的取入库的存储路径
+                String audioName = codeResult.getAudioPath();
+                if (!StringUtils.hasText(audioName)) {
                     String codeMessage = "请到设备管理页面添加设备，输入验证码" + codeResult.getCode();
-                    audioPath = ttsFactory.getDefaultTtsService().textToSpeech(codeMessage);
-                    deviceService.updateCodeAudioPath(deviceId, sessionId, codeResult.getCode(), audioPath.toString());
+                    Path audioFile = ttsFactory.getDefaultTtsService().textToSpeech(codeMessage);
+                    if (audioFile == null) {
+                        // 合成失败就不要把空路径写进验证码记录，否则下次命中缓存分支会拿到脏数据
+                        log.error("验证码语音合成失败，设备收不到验证码 - DeviceId: {}, Code: {}", deviceId, codeResult.getCode());
+                        captchaGenerationInProgress.remove(deviceId);
+                        return;
+                    }
+                    audioName = audioFile.getFileName().toString();
+                    // 上传会接管本地文件（云端上传后即删），音频字节先读出来，本次播报不依赖上传结果
+                    audioData = Files.readAllBytes(audioFile);
+                    try {
+                        // 这条记录由 server 进程读来下发前端、由本进程读来重播，
+                        // 两边工作目录未必相同，必须交给存储服务，入库的是存储返回的路径
+                        String storedPath = storageServiceFactory.getStorageService()
+                                .upload(audioFile, AudioUtils.AUDIO_PATH + VERIFY_CODE_AUDIO_DIR + audioName);
+                        deviceService.updateCodeAudioPath(deviceId, sessionId, codeResult.getCode(), storedPath);
+                    } catch (Exception e) {
+                        // 存不进共享存储就不落库，留空让下次重新合成，好过记下一个别处读不到的路径
+                        log.error("验证码语音上传失败，本次仍向设备播报 - DeviceId: {}, Code: {}", deviceId, codeResult.getCode(), e);
+                    }
                 } else {
-                    audioPath = Path.of(codeResult.getAudioPath());
+                    audioData = storageServiceFactory.downloadFrom(audioName);
+                    if (audioData == null || audioData.length == 0) {
+                        log.error("验证码语音读取失败，设备收不到验证码 - DeviceId: {}, AudioPath: {}", deviceId, audioName);
+                        captchaGenerationInProgress.remove(deviceId);
+                        return;
+                    }
                 }
 
-                player.play(codeResult.getCode(), audioPath);
+                player.play(codeResult.getCode(), audioData, audioName);
                 // 延迟一段时间后再解除标记
                 try {
                     Thread.sleep(1000);
@@ -408,18 +448,28 @@ public class MessageHandler {
                     String abortDeviceId = chatSession.getDevice() != null ? chatSession.getDevice().getDeviceId() : null;
                     applicationContext.publishEvent(new ChatAbortedEvent(this, chatSession.getSessionId(), abortDeviceId, modeValue));
                 }
-                // 确保 Persona 存在、通知设备、更新活跃时间
+                // 回执按序留在读线程上发出；建 Persona 与启动 LLM 要走工具路由的 embedding、
+                // RAG 的向量检索和一次 LLM 建连，占住读线程会让设备随后发来的 abort、listen stop 一直排队
                 sessionManager.updateLastActivity(sessionId);
-                personaFactory.buildPersona(chatSession);
                 messageService.sendSttMessage(chatSession, message.getText());
                 log.info("处理聊天文字输入: \"{}\"", message.getText());
-                dialogueService.handleText(chatSession, SttResult.textOnly(message.getText()));
+                Thread.startVirtualThread(() -> {
+                    try {
+                        personaFactory.buildPersona(chatSession);
+                        dialogueService.handleText(chatSession, SttResult.textOnly(message.getText()));
+                    } catch (Exception e) {
+                        log.error("处理聊天文字输入失败 - SessionId: {}", sessionId, e);
+                    }
+                });
                 break;
 
             case ListenState.Detect:
                 // 检测到唤醒词 — 确保 AEC 在 TTS 开始前已初始化
                 if (aecService != null) aecService.initSession(sessionId);
-                dialogueService.handleWakeWord(chatSession, message.getText());
+                // 状态切换必须留在读线程：唤醒响应期间要立刻屏蔽 VAD，
+                // 晚一步紧随其后的上行音频帧就会被当成用户说话
+                chatSession.transitionTo(DeviceState.SPEAKING);
+                Thread.startVirtualThread(() -> dialogueService.handleWakeWord(chatSession, message.getText()));
                 break;
 
             default:

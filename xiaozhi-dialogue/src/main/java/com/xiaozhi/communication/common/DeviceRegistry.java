@@ -5,12 +5,14 @@ import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -28,6 +30,11 @@ public class DeviceRegistry {
 
     private static final String KEY_PREFIX = "xiaozhi:device:instance:";
     private static final Duration TTL = Duration.ofSeconds(300); // 5 分钟
+
+    /** 比较后再删：绑定已经指向别的实例时不能删，取值与删除必须在一次 Redis 调用里完成 */
+    private static final RedisScript<Long> UNBIND_IF_OWNED = RedisScript.of(
+            "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0",
+            Long.class);
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
@@ -48,6 +55,16 @@ public class DeviceRegistry {
      */
     public void unbind(String deviceId) {
         stringRedisTemplate.delete(KEY_PREFIX + deviceId);
+    }
+
+    /**
+     * 会话收尾时解绑：绑定仍指向本实例才删。
+     * 设备迁移到别的实例后旧实例才收尾时，无条件删会把新实例刚写好的路由抹掉，
+     * 该设备在下次重连之前收不到任何跨实例下发的消息。
+     */
+    public void unbindIfOwned(String deviceId) {
+        stringRedisTemplate.execute(UNBIND_IF_OWNED,
+                List.of(KEY_PREFIX + deviceId), instanceIdHolder.getInstanceId());
     }
 
     /**

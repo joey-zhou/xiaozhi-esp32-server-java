@@ -57,31 +57,38 @@ public class ConfigController extends BaseController {
      * 配置信息更新
      *
      * @param configId 配置ID
-     * @param param 更新参数
+     * @param req 更新参数
+     * @param confirmStorageSwitch 已确认换掉对象存储会让历史文件不可访问
      * @return
      */
     @PutMapping("/{configId}")
     @ResponseBody
     @SaCheckPermission("system:config:api:update")
-    @CheckOwner(resource = "config", id = "#configId")
+    @CheckOwner(resource = "configWrite", id = "#configId")
     @AuditLog(module = "配置管理", operation = "更新配置")
-    @Operation(summary = "更新配置信息", description = "更新LLM/STT/TTS配置")
-    public ApiResponse<ConfigResp> update(@PathVariable Integer configId, @Valid @RequestBody ConfigUpdateReq req) {
-        return ApiResponse.success(configAppService.update(configId, req));
+    @Operation(summary = "更新配置信息", description = "更新LLM/STT/TTS配置；换掉当前生效的对象存储时先返回待确认，"
+        + "带 confirmStorageSwitch=true 重发才执行")
+    public ApiResponse<ConfigResp> update(@PathVariable Integer configId,
+                                          @Valid @RequestBody ConfigUpdateReq req,
+                                          @RequestParam(defaultValue = "false") boolean confirmStorageSwitch) {
+        return ApiResponse.success(configAppService.update(configId, req, confirmStorageSwitch));
     }
 
     /**
      * 添加配置
      *
-     * @param param 添加参数
+     * @param req 添加参数
+     * @param confirmStorageSwitch 已确认换掉对象存储会让历史文件不可访问
      */
     @PostMapping("")
     @ResponseBody
     @SaCheckPermission("system:config:api:create")
     @AuditLog(module = "配置管理", operation = "创建配置")
-    @Operation(summary = "添加配置信息", description = "添加新的LLM/STT/TTS配置")
-    public ApiResponse<ConfigResp> create(@Valid @RequestBody ConfigCreateReq req) {
-        return ApiResponse.success(configAppService.create(req, StpUtil.getLoginIdAsInt()));
+    @Operation(summary = "添加配置信息", description = "添加新的LLM/STT/TTS配置；新增的对象存储配置直接设为默认时先返回待确认，"
+        + "带 confirmStorageSwitch=true 重发才执行")
+    public ApiResponse<ConfigResp> create(@Valid @RequestBody ConfigCreateReq req,
+                                          @RequestParam(defaultValue = "false") boolean confirmStorageSwitch) {
+        return ApiResponse.success(configAppService.create(req, StpUtil.getLoginIdAsInt(), confirmStorageSwitch));
     }
 
     /**
@@ -108,11 +115,12 @@ public class ConfigController extends BaseController {
     @DeleteMapping("/{configId}")
     @ResponseBody
     @SaCheckPermission("system:config:api:delete")
-    @CheckOwner(resource = "config", id = "#configId")
+    @CheckOwner(resource = "configWrite", id = "#configId")
     @AuditLog(module = "配置管理", operation = "删除配置")
     @Operation(summary = "删除配置信息", description = "软删除指定配置")
-    public ApiResponse<Void> delete(@PathVariable Integer configId) {
-        configAppService.delete(configId);
+    public ApiResponse<Void> delete(@PathVariable Integer configId,
+                                   @RequestParam(defaultValue = "false") boolean confirmStorageSwitch) {
+        configAppService.delete(configId, confirmStorageSwitch);
         return ApiResponse.success("删除成功");
     }
 }

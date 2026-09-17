@@ -9,6 +9,12 @@
 export const REQUEST_TIMEOUT = 30000
 
 /**
+ * 后端判定操作有不可逆后果、要求二次确认时的业务码
+ * 真源 ResultStatus.java CONFIRM_REQUIRED；响应走 HTTP 200，message 是给用户看的后果说明
+ */
+export const CODE_CONFIRM_REQUIRED = 4090
+
+/**
  * 分页默认配置
  * 对应 composables/useTable.ts 的分页初值
  */

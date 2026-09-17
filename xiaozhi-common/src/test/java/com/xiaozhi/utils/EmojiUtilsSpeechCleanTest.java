@@ -102,4 +102,29 @@ class EmojiUtilsSpeechCleanTest {
         // 😀 在 EmojiUtils 的映射表里唯一属于 laughing
         assertThat(moods).containsExactly("laughing");
     }
+
+    @Test
+    void supplementaryPlaneCharactersAreKeptAsSingleCodePoint() {
+        // 𝐀(U+1D400) 与 𫝀(U+2A740) 都是增补平面字符且不属于任何表情区段，
+        // 逐 char 而非逐码点推进会把它们拆成孤立代理项，导致输出比输入还长
+        String input = "公式𝐀和𫝀结束";
+        String result = EmojiUtils.processSentence(input, new ArrayList<>());
+
+        assertThat(result).isEqualTo(input);
+        // 拆错时增补平面字符会退化成落在 U+D800-U+DFFF 的孤立代理项，正确配对时合成单个码点不落在这个区间
+        assertThat(result.codePoints()
+                .noneMatch(cp -> cp >= Character.MIN_SURROGATE && cp <= Character.MAX_SURROGATE)).isTrue();
+    }
+
+    @Test
+    void cjkExtensionBIdeographIsKeptNotTreatedAsEmoji() {
+        // U+20000 属于 CJK 扩展 B（生僻汉字），不是表情，不能被当作表情删掉
+        assertThat(EmojiUtils.isEmoji(0x20000)).isFalse();
+
+        List<String> moods = new ArrayList<>();
+        String result = EmojiUtils.processSentence("名字𠀋结束", moods);
+
+        assertThat(result).isEqualTo("名字𠀋结束");
+        assertThat(moods).isEmpty();
+    }
 }

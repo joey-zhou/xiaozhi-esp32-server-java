@@ -3,12 +3,14 @@ package com.xiaozhi.server.exception;
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.NotRoleException;
+import com.xiaozhi.common.exception.ConfirmRequiredException;
 import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
 import com.xiaozhi.common.exception.UsernameNotFoundException;
 import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.common.web.ResultStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DuplicateKeyException;
@@ -163,6 +165,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleIllegalArgumentException(IllegalArgumentException e, WebRequest request) {
+        // 本仓把这个异常当业务异常用，message 是有意写给用户看的（"不支持的文件扩展名: .html"、"该邮箱未注册" 等），
+        // 必须透传。改成一律回显兜底文案会让至少 7 个端点丢掉可操作的提示；
+        // 真要杜绝框架内部 message 外泄，得先把这些抛出点换成专门的业务异常类，那是另一件事。
         log.warn("参数错误: {}", e.getMessage(), e);
         return ApiResponse.badRequest(defaultMessage(e.getMessage(), "请求参数不合法"));
     }
@@ -170,8 +175,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ApiResponse<Void> handleIllegalStateException(IllegalStateException e, WebRequest request) {
+        // 同上，"MCP服务代码重复"、"该手机号、邮箱或用户名已被注册"、"不能禁用当前登录账号" 都靠这条透传
         log.warn("业务状态冲突: {}", e.getMessage(), e);
         return ApiResponse.conflict(defaultMessage(e.getMessage(), "当前状态不允许此操作"));
+    }
+
+    @ExceptionHandler(ConfirmRequiredException.class)
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<Void> handleConfirmRequiredException(ConfirmRequiredException e, WebRequest request) {
+        // 走 HTTP 200：这不是失败，是等用户表态。返非 2xx 会被前端 axios 拦截器当错误弹一条 toast，
+        // 用户就会同时看到「操作失败」和二次确认框
+        log.info("操作待用户确认: {}", e.getMessage());
+        return ApiResponse.error(ResultStatus.CONFIRM_REQUIRED, e.getMessage());
     }
 
     @ExceptionHandler(OperationFailedException.class)

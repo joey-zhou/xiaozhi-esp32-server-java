@@ -16,6 +16,7 @@ import java.util.List;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,7 +61,8 @@ class InactiveSessionCheckerTest {
 
         checker.checkInactiveSessions();
 
-        verify(sessionManager).closeSession(expired);
+        // 实际关闭挪到了虚拟线程上执行，用 timeout 等它落地而不是假设同步完成
+        verify(sessionManager, timeout(1000)).closeSession(expired);
         verify(sessionManager, never()).closeSession(active);
     }
 
@@ -86,8 +88,9 @@ class InactiveSessionCheckerTest {
         checker.checkInactiveSessions();
         checker.checkInactiveSessions();
 
-        // 超时是服务端主动退出，没人说过再见，话术只能取自注入的超时提示语并原样下发
-        verify(persona).sendFarewell(TIMEOUT_TEXT);
+        // 超时是服务端主动退出，没人说过再见，话术只能取自注入的超时提示语并原样下发；
+        // 实际调用挪到了虚拟线程上执行，用 timeout 等它落地
+        verify(persona, timeout(1000)).sendFarewell(TIMEOUT_TEXT);
         verify(sessionManager, never()).closeSession(session);
     }
 

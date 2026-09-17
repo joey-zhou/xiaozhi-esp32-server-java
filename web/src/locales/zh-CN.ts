@@ -165,9 +165,6 @@ export default {
     exporting: '正在导出...',
     success: '导出成功',
     failed: '导出失败',
-    unsupportedFormat: '不支持的导出格式',
-    importSuccess: '导入成功',
-    importFailed: '导入失败',
   },
   
   clipboard: {
@@ -690,6 +687,8 @@ export default {
     fillRequiredFields: '请填写必填项',
     modelNameNoChinese: '模型名称不能包含中文，请输入正确的模型名称',
     modelNameInvalid: '模型名称 "{name}" 不在有效列表中',
+    storageSwitchTitle: '确认切换对象存储',
+    storageSwitchOk: '仍然切换',
   },
 
   message: {

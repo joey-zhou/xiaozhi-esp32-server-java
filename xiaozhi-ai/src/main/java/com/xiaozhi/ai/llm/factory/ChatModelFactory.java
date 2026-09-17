@@ -5,11 +5,14 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.port.ConfigLookup;
+import com.xiaozhi.event.AiConfigChangedEvent;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.util.Assert;
 
 import java.util.List;
@@ -81,6 +84,18 @@ public class ChatModelFactory {
 
     static String cacheKey(Integer modelId, RoleBO role) {
         return modelId + ":" + role.getTemperature() + ":" + role.getTopP();
+    }
+
+    /**
+     * 本进程内的配置变更：HTTP 入口所在进程不订阅 Redis 广播（xiaozhi-dialogue 不在它的运行时依赖里），
+     * 只能靠本地事件失效缓存；对话进程那侧由 RedisSubscriber.onConfigChanged 处理跨实例广播。
+     * 提交后才清，避免回滚的事务把缓存白清一遍。
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onAiConfigChanged(AiConfigChangedEvent event) {
+        if ("llm".equals(event.getConfigType())) {
+            removeCache(event.getConfigId());
+        }
     }
 
     /**

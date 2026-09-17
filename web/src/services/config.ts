@@ -12,23 +12,27 @@ export function queryConfigs(params: Partial<ConfigQueryParams>) {
 
 /**
  * 添加配置
+ * @param confirmStorageSwitch 已确认换掉当前生效的对象存储会让历史文件不可访问
  */
-export function addConfig(data: Partial<Config>) {
-  return http.post(api.config.root, data)
+export function addConfig(data: Partial<Config>, confirmStorageSwitch = false) {
+  return http.post(api.config.root, data, { params: { confirmStorageSwitch } })
 }
 
 /**
  * 更新配置
+ * @param confirmStorageSwitch 已确认换掉当前生效的对象存储会让历史文件不可访问
  */
-export function updateConfig(data: Partial<Config>) {
-  return http.put(`${api.config.root}/${data.configId}`, data)
+export function updateConfig(data: Partial<Config>, confirmStorageSwitch = false) {
+  return http.put(`${api.config.root}/${data.configId}`, data, { params: { confirmStorageSwitch } })
 }
 
 /**
  * 删除配置
+ *
+ * @param confirmStorageSwitch 已确认删掉当前生效的对象存储配置会让历史文件不可访问
  */
-export function deleteConfig(configId: number) {
-  return http.delete(`${api.config.root}/${configId}`)
+export function deleteConfig(configId: number, confirmStorageSwitch = false) {
+  return http.delete(`${api.config.root}/${configId}`, { params: { confirmStorageSwitch } })
 }
 
 /**

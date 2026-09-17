@@ -58,7 +58,7 @@ public class SmsUtils {
             // 检查发送结果
             String code = sendSmsResponse.getBody().getCode();
             if ("OK".equals(code)) {
-                log.info("短信发送成功，手机号: {}", phoneNumber);
+                log.info("短信发送成功，手机号: {}", maskPhone(phoneNumber));
                 return true;
             } else {
                 log.error("短信发送失败，错误码: {}, 错误信息: {}", code, sendSmsResponse.getBody().getMessage());
@@ -80,9 +80,19 @@ public class SmsUtils {
         Config config = new Config()
             .setAccessKeyId(accessKeyId)
             .setAccessKeySecret(accessKeySecret);
-        
+
         // 配置 Endpoint
         config.endpoint = "dysmsapi.aliyuncs.com";
         return new Client(config);
+    }
+
+    /**
+     * 日志脱敏：手机号只保留前 3 位和后 4 位，中间用 **** 代替
+     */
+    private String maskPhone(String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.length() < 7) {
+            return "***";
+        }
+        return phoneNumber.substring(0, 3) + "****" + phoneNumber.substring(phoneNumber.length() - 4);
     }
 }

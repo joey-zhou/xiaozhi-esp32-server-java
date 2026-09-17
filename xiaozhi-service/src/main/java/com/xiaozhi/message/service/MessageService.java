@@ -67,5 +67,12 @@ public interface MessageService {
      */
     int purgeExpiredAudio(int retentionDays, int batchSize);
 
+    /**
+     * 统计 audioPath 以 prefix 开头的对话录音条数。
+     * <p>
+     * 换对象存储前用它数存量：库里只存地址不存归属，前缀是唯一能认出「这条录音属于哪个存储」的线索。
+     */
+    long countStoredPathsWithPrefix(String prefix);
+
     void truncateAssistant(String deviceId, Integer roleId, LocalDateTime createTime, String spokenText);
 }

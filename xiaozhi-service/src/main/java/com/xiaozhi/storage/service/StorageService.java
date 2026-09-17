@@ -85,6 +85,13 @@ public interface StorageService {
     String getProvider();
 
     /**
+     * 本实现写出的地址前缀；本地存储没有前缀，返回空串。
+     * <p>
+     * 用于判断某条历史值是不是本实现管的对象——换存储之前要靠它数清楚有多少存量会变得不可达。
+     */
+    String urlPrefix();
+
+    /**
      * 检查文件大小
      */
     static void assertAllowed(MultipartFile file) {

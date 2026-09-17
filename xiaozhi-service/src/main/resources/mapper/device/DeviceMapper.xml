@@ -8,11 +8,6 @@
         d.roleId,
         r.roleName,
         d.state,
-        (
-            SELECT COUNT(*)
-            FROM sys_message m
-            WHERE m.deviceId = d.deviceId
-        ) AS totalMessage,
         d.wifiName,
         d.ip,
         d.chipModelName,

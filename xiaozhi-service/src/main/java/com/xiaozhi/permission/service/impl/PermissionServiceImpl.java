@@ -96,20 +96,43 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
+    @Cacheable(value = CACHE_NAME, key = "'authRole:keys:' + #authRoleId", condition = "#authRoleId != null")
+    public List<String> listKeysByAuthRoleId(Integer authRoleId) {
+        if (authRoleId == null) {
+            return new ArrayList<>();
+        }
+
+        List<Integer> permissionIds = self.listIdsByAuthRoleId(authRoleId);
+        if (CollectionUtils.isEmpty(permissionIds)) {
+            return new ArrayList<>();
+        }
+
+        // 只选 permissionKey 列：sa-token 每次权限判定都要经过这里，不必为一份字符串列表
+        // 反序列化整份 PermissionBO
+        return permissionMapper.selectList(new LambdaQueryWrapper<PermissionDO>()
+                .select(PermissionDO::getPermissionKey)
+                .in(PermissionDO::getPermissionId, permissionIds)
+                .eq(PermissionDO::getStatus, ENABLED))
+            .stream()
+            .map(PermissionDO::getPermissionKey)
+            .filter(StringUtils::hasText)
+            // 必须收成 ArrayList：缓存值走 GenericJackson2JsonRedisSerializer，
+            // Stream.toList() 的 final 实现带不上 @class，回读时首元素会被当成类型 id
+            .collect(Collectors.toCollection(ArrayList::new));
+    }
+
+    @Override
     @Caching(evict = {
         @CacheEvict(value = CACHE_NAME, key = "'authRole:list:' + #authRoleId"),
-        @CacheEvict(value = CACHE_NAME, key = "'authRole:ids:' + #authRoleId")
+        @CacheEvict(value = CACHE_NAME, key = "'authRole:ids:' + #authRoleId"),
+        @CacheEvict(value = CACHE_NAME, key = "'authRole:keys:' + #authRoleId")
     })
     public void clearAuthRoleCache(Integer authRoleId) {
     }
 
     @Override
     public List<PermissionBO> listByUserId(Integer userId) {
-        if (userId == null) {
-            return new ArrayList<>();
-        }
-        UserBO user = userService.getBO(userId);
-        Integer authRoleId = user == null ? null : user.getAuthRoleId();
+        Integer authRoleId = resolveAuthRoleId(userId);
         if (authRoleId == null) {
             return new ArrayList<>();
         }
@@ -123,10 +146,19 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     public List<String> listKeysByUserId(Integer userId) {
-        return listByUserId(userId).stream()
-            .map(PermissionBO::getPermissionKey)
-            .filter(StringUtils::hasText)
-            .toList();
+        Integer authRoleId = resolveAuthRoleId(userId);
+        if (authRoleId == null) {
+            return new ArrayList<>();
+        }
+        return self.listKeysByAuthRoleId(authRoleId);
+    }
+
+    private Integer resolveAuthRoleId(Integer userId) {
+        if (userId == null) {
+            return null;
+        }
+        UserBO user = userService.getBO(userId);
+        return user == null ? null : user.getAuthRoleId();
     }
 
     /** 直接在入参节点上挂 children，每个节点的 children 都会先重置为空。 */

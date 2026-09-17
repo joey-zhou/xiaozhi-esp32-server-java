@@ -37,18 +37,37 @@ public class OwnershipConfig {
         };
     }
 
+    /** 引用路径（把某个模型/音色绑到自己的角色上）用的检查器。 */
     @Bean
     public OwnershipChecker configOwnershipChecker(ConfigService configService) {
         return new AbstractChecker("config") {
             @Override
             public void check(Object resourceId, Integer userId) {
-                ConfigBO config = configService.getBO(toIntId(resourceId, "configId"));
-                if (config == null) {
-                    throw new ResourceNotFoundException("配置不存在");
-                }
+                ConfigBO config = requireConfig(configService, toIntId(resourceId, "configId"));
                 requireOwner(config.getUserId(), userId, "配置不归属当前用户");
             }
         };
+    }
+
+    /** 写路径（改配置、删配置）用的检查器。 */
+    @Bean
+    public OwnershipChecker configWriteOwnershipChecker(ConfigService configService) {
+        return new AbstractChecker("configWrite") {
+            @Override
+            public void check(Object resourceId, Integer userId) {
+                ConfigBO config = requireConfig(configService, toIntId(resourceId, "configId"));
+                requireOwner(config.getUserId(), userId, "配置不归属当前用户");
+            }
+        };
+    }
+
+    /** 两个 config 检查器共用的取数。 */
+    private static ConfigBO requireConfig(ConfigService configService, Integer configId) {
+        ConfigBO config = configService.getBO(configId);
+        if (config == null) {
+            throw new ResourceNotFoundException("配置不存在");
+        }
+        return config;
     }
 
     @Bean

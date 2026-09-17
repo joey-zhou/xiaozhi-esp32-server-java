@@ -1,5 +1,6 @@
 package com.xiaozhi.storage.service;
 
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.storage.service.impl.AliyunOssStorageService;
@@ -14,14 +15,26 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 存储服务工厂。
  * 从 sys_config（configType="oss"）读取默认 OSS 配置，按 provider 创建对应实现。
- * 无配置或配置无效时 fallback 到本地存储。
+ * 无配置或配置显式为 local 时才 fallback 到本地存储；读取/初始化中途出错一律抛异常，
+ * 不能悄悄退回本地存储——否则写入的文件只落在当次实例磁盘上，其它实例按 OSS 路径读会 404。
  * <p>
  * 云端客户端会被缓存复用（COS/OSS SDK 客户端均线程安全）。缓存标识由 provider + configId + updateTime
  * 组成，因此切换 provider、切换默认配置、或修改当前配置的任意字段（ak/sk/endpoint/bucket 等）都会触发重建。
+ * <p>
+ * <b>写入用 {@link #getStorageService()}（当前生效的实现），读取用本类的 accessUrlOf / downloadFrom /
+ * removeFrom（按值本身的形态选实现）。</b>
+ * 库里存的历史值有两种形态：相对路径是本地文件，{@code http(s)://} 开头是云上对象。
+ * 换存储实现不会、也不该改写这些历史值，所以读取时只能认值的形态——
+ * 拿当前生效的实现去解析所有历史值，会让切到对象存储后的历史本地录音全部 403（云端认不出相对路径便原样返回，
+ * 丢掉本地访问所需的签名），也会让切回本地后的云地址无从解析。
  */
 @Slf4j
 @Component
 public class StorageServiceFactory {
+
+    // 默认 OSS 配置本身极少变化，进程内短暂缓存吸收一轮对话里的多次重复读取；
+    // 配置变更广播会调用 refresh() 立即失效，不依赖这个 TTL 过期
+    private static final long OSS_CONFIG_CACHE_MILLIS = 30_000L;
 
     @Resource
     private ConfigService configService;
@@ -32,36 +45,43 @@ public class StorageServiceFactory {
     private volatile StorageService cachedCloudService;
     private volatile String cachedSignature;
 
+    private volatile ConfigBO cachedOssConfig;
+    private volatile long cachedOssConfigAt;
+
     /**
      * 获取当前生效的存储服务
      */
     public StorageService getStorageService() {
+        ConfigBO ossConfig;
         try {
-            ConfigBO ossConfig = getDefaultOssConfig();
+            ossConfig = getDefaultOssConfig();
+        } catch (Exception e) {
+            throw new OperationFailedException("存储配置读取失败，请稍后重试", e);
+        }
 
-            if (ossConfig == null || "local".equals(ossConfig.getProvider())) {
-                return localStorageService;
-            }
+        if (ossConfig == null || "local".equals(ossConfig.getProvider())) {
+            return localStorageService;
+        }
 
-            // 缓存标识包含 configId 与 updateTime：同 provider 下改动 ak/sk/endpoint/bucket 等字段也能触发重建
-            String signature = ossConfig.getProvider() + ":" + ossConfig.getConfigId() + ":" + ossConfig.getUpdateTime();
+        // 缓存标识包含 configId 与 updateTime：同 provider 下改动 ak/sk/endpoint/bucket 等字段也能触发重建
+        String signature = ossConfig.getProvider() + ":" + ossConfig.getConfigId() + ":" + ossConfig.getUpdateTime();
+        if (signature.equals(cachedSignature) && cachedCloudService != null) {
+            return cachedCloudService;
+        }
+
+        synchronized (this) {
             if (signature.equals(cachedSignature) && cachedCloudService != null) {
                 return cachedCloudService;
             }
-
-            synchronized (this) {
-                if (signature.equals(cachedSignature) && cachedCloudService != null) {
-                    return cachedCloudService;
-                }
+            try {
                 shutdownCached();
                 cachedCloudService = createStorageService(ossConfig);
                 cachedSignature = signature;
                 log.info("存储服务已切换到: {} (configId={})", ossConfig.getProvider(), ossConfig.getConfigId());
                 return cachedCloudService;
+            } catch (Exception e) {
+                throw new OperationFailedException("存储服务初始化失败，请稍后重试", e);
             }
-        } catch (Exception e) {
-            log.warn("获取 OSS 配置失败，使用本地存储: {}", e.getMessage());
-            return localStorageService;
         }
     }
 
@@ -83,8 +103,47 @@ public class StorageServiceFactory {
         return service;
     }
 
+    /**
+     * 按值的形态选出能解析它的实现：相对路径归本地，{@code http(s)://} 归当前云实现。
+     * <p>
+     * 当前生效的是本地存储、而值是云地址时，返回本地实现——它对认不出的值原样返回，
+     * 好过拿本地策略去套一个云地址。这种情况说明存储被从对象存储切回了本地，历史云对象已不可达。
+     */
+    public StorageService resolveFor(String storedPath) {
+        if (storedPath == null || storedPath.isBlank()) {
+            return localStorageService;
+        }
+        if (storedPath.startsWith("http://") || storedPath.startsWith("https://")) {
+            StorageService current = getStorageService();
+            return current.getProvider().equals(localStorageService.getProvider()) ? localStorageService : current;
+        }
+        return localStorageService;
+    }
+
+    /** 历史路径转可访问 URL，实现按值的形态选，不按当前生效配置选 */
+    public String accessUrlOf(String storedPath) {
+        return resolveFor(storedPath).getAccessUrl(storedPath);
+    }
+
+    /** 读历史文件内容，实现按值的形态选 */
+    public byte[] downloadFrom(String storedPath) {
+        return resolveFor(storedPath).download(storedPath);
+    }
+
+    /** 删历史文件，实现按值的形态选；删错地方等于删不掉，文件会一直留着 */
+    public void removeFrom(String storedPath) {
+        resolveFor(storedPath).remove(storedPath);
+    }
+
     private ConfigBO getDefaultOssConfig() {
-        return configService.getDefaultBO("oss");
+        ConfigBO cached = cachedOssConfig;
+        if (cached != null && System.currentTimeMillis() - cachedOssConfigAt < OSS_CONFIG_CACHE_MILLIS) {
+            return cached;
+        }
+        ConfigBO result = configService.getDefaultBO("oss");
+        cachedOssConfig = result;
+        cachedOssConfigAt = System.currentTimeMillis();
+        return result;
     }
 
     /**
@@ -97,6 +156,8 @@ public class StorageServiceFactory {
     public synchronized void refresh() {
         // 先清除 default:oss 的 Redis 缓存，避免下面重建时又命中其它实例回填的旧默认配置
         configService.evictDefaultCache("oss");
+        cachedOssConfig = null;
+        cachedOssConfigAt = 0;
         shutdownCached();
         cachedCloudService = null;
         cachedSignature = null;

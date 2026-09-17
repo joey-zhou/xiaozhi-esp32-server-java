@@ -16,7 +16,7 @@ import org.springframework.cache.annotation.Cacheable;
 
 import java.util.Set;
 
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 
 /**
  * 缓存方法不得构造 JDK 不可变集合。
@@ -62,17 +62,20 @@ class CacheableReturnTypeArchTest {
 
     @Test
     void cacheableMethodsDoNotBuildImmutableCollections() {
-        ArchRule rule = noMethods()
+        // 必须是 methods().should(不构造)，不能写成 noMethods().should(构造)：
+        // noMethods 会把条件整体取反，而下面的条件只发 violated 事件、从不发 satisfied，
+        // 取反后违规反而算通过，规则永远绿——这个洞放跑过一次真实故障
+        ArchRule rule = methods()
             .that().areAnnotatedWith(Cacheable.class)
             .or().areAnnotatedWith(CachePut.class)
-            .should(buildImmutableCollection())
+            .should(notBuildImmutableCollection())
             .because("缓存值要写进 Redis，JDK 不可变集合是 final 实现、带不上 @class，回读时会抛序列化异常");
 
         rule.check(xiaozhiClasses);
     }
 
-    private static ArchCondition<JavaMethod> buildImmutableCollection() {
-        return new ArchCondition<>("构造 JDK 不可变集合") {
+    private static ArchCondition<JavaMethod> notBuildImmutableCollection() {
+        return new ArchCondition<>("不构造 JDK 不可变集合") {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
                 for (JavaCall<?> call : method.getCallsFromSelf()) {

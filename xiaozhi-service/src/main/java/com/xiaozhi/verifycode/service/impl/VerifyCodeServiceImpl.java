@@ -6,17 +6,21 @@ import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.verifycode.convert.VerifyCodeConvert;
 import com.xiaozhi.verifycode.dal.mysql.dataobject.VerifyCodeDO;
 import com.xiaozhi.verifycode.dal.mysql.mapper.VerifyCodeMapper;
+import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@Slf4j
 public class VerifyCodeServiceImpl implements VerifyCodeService {
 
     private static final int VALID_MINUTES = 10;
@@ -36,6 +40,9 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private StorageServiceFactory storageServiceFactory;
 
     @Override
     public VerifyCodeBO findValid(String code, String deviceId, String sessionId) {
@@ -86,8 +93,37 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
 
     @Override
     public int deleteByDeviceId(String deviceId) {
-        return verifyCodeMapper.delete(new LambdaQueryWrapper<VerifyCodeDO>()
+        List<String> audioPaths = audioPathsOf(new LambdaQueryWrapper<VerifyCodeDO>()
             .eq(VerifyCodeDO::getDeviceId, deviceId));
+        int deleted = verifyCodeMapper.delete(new LambdaQueryWrapper<VerifyCodeDO>()
+            .eq(VerifyCodeDO::getDeviceId, deviceId));
+        removeAudios(audioPaths);
+        return deleted;
+    }
+
+    /** 只取有音频的那些行的路径；验证码音频每次合成一个独立文件，不存在多行共用 */
+    private List<String> audioPathsOf(LambdaQueryWrapper<VerifyCodeDO> scope) {
+        return verifyCodeMapper.selectList(scope.select(VerifyCodeDO::getAudioPath))
+            .stream()
+            .map(VerifyCodeDO::getAudioPath)
+            .filter(StringUtils::hasText)
+            .toList();
+    }
+
+    /**
+     * 删验证码音频文件。
+     * <p>
+     * 调用方是设备绑定成功与删除设备两条路径，删文件失败不该让它们失败——
+     * 存储抖动时最坏只是留一个孤儿文件，而抛出去会让新设备直接绑不上。
+     */
+    private void removeAudios(List<String> audioPaths) {
+        for (String audioPath : audioPaths) {
+            try {
+                storageServiceFactory.removeFrom(audioPath);
+            } catch (Exception e) {
+                log.warn("删除验证码音频失败，文件将残留: {}", audioPath, e);
+            }
+        }
     }
 
     @Override
@@ -174,7 +210,7 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
         int deleted = 0;
         while (true) {
             List<VerifyCodeDO> batch = verifyCodeMapper.selectList(new LambdaQueryWrapper<VerifyCodeDO>()
-                .select(VerifyCodeDO::getCodeId)
+                .select(VerifyCodeDO::getCodeId, VerifyCodeDO::getAudioPath)
                 .lt(VerifyCodeDO::getCreateTime, expireBefore)
                 .orderByAsc(VerifyCodeDO::getCodeId)
                 .last("LIMIT " + batchSize));
@@ -182,7 +218,12 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
                 break;
             }
             List<Integer> codeIds = batch.stream().map(VerifyCodeDO::getCodeId).toList();
+            List<String> audioPaths = batch.stream()
+                .map(VerifyCodeDO::getAudioPath)
+                .filter(StringUtils::hasText)
+                .toList();
             verifyCodeMapper.delete(new LambdaQueryWrapper<VerifyCodeDO>().in(VerifyCodeDO::getCodeId, codeIds));
+            removeAudios(audioPaths);
             deleted += codeIds.size();
         }
         return deleted;

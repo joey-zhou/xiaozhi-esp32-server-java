@@ -317,13 +317,34 @@ public abstract class Player {
         }
         // 分块读取PCM，避免全量加载进内存
         try {
-            List<byte[]> chunks = AudioUtils.readAsPcmChunks(audioPath.toString());
-            AtomicBoolean first = new AtomicBoolean(true);
-            play(Flux.fromIterable(chunks)
-                    .map(chunk -> first.compareAndSet(true, false) ? new Speech(chunk, text) : new Speech(chunk)));
+            playChunks(text, AudioUtils.readAsPcmChunks(audioPath.toString()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * 播放已读入内存的音频。音频存在对象存储上时本地没有文件可读，只能拿到字节。
+     *
+     * @param audioName 判断音频格式用的文件名或存储路径，只取扩展名
+     */
+    public void play(String text, byte[] audioData, String audioName) {
+        if (audioData == null || audioData.length == 0) {
+            log.error("音频数据为空: {}", audioName);
+            return;
+        }
+        try {
+            playChunks(text, AudioUtils.readAsPcmChunks(audioData, audioName));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /** 首块带上文本，后续块只带音频，与设备约定的 sentence_start 时机对齐 */
+    private void playChunks(String text, List<byte[]> chunks) {
+        AtomicBoolean first = new AtomicBoolean(true);
+        play(Flux.fromIterable(chunks)
+                .map(chunk -> first.compareAndSet(true, false) ? new Speech(chunk, text) : new Speech(chunk)));
     }
 
     /**

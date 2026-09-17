@@ -177,48 +177,57 @@ public class Persona {
      * @param useFunctionCall 是否使用函数调用
      */
     private Flux<ChatResponse> chatStream(Turn turn, boolean useFunctionCall) {
-        UserMessage userMessage = turn.userMessage;
-        String ownerId = conversation.getOwnerId();
+        try {
+            UserMessage userMessage = turn.userMessage;
+            String ownerId = conversation.getOwnerId();
 
-        // 从 ToolsSessionHolder 获取实时工具列表（包含后注册的设备 MCP 工具）
-        List<ToolCallback> liveTools = getSession().getToolsSessionHolder().getAllFunction();
+            // 从 ToolsSessionHolder 获取实时工具列表（包含后注册的设备 MCP 工具）
+            List<ToolCallback> liveTools = getSession().getToolsSessionHolder().getAllFunction();
 
-        // Layer 3: Embedding 预筛选工具子集
-        List<ToolCallback> effectiveTools = useFunctionCall ? liveTools : new ArrayList<>();
+            List<ToolCallback> effectiveTools = useFunctionCall ? liveTools : new ArrayList<>();
 
-        ChatOptions chatOptions = ToolCallingChatOptions.builder()
-                .toolCallbacks(effectiveTools)
-                .toolContext(TOOL_CONTEXT_SESSION_ID_KEY, sessionId)
-                .toolContext("deviceId", ownerId)
-                .toolContext("conversationTimestamp", turn.turnId)
-                .build();
+            ChatOptions chatOptions = ToolCallingChatOptions.builder()
+                    .toolCallbacks(effectiveTools)
+                    .toolContext(TOOL_CONTEXT_SESSION_ID_KEY, sessionId)
+                    .toolContext("deviceId", ownerId)
+                    .toolContext("conversationTimestamp", turn.turnId)
+                    .build();
 
-        // 准备期间被打断：用户消息已由打断收尾记入历史，这里不再生成
-        if (!turn.phase.compareAndSet(Phase.PREPARING, Phase.GENERATING)) {
-            return Flux.empty();
-        }
-
-        // 构建运行时上下文
-        ChatSession currentSession = getSession();
-        String location = currentSession.getDevice() != null ? currentSession.getDevice().getLocation() : null;
-        ConversationContext ctx = new ConversationContext(location);
-        List<Message> messages = conversation.messages(ctx);
-        Prompt prompt = new Prompt(messages, chatOptions);
-
-        Flux<ChatResponse> chatFlux = chatModel.stream(prompt)
-            .doOnError(error -> {
-                listener.onError(error);
-                failTurn(turn);
-            });
-        chatFlux = chatFlux.doOnNext(chatResponse -> {
-            // 首 token 时刻即助手消息创建时间；播放器落盘音频文件也以此关联到助手消息
-            Instant assistantMessageCreatedAt = Instant.now();
-            boolean isFirst = turn.ttft.compareAndSet(null, assistantMessageCreatedAt);
-            if (isFirst && player.getOpusRecorder() != null) {
-                player.getOpusRecorder().setAssistantMessageCreatedAt(assistantMessageCreatedAt);
+            // 准备期间被打断：用户消息已由打断收尾记入历史，这里不再生成
+            if (!turn.phase.compareAndSet(Phase.PREPARING, Phase.GENERATING)) {
+                return Flux.empty();
             }
-        });
-        return new MessageAggregator().aggregate(chatFlux, chatResponse -> completeTurn(turn, chatResponse));
+
+            // 构建运行时上下文
+            ChatSession currentSession = getSession();
+            String location = currentSession.getDevice() != null ? currentSession.getDevice().getLocation() : null;
+            ConversationContext ctx = new ConversationContext(location);
+            List<Message> messages = conversation.messages(ctx);
+            Prompt prompt = new Prompt(messages, chatOptions);
+
+            Flux<ChatResponse> chatFlux = chatModel.stream(prompt)
+                .doOnError(error -> {
+                    listener.onError(error);
+                    failTurn(turn);
+                });
+            chatFlux = chatFlux.doOnNext(chatResponse -> {
+                // 首 token 时刻即助手消息创建时间；播放器落盘音频文件也以此关联到助手消息
+                Instant assistantMessageCreatedAt = Instant.now();
+                boolean isFirst = turn.ttft.compareAndSet(null, assistantMessageCreatedAt);
+                if (isFirst && player.getOpusRecorder() != null) {
+                    player.getOpusRecorder().setAssistantMessageCreatedAt(assistantMessageCreatedAt);
+                }
+            });
+            return new MessageAggregator().aggregate(chatFlux, chatResponse -> completeTurn(turn, chatResponse));
+        } catch (Exception e) {
+            // 工具路由、RAG 召回、记忆装配都在订阅时同步跑，抛到这里等于本轮只剩内存里的用户消息，
+            // 必须自己收尾，否则聊天记录里这一轮彻底消失
+            listener.onError(e);
+            // 准备期就失败时先把阶段推到生成中，failTurn 的 CAS 才生效
+            turn.phase.compareAndSet(Phase.PREPARING, Phase.GENERATING);
+            failTurn(turn);
+            return Flux.error(e);
+        }
     }
 
     /**

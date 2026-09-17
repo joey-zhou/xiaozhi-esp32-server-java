@@ -72,9 +72,10 @@ export interface ConfigTypeInfo {
 }
 
 /**
- * 模型选项
+ * 模型选项（LLM 工厂里的模型名，仅 value/label 两个字段）
+ * 与 types/role.ts 的 ModelOption（角色可选的模型配置记录）是两码事，故单独命名
  */
-export interface ModelOption {
+export interface LlmModelOption {
   value: string
   label: string
 }

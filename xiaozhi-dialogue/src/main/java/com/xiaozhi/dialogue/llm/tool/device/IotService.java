@@ -5,20 +5,22 @@ import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.communication.domain.iot.IotDescriptor;
+import com.xiaozhi.communication.domain.iot.IotMethodParameter;
 import com.xiaozhi.communication.domain.iot.IotProperty;
 import com.xiaozhi.communication.domain.iot.IotState;
 import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.ai.tool.ToolsSessionHolder;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
-import org.apache.commons.text.StringSubstitutor;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -202,7 +204,12 @@ public class IotService {
     private void registerPropertiesFunctionTools(String sessionId, ToolsSessionHolder toolsSessionHolder, IotDescriptor iotDescriptor) {
         //遍历properties，生成FunctionCallTool
         var iotName = iotDescriptor.getName();
-        for (var entry : iotDescriptor.getProperties().entrySet()) {
+        var properties = iotDescriptor.getProperties();
+        if (properties == null) {
+            // 设备只上报了 methods，没有可查询的属性，跳过即可，不影响其它能力注册
+            return;
+        }
+        for (var entry : properties.entrySet()) {
             var propName = entry.getKey();
             var propInfo = entry.getValue();
             // 创建函数名称，格式：iot_get_{IoTName}_{PropName}
@@ -259,38 +266,19 @@ public class IotService {
     private void registerMethodFunctionTools(String sessionId, ToolsSessionHolder toolsSessionHolder, IotDescriptor iotDescriptor) {
         // 遍历methods，生成FunctionCallTool
         var iotName = iotDescriptor.getName();
+        var methods = iotDescriptor.getMethods();
+        if (methods == null) {
+            // 设备只上报了 properties，没有可调用的方法，跳过即可，不影响其它能力注册
+            return;
+        }
 
-        for (var entry : iotDescriptor.getMethods().entrySet()) {
+        for (var entry : methods.entrySet()) {
             var methodName = entry.getKey();
             var method = entry.getValue();
             // 创建函数名称，格式：iot_{IoTName}_{MethodName}
             var funcName = "iot_" + iotName + "_" + methodName;
 
-            Map<String, String> valueMap = new HashMap<>();
-            //获取iotMethod方法参数，添加到函数参数中。 iot方法都是单参数
-            for (var paramEntry : method.getParameters().entrySet()) {
-                var paramName = paramEntry.getKey();
-                var paramInfo = paramEntry.getValue();
-                valueMap.put("paramName", paramName);
-                valueMap.put("paramType", paramInfo.getType());
-                valueMap.put("paramDescription", paramInfo.getDescription());
-            }
-            String inputSchema = StringSubstitutor.replace("""
-                        {
-                            "type": "object",
-                            "properties": {
-                                "${paramName}": {
-                                    "type": "${paramType}",
-                                    "description": "${paramDescription}"
-                                },
-                                "response_success": {
-                                    "type": "string",
-                                    "description": "操作成功时的友好回复,关于该设备的操作结果，设备名称使用description中的名称，不要出现占位符"
-                                }
-                            },
-                            "required": ["${paramName}", "response_success"]
-                        }
-                    """, valueMap);
+            String inputSchema = buildMethodInputSchema(method.getParameters());
 
             var toolCallback = FunctionToolCallback
                     .builder(funcName, (Map<String, Object> params, ToolContext toolContext) -> {
@@ -317,6 +305,39 @@ public class IotService {
             // 注册到当前会话的函数持有者
             toolsSessionHolder.registerFunction(funcName, toolCallback);
         }
+    }
+
+    /**
+     * 按方法参数拼装 inputSchema。参数为空时只保留 response_success，避免生成含 ${paramName} 字面量的死 schema；
+     * 参数不止一个时逐个铺开，避免复用同一份 valueMap 导致只剩最后一个参数
+     *
+     * @param parameters iot方法的参数定义，可能为null或空
+     */
+    private String buildMethodInputSchema(Map<String, IotMethodParameter> parameters) {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        List<String> required = new ArrayList<>();
+        if (parameters != null) {
+            for (var paramEntry : parameters.entrySet()) {
+                var paramInfo = paramEntry.getValue();
+                Map<String, Object> paramSchema = new LinkedHashMap<>();
+                paramSchema.put("type", paramInfo.getType());
+                paramSchema.put("description", paramInfo.getDescription());
+                properties.put(paramEntry.getKey(), paramSchema);
+                required.add(paramEntry.getKey());
+            }
+        }
+
+        Map<String, Object> responseSuccessSchema = new LinkedHashMap<>();
+        responseSuccessSchema.put("type", "string");
+        responseSuccessSchema.put("description", "操作成功时的友好回复,关于该设备的操作结果，设备名称使用description中的名称，不要出现占位符");
+        properties.put("response_success", responseSuccessSchema);
+        required.add("response_success");
+
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("properties", properties);
+        schema.put("required", required);
+        return JsonUtil.toJson(schema);
     }
 
 }

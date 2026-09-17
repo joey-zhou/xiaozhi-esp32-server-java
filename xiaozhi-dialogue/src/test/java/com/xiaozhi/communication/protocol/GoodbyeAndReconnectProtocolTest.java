@@ -16,6 +16,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -67,7 +68,7 @@ class GoodbyeAndReconnectProtocolTest {
         assertThat(harness.sessionManager().getSession(sessionId)).isNull();
         assertThat(harness.sessionManager().getSessionByDeviceId(DEVICE_ID)).isNull();
         // 设备-实例绑定解除，连接由服务端关闭
-        verify(harness.deviceRegistry()).unbind(DEVICE_ID);
+        verify(harness.deviceRegistry()).unbindIfOwned(DEVICE_ID);
         assertThat(device.transport().isOpen()).isFalse();
         assertThat(device.transport().closeStatus()).isNotNull();
         // 关连接前先下发 tts stop 通知设备停播，此外不再有别的出站
@@ -160,7 +161,8 @@ class GoodbyeAndReconnectProtocolTest {
 
         // 新会话上唤醒词照常触发唤醒流程
         second.listenDetect("你好小智");
-        verify(harness.personaFactory()).buildPersona(fresh);
+        // 唤醒处理跑在虚拟线程上，读线程只同步切状态
+        verify(harness.personaFactory(), timeout(2000)).buildPersona(fresh);
         assertThat(fresh.getDeviceState()).isEqualTo(DeviceState.SPEAKING);
 
         // 新会话上的上行音频链路同样是通的
@@ -231,7 +233,7 @@ class GoodbyeAndReconnectProtocolTest {
         assertThat(harness.sessionManager().getSession(freshSessionId)).isNotNull();
         assertThat(harness.sessionManager().getSessionByDeviceId(DEVICE_ID).getSessionId())
                 .isEqualTo(freshSessionId);
-        verify(harness.deviceRegistry(), never()).unbind(DEVICE_ID);
+        verify(harness.deviceRegistry(), never()).unbindIfOwned(DEVICE_ID);
     }
 
     /** 没有重连时旧连接关闭要正常解绑，否则实例上会留下查得到却已不存在的设备 */
@@ -244,7 +246,7 @@ class GoodbyeAndReconnectProtocolTest {
 
         AwaitHelper.until("会话已注销",
                 () -> harness.sessionManager().getSession(device.sessionId()) == null);
-        verify(harness.deviceRegistry()).unbind(DEVICE_ID);
+        verify(harness.deviceRegistry()).unbindIfOwned(DEVICE_ID);
     }
 
     /**
@@ -264,7 +266,7 @@ class GoodbyeAndReconnectProtocolTest {
 
         assertThat(harness.sessionManager().getSession(device.sessionId())).isSameAs(session);
         assertThat(device.transport().isOpen()).isTrue();
-        verify(harness.personaFactory()).buildPersona(session);
+        verify(harness.personaFactory(), timeout(2000)).buildPersona(session);
     }
 
     /** 等价于告别语播放完成后 functionAfterChat 执行完的会话状态 */

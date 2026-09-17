@@ -45,8 +45,9 @@ public class FileUrlSigningResponseBodyAdvice implements ResponseBodyAdvice<Obje
             return body;
         }
         try {
-            StorageService storageService = storageServiceFactory.getStorageService();
-            SignedFileUrlSupport.apply(apiResponse.getData(), storageService::getAccessUrl);
+            // 按值的形态选实现：库里的历史值有本地相对路径与云地址两种，
+            // 拿当前生效的实现去套所有值，会让换过存储之后的历史录音签不上名、被本地拦截器判 403
+            SignedFileUrlSupport.apply(apiResponse.getData(), storageServiceFactory::accessUrlOf);
         } catch (Exception e) {
             // 签名失败不应影响正常响应
             log.warn("响应文件 URL 签名处理失败", e);

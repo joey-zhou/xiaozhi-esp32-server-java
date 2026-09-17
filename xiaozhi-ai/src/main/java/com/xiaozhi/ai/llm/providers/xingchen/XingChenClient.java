@@ -33,33 +33,25 @@ public class XingChenClient {
     
     private final String baseUrl;
     private final String flowId;
-    private final String bearerToken; // APIKey:APISecret
+    private final String bearerToken; // 控制台「授权码」，已经是 APIKey:APISecret 拼接好的完整值
     private final OkHttpClient httpClient;
 
     /**
      * 构造函数
-     * @param apiKey API密钥
-     * @param apiSecret API密钥
+     * @param bearerToken 控制台配置的授权码(APIKey:APISecret)，直接作为 Bearer token 使用
      * @param flowId 工作流ID
      */
-    public XingChenClient(String baseUrl, String apiKey, String apiSecret, String flowId) {
+    public XingChenClient(String baseUrl, String bearerToken, String flowId) {
         this.baseUrl = baseUrl != null && !baseUrl.isEmpty() ? baseUrl : API_BASE_URL;
         this.flowId = flowId;
-        this.bearerToken = apiKey + ":" + apiSecret;
+        this.bearerToken = bearerToken;
         this.httpClient = new OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(300, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build();
-        
-        log.info("XingChenClient初始化: baseUrl={}, flowId={}", this.baseUrl, flowId);
-    }
 
-    /**
-     * 兼容旧构造函数
-     */
-    public XingChenClient(String endpoint, String apiKey, String apiSecret) {
-        this(endpoint, apiKey, apiSecret, null);
+        log.info("XingChenClient初始化: baseUrl={}, flowId={}", this.baseUrl, flowId);
     }
 
     public String getFlowId() {
@@ -181,7 +173,9 @@ public class XingChenClient {
                             
                             // 检查是否是工具调用事件
                             if (event.getEventData() != null) {
-                                log.debug("收到工具调用事件: {}", JsonUtil.toJson(event.getEventData()));
+                                if (log.isDebugEnabled()) {
+                                    log.debug("收到工具调用事件: {}", JsonUtil.toJson(event.getEventData()));
+                                }
                                 callback.onFunctionCall(event);
                             } else if (event.getChoices() != null && !event.getChoices().isEmpty()) {
                                 // 普通消息事件

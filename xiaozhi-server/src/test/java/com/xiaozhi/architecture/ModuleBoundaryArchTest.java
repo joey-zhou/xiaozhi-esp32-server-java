@@ -35,10 +35,9 @@ class ModuleBoundaryArchTest {
         "com.qcloud..", "software.amazon.."
     };
 
-    /** WebChatService 的内部会话状态类持有同一个 ChatModel，一并豁免 */
     private static final String SDK_KNOWN_VIOLATIONS =
         "com\\.xiaozhi\\.(config\\.ConfigConnectionChecker"
-            + "|server\\.web\\.chat\\.WebChatService(\\$\\w+)?"
+            + "|server\\.web\\.chat\\.WebChatService"
             + "|utils\\.SmsUtils)";
 
     /** 路径匹配失效会扫到 0 个类而假绿，用它的规则须先过 {@link #serverModuleIsActuallyScanned}。 */

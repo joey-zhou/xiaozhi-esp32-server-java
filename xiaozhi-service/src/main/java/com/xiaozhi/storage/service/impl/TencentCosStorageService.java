@@ -133,6 +133,11 @@ public class TencentCosStorageService implements StorageService {
     }
 
     @Override
+    public String urlPrefix() {
+        return urlPrefix;
+    }
+
+    @Override
     public String getProvider() {
         return "tencent";
     }

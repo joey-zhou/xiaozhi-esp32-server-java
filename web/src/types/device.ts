@@ -11,7 +11,6 @@ export interface Device {
   roleId?: number
   roleName?: string
   state?: string
-  totalMessage?: number
   code?: string
   audioPath?: string
   wifiName?: string

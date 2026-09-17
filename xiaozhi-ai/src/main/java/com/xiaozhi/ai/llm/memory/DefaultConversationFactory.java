@@ -31,25 +31,22 @@ public class DefaultConversationFactory implements ConversationFactory {
     public Conversation initConversation(String ownerId, Integer userId, RoleBO role, String sessionId) {
         return switch (role.getMemoryType()) {
             case "summary" -> summaryConversationFactory.initConversation(ownerId, userId, role, sessionId);
-            case "window" -> MessageWindowConversation.builder().chatMemory(chatMemory)
-                    .maxMessages(maxMessages)
-                    .ownerId(ownerId)
-                    .roleId(role.getRoleId())
-                    .roleDesc(role.getRoleDesc())
-                    .userId(userId)
-                    .sessionId(sessionId)
-                    .build();
+            case "window" -> windowConversation(ownerId, userId, role, sessionId);
             default -> {
                 log.warn("系统目前不支持这类未知的记忆类型：{} ，将启用默认的MessageWindowConversation", role.getMemoryType());
-                yield MessageWindowConversation.builder().chatMemory(chatMemory)
-                    .maxMessages(maxMessages)
-                    .ownerId(ownerId)
-                    .roleId(role.getRoleId())
-                    .roleDesc(role.getRoleDesc())
-                    .userId(userId)
-                    .sessionId(sessionId)
-                    .build();
+                yield windowConversation(ownerId, userId, role, sessionId);
             }
         };
+    }
+
+    private Conversation windowConversation(String ownerId, Integer userId, RoleBO role, String sessionId) {
+        return MessageWindowConversation.builder().chatMemory(chatMemory)
+                .maxMessages(maxMessages)
+                .ownerId(ownerId)
+                .roleId(role.getRoleId())
+                .roleDesc(role.getRoleDesc())
+                .userId(userId)
+                .sessionId(sessionId)
+                .build();
     }
 }

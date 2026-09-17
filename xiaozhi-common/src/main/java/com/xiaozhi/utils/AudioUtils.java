@@ -385,7 +385,25 @@ public class AudioUtils {
      * @return PCM数据分块列表，每块3840字节（最后一块可能更小）
      */
     public static List<byte[]> readAsPcmChunks(String filePath) throws IOException {
-        byte[] pcmData = readAsPcm(filePath);
+        return splitPcmChunks(readAsPcm(filePath));
+    }
+
+    /**
+     * 从字节数组读取PCM数据并按Opus帧大小分块返回，格式由文件名/扩展名判断。
+     * 音频存在对象存储上时没有本地文件可读，只能先下载成字节再交给这里。
+     *
+     * @param data           音频字节
+     * @param fileNameForExt 用于判断格式的文件名或路径（仅取扩展名）
+     * @return PCM数据分块列表，每块3840字节（最后一块可能更小）
+     */
+    public static List<byte[]> readAsPcmChunks(byte[] data, String fileNameForExt) throws IOException {
+        return splitPcmChunks(readAsPcm(data, fileNameForExt));
+    }
+
+    /**
+     * 把PCM按Opus帧大小（3840字节 = 60ms）切块，避免整段音频作为单个byte[]持有
+     */
+    private static List<byte[]> splitPcmChunks(byte[] pcmData) {
         // 每个Opus帧对应的PCM大小：60ms × 16000Hz × 16bit / 8 = 3840 bytes
         int chunkSize = OPUS_FRAME_DURATION_MS * SAMPLE_RATE * 2 / 1000; // 3840
         List<byte[]> chunks = new ArrayList<>();

@@ -1,6 +1,7 @@
 package com.xiaozhi.common.web;
 
 import com.xiaozhi.common.config.RuntimePathConfig;
+import com.xiaozhi.communication.ServerAddressProvider;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,6 +58,9 @@ public class LocalFileUrlPolicy {
 
     @Resource
     private RuntimePathConfig runtimePathConfig;
+
+    @Resource
+    private ServerAddressProvider serverAddressProvider;
 
     private List<String> protectedPrefixes = List.of();
 
@@ -126,16 +130,23 @@ public class LocalFileUrlPolicy {
      * <p>
      * 上传接口下发的是带主机名的完整地址，直接入库会把部署地址写死进数据，
      * 且此后既签不上名也过不了校验，所以入库前统一在这里还原成相对路径。
+     * <p>
+     * 判据是「主机名等于本机对外地址」，不能只看路径前缀：对象存储的键同样以 audio/、uploads/ 开头，
+     * 按前缀判断会把整条云地址截成一个假的本地相对路径，原地址就此丢失、云上对象再也定位不到。
+     * 前端拿到的本地地址本来就是用 {@link ServerAddressProvider#getServerAddress()} 拼出来的，比得上。
      */
     public String toStoredPath(String value) {
         if (value == null || !(value.startsWith("http://") || value.startsWith("https://"))) {
             return value;
         }
-        int pathStart = value.indexOf('/', value.indexOf("://") + 3);
-        if (pathStart < 0) {
+        String base = serverAddressProvider.getServerAddress();
+        if (base == null || base.isBlank() || !value.startsWith(base)) {
             return value;
         }
-        String path = value.substring(pathStart + 1);
+        String path = value.substring(base.length());
+        if (path.startsWith("/")) {
+            path = path.substring(1);
+        }
         return isProtected(path) ? path : value;
     }
 

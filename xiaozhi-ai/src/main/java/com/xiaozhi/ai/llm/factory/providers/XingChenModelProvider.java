@@ -49,10 +49,11 @@ public class XingChenModelProvider implements ChatModelProvider {
             throw new IllegalStateException("未找到XingChen agent配置, userId=" + config.getUserId());
         }
         ConfigBO queryConfig = configs.get(0);
-        String apiKey = queryConfig.getApiKey();
-        String apiSecret = queryConfig.getApiSecret();
-        
-        var chatModel = new XingChenChatModel(endpoint, apiKey, apiSecret, toolCallingManager);
+        // 控制台字段：apiKey 是授权码(APIKey:APISecret)，直接当 Bearer token 用；apiSecret 实际存的是 FlowId
+        String bearerToken = queryConfig.getApiKey();
+        String flowId = queryConfig.getApiSecret();
+
+        var chatModel = new XingChenChatModel(endpoint, bearerToken, flowId, toolCallingManager);
         
         log.info("Created XingChen ChatModel: endpoint={}", endpoint);
         return chatModel;

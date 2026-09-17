@@ -77,6 +77,14 @@ public class ResultStatus {
     public static final int UNSUPPORTED_TYPE = 415;
 
     /**
+     * 操作有不可逆后果，前端二次确认后带确认参数重发即可继续。
+     * <p>
+     * 是 {@link #CONFLICT} 的细分：前端要靠它区分「弹确认框」和「弹错误提示」，
+     * 复用 409 会让所有普通冲突都弹出确认框。
+     */
+    public static final int CONFIRM_REQUIRED = 4090;
+
+    /**
      * 系统内部错误
      */
     public static final int ERROR = 500;

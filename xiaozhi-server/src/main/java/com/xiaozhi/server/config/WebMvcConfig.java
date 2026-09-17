@@ -19,7 +19,6 @@ import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 
-import java.io.File;
 
 @Configuration
 @Slf4j
@@ -96,7 +95,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         try {
             String audioPath = runtimePathConfig.resolveAudioDir().toUri().toString();
-            String uploadsPath = new File(uploadPath).getAbsoluteFile().toURI().toString();
+            String uploadsPath = runtimePathConfig.resolveStorageKey(uploadPath).toUri().toString();
 
             registry.addResourceHandler("/audio/**")
                     .addResourceLocations(audioPath);

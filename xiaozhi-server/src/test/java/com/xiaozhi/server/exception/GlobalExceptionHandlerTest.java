@@ -3,12 +3,14 @@ package com.xiaozhi.server.exception;
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.NotRoleException;
+import com.xiaozhi.common.exception.ConfirmRequiredException;
 import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
 import com.xiaozhi.common.exception.UsernameNotFoundException;
 import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,6 +83,18 @@ class GlobalExceptionHandlerTest extends ControllerTestSupport {
             // 未单独映射的运行时异常统一兜底，内部细节不外泄
             Arguments.of(new RuntimeException("不该外泄的内部细节"), 500, "服务器错误，请联系管理员")
         );
+    }
+
+    /** 待确认不是失败：走 HTTP 200 前端才不会既弹错误提示又弹确认框 */
+    @Test
+    void mapsConfirmRequiredToHttpOkWithDedicatedCode() throws Exception {
+        String warning = "当前对象存储上还有 1234 条历史音频/文件，切换后这些内容将永久无法访问";
+        controller.toThrow = new ConfirmRequiredException(warning);
+
+        mockMvc.perform(get("/probe/throw"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(ResultStatus.CONFIRM_REQUIRED))
+            .andExpect(jsonPath("$.message").value(warning));
     }
 
     @Test

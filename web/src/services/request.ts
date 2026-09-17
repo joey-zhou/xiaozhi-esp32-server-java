@@ -290,8 +290,8 @@ export const http = {
   /**
    * PUT 请求（JSON 格式）
    */
-  put<T = unknown>(url: string, data?: unknown): Promise<DataResponse<T>> {
-    return request.put(url, data)
+  put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<DataResponse<T>> {
+    return request.put(url, data, config)
   },
 
   /**

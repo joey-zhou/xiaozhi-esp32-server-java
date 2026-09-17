@@ -12,6 +12,7 @@ import com.xiaozhi.communication.domain.mcp.device.initialize.DeviceMcpVision;
 import com.xiaozhi.common.port.DeviceWriter;
 import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.utils.JsonUtil;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.ai.chat.model.ToolContext;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -42,6 +44,22 @@ public class DeviceMcpService {
     /** 设备指令等待应答的上限（秒）。拍照识图等合法长指令会用满这个时间 */
     @Value("${xiaozhi.mcp.device.request-timeout-seconds:30}")
     private int mcpRequestTimeoutSeconds = 30;
+
+    /**
+     * 同时在等设备应答的指令数上限，0 表示按 CPU 数推算。
+     * <p>
+     * ToolCallback.call() 是同步接口，Spring AI 把工具执行放在公共的 boundedElastic 上，
+     * 因此每等一条指令就占住那个池的一根线程，最长占满 {@code request-timeout-seconds}；
+     * 而 TTS 的流式下行订阅在同一个池上。这里用信号量把占用量卡死，
+     * 超出上限的指令直接告诉模型设备忙，不排队——排队只会把等待时间叠加到对话上。
+     */
+    @Value("${xiaozhi.mcp.device.max-concurrent-requests:0}")
+    private int configuredMaxConcurrentRequests;
+
+    // 先按 CPU 数给一份可用的默认值，@PostConstruct 只在显式配置了上限时替换，
+    // 这样脱离容器直接 new 出来的实例（测试）也有闸门可用
+    private int maxConcurrentRequests = Math.max(4, Runtime.getRuntime().availableProcessors() * 2);
+    private volatile Semaphore inFlightPermits = new Semaphore(maxConcurrentRequests);
 
     @Resource
     private ServerAddressProvider serverAddressProvider;
@@ -57,6 +75,15 @@ public class DeviceMcpService {
 
     @Value("${xiaozhi.mcp.device.max-tools-count:32}")
     private int maxToolsCount = 32;
+
+    @PostConstruct
+    void applyConfiguredConcurrencyLimit() {
+        if (configuredMaxConcurrentRequests > 0) {
+            maxConcurrentRequests = configuredMaxConcurrentRequests;
+            inFlightPermits = new Semaphore(maxConcurrentRequests);
+        }
+        log.info("设备指令并发上限 {}, 单条等待上限 {} 秒", maxConcurrentRequests, mcpRequestTimeoutSeconds);
+    }
 
     /**
      * 初始化设备端MCP工具列表，并将能力列表持久化到数据库
@@ -381,6 +408,12 @@ public class DeviceMcpService {
             log.warn("SessionId: {}, 连接已关闭，设备指令未下发, id: {}", chatSession.getSessionId(), id);
             return new McpCallResult(null, "设备连接不可用，指令没有下发成功。请告诉用户设备当前无法控制");
         }
+        // 池子里已经有足够多的线程在等设备了，再压进来只会挤掉同一个池上的 TTS 下行
+        if (!inFlightPermits.tryAcquire()) {
+            log.warn("SessionId: {}, 并发设备指令已达上限 {}, 本次未下发, id: {}",
+                    chatSession.getSessionId(), maxConcurrentRequests, id);
+            return new McpCallResult(null, "同时执行的设备指令太多，这一条没有下发。请告诉用户稍后再试");
+        }
         CompletableFuture<DeviceMcpMessage> future = new CompletableFuture<>();
         Map<Long, CompletableFuture<DeviceMcpMessage>> pendingRequests =
                 chatSession.getDeviceMcpHolder().getMcpPendingRequests();
@@ -403,6 +436,7 @@ public class DeviceMcpService {
             return new McpCallResult(null, "设备连接不可用，指令没有下发成功。请告诉用户设备当前无法控制");
         } finally {
             pendingRequests.remove(id);
+            inFlightPermits.release();
         }
     }
 }

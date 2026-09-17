@@ -1,5 +1,6 @@
 package com.xiaozhi.storage.service.impl;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.common.web.LocalFileUrlPolicy;
 import jakarta.annotation.Resource;
 import com.xiaozhi.storage.service.StorageService;
@@ -26,22 +27,26 @@ public class LocalStorageService implements StorageService {
     @Resource
     private LocalFileUrlPolicy localFileUrlPolicy;
 
+    @Resource
+    private RuntimePathConfig runtimePathConfig;
+
     @Value("${xiaozhi.upload-path:uploads}")
     private String baseDir;
 
     @Override
 
     public String upload(MultipartFile file, String relativePath, String fileName) throws IOException {
-        String fullPath = baseDir;
+        String key = baseDir;
         if (!relativePath.isEmpty()) {
-            fullPath = fullPath + File.separator + relativePath;
+            key = key + File.separator + relativePath;
         }
 
-        File directory = new File(fullPath);
+        // key 是入库用的相对路径，文件按 data-dir 落到实际位置，两者不能混用
+        File directory = runtimePathConfig.resolveStorageKey(key).toFile();
         if (!directory.exists()) {
             boolean created = directory.mkdirs();
             if (!created) {
-                throw new IOException("无法创建目录: " + fullPath);
+                throw new IOException("无法创建目录: " + directory);
             }
         }
 
@@ -52,25 +57,26 @@ public class LocalStorageService implements StorageService {
         }
 
         // 返回相对路径（统一使用正斜杠，便于 URL 访问）
-        String relativeFilePath = baseDir + File.separator + relativePath + File.separator + fileName;
+        String relativeFilePath = key + File.separator + fileName;
         return relativeFilePath.replace(File.separator, "/");
     }
 
     @Override
 
     public String upload(Path localFile, String objectKey) throws IOException {
-        Path target = Path.of(objectKey);
-        if (!localFile.equals(target)) {
+        Path target = runtimePathConfig.resolveStorageKey(objectKey);
+        if (!localFile.toAbsolutePath().normalize().equals(target)) {
             Files.createDirectories(target.getParent());
             Files.move(localFile, target, StandardCopyOption.REPLACE_EXISTING);
         }
-        return target.toString();
+        // 返回传入的键而不是落地的绝对路径：入库的必须是相对键，否则签不上名也匹配不上 /audio/** 映射
+        return objectKey.replace('\\', '/');
     }
 
     @Override
     public byte[] download(String storedPath) {
         try {
-            Path path = Path.of(storedPath);
+            Path path = runtimePathConfig.resolveStorageKey(storedPath);
             return Files.exists(path) ? Files.readAllBytes(path) : null;
         } catch (Exception e) {
             log.warn("读取本地文件失败: {}", storedPath, e);
@@ -82,7 +88,7 @@ public class LocalStorageService implements StorageService {
     public void remove(String storedPath) {
         if (storedPath == null) return;
         try {
-            Files.deleteIfExists(Path.of(storedPath));
+            Files.deleteIfExists(runtimePathConfig.resolveStorageKey(storedPath));
         } catch (Exception e) {
             log.warn("删除本地文件失败: {}", storedPath, e);
         }
@@ -90,7 +96,7 @@ public class LocalStorageService implements StorageService {
 
     @Override
     public boolean exists(String storedPath) {
-        return storedPath != null && Files.exists(Path.of(storedPath));
+        return storedPath != null && Files.exists(runtimePathConfig.resolveStorageKey(storedPath));
     }
 
     @Override
@@ -102,6 +108,12 @@ public class LocalStorageService implements StorageService {
     @Override
     public String stripSignature(String url) {
         return localFileUrlPolicy.stripSignature(url);
+    }
+
+    @Override
+    public String urlPrefix() {
+        // 本地存储写出的是相对路径，没有前缀可言
+        return "";
     }
 
     @Override

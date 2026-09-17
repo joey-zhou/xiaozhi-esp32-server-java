@@ -21,6 +21,8 @@ import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -39,6 +41,16 @@ import lombok.extern.slf4j.Slf4j;
  * - 前3帧立即发送（targetSendTime < currentTime，直接通过）
  * - 第4帧开始按精确时间调度
  * - 效果：设备收到前3帧立即开始播放，不会因等待数据而破音；服务端 AEC 参考保留两帧积压后仍领先播放点
+ *
+ * 并发模型（三把锁，获取顺序固定为 fluxDisposable → encodeLock → pauseLock，不得反向嵌套）：
+ * - fluxDisposable 的监视器：订阅生命周期锁。fluxDisposable / fluxQueue / running / senderThread /
+ *   startTimestamp / playPosition 的写，以及"本轮是否播完"的判定，都在这把锁下，
+ *   保证发送线程收尾与新一轮 play() 起线程不会交错。
+ * - encodeLock：编码与入队锁。订阅回调里的"代次校验 → 编码 → 入队"与 stop() 的
+ *   "递增代次 → 清队列 → 丢残留样本"整体互斥。
+ * - pauseLock（ReentrantLock）：暂停状态锁。paused / pauseDeadlineNs / pauseStartNs /
+ *   gapFramesRemaining 的写、发送线程的退帧回队头、stop() 的清队列都在这把锁下。
+ *   发送线程是虚拟线程，等待续播用 Condition 而非 Object.wait，避免 pin 住载体线程。
  */
 @Slf4j
 public class ScheduledPlayer extends Player {
@@ -66,30 +78,32 @@ public class ScheduledPlayer extends Player {
     // 发送线程停顿超过此值视为失步，以当前时刻重锚定时间轴
     private static final long MAX_PLAYBACK_LAG_NS = 500 * 1_000_000L; // 500ms
 
-    // Burst模式状态
+    // Burst模式状态。只由发送线程在循环内推进，跨轮重置在 fluxDisposable 监视器下做
     private long startTimestamp = 0;  // 播放开始的绝对时间戳（纳秒）
     private long playPosition = BURST_PREBUFFER_NS;  // 当前播放位置（纳秒），初始为-180ms实现预缓冲
 
     // 音频帧队列。暂停期间发送线程会把已取出的帧退回队头
     private final Deque<Frame> allOpusFrames = new ConcurrentLinkedDeque<>();
 
-    // Flux队列（用于排队多个TTS任务）
+    // Flux队列（用于排队多个TTS任务）。增删须持有 fluxDisposable 监视器
     private final Queue<QueuedFlux> fluxQueue = new ConcurrentLinkedQueue<>();
 
-    // 当前正在订阅的Flux
+    // 当前正在订阅的Flux。它自身的监视器就是订阅生命周期锁，写入须持有该监视器
     private final AtomicReference<Disposable> fluxDisposable = new AtomicReference<>(null);
 
-    // 虚拟线程控制
+    // 虚拟线程控制。两者都在 fluxDisposable 监视器下写，发送循环无锁读，故加 volatile
     private volatile boolean running = false;
-    private Thread senderThread;
+    private volatile Thread senderThread;
 
     // 待下发的句间静音帧数，修改须持有 pauseLock
     private volatile int gapFramesRemaining = 0;
 
     // 暂停下发：用户开口后先停住，等识别终稿决定续播还是真打断。队列、时间轴、订阅都保留。
-    // 开播前暂停发送线程原地等待；开播后暂停按节拍发静音帧
-    private final Object pauseLock = new Object();
+    // 开播前暂停发送线程在 pauseResumed 上等待；开播后暂停按节拍发静音帧
+    private final ReentrantLock pauseLock = new ReentrantLock();
+    private final Condition pauseResumed = pauseLock.newCondition();
     private volatile boolean paused = false;
+    // 以下两个时刻只在 pauseLock 下读写
     private long pauseDeadlineNs = 0;
     private long pauseStartNs = 0;
 
@@ -137,7 +151,7 @@ public class ScheduledPlayer extends Player {
     }
 
     /**
-     * 订阅音频流
+     * 订阅音频流。调用方须持有 fluxDisposable 监视器
      */
     private void subscribe(Flux<Speech> speechFlux, boolean reply) {
         Assert.notNull(speechFlux, "speechFlux 不能为空");
@@ -164,8 +178,13 @@ public class ScheduledPlayer extends Player {
                             // 更新活跃时间
                             session.setLastActivityTime(Instant.now());
 
-                            // 预编码的 Opus 帧（来自缓存直读），直接入队无需转换
+                            // 预编码的 Opus 帧（来自缓存直读），无需转换。命中句与未命中句在同一轮回复里
+                            // 交替出现，入队前同样要走一遍句边界收尾，否则上一句留在编码器里的残样
+                            // 会被拖到再下一句时才 flush 出来，接在本句音频之后冒出一截上一句的尾音。
                             if (speech.isOpusEncoded()) {
+                                if (StringUtils.hasText(speech.getText())) {
+                                    flushPreviousSentence(pendingText, reply);
+                                }
                                 allOpusFrames.add(new Frame(speech, reply));
                                 return;
                             }
@@ -174,25 +193,9 @@ public class ScheduledPlayer extends Player {
                             byte[] pcmData = speech.getOutput();
                             String text = speech.getText();
 
-                            // 句子边界对齐：带文本表示新句开始。先把上一句残留在编码器里的
-                            // 不足一帧的 PCM flush 成独立帧，避免上一句尾音与本句首帧 PCM 拼接，
-                            // 导致本句文本被绑定到混有上一句尾音的帧上（字幕相对音频提前、末句字幕丢失）。
+                            // 带文本表示新句开始，先把上一句的残留收成独立帧
                             if (StringUtils.hasText(text)) {
-                                List<byte[]> tailFrames = opusProcessor.flushLeftover();
-                                if (!CollectionUtils.isEmpty(tailFrames)) {
-                                    // 上一句的收尾帧不带文本，归属上一句
-                                    String carriedText = pendingText.getAndSet(null);
-                                    List<Speech> tailList = tailFrames.stream()
-                                            .map(Speech::new)
-                                            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-                                    // 若上一句因首帧 PCM 过小而暂存了文本却一直没凑够帧，
-                                    // 此刻补绑到其收尾帧，避免上一句字幕彻底丢失
-                                    if (StringUtils.hasText(carriedText)) {
-                                        Speech firstTail = tailList.remove(0);
-                                        tailList.add(0, new Speech(firstTail.getOutput(), carriedText));
-                                    }
-                                    allOpusFrames.addAll(frames(tailList, reply));
-                                }
+                                flushPreviousSentence(pendingText, reply);
                             }
 
                             // 当前帧无文本，尝试取上次因PCM不足一帧而未能附加的文本
@@ -263,7 +266,38 @@ public class ScheduledPlayer extends Player {
                     }
                 );
 
+        // stop() 与本方法同在 fluxDisposable 监视器下，走到这里代次仍变了说明订阅动作本身
+        // 跨过了一次打断：不能把已作废的 disposable 写回去，否则它的回调全被代次校验丢弃、
+        // 再没人调 subscribeNext() 把 fluxDisposable 置空，后续 play() 只会入队不订阅。
+        if (myGeneration != generation.get()) {
+            disposable.dispose();
+            return;
+        }
         fluxDisposable.set(disposable);
+    }
+
+    /**
+     * 句子边界对齐：新句开始前，把上一句残留在编码器里的不足一帧的 PCM flush 成独立帧，
+     * 避免上一句尾音与本句首帧 PCM 拼接，导致本句文本被绑定到混有上一句尾音的帧上
+     * （字幕相对音频提前、末句字幕丢失）。调用方须持有 encodeLock
+     */
+    private void flushPreviousSentence(AtomicReference<String> pendingText, boolean reply) {
+        List<byte[]> tailFrames = opusProcessor.flushLeftover();
+        if (CollectionUtils.isEmpty(tailFrames)) {
+            return;
+        }
+        // 上一句的收尾帧不带文本，归属上一句
+        String carriedText = pendingText.getAndSet(null);
+        List<Speech> tailList = tailFrames.stream()
+                .map(Speech::new)
+                .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+        // 若上一句因首帧 PCM 过小而暂存了文本却一直没凑够帧，
+        // 此刻补绑到其收尾帧，避免上一句字幕彻底丢失
+        if (StringUtils.hasText(carriedText)) {
+            Speech firstTail = tailList.remove(0);
+            tailList.add(0, new Speech(firstTail.getOutput(), carriedText));
+        }
+        allOpusFrames.addAll(frames(tailList, reply));
     }
 
     private static List<Frame> frames(List<Speech> speeches, boolean reply) {
@@ -306,11 +340,12 @@ public class ScheduledPlayer extends Player {
         } catch (RuntimeException e) {
             // 发送失败（连接已断等）：结束本轮，不让 running 卡在 true
             log.error("音频发送线程异常退出 - SessionId: {}: {}", session.getSessionId(), e.getMessage());
-            if (generation.get() == myGeneration) {
-                running = false;
-                setPlaying(false);
-                startTimestamp = 0;
-                playPosition = BURST_PREBUFFER_NS;
+            synchronized (fluxDisposable) {
+                if (generation.get() == myGeneration) {
+                    running = false;
+                    setPlaying(false);
+                    resetPlaybackTimeline();
+                }
             }
         }
     }
@@ -338,27 +373,19 @@ public class ScheduledPlayer extends Player {
             Frame frame = allOpusFrames.peek();
             if (frame == SENTENCE_GAP_MARKER) {
                 allOpusFrames.poll();
-                synchronized (pauseLock) {
-                    gapFramesRemaining += SENTENCE_GAP_FRAMES;
-                }
+                addSentenceGap();
                 continue;
             }
             if (gapFramesRemaining > 0) {
                 // 末句之后的间隔不播，直接收尾
                 if (nothingMoreToPlay()) {
-                    synchronized (pauseLock) {
-                        gapFramesRemaining = 0;
-                    }
+                    clearSentenceGap();
                     continue;
                 }
                 if (!sendSilenceTick()) {
                     break;
                 }
-                synchronized (pauseLock) {
-                    if (gapFramesRemaining > 0) {
-                        gapFramesRemaining--;
-                    }
-                }
+                consumeGapFrame();
                 continue;
             }
             if (frame != null) {
@@ -378,11 +405,7 @@ public class ScheduledPlayer extends Player {
                 }
 
                 // 再次检查，确保没有新数据
-                if (nothingMoreToPlay()) {
-                    running = false;
-                    // 重置Burst模式状态，避免下次play()时因旧的startTimestamp导致所有帧以零延迟发送
-                    startTimestamp = 0;
-                    playPosition = BURST_PREBUFFER_NS;
+                if (finishIfDrained(myGeneration)) {
                     sendStop();
                     break;
                 }
@@ -410,10 +433,65 @@ public class ScheduledPlayer extends Player {
     }
 
     /**
-     * 开播前暂停在此阻塞；超过期限自动恢复。返回 false 表示线程被中断，应退出循环
+     * 判定本轮是否已播完，是则收起发送线程并重置时间轴。返回 true 表示应发 tts stop 并退出循环。
+     *
+     * 判定与 running 置位必须在同一把订阅生命周期锁下完成：否则新一轮 play() 可能挤在两者之间，
+     * 看到队列已空就直接订阅、又读到尚未清零的 running 而不起发送线程，新一轮的帧无人消费。
+     * 代次已变说明本轮是被 stop() 打断的，收尾的 tts stop 由打断方发出，这里不再重复发。
+     */
+    private boolean finishIfDrained(int myGeneration) {
+        synchronized (fluxDisposable) {
+            if (generation.get() != myGeneration || !nothingMoreToPlay()) {
+                return false;
+            }
+            running = false;
+            resetPlaybackTimeline();
+            return true;
+        }
+    }
+
+    /** 重置Burst模式状态，避免下次play()时因旧的startTimestamp导致所有帧以零延迟发送 */
+    private void resetPlaybackTimeline() {
+        startTimestamp = 0;
+        playPosition = BURST_PREBUFFER_NS;
+    }
+
+    /** 句子间隔标记出队：补记一段句间静音 */
+    private void addSentenceGap() {
+        pauseLock.lock();
+        try {
+            gapFramesRemaining += SENTENCE_GAP_FRAMES;
+        } finally {
+            pauseLock.unlock();
+        }
+    }
+
+    private void clearSentenceGap() {
+        pauseLock.lock();
+        try {
+            gapFramesRemaining = 0;
+        } finally {
+            pauseLock.unlock();
+        }
+    }
+
+    private void consumeGapFrame() {
+        pauseLock.lock();
+        try {
+            if (gapFramesRemaining > 0) {
+                gapFramesRemaining--;
+            }
+        } finally {
+            pauseLock.unlock();
+        }
+    }
+
+    /**
+     * 开播前暂停在此等待；超过期限自动恢复。返回 false 表示线程被中断，应退出循环
      */
     private boolean awaitResume(int myGeneration) {
-        synchronized (pauseLock) {
+        pauseLock.lock();
+        try {
             while (paused && running && generation.get() == myGeneration) {
                 long remainingNs = pauseDeadlineNs - System.nanoTime();
                 if (remainingNs <= 0) {
@@ -422,12 +500,14 @@ public class ScheduledPlayer extends Player {
                     break;
                 }
                 try {
-                    pauseLock.wait(Math.max(1, remainingNs / 1_000_000L));
+                    pauseResumed.awaitNanos(remainingNs);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return false;
                 }
             }
+        } finally {
+            pauseLock.unlock();
         }
         return running && generation.get() == myGeneration;
     }
@@ -436,33 +516,42 @@ public class ScheduledPlayer extends Player {
      * 暂停超过期限则自动续播
      */
     private boolean resumeIfExpired() {
-        synchronized (pauseLock) {
+        pauseLock.lock();
+        try {
             if (!paused || System.nanoTime() < pauseDeadlineNs) {
                 return false;
             }
             log.info("暂停超时，自动续播 - SessionId: {}", session.getSessionId());
             doResume();
             return true;
+        } finally {
+            pauseLock.unlock();
         }
     }
 
     @Override
     public void pause(long maxMillis) {
-        synchronized (pauseLock) {
+        pauseLock.lock();
+        try {
             if (!paused) {
                 pauseStartNs = System.nanoTime();
             }
             paused = true;
             pauseDeadlineNs = System.nanoTime() + maxMillis * 1_000_000L;
+        } finally {
+            pauseLock.unlock();
         }
     }
 
     @Override
     public void resume() {
-        synchronized (pauseLock) {
+        pauseLock.lock();
+        try {
             if (paused) {
                 doResume();
             }
+        } finally {
+            pauseLock.unlock();
         }
     }
 
@@ -475,7 +564,7 @@ public class ScheduledPlayer extends Player {
         while (allOpusFrames.peek() == SENTENCE_GAP_MARKER) {
             allOpusFrames.poll();
         }
-        pauseLock.notifyAll();
+        pauseResumed.signalAll();
     }
 
     @Override
@@ -549,7 +638,8 @@ public class ScheduledPlayer extends Player {
         }
 
         // 等待期间被暂停：帧退回队头，续播后再发。与 stop() 清队列互斥
-        synchronized (pauseLock) {
+        pauseLock.lock();
+        try {
             if (generation.get() != myGeneration) {
                 return;
             }
@@ -557,6 +647,8 @@ public class ScheduledPlayer extends Player {
                 allOpusFrames.addFirst(queued);
                 return;
             }
+        } finally {
+            pauseLock.unlock();
         }
 
         // 更新活跃时间
@@ -583,42 +675,49 @@ public class ScheduledPlayer extends Player {
     @Override
     public void stop() {
         super.stop();
-        running = false;
 
-        // 整段与订阅回调互斥：先等在飞的回调跑完，再递增代次、清队列、丢残留样本。
+        // 订阅生命周期与编码入队整段互斥，锁序固定为 fluxDisposable → encodeLock → pauseLock：
+        // 外层挡住并发的 play()/subscribeNext()，否则一个正在建立的订阅会把已作废的 disposable
+        // 写回去，此后再没人把它置空；内层先等在飞的订阅回调跑完，再递增代次、清队列、丢残留样本，
         // dispose() 不会等待正在执行的 onNext，只靠代次校验挡不住已经进入回调体的那一帧。
-        synchronized (encodeLock) {
-            // 先递增代次：让此前订阅的 Flux 回调（可能仍在 TTS 回调线程上飞）立即失效，
-            // 之后它们的 add/addAll 会被 subscribe() 内的代次校验拦截，不会再污染队列。
-            generation.incrementAndGet();
+        synchronized (fluxDisposable) {
+            running = false;
 
-            // 中断发送线程
-            if (senderThread != null) {
-                senderThread.interrupt();
+            synchronized (encodeLock) {
+                // 先递增代次：让此前订阅的 Flux 回调（可能仍在 TTS 回调线程上飞）立即失效，
+                // 之后它们的 add/addAll 会被 subscribe() 内的代次校验拦截，不会再污染队列。
+                generation.incrementAndGet();
+
+                // 中断发送线程
+                Thread thread = senderThread;
+                if (thread != null) {
+                    thread.interrupt();
+                }
+
+                // 解除暂停并清空队列。与发送线程退帧回队头互斥
+                pauseLock.lock();
+                try {
+                    paused = false;
+                    gapFramesRemaining = 0;
+                    fluxQueue.clear();
+                    allOpusFrames.clear();
+                    pauseResumed.signalAll();
+                } finally {
+                    pauseLock.unlock();
+                }
+
+                // 取消Flux订阅
+                Disposable disposable = fluxDisposable.getAndSet(null);
+                if (disposable != null && !disposable.isDisposed()) {
+                    disposable.dispose();
+                }
+
+                // 丢弃本轮未成帧的残留样本，不能拼进下一轮首帧
+                opusProcessor.discardLeftover();
             }
 
-            // 解除暂停并清空队列。与发送线程退帧回队头互斥
-            synchronized (pauseLock) {
-                paused = false;
-                gapFramesRemaining = 0;
-                fluxQueue.clear();
-                allOpusFrames.clear();
-                pauseLock.notifyAll();
-            }
-
-            // 取消Flux订阅
-            Disposable disposable = fluxDisposable.getAndSet(null);
-            if (disposable != null && !disposable.isDisposed()) {
-                disposable.dispose();
-            }
-
-            // 丢弃本轮未成帧的残留样本，不能拼进下一轮首帧
-            opusProcessor.discardLeftover();
+            resetPlaybackTimeline();
         }
-
-        // 重置Burst模式状态
-        startTimestamp = 0;
-        playPosition = BURST_PREBUFFER_NS;
 
         // 中断时主动关闭文件，避免产生损坏的 Opus 文件
         if (getOpusRecorder() != null) {

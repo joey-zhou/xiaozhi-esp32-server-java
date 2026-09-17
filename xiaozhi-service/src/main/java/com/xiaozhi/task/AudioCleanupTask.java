@@ -1,6 +1,7 @@
 package com.xiaozhi.task;
 
 import com.xiaozhi.message.service.MessageService;
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.utils.AudioUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +42,9 @@ public class AudioCleanupTask {
     private static final String MESSAGE_AUDIO_LOCK = "lock:task:message-audio-purge";
 
     @Resource
+    private RuntimePathConfig runtimePathConfig;
+
+    @Resource
     private MessageService messageService;
 
     @Resource
@@ -50,7 +54,7 @@ public class AudioCleanupTask {
 
     @Scheduled(cron = "0 0 1 * * ?")
     public void cleanupExpiredAudio() {
-        Path audioDir = Path.of(AudioUtils.AUDIO_PATH);
+        Path audioDir = runtimePathConfig.resolveAudioDir();
         if (!Files.exists(audioDir)) {
             return;
         }

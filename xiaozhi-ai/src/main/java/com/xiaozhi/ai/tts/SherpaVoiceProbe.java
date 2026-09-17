@@ -1,10 +1,9 @@
-package com.xiaozhi.role.impl;
+package com.xiaozhi.ai.tts;
 
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.common.model.resp.SherpaVoiceResp;
-import com.xiaozhi.role.SherpaVoiceService;
 import jakarta.annotation.Resource;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.IOException;
@@ -13,17 +12,23 @@ import java.nio.file.Files;
 import java.util.*;
 
 import lombok.extern.slf4j.Slf4j;
+
 /**
- * Sherpa-ONNX 本地音色扫描服务实现。
+ * Sherpa-ONNX 本地音色扫描。
+ * <p>
+ * 扫描配置的本地 TTS 模型目录，自动识别模型类型（Kokoro / Matcha / VITS）和 speaker。
+ * 扫描的是与 {@link com.xiaozhi.ai.tts.providers.SherpaOnnxTtsService} 相同的模型目录。
  */
 @Slf4j
-@Service
-public class SherpaVoiceServiceImpl implements SherpaVoiceService {
+@Component
+public class SherpaVoiceProbe {
 
     @Resource
     private RuntimePathConfig runtimePathConfig;
 
-    @Override
+    /**
+     * 扫描本地 TTS 模型目录，返回所有可用的 sherpa-onnx 音色列表。
+     */
     public List<SherpaVoiceResp> listVoices() {
         List<SherpaVoiceResp> voices = new ArrayList<>();
         File ttsDir = runtimePathConfig.resolveTtsModelsDir().toFile();
