@@ -1,5 +1,6 @@
 package com.xiaozhi.architecture;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -19,6 +20,7 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.tngtech.archunit.base.DescribedPredicate.not;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,10 +40,32 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ServiceLayerArchTest {
 
-    /** 不含 {@code ..convert..}：转换器的职责就是 Req/Resp ↔ BO/DO。 */
-    private static final String[] BELOW_SERVER_PACKAGES = {
-        "..service..", "..dal..", "..security.."
-    };
+    /**
+     * 禁止项 1 的判定面：server 之下三个模块的全部编译产物，按模块位置判定，不按包名段枚举。
+     * <p>
+     * 原来枚举 {@code ..service.. / ..dal.. / ..security..} 三段，xiaozhi-service 的 141 个包里
+     * 有 35 个（domain、infrastructure、model、task 等）一段都不含，写在那里的 Req/Resp 依赖
+     * 规则根本看不见；xiaozhi-ai 更是整个模块基本不带这三段。
+     * <p>
+     * 不含 xiaozhi-common：Req/Resp 本身就住在那儿，它们互相引用不是违规。
+     * 路径匹配失效会一个类都扫不到而假绿，用它的规则须先过 {@link #belowServerModulesAreActuallyScanned}。
+     */
+    private static final ImportOption BELOW_SERVER_MODULES = location ->
+        location.contains("/xiaozhi-service/target/classes/")
+            || location.contains("/xiaozhi-ai/target/classes/")
+            || location.contains("/xiaozhi-dialogue/target/classes/");
+
+    /**
+     * 存量：xiaozhi-ai 的这四个类直接返回 Resp。原枚举式判定面覆盖不到它们所在的包，
+     * 因此从未被发现。真正的修法是让它们返回 BO、由 server 侧组装 Resp，
+     * 涉及 MCP 工具清单与 sherpa 音色探测两条对外链路的返回类型契约，单独排期。
+     */
+    private static final Set<String> RESP_KNOWN_VIOLATIONS = Set.of(
+        "com.xiaozhi.ai.mcp.server.McpToolQueryService",
+        "com.xiaozhi.ai.mcp.server.McpToolQueryServiceImpl",
+        "com.xiaozhi.ai.tool.ToolsGlobalRegistry",
+        "com.xiaozhi.ai.tts.SherpaVoiceProbe"
+    );
 
     private static final String API_RESPONSE = "com.xiaozhi.common.web.ApiResponse";
     private static final String PAGE_RESULT = "com.xiaozhi.common.model.PageResult";
@@ -55,34 +79,56 @@ class ServiceLayerArchTest {
     );
 
     private static JavaClasses xiaozhiClasses;
+    private static JavaClasses belowServerClasses;
 
     @BeforeAll
     static void importClasses() {
         xiaozhiClasses = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages("com.xiaozhi");
+        belowServerClasses = new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+            .withImportOption(BELOW_SERVER_MODULES)
+            .importPackages("com.xiaozhi");
+    }
+
+    @Test
+    void belowServerModulesAreActuallyScanned() {
+        assertThat(belowServerClasses)
+            .as("按路径过滤 service/ai/dialogue 的产物失效了，禁止项 1 会假绿")
+            .hasSizeGreaterThan(200);
     }
 
     @Test
     void serviceLayerDoesNotDependOnReqDtoPackage() {
         ArchRule rule = noClasses()
-            .that().resideInAnyPackage(BELOW_SERVER_PACKAGES)
+            .that().resideOutsideOfPackage("..convert..")
             .should().dependOnClassesThat()
             .resideInAPackage("..model.req..")
             .because("Service 层不得依赖 *Req DTO，Controller 应先把 Req 拆成独立入参或 BO");
 
-        rule.check(xiaozhiClasses);
+        rule.check(belowServerClasses);
     }
 
     @Test
     void serviceLayerDoesNotDependOnRespDtoPackage() {
         ArchRule rule = noClasses()
-            .that().resideInAnyPackage(BELOW_SERVER_PACKAGES)
+            .that().resideOutsideOfPackage("..convert..")
+            .and(not(hasNameIn(RESP_KNOWN_VIOLATIONS)))
             .should().dependOnClassesThat()
             .resideInAPackage("..model.resp..")
             .because("Resp 的组装只发生在 server 模块，读侧 Service 返回 BO 或包内只读投影");
 
-        rule.check(xiaozhiClasses);
+        rule.check(belowServerClasses);
+    }
+
+    private static DescribedPredicate<JavaClass> hasNameIn(Set<String> names) {
+        return new DescribedPredicate<>("已登记的存量违规") {
+            @Override
+            public boolean test(JavaClass javaClass) {
+                return names.contains(javaClass.getName());
+            }
+        };
     }
 
     /** com.xiaozhi 之后的第一段包名。 */

@@ -817,7 +817,7 @@ fetchData()
 .field-help {
   margin-top: 4px;
   font-size: 12px;
-  color: #999;
+  color: var(--ant-color-text-tertiary);
 }
 
 .ellipsis-text {

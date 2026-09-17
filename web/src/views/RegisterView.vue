@@ -379,6 +379,7 @@ const handleSubmit = async () => {
 }
 
 // 表单标签
+/* 这三页压在一张固定的深色背景图上，标签色不跟随明暗主题，保持浅灰即可 */
 :deep(.ant-form-item-label > label) {
   color: #cccccc !important;
   font-weight: 500;

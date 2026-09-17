@@ -5,6 +5,7 @@ import com.xiaozhi.authrole.service.AuthRoleService;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
 import com.xiaozhi.common.exception.UsernameNotFoundException;
+import com.xiaozhi.common.model.bo.UserAuthBO;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.req.UserPageReq;
 import com.xiaozhi.common.model.req.UserRegisterReq;
@@ -24,6 +25,7 @@ import com.xiaozhi.security.AuthenticationService;
 import com.xiaozhi.template.service.TemplateService;
 import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.service.UserService;
+import com.xiaozhi.userauth.service.UserAuthService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 用户领域应用服务。
@@ -47,6 +50,7 @@ import java.util.List;
 public class UserAppService {
 
     private static final Integer ADMIN_TEMPLATE_OWNER_ID = 1;
+    private static final String PLATFORM_WECHAT = "wechat";
     private static final int TOKEN_EXPIRE_SECONDS = 2592000;
 
     @Resource
@@ -69,6 +73,9 @@ public class UserAppService {
 
     @Resource
     private AuthenticationService authenticationService;
+
+    @Resource
+    private UserAuthService userAuthService;
 
     @Resource
     private AuthRoleService authRoleService;
@@ -189,6 +196,72 @@ public class UserAppService {
             throw new UserPasswordNotMatchException();
         }
         return user;
+    }
+
+    /**
+     * 手机号验证码登录，未注册则自动建号。
+     * <p>
+     * 建号与初始化默认资源（角色模板、虚拟设备）在同一个事务里，中途失败整体回滚，
+     * 不会留下没有角色也没有虚拟设备的半截账号。验证码消费留在调用方，
+     * 消费成功但建号失败时验证码已作废，避免同一个码被重试放大成多次建号尝试。
+     */
+    @Transactional
+    public UserBO loginByTel(String tel) {
+        UserBO user = userService.getByTel(tel);
+        if (user != null) {
+            userService.requireEnabled(user);
+            return user;
+        }
+
+        String suffix = tel.length() >= 4 ? tel.substring(tel.length() - 4) : tel;
+        UserBO createUser = new UserBO();
+        createUser.setUsername("tel_" + suffix + "_" + System.currentTimeMillis() % 1000);
+        createUser.setPassword(authenticationService.encryptPassword(UUID.randomUUID().toString()));
+        createUser.setName("用户" + suffix);
+        createUser.setTel(tel);
+        return createUserWithDefaults(createUser);
+    }
+
+    /**
+     * 微信登录，未注册则自动建号并落授权记录。
+     * <p>
+     * 建号与授权记录必须同事务：分成两段各自提交时，授权记录写失败会留下一个建好的用户，
+     * 但没有任何 openId 指向它——同一个微信号下次登录只会又建一个新账号，
+     * 之前那个连同它的角色、虚拟设备、聊天记录再也回不去，只能人工清库。
+     *
+     * @param profile 微信返回的原始资料 JSON，由调用方序列化后传入
+     */
+    @Transactional
+    public WechatLogin loginByWechat(String openId, String unionId, String profile) {
+        UserAuthBO userAuth = userAuthService.getByOpenIdAndPlatform(openId, PLATFORM_WECHAT);
+        if (userAuth != null) {
+            UserBO user = userService.getBO(userAuth.getUserId());
+            if (user == null) {
+                throw new ResourceNotFoundException("用户不存在");
+            }
+            userService.requireEnabled(user);
+            return new WechatLogin(user, false);
+        }
+
+        UserBO createUser = new UserBO();
+        createUser.setUsername("wx_" + openId.substring(0, Math.min(10, openId.length())));
+        createUser.setPassword(authenticationService.encryptPassword(UUID.randomUUID().toString()));
+        createUser.setName("微信用户" + System.currentTimeMillis() % 10000);
+        UserBO created = createUserWithDefaults(createUser);
+
+        UserAuthBO auth = new UserAuthBO();
+        auth.setUserId(created.getUserId());
+        auth.setOpenId(openId);
+        auth.setUnionId(unionId);
+        auth.setPlatform(PLATFORM_WECHAT);
+        auth.setProfile(profile);
+        userAuthService.create(auth);
+
+        return new WechatLogin(created, true);
+    }
+
+    /** 微信登录结果，newUser 用于让前端区分首次注册与再次登录 */
+    public record WechatLogin(UserBO user, boolean newUser) {
     }
 
     /**

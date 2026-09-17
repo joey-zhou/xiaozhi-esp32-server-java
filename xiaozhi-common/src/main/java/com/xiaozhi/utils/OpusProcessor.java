@@ -33,6 +33,18 @@ public class OpusProcessor {
     private static final int MAX_SIZE = 1275;
 
     /**
+     * 单个 Opus 包解码后的最大样本数。Opus 一个包最长 120ms，按解码器的采样率算就是上限；
+     * 原先按 FRAME_SIZE * 12 取，是这个上限的 6 倍，每帧都要白分配一块 23KB 的临时数组。
+     */
+    private static final int MAX_DECODED_SAMPLES = SAMPLE_RATE / 1000 * 120 * CHANNELS;
+
+    /**
+     * 解码复用的样本缓冲。OpusDecoder 本身就有跨帧状态、不能并发调用，
+     * 每个 OpusProcessor 实例都归单条链路独占，所以这块缓冲可以跟着实例一起复用。
+     */
+    private final short[] decodeBuffer = new short[MAX_DECODED_SAMPLES];
+
+    /**
      * 残留数据状态类
      */
     public static class LeftoverState {
@@ -118,7 +130,7 @@ public class OpusProcessor {
 
         try {
             OpusDecoder decoder = decoders;
-            short[] buf = new short[FRAME_SIZE * 12];
+            short[] buf = decodeBuffer;
             int samples = decoder.decode(data, 0, data.length, buf, 0, buf.length, false);
 
             byte[] pcm = new byte[samples * 2];

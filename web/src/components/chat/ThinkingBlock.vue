@@ -206,11 +206,11 @@ function onScroll() {
 }
 
 .tr-verb {
-  color: #a1a1a1;
+  color: var(--ant-color-text-tertiary);
 }
 
 .tr-chevron {
-  color: #a1a1a1;
+  color: var(--ant-color-text-tertiary);
   transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
   transform: rotate(180deg);
 }
@@ -220,7 +220,7 @@ function onScroll() {
 }
 
 .tr-header.is-clickable:hover .tr-chevron {
-  color: #a1a1a1;
+  color: var(--ant-color-text-tertiary);
 }
 
 .tr-collapsible {
@@ -272,7 +272,7 @@ function onScroll() {
   line-height: 20px;
   font-size: 13px;
   font-weight: 425;
-  color: #a1a1a1;
+  color: var(--ant-color-text-tertiary);
   letter-spacing: -0.005em;
   display: -webkit-box;
   -webkit-line-clamp: 2;

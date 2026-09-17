@@ -191,12 +191,12 @@ provide('resetError', resetError)
     pre {
       margin: 0;
       padding: 12px;
-      background: #fff;
+      background: var(--ant-color-fill-quaternary);
       border-radius: 4px;
       overflow-x: auto;
       font-size: 12px;
       line-height: 1.5;
-      color: #c41d7f;
+      color: var(--ant-color-error);
     }
   }
 }

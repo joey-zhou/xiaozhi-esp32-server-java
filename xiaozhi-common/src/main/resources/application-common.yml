@@ -5,6 +5,14 @@
 # ============================================================
 
 spring:
+  autoconfigure:
+    # Redisson 的自动配置会顺带提供 RedissonConnectionFactory 当作 RedisConnectionFactory，
+    # 且排在 RedisAutoConfiguration 之前，一旦生效上面的 lettuce.pool 就永远不会被读到，
+    # 所有 Redis 命令还要绕一层 redisson-spring-data 适配器。RedissonClient 改由
+    # com.xiaozhi.common.config.RedissonConfig 显式构建，只用于分布式锁与布隆过滤器。
+    exclude:
+      - org.redisson.spring.starter.RedissonAutoConfigurationV2
+
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
@@ -31,16 +39,14 @@ spring:
       database: 0
       # Redis 开启 requirepass 后用环境变量 SPRING_DATA_REDIS_PASSWORD 提供口令。
       # 此处不能写 password: 空值——Redisson 会把空串当口令发出 AUTH ""，无口令的 Redis 直接报错拒连。
-      # Lettuce 连接池配置（默认不开池，所有线程共享单连接，高并发下会成为瓶颈）
+      # Lettuce 连接池配置（默认不开池，所有线程共享单连接，高并发下会成为瓶颈）。
+      # 这份配置要生效，前提是下面把 Redisson 的自动配置排除掉，否则连接工厂会被它抢走。
       lettuce:
         pool:
           max-active: 16    # 最大活跃连接数
           max-idle: 8       # 最大空闲连接数
           min-idle: 2       # 最小空闲连接数
           max-wait: 3s      # 获取连接最大等待时间
-      # Redisson 高级配置文件（用于分布式锁、布隆过滤器等高级功能）
-      redisson:
-        config: classpath:redisson-config.yml
 
   # 禁用Groovy模板位置检查
   groovy:

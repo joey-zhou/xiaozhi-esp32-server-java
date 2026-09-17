@@ -17,7 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 模块边界约束：反向需求一律经 common/port 接口倒置。
  * <p>
  * 全模块规则靠 xiaozhi-server 的 test 作用域 xiaozhi-dialogue 依赖才扫得到 dialogue 类；
- * 去掉那条依赖或把本类挪出 server 模块，规则照常通过，只是不再覆盖 dialogue。
+ * 去掉那条依赖或把本类挪出 server 模块，覆盖 dialogue 的规则会因为「一个类都判不到」
+ * 而空真通过。{@link #dialogueModuleIsActuallyImported} 就是钉这件事的哨兵。
  */
 class ModuleBoundaryArchTest {
 
@@ -96,6 +97,24 @@ class ModuleBoundaryArchTest {
             .because("下游模块只依赖 Service 接口或 common/port，依赖实现类会把事务与缓存细节泄漏到会话链路");
 
         rule.check(xiaozhiClasses);
+    }
+
+    /**
+     * dialogue 覆盖哨兵。{@link #DOWNSTREAM_PACKAGES} 里的 com.xiaozhi.dialogue 只有靠
+     * xiaozhi-server 对 xiaozhi-dialogue 的 test 作用域依赖才进得了 importPackages 的视野。
+     * 那条依赖一旦被删掉，本类里所有覆盖 dialogue 的规则会因为判定集为空而全部通过，
+     * 违规可以在完全不触发 CI 的情况下进 dialogue 模块——所以先在这里断言它确实被导入了。
+     */
+    @Test
+    void dialogueModuleIsActuallyImported() {
+        assertThat(xiaozhiClasses.stream().map(c -> c.getName()))
+            .as("扫不到 com.xiaozhi.dialogue 的类，覆盖 dialogue 的规则已经全部退化成空真")
+            .anyMatch(name -> name.startsWith("com.xiaozhi.dialogue."));
+        assertThat(xiaozhiClasses.stream()
+                .filter(c -> c.getName().startsWith("com.xiaozhi.dialogue."))
+                .count())
+            .as("只扫到零星几个 dialogue 类，说明依赖被裁剪过，覆盖面已经不完整")
+            .isGreaterThan(50);
     }
 
     @Test

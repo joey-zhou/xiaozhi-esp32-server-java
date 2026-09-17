@@ -115,25 +115,8 @@ public class XfyunTtsService implements TtsService {
         CountDownLatch recognitionLatch = new CountDownLatch(1);
         AtomicBoolean succeeded = new AtomicBoolean(false);
         try {
-            // 将我们的参数（0.5-2.0）非线性映射到讯飞的参数（0-100）
-            // 映射规则：0.5→0，1.0→50（讯飞默认），2.0→100
-            int xfyunSpeed;
-            if (getSpeed() <= 1.0f) {
-                xfyunSpeed = (int)Math.round((getSpeed() - 0.5f) * 100f);
-            } else {
-                xfyunSpeed = (int)Math.round(50f + (getSpeed() - 1.0f) * 50f);
-            }
-
-            int xfyunPitch;
-            if (getPitch() <= 1.0f) {
-                xfyunPitch = (int)Math.round((getPitch() - 0.5f) * 100f);
-            } else {
-                xfyunPitch = (int)Math.round(50f + (getPitch() - 1.0f) * 50f);
-            }
-
-            // 确保值在有效范围内
-            xfyunSpeed = Math.max(0, Math.min(100, xfyunSpeed));
-            xfyunPitch = Math.max(0, Math.min(100, xfyunPitch));
+            int xfyunSpeed = toXfyunScale(getSpeed());
+            int xfyunPitch = toXfyunScale(getPitch());
 
             // 设置合成参数
             TtsClient ttsClient = new TtsClient.Builder()
@@ -207,4 +190,20 @@ public class XfyunTtsService implements TtsService {
         return succeeded.get();
     }
 
+
+    /**
+     * 把本系统的语速/音调（0.5-2.0，1.0 为常速）非线性映射到讯飞的 0-100 刻度：
+     * 0.5→0、1.0→50（讯飞默认）、2.0→100。
+     * <p>
+     * 结果必须钳到 0-100 再交给 SDK：角色的语速/音调是用户自由填写的数值，
+     * 越界值算出来会是负数或大于 100，讯飞对超范围参数的行为未定义。
+     * 取值缺省时按常速处理，避免拆箱 NPE。
+     */
+    static int toXfyunScale(Double rate) {
+        double value = rate == null ? 1.0d : rate;
+        int scaled = value <= 1.0d
+                ? (int) Math.round((value - 0.5d) * 100d)
+                : (int) Math.round(50d + (value - 1.0d) * 50d);
+        return Math.max(0, Math.min(100, scaled));
+    }
 }

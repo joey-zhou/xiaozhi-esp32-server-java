@@ -8,7 +8,6 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.exception.OperationFailedException;
-import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.google.gson.Gson;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.req.UserCheckReq;
@@ -25,11 +24,8 @@ import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.UserResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
-import com.xiaozhi.security.AuthenticationService;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.user.service.WxLoginService;
-import com.xiaozhi.common.model.bo.UserAuthBO;
-import com.xiaozhi.userauth.service.UserAuthService;
 import com.xiaozhi.utils.CaptchaUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,7 +36,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/user")
@@ -54,13 +49,7 @@ public class UserController extends BaseController {
     private UserService userService;
 
     @Resource
-    private AuthenticationService authenticationService;
-
-    @Resource
     private WxLoginService wxLoginService;
-
-    @Resource
-    private UserAuthService userAuthService;
 
     @Resource
     private CaptchaUtils captchaUtils;
@@ -135,17 +124,7 @@ public class UserController extends BaseController {
             throw new IllegalArgumentException("验证码错误或已过期");
         }
 
-        UserBO user = userService.getByTel(req.getTel());
-        userService.requireEnabled(user);
-        if (user == null) {
-            String suffix = req.getTel().length() >= 4 ? req.getTel().substring(req.getTel().length() - 4) : req.getTel();
-            UserBO createUser = new UserBO();
-            createUser.setUsername("tel_" + suffix + "_" + System.currentTimeMillis() % 1000);
-            createUser.setPassword(authenticationService.encryptPassword(UUID.randomUUID().toString()));
-            createUser.setName("用户" + suffix);
-            createUser.setTel(req.getTel());
-            user = userAppService.createUserWithDefaults(createUser);
-        }
+        UserBO user = userAppService.loginByTel(req.getTel());
 
         userAppService.recordLoginInfo(user, trustedProxyPolicy.resolveClientIp(request));
 
@@ -167,37 +146,15 @@ public class UserController extends BaseController {
             throw new IllegalStateException("获取微信openid失败");
         }
 
-        UserAuthBO userAuth = userAuthService.getByOpenIdAndPlatform(openId, "wechat");
-        UserBO user;
-        boolean isNewUser = false;
-        if (userAuth == null) {
-            UserBO createUser = new UserBO();
-            createUser.setUsername("wx_" + openId.substring(0, Math.min(10, openId.length())));
-            createUser.setPassword(authenticationService.encryptPassword(UUID.randomUUID().toString()));
-            createUser.setName("微信用户" + System.currentTimeMillis() % 10000);
-            user = userAppService.createUserWithDefaults(createUser);
-            isNewUser = true;
-
-            userAuth = new UserAuthBO();
-            userAuth.setUserId(user.getUserId());
-            userAuth.setOpenId(openId);
-            userAuth.setUnionId(unionId);
-            userAuth.setPlatform("wechat");
-            userAuth.setProfile(new Gson().toJson(wxLoginInfo));
-            userAuthService.create(userAuth);
-        } else {
-            user = userService.getBO(userAuth.getUserId());
-            if (user == null) {
-                throw new ResourceNotFoundException("用户不存在");
-            }
-            userService.requireEnabled(user);
-        }
+        UserAppService.WechatLogin result =
+                userAppService.loginByWechat(openId, unionId, new Gson().toJson(wxLoginInfo));
+        UserBO user = result.user();
 
         userAppService.recordLoginInfo(user, trustedProxyPolicy.resolveClientIp(request));
 
         int expireSeconds = userAppService.getTokenExpireSeconds();
         StpUtil.login(user.getUserId(), expireSeconds);
-        return ApiResponse.success(requireLoginResp(user.getUserId(), isNewUser));
+        return ApiResponse.success(requireLoginResp(user.getUserId(), result.newUser()));
     }
 
     @SaIgnore

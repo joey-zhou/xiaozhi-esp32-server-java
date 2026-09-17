@@ -403,7 +403,7 @@ defineExpose({ focus })
 }
 
 .send {
-  color: #a1a1a1;
+  color: var(--ant-color-text-tertiary);
 }
 
 .send:disabled {
@@ -483,7 +483,7 @@ defineExpose({ focus })
 
 .menu-icon,
 .menu-chevron {
-  color: #a1a1a1;
+  color: var(--ant-color-text-tertiary);
 }
 
 .menu-check,
@@ -564,14 +564,14 @@ defineExpose({ focus })
   margin: 2px 0 0;
   font-size: 11px;
   line-height: 15px;
-  color: #a1a1a1;
+  color: var(--ant-color-text-tertiary);
 }
 
 .popover-meta {
   margin-top: 8px;
   font-size: 11px;
   line-height: 14px;
-  color: #a1a1a1;
+  color: var(--ant-color-text-tertiary);
 }
 
 .menu-divider {
@@ -584,7 +584,7 @@ defineExpose({ focus })
   padding: 3px 7px;
   font-size: 11px;
   font-weight: 425;
-  color: #a1a1a1;
+  color: var(--ant-color-text-tertiary);
 }
 
 @keyframes pi-menu-in {
