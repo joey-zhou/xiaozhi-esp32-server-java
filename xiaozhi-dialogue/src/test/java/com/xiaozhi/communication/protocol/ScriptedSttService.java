@@ -6,6 +6,8 @@ import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Deque;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -32,6 +34,8 @@ class ScriptedSttService implements SttService {
 
     private volatile List<String> partials = List.of();
     private volatile SttResult finalResult = SttResult.textOnly("");
+    /** 按识别流返回顺序依次消费的终稿，空了才退回 finalResult；用于一次说话多段识别流的用例 */
+    private final Deque<SttResult> queuedFinals = new ConcurrentLinkedDeque<>();
     private volatile CountDownLatch releaseGate;
 
     @Override
@@ -73,7 +77,8 @@ class ScriptedSttService implements SttService {
             }
         }
         completedStreams.incrementAndGet();
-        return finalResult;
+        SttResult queued = queuedFinals.poll();
+        return queued != null ? queued : finalResult;
     }
 
     // ========== 编排 ==========
@@ -85,6 +90,15 @@ class ScriptedSttService implements SttService {
 
     ScriptedSttService withFinalText(String text) {
         this.finalResult = SttResult.textOnly(text);
+        return this;
+    }
+
+    /** 多段识别流各自的终稿，按流返回的先后依次给出 */
+    ScriptedSttService withFinalTexts(String... texts) {
+        queuedFinals.clear();
+        for (String text : texts) {
+            queuedFinals.add(SttResult.textOnly(text));
+        }
         return this;
     }
 

@@ -18,6 +18,7 @@ import com.xiaozhi.dialogue.audio.AecService;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.runtime.GoodbyeMessageSupplier;
 import com.xiaozhi.dialogue.runtime.Persona;
+import com.xiaozhi.dialogue.runtime.SpeechTurn;
 import com.xiaozhi.dialogue.runtime.UserSpeechAudio;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.event.ChatAbortedEvent;
@@ -39,6 +40,7 @@ import reactor.core.publisher.Sinks;
 import jakarta.annotation.Resource;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -63,6 +65,8 @@ public class DialogueService{
     private static final long BARGE_IN_PAUSE_MAX_MS = 5000;
     /** 唤醒词音频的文件名标记，与 user/assistant 区分开 */
     private static final String WAKE_WORD_AUDIO_TAG = "wakeword";
+    /** 最后一段收句后等前面各段终稿的上限，前面的段早在换流时就已收流，正常几百毫秒内到齐 */
+    private static final Duration SEGMENT_MERGE_WAIT = Duration.ofSeconds(15);
 
     @Resource
     private PersonaFactory personaFactory;
@@ -156,6 +160,11 @@ public class DialogueService{
                             || session.getDeviceState() == DeviceState.SPEAKING) {
                         session.sendAudioData(vadResult.getProcessedData());
                     }
+                    break;
+
+                case SPEECH_ROTATE:
+                    // 说到 STT 单段上限：换识别流继续，不收句
+                    rotateSegment(session, vadResult);
                     break;
 
                 case SPEECH_END:
@@ -261,7 +270,7 @@ public class DialogueService{
     }
 
     /**
-     * 启动语音识别
+     * 启动语音识别：本次说话的第一段。
      * 同步创建音频流（避免竞态条件），然后在虚拟线程中执行 STT 及后续处理
      */
     private void startStt(
@@ -275,15 +284,55 @@ public class DialogueService{
         session.closeAudioStream();
         session.createAudioStream();
         session.transitionTo(DeviceState.LISTENING);
-        Sinks.Many<byte[]> turnSink = session.getAudioSinks();
+        SpeechTurn turn = new SpeechTurn();
+        session.setSpeechTurn(turn);
+        runSegment(session, turn, turn.newSegment(session.getAudioSinks()), initialAudio);
+    }
+
+    /**
+     * 段的第一帧要在这里同步塞进流：流会缓冲到识别线程订阅为止；
+     * 放到线程里再塞，换流或收句抢在线程起跑之前终结了流，这一帧就没了
+     */
+    private static void feedInitialAudio(ChatSession session, byte[] initialAudio) {
+        if (initialAudio != null && initialAudio.length > 0) {
+            session.sendAudioData(initialAudio);
+        }
+    }
+
+    /**
+     * 当前段说到 STT 单段时长上限：终结这段的音频流让它出终稿，紧接着起新流继续识别。
+     * 不收句、不回答，这段的文本由最后一段收句时拼进整句。
+     */
+    private void rotateSegment(ChatSession session, VadService.VadResult vadResult) {
+        SpeechTurn turn = session.getSpeechTurn();
+        Sinks.Many<byte[]> current = session.getAudioSinks();
+        SpeechTurn.Segment segment = turn != null ? turn.currentSegment() : null;
+        if (segment == null || current == null || segment.sink() != current) {
+            // 本轮没有识别在跑（角色未就绪等），这一帧按普通续帧处理
+            if (session.getDeviceState() == DeviceState.LISTENING
+                    || session.getDeviceState() == DeviceState.SPEAKING) {
+                session.sendAudioData(vadResult.getProcessedData());
+            }
+            return;
+        }
+        // 先标记再终结流：段线程从 stream 返回时必须已经看到 rotated
+        segment.markRotated(vadResult.getSegmentPcm());
+        session.closeAudioStream();
+        session.createAudioStream();
+        runSegment(session, turn, turn.newSegment(session.getAudioSinks()), vadResult.getProcessedData());
+    }
+
+    /**
+     * 在虚拟线程上跑一段识别。中间段的终稿只记下并把已识别的文本发给设备；
+     * 最后一段把各段拼成整句后走打断裁决与对话。
+     */
+    private void runSegment(ChatSession session, SpeechTurn turn, SpeechTurn.Segment segment, byte[] initialAudio) {
+        String sessionId = session.getSessionId();
+        Sinks.Many<byte[]> turnSink = segment.sink();
+        feedInitialAudio(session, initialAudio);
 
         Thread.startVirtualThread(() -> {
             try {
-                // 发送初始音频数据
-                if (initialAudio != null && initialAudio.length > 0) {
-                    session.sendAudioData(initialAudio);
-                }
-
                 if (turnSink == null) {
                     releaseDiscardedTurn(session, turnSink);
                     return;
@@ -295,13 +344,24 @@ public class DialogueService{
                     return;
                 }
 
-                AtomicBoolean bargeIn = new AtomicBoolean(false);
+                AtomicBoolean bargeIn = turn.bargeIn();
                 Consumer<String> onPartialText = partialText -> onSttPartialText(session, partialText, bargeIn);
                 SttService sttService = persona.getSttService();
                 SttResult sttResult = sttService.stream(turnSink.asFlux(), onPartialText);
-                // 识别失败与用户没说话是两回事：失败的这句还在 VAD 缓冲里，原样重放一次
-                if (sttResult != null && sttResult.operationFailed() && session.getAudioSinks() == turnSink) {
-                    sttResult = retryWithReplay(session, sttService, sttResult, onPartialText);
+                // 识别失败与用户没说话是两回事：失败的这段还在缓冲里，原样重放一次
+                if (sttResult != null && isRetryable(sttResult)
+                        && (segment.isRotated() || session.getAudioSinks() == turnSink)) {
+                    sttResult = retryWithReplay(session, segment, sttService, sttResult, onPartialText);
+                }
+
+                // 中间段：终稿只拼接不回答，先把到目前为止的文本发给设备，用户知道服务端听到了
+                if (segment.isRotated()) {
+                    segment.complete(sttResult);
+                    String soFar = turn.textSoFar();
+                    if (StringUtils.hasText(soFar) && persona.getPlayer() != null) {
+                        persona.getPlayer().sendStt(soFar);
+                    }
+                    return;
                 }
 
                 // 本轮已被新一轮或 abort 取代，结果作废，否则过期文本会触发一轮多余对话；
@@ -312,6 +372,9 @@ public class DialogueService{
                     }
                     return;
                 }
+
+                // 最后一段：等前面各段终稿到齐，按顺序拼成整句
+                sttResult = turn.merge(segment, sttResult, SEGMENT_MERGE_WAIT);
 
                 String text = sttResult != null ? sttResult.text() : null;
                 if (bargeIn.get() && !resolveBargeIn(session, persona, text)) {
@@ -340,7 +403,7 @@ public class DialogueService{
                     UserSpeechAudio userAudio =
                             new UserSpeechAudio(session.getAudioPath(MessageBO.SENDER_USER, Instant.now()));
                     session.setUserSpeechAudio(userAudio);
-                    saveUserAudio(session, userAudio);
+                    saveUserAudio(session, userAudio, turn.collectPcm(vadService.getPcmData(sessionId)));
 
                     // 发布语音识别完成事件
                     eventPublisher.publishEvent(new SpeechRecognizedEvent(this, sessionId, sttResult.text(),
@@ -358,24 +421,35 @@ public class DialogueService{
                     player.resume();
                 }
                 releaseDiscardedTurn(session, turnSink);
+            } finally {
+                // 中间段异常退出也要给个空终稿，最后一段拼接时才不用等到超时
+                segment.complete(SttResult.textOnly(""));
             }
         });
     }
 
     /**
-     * 识别失败时把 VAD 缓存的整句 PCM 原样重放一次。
-     * 只能整句重放：流内从出错点续传只拿得到出错之后的音频，句子开头找不回来。
-     * 重试也失败时保留带文本的那份结果，失败前识别到的部分文本总比整句丢掉好。
+     * 上游报错与本地错误值得重放；超时是开口起 90 秒内一个字都没出，重放缓冲也救不回来，只会再晾用户一轮。
      */
-    private SttResult retryWithReplay(ChatSession session, SttService sttService, SttResult failed,
-                                      Consumer<String> onPartialText) {
+    private static boolean isRetryable(SttResult result) {
+        return result.operationFailed() && !SttResult.FAILURE_TIMEOUT.equals(result.failureReason());
+    }
+
+    /**
+     * 识别失败时把这一段的 PCM 原样重放一次。
+     * 只能整段重放：流内从出错点续传只拿得到出错之后的音频，段开头找不回来。
+     * 已换流的段用换流时交出的整段 PCM，当前段直接取 VAD 缓冲。
+     * 重试也失败时保留带文本的那份结果，失败前识别到的部分文本总比整段丢掉好。
+     */
+    private SttResult retryWithReplay(ChatSession session, SpeechTurn.Segment segment, SttService sttService,
+                                      SttResult failed, Consumer<String> onPartialText) {
         String sessionId = session.getSessionId();
-        List<byte[]> pcmFrames = vadService.getPcmData(sessionId);
+        List<byte[]> pcmFrames = segment.isRotated() ? segment.pcm() : vadService.getPcmData(sessionId);
         if (pcmFrames.isEmpty()) {
             log.warn("识别失败({})且没有可重放的音频 - SessionId: {}", failed.failureReason(), sessionId);
             return failed;
         }
-        log.warn("识别失败({})，重放整句音频重试 - SessionId: {}, 帧数: {}",
+        log.warn("识别失败({})，重放整段音频重试 - SessionId: {}, 帧数: {}",
                 failed.failureReason(), sessionId, pcmFrames.size());
         SttResult retried = sttService.stream(Flux.fromIterable(pcmFrames), onPartialText);
         if (retried != null && !retried.operationFailed()) {
@@ -624,7 +698,13 @@ public class DialogueService{
      * PCM 必须在当前线程取走：下一轮 SPEECH_START 会清空 VAD 缓冲，异步任务里再取就是空的。
      */
     void saveUserAudio(ChatSession session, UserSpeechAudio audio) {
-        List<byte[]> pcmFrames = vadService.getPcmData(session.getSessionId());
+        saveUserAudio(session, audio, vadService.getPcmData(session.getSessionId()));
+    }
+
+    /**
+     * @param pcmFrames 本次说话的全部 PCM，说得久时是各段拼起来的
+     */
+    void saveUserAudio(ChatSession session, UserSpeechAudio audio, List<byte[]> pcmFrames) {
         SerialTaskRegistry.submit(session.getSessionId(), () -> {
             Path path = audio.localPath();
             String storedPath = null;

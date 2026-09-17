@@ -25,6 +25,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -275,6 +276,11 @@ public class VoskSttService implements SttService {
         } catch (InterruptedException e) {
             log.warn("等待Vosk识别完成时被中断", e);
             Thread.currentThread().interrupt();
+            future.cancel(true);
+        } catch (TimeoutException e) {
+            // 与远端 provider 口径一致：超时不是本地错误，上层据此决定不重放
+            log.warn("Vosk识别超过90秒未完成");
+            failureReason.set(SttResult.FAILURE_TIMEOUT);
             future.cancel(true);
         } catch (Exception e) {
             log.error("Vosk识别任务执行失败", e);

@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
 /**
  * 识别失败不是用户没说话：失败的这句还在 VAD 缓冲里，要原样重放一次再决定这轮去留。
  * 重放必须是整句而不是出错点之后的残段；两次都失败时失败前识别到的部分文本要保住；
- * 没有可重放音频时不得多打一次识别。
+ * 没有可重放音频时不得多打一次识别；识别超时（开口起 90 秒无任何结果）不重放。
  */
 @ExtendWith(MockitoExtension.class)
 class DialogueServiceSttRetryTest {
@@ -131,6 +131,18 @@ class DialogueServiceSttRetryTest {
     }
 
     @Test
+    void timeoutIsNotRetried() {
+        lenient().when(vadService.getPcmData(SESSION_ID)).thenReturn(List.of(frame()));
+
+        runTurn(SttResult.failure(SttResult.FAILURE_TIMEOUT), SttResult.textOnly("不该用到"));
+
+        verify(session, timeout(AWAIT_TIMEOUT.toMillis())).transitionTo(DeviceState.IDLE);
+        assertThat(sttCalls.get()).isEqualTo(1);
+        assertThat(session.getDeviceState()).isEqualTo(DeviceState.IDLE);
+        verify(persona, never()).prepareTurn();
+    }
+
+    @Test
     void partialTextSurvivesWhenRetryFailsToo() {
         when(vadService.getPcmData(SESSION_ID)).thenReturn(List.of(frame()));
 
@@ -145,7 +157,7 @@ class DialogueServiceSttRetryTest {
     void turnIsDiscardedWhenBothAttemptsFailWithoutText() {
         when(vadService.getPcmData(SESSION_ID)).thenReturn(List.of(frame()));
 
-        runTurn(SttResult.failure(SttResult.FAILURE_TIMEOUT), SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR));
+        runTurn(SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR), SttResult.failure(SttResult.FAILURE_LOCAL_ERROR));
 
         verify(session, timeout(AWAIT_TIMEOUT.toMillis())).transitionTo(DeviceState.IDLE);
         assertThat(sttCalls.get()).isEqualTo(2);

@@ -13,6 +13,7 @@ import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.dialogue.runtime.Persona;
+import com.xiaozhi.dialogue.runtime.SpeechTurn;
 import com.xiaozhi.dialogue.runtime.UserSpeechAudio;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -142,6 +143,9 @@ public abstract class ChatSession {
     public List<ToolCallback> getToolCallbacks()                               { return dialogueContext.getToolCallbacks(); }
     public void addToolCallDetail(Long turnId, String name, String args, String result) { dialogueContext.addToolCallDetail(turnId, name, args, result); }
     public boolean isFunctionCalled()                                          { return dialogueContext.isFunctionCalled(); }
+
+    /** 本次说话的识别过程，说得久时由多段 STT 流组成，起新一轮时整体换掉 */
+    private volatile SpeechTurn speechTurn;
 
     // ========== 超时断连标记 ==========
     private volatile boolean timeoutDisconnect;

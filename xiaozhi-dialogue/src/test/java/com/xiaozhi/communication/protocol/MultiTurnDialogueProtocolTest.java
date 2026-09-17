@@ -150,6 +150,35 @@ class MultiTurnDialogueProtocolTest {
     }
 
     @Test
+    void longSpeechRotatesSttStreamAndAnswersMergedTextOnce() {
+        scriptedReplies.add("好，记住了。");
+        harness.stt().withFinalTexts("我先说前半段，", "再说后半段。");
+        device.transport().clearOutbound();
+
+        device.listenStart(ListenMode.AUTO);
+        // 说到单段上限换一次识别流，再接着说到收句
+        device.speak(ScriptedVadService.SPEECH_START, ScriptedVadService.SPEECH_CONTINUE,
+                ScriptedVadService.SPEECH_ROTATE, ScriptedVadService.SPEECH_CONTINUE,
+                ScriptedVadService.SPEECH_END);
+        device.transport().awaitJson("tts:stop");
+        AwaitHelper.until("本轮播放已收尾", () -> !session.getPlayer().hasContent()
+                && session.getDeviceState() == DeviceState.LISTENING);
+
+        // 两条识别流都终结了，但只回答一次
+        assertThat(harness.stt().streamCalls()).isEqualTo(2);
+        assertThat(harness.stt().completedStreams()).isEqualTo(2);
+        assertThat(Collections.frequency(outboundFlow(), "tts:start")).isEqualTo(1);
+        // 换流时先把前半段发给设备，收句后再发整句覆盖
+        List<String> sttTexts = device.transport().jsonMessages().stream()
+                .filter(node -> "stt".equals(node.path("type").asText()))
+                .map(node -> node.path("text").asText())
+                .toList();
+        assertThat(sttTexts).containsExactly("我先说前半段，", "我先说前半段，再说后半段。");
+        // LLM 与历史里是一条完整的用户消息
+        assertThat(texts(conversation.rawMessages())).containsExactly("我先说前半段，再说后半段。", "好，记住了。");
+    }
+
+    @Test
     void exitIntentSendsGoodbyeAndClosesAfterPlayback() {
         // 告别语播到一半挂住，制造一段"正在播告别语"的窗口
         synthesizer.holdPlayback();

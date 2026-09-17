@@ -38,7 +38,9 @@ import static org.mockito.Mockito.when;
  *   <li>SPEECH_END 按 (静音时长 - tailKeepMs) / 静音时长 的比例从 pcmData 尾部删帧，
  *       比例算错会把用户话尾一起删掉造成丢字，删多了要以实际帧数为界不能越界；</li>
  *   <li>连续 30 帧静音必须清零 GRU 隐状态，否则长静音后 VAD 再也拉不起来、设备变哑巴；</li>
- *   <li>角色没配阈值时退回默认值（起播 0.4），退化会让全量设备误触发或不触发。</li>
+ *   <li>角色没配阈值时退回默认值（起播 0.4），退化会让全量设备误触发或不触发；</li>
+ *   <li>说到 STT 单段上限换识别流继续，整段 PCM 交出去；说到总天花板强制收句，
+ *       剩下的话丢弃到停顿（manual 为 listen/stop）为止，不许起新一轮把刚收的那句作废。</li>
  * </ul>
  *
  * <p>Silero 模型换成替身，测试不加载 ONNX；喂进去的都是能量远高于门限的方波，
@@ -74,6 +76,8 @@ class VadServiceTest {
         ReflectionTestUtils.setField(vadService, "sessionManager", sessionManager);
         ReflectionTestUtils.setField(vadService, "preBufferMs", 500);
         ReflectionTestUtils.setField(vadService, "tailKeepMs", 300);
+        ReflectionTestUtils.setField(vadService, "segmentMs", 60_000);
+        ReflectionTestUtils.setField(vadService, "maxSpeechMs", 300_000);
         // aecService 留空：生产代码对其判空，本类只关心断句状态机
 
         lenient().when(springSession.getId()).thenReturn(SESSION_ID);
@@ -214,6 +218,90 @@ class VadServiceTest {
         assertThat(feed(0.35f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
         assertThat(feed(0.35f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
         assertThat(feed(0.45f).getStatus()).isEqualTo(VadStatus.SPEECH_START);
+    }
+
+    @Test
+    void speechReachingSegmentLimitRotatesStreamAndHandsOverSegmentPcm() {
+        // 每帧 60ms，单段上限 180ms：起播帧不计，之后第三帧到点换流
+        ReflectionTestUtils.setField(vadService, "segmentMs", 180);
+        vadService.initSession(SESSION_ID);
+        feed(0.9f);
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.SPEECH_START);
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.SPEECH_CONTINUE);
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.SPEECH_CONTINUE);
+
+        VadResult rotate = feed(0.9f);
+
+        assertThat(rotate.getStatus()).isEqualTo(VadStatus.SPEECH_ROTATE);
+        // 交出去的是起播块加两个语音块，缓冲只剩换流这一帧，供下一段重放
+        assertThat(rotate.getSegmentPcm()).hasSize(3);
+        assertThat(vadService.getPcmData(SESSION_ID)).hasSize(1);
+        // 用户还在说：仍在说话状态，新一段从零计时，到点再换
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.SPEECH_CONTINUE);
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.SPEECH_CONTINUE);
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.SPEECH_ROTATE);
+        // 停顿够久照常收句
+        assertThat(feed(0.1f).getStatus()).isEqualTo(VadStatus.SPEECH_CONTINUE);
+        rewindSilenceStart(1000);
+        assertThat(feed(0.1f).getStatus()).isEqualTo(VadStatus.SPEECH_END);
+    }
+
+    @Test
+    void speechReachingTotalCeilingIsForcedToEndAndMutedUntilSilence() {
+        // 总天花板 180ms：起播后第三帧到顶强制收句，单段上限远大于它不会先触发
+        ReflectionTestUtils.setField(vadService, "maxSpeechMs", 180);
+        vadService.initSession(SESSION_ID);
+        feed(0.9f);
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.SPEECH_START);
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.SPEECH_CONTINUE);
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.SPEECH_CONTINUE);
+
+        VadResult end = feed(0.9f);
+
+        assertThat(end.getStatus()).isEqualTo(VadStatus.SPEECH_END);
+        assertThat(end.getSegmentPcm()).isNull();
+        // 用户还在说：不起新一轮，否则刚收的那句会被新流作废
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
+        // 停顿不够久仍然丢弃
+        assertThat(feed(0.1f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
+        rewindSilenceStart(1000);
+        assertThat(feed(0.1f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
+        // 停顿够久后再开口是新的一轮
+        feed(0.9f);
+        assertThat(feed(0.9f).getStatus()).isEqualTo(VadStatus.SPEECH_START);
+    }
+
+    @Test
+    void manualModeRotatesAtSegmentLimitAndStillEndsOnFinishSegment() {
+        ReflectionTestUtils.setField(vadService, "segmentMs", 120);
+        vadService.initSession(SESSION_ID, false);
+        assertThat(feed(0f).getStatus()).isEqualTo(VadStatus.SPEECH_START);
+        assertThat(feed(0f).getStatus()).isEqualTo(VadStatus.SPEECH_CONTINUE);
+
+        VadResult rotate = feed(0f);
+
+        assertThat(rotate.getStatus()).isEqualTo(VadStatus.SPEECH_ROTATE);
+        assertThat(rotate.getSegmentPcm()).hasSize(2);
+        assertThat(feed(0f).getStatus()).isEqualTo(VadStatus.SPEECH_CONTINUE);
+        // 松手才收句，换过流不影响
+        assertThat(vadService.finishSegment(SESSION_ID)).isTrue();
+        assertThat(vadService.getPcmData(SESSION_ID)).hasSize(2);
+    }
+
+    @Test
+    void manualModeReachingTotalCeilingEndsAndIgnoresUntilFinishSegment() {
+        ReflectionTestUtils.setField(vadService, "maxSpeechMs", 120);
+        vadService.initSession(SESSION_ID, false);
+        assertThat(feed(0f).getStatus()).isEqualTo(VadStatus.SPEECH_START);
+        assertThat(feed(0f).getStatus()).isEqualTo(VadStatus.SPEECH_CONTINUE);
+
+        assertThat(feed(0f).getStatus()).isEqualTo(VadStatus.SPEECH_END);
+        assertThat(feed(0f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
+        // 收句已由强制截断完成，listen/stop 这次不算有语音在进行
+        assertThat(vadService.finishSegment(SESSION_ID)).isFalse();
+        // 下一次 listen/start 后的首帧照常起流
+        assertThat(feed(0f).getStatus()).isEqualTo(VadStatus.SPEECH_START);
     }
 
     /** 起播后再喂 silenceFrames 帧未超时的静音，此时 pcmData 为 1 个起播块 + 2 个语音块 + 静音块 */

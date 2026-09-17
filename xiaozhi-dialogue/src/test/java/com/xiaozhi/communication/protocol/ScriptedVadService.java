@@ -13,7 +13,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 脚本化 VAD 假体，彻底绕开 ONNX 与 SileroVadModel。
  *
  * <p>断句结果不由音频内容决定，而是读上行帧的第 0 个字节当脚本标记：
- * 0 = NO_SPEECH，1 = SPEECH_START，2 = SPEECH_CONTINUE，3 = SPEECH_END。
+ * 0 = NO_SPEECH，1 = SPEECH_START，2 = SPEECH_CONTINUE，3 = SPEECH_END，4 = SPEECH_ROTATE（说到单段上限换识别流）。
  * 用例通过 {@code FakeDevice.speak(SPEECH_START, SPEECH_CONTINUE, SPEECH_END)} 编排断句时序。
  *
  * <p>保留的真实语义（用例可以依赖）：
@@ -32,6 +32,7 @@ class ScriptedVadService extends VadService {
     static final byte SPEECH_START = 1;
     static final byte SPEECH_CONTINUE = 2;
     static final byte SPEECH_END = 3;
+    static final byte SPEECH_ROTATE = 4;
 
     private final Map<String, Boolean> autoSegment = new ConcurrentHashMap<>();
     private final Map<String, Boolean> speaking = new ConcurrentHashMap<>();
@@ -84,6 +85,12 @@ class ScriptedVadService extends VadService {
                 speaking.put(sessionId, false);
                 pcm.computeIfAbsent(sessionId, k -> new CopyOnWriteArrayList<>()).add(opusData);
                 yield new VadResult(VadStatus.SPEECH_END, opusData);
+            }
+            case SPEECH_ROTATE -> {
+                // 与真实 VAD 一致：整段 PCM 交出去，缓冲从这一帧重新开始
+                List<byte[]> segment = new ArrayList<>(pcm.getOrDefault(sessionId, List.of()));
+                pcm.put(sessionId, new CopyOnWriteArrayList<>(List.of(opusData)));
+                yield new VadResult(VadStatus.SPEECH_ROTATE, opusData, segment);
             }
             default -> new VadResult(VadStatus.NO_SPEECH, null);
         };

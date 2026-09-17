@@ -120,6 +120,8 @@ xiaozhi:
   vad:
     model:
       path: models/silero_vad.onnx
+    segment-ms: 60000      # STT 单段时长，说到这里换一条识别流继续、各段文本拼接；要留在识别流 90 秒总时长之内
+    max-speech-ms: 300000  # 一次说话的总天花板，到点强制收句并回答，之后的话丢弃到停顿为止
 
 # ============================================================
 # Sa-Token 认证框架配置（两边共用部分；jwt-secret-key 见各自 application.yml）

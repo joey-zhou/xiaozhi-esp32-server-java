@@ -157,8 +157,8 @@ class FakeDevice {
         for (byte marker : vadScript) {
             int streamsBefore = harness.stt().streamCalls();
             sendAudio(frame(marker));
-            if (marker == ScriptedVadService.SPEECH_START) {
-                AwaitHelper.until("STT 已开始订阅本轮音频流",
+            if (marker == ScriptedVadService.SPEECH_START || marker == ScriptedVadService.SPEECH_ROTATE) {
+                AwaitHelper.until("STT 已开始订阅本段音频流",
                         () -> harness.stt().streamCalls() > streamsBefore);
             }
         }

@@ -38,14 +38,22 @@ public class VadService {
     @Value("${xiaozhi.vad.tail.keep.ms:300}")
     private int tailKeepMs;
 
+    // STT 单段时长：一条识别流从开口起最多等 90 秒，说到这个时长就换一条流继续，各段文本最后拼接。
+    // 必须留在 90 秒之内，否则识别流先超时把这一段作废
+    @Value("${xiaozhi.vad.segment-ms:60000}")
+    private int segmentMs;
+
+    // 一次说话的总时长天花板，到点强制收句回答；之后的音频丢弃到用户停顿为止，不然一条用户消息会撑爆上下文
+    @Value("${xiaozhi.vad.max-speech-ms:300000}")
+    private int maxSpeechMs;
+
     private static final int SILENCE_FRAME_THRESHOLD = 2;
     private static final int VAD_SAMPLE_SIZE = AudioUtils.BUFFER_SIZE;
     private static final int VAD_CONTEXT_SIZE = SileroVadModel.CONTEXT_SIZE;
     // 连续静音帧数阈值，超过时重置GRU状态，防止长时间静音后GRU深度收敛（30帧 ≈ 约2秒）
     private static final int SILENCE_RESET_FRAMES = 30;
-    // 单轮语音最长缓存时长：异常场景（持续噪音、迟迟不触发静音结束）下 pcmData 不再无限增长，
-    // 超过这个时长的部分直接丢弃，只保留这轮语音最早的一段
-    private static final int MAX_PCM_MS = 60_000;
+    // 16kHz、16bit、单声道
+    private static final int PCM_BYTES_PER_MS = 32;
 
     // 角色未配置时的 VAD 阈值默认值
     private static final float DEFAULT_SPEECH_THRESHOLD = 0.4f;
@@ -94,6 +102,13 @@ public class VadService {
         // 静音期间累计帧数，用于SPEECH_END时按比例移除静音帧
         private int silenceFrameCount = 0;
 
+        // 本次说话开口后已喂入的语音总时长
+        private int spokenMs = 0;
+        // 当前识别段已喂入的语音时长，换流时清零
+        private int segmentSpokenMs = 0;
+        // 本次说话已因达到总时长天花板被强制收句，后续音频丢弃到用户停顿（manual 为 listen/stop）为止
+        private boolean truncated = false;
+
         private float[][][] sileroState = new float[2][1][128];
         // 跨帧样本拼接缓冲
         private float[] sampleCarryOver = new float[0];
@@ -111,8 +126,9 @@ public class VadService {
         private final OpusProcessor opusProcessor = new OpusProcessor();
 
         public VadState() {
-            this.maxPreBufferSize = preBufferMs * 32; // 16kHz, 16bit, mono = 32 bytes/ms
-            this.maxPcmSize = MAX_PCM_MS * 32;
+            this.maxPreBufferSize = preBufferMs * PCM_BYTES_PER_MS;
+            // 缓冲按识别段算：换流时整段交给识别侧，缓冲从零开始装下一段
+            this.maxPcmSize = (segmentMs + preBufferMs) * PCM_BYTES_PER_MS;
         }
 
         public boolean isSpeaking() { return speaking; }
@@ -211,6 +227,9 @@ public class VadService {
             vadContext = new float[VAD_CONTEXT_SIZE];
             preBuffer.clear();
             preBufferSize = 0;
+            spokenMs = 0;
+            segmentSpokenMs = 0;
+            truncated = false;
             clearPcm();
         }
     }
@@ -311,11 +330,40 @@ public class VadService {
                     pcmData = aecService.process(sessionId, pcmData, echoTimestamp);
                 }
 
+                if (state.isSpeaking()) {
+                    int frameMs = pcmData.length / PCM_BYTES_PER_MS;
+                    state.spokenMs += frameMs;
+                    state.segmentSpokenMs += frameMs;
+                    // 说到总天花板即强制收句回答
+                    if (state.spokenMs >= maxSpeechMs) {
+                        state.setSpeaking(false);
+                        state.resetSilenceFrameCount();
+                        state.truncated = true;
+                        log.info("单次说话达到上限 {}ms，强制收句，后续音频丢弃到停顿为止 - SessionId: {}",
+                                maxSpeechMs, sessionId);
+                        return new VadResult(VadStatus.SPEECH_END, pcmData);
+                    }
+                    // 说到单段上限即换识别流：整段 PCM 交给识别侧做重放与落盘，缓冲从这一帧重新开始
+                    if (state.segmentSpokenMs >= segmentMs) {
+                        List<byte[]> segmentPcm = state.getPcmData();
+                        state.clearPcm();
+                        state.addPcm(pcmData);
+                        state.segmentSpokenMs = 0;
+                        log.info("单段语音达到 {}ms，切换识别流继续 - SessionId: {}", segmentMs, sessionId);
+                        return new VadResult(VadStatus.SPEECH_ROTATE, pcmData, segmentPcm);
+                    }
+                }
+
                 // manual 模式跳过 Silero：首帧起流，其余持续喂流，收句由 listen/stop 触发
                 if (!state.autoSegment) {
+                    if (state.truncated) {
+                        return new VadResult(VadStatus.NO_SPEECH, null);
+                    }
                     if (!state.isSpeaking()) {
                         state.clearPcm();
                         state.setSpeaking(true);
+                        state.spokenMs = 0;
+                        state.segmentSpokenMs = 0;
                         state.addPcm(pcmData);
                         return new VadResult(VadStatus.SPEECH_START, pcmData);
                     }
@@ -348,6 +396,14 @@ public class VadService {
 
                 boolean speechStartAllowed = state.getConsecutiveSpeechFrames() >= 2;
 
+                // 被截断的那句剩下的部分不再起新一轮，等用户停顿够久才恢复检测
+                if (state.truncated) {
+                    if (isSilence && state.getSilenceDuration() > state.thresholds.silenceMs()) {
+                        state.truncated = false;
+                    }
+                    return new VadResult(VadStatus.NO_SPEECH, null);
+                }
+
                 // log.debug("VAD[{}] prob:{} nrg:{} sil:{}ms({}) {}{}",
                 //         sessionId,
                 //         String.format("%.3f", speechProb),
@@ -359,6 +415,8 @@ public class VadService {
                 if (!state.isSpeaking() && isSpeech && speechStartAllowed) {
                     state.clearPcm();
                     state.setSpeaking(true);
+                    state.spokenMs = 0;
+                    state.segmentSpokenMs = 0;
                     state.resetSilenceFrameCount();
 
                     log.debug("检测到语音开始 - SessionId: {}, 概率: {}, 能量: {}, 阈值: {}",
@@ -505,7 +563,12 @@ public class VadService {
             return false;
         }
         synchronized (state) {
-            if (states.get(sessionId) != state || !state.isSpeaking()) {
+            if (states.get(sessionId) != state) {
+                return false;
+            }
+            // listen/stop 之后客户端不再送音频，被截断那轮的丢弃状态到此结束
+            state.truncated = false;
+            if (!state.isSpeaking()) {
                 return false;
             }
             state.setSpeaking(false);
@@ -524,19 +587,29 @@ public class VadService {
     }
 
     public enum VadStatus {
-        NO_SPEECH, SPEECH_START, SPEECH_CONTINUE, SPEECH_END, ERROR
+        NO_SPEECH, SPEECH_START, SPEECH_CONTINUE, SPEECH_END, ERROR,
+        /** 当前段到时长上限：识别侧终结当前流、起新流继续，不收句 */
+        SPEECH_ROTATE
     }
 
     public static class VadResult {
         private final VadStatus status;
         private final byte[] data;
+        private final List<byte[]> segmentPcm;
 
         public VadResult(VadStatus status, byte[] data) {
+            this(status, data, null);
+        }
+
+        /** @param segmentPcm SPEECH_ROTATE 时交出的上一段整段 PCM，其余状态为 null */
+        public VadResult(VadStatus status, byte[] data, List<byte[]> segmentPcm) {
             this.status = status;
             this.data = data;
+            this.segmentPcm = segmentPcm;
         }
 
         public VadStatus getStatus() { return status; }
         public byte[] getProcessedData() { return data; }
+        public List<byte[]> getSegmentPcm() { return segmentPcm; }
     }
 }
