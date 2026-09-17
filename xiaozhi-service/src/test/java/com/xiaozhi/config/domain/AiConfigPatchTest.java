@@ -189,7 +189,7 @@ class AiConfigPatchTest {
                 "我的模型", "备注", "chat",
                 "saved-app", "saved-key", "saved-secret",
                 "saved-ak", "saved-sk", "https://saved.example.com",
-                true, AiConfig.STATE_DISABLED, true,
+                true, null, AiConfig.STATE_DISABLED, true,
                 CREATE_TIME, UPDATE_TIME);
     }
 
@@ -198,7 +198,7 @@ class AiConfigPatchTest {
                 "我的模型", "备注", "chat",
                 "saved-app", "saved-key", "saved-secret",
                 "saved-ak", "saved-sk", "https://saved.example.com",
-                false, AiConfig.STATE_ENABLED, isDefault,
+                false, null, AiConfig.STATE_ENABLED, isDefault,
                 CREATE_TIME, UPDATE_TIME);
     }
 }

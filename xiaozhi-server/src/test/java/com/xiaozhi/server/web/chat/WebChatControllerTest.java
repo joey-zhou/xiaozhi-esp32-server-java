@@ -17,8 +17,11 @@ import reactor.core.publisher.Flux;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -54,6 +57,30 @@ class WebChatControllerTest extends ControllerTestSupport {
         }
 
         verify(webChatAppService).chatStream("s-1", "你好", 9);
+    }
+
+    /**
+     * 开流前失败走通用异常处理器，返回 ApiResponse JSON。
+     * 前端 Accept 必须同时带 application/json，否则内容协商失败，原异常会穿透到容器、客户端拿不到 message。
+     */
+    @Test
+    void streamFailureBeforeFirstTokenReturnsJsonError() throws Exception {
+        when(webChatAppService.chatStream("s-1", "你好", 9))
+            .thenReturn(Flux.error(new IllegalArgumentException("会话不存在或已删除: s-1")));
+
+        try (var ignored = mockLoginUser(9)) {
+            var started = mockMvc.perform(post("/api/chat/stream")
+                    .accept(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"sessionId":"s-1","text":"你好"}
+                        """))
+                .andReturn();
+            mockMvc.perform(asyncDispatch(started))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("会话不存在或已删除: s-1"));
+        }
     }
 
     @Test

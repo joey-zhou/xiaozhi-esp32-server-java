@@ -3,6 +3,7 @@ package com.xiaozhi.ai.llm.memory;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.MessageMetadataBO;
 import com.xiaozhi.common.model.bo.SummaryBO;
+import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.summary.service.SummaryService;
 import org.jetbrains.annotations.NotNull;
@@ -34,21 +35,37 @@ public class DatabaseChatMemory implements ChatMemory {
 
     private final SummaryService summaryService;
     private final MessageService messageService;
+    private final ConversationService conversationService;
 
     @Autowired
-    public DatabaseChatMemory(MessageService messageService, SummaryService summaryService) {
+    public DatabaseChatMemory(MessageService messageService, SummaryService summaryService,
+                              ConversationService conversationService) {
         this.messageService = messageService;
         this.summaryService = summaryService;
+        this.conversationService = conversationService;
     }
 
+    /**
+     * Web 会话的摘要挂在会话上：压缩线程调模型的这几秒里用户可能已经把会话删了，落库前再确认会话还在，
+     * 否则留下一条列表里看不到、也删不掉的摘要。
+     */
     @Override
     public void save(SummaryBO summary) {
+        if (summary.getSessionId() != null && conversationService.get(summary.getSessionId()) == null) {
+            log.info("会话已删除，丢弃其摘要: sessionId={}", summary.getSessionId());
+            return;
+        }
         summaryService.save(summary);
     }
 
     @Override
     public SummaryBO findLastSummary(String ownerId, int roleId) {
         return summaryService.findLast(ownerId, roleId);
+    }
+
+    @Override
+    public SummaryBO findLastSummaryBySession(String sessionId) {
+        return summaryService.findLastBySession(sessionId);
     }
 
     @Override
@@ -155,6 +172,11 @@ public class DatabaseChatMemory implements ChatMemory {
     @Override
     public List<Message> find(String ownerId, int roleId, Instant since) {
         return toSpringMessages(messageService.listHistoryAfter(ownerId, roleId, since));
+    }
+
+    @Override
+    public List<Message> findBySession(String sessionId, Instant since) {
+        return toSpringMessages(messageService.listSessionHistoryAfter(sessionId, since));
     }
 
     @Override

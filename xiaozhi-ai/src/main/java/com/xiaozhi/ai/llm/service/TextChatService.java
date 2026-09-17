@@ -4,19 +4,19 @@ import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.ai.llm.memory.ChatMemory;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.memory.ConversationContext;
+import com.xiaozhi.ai.llm.memory.ConversationFactory;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
-import com.xiaozhi.ai.llm.memory.MessageWindowConversation;
 import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.common.model.bo.RoleBO;
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientResponseException;
@@ -28,8 +28,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -46,14 +48,10 @@ public class TextChatService {
     @Resource
     private ChatModelFactory chatModelFactory;
     @Resource
-    private ChatMemory chatMemory;
-
-    // 独立的 key：Web 聊天场景单独调优，不和设备侧窗口/长期/摘要三种记忆策略的 max-messages 共用配置项
-    @Value("${conversation.web-chat.max-messages:16}")
-    private int maxMessages;
+    private ConversationFactory conversationFactory;
 
     /**
-     * 建立按 sessionId 加载历史的消息窗口对话（新会话为空，续接会拉到历史）。
+     * 建立按 sessionId 加载历史与摘要的对话（新会话为空，续接会拉到历史）。
      *
      * @param ownerId   聊天参与者标识
      * @param userId    用户 ID
@@ -61,16 +59,7 @@ public class TextChatService {
      * @param sessionId 会话 ID
      */
     public Conversation openConversation(String ownerId, Integer userId, RoleBO role, String sessionId) {
-        return MessageWindowConversation.builder()
-                .chatMemory(chatMemory)
-                .maxMessages(maxMessages)
-                .ownerId(ownerId)
-                .roleId(role.getRoleId())
-                .roleDesc(role.getRoleDesc())
-                .userId(userId)
-                .sessionId(sessionId)
-                .sessionScoped(true)
-                .build();
+        return conversationFactory.initSessionConversation(ownerId, userId, role, sessionId);
     }
 
     /**
@@ -82,10 +71,12 @@ public class TextChatService {
      * @param role            本轮使用的角色
      * @param userText        用户输入文本
      * @param userCreatedAt   用户消息时间
-     * @param onTurnCompleted 一轮完整结束时回调，入参是正文（不含思考过程）
+     * @param onTurnCompleted 一轮完整结束时回调，入参是正文（不含思考过程）与助手消息时间。
+     *                        助手消息挂的时间元数据与落库用的必须是同一个：摘要按批里最后一条的时间切分历史，
+     *                        两边不一致会让重载时丢掉或重复一段消息
      */
     public Flux<ChatToken> streamTurn(Conversation conversation, RoleBO role, String userText,
-                                      LocalDateTime userCreatedAt, Consumer<String> onTurnCompleted) {
+                                      LocalDateTime userCreatedAt, BiConsumer<String, LocalDateTime> onTurnCompleted) {
         ChatModel chatModel = chatModelFactory.getChatModel(role);
 
         // 裸文本 UserMessage + 时间戳 metadata；Conversation 投影层会在送 LLM 前拼出 [时间戳] 文本 的前缀。
@@ -102,8 +93,15 @@ public class TextChatService {
 
         StringBuilder fullResponse = new StringBuilder();
         AtomicBoolean turnCompleted = new AtomicBoolean(false);
+        AtomicReference<Usage> usage = new AtomicReference<>();
 
-        return toChatTokens(chatModel.stream(prompt))
+        return toChatTokens(chatModel.stream(prompt).doOnNext(response -> {
+                    // 流式用量一般只在最后一块返回，只留带输入 token 的那块
+                    Usage chunkUsage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
+                    if (chunkUsage != null && chunkUsage.getPromptTokens() != null && chunkUsage.getPromptTokens() > 0) {
+                        usage.set(chunkUsage);
+                    }
+                }))
                 .doOnNext(token -> {
                     // 只累积正式回复内容，思考过程不持久化
                     if (token.isContent()) {
@@ -116,9 +114,17 @@ public class TextChatService {
                         return;
                     }
                     String reply = fullResponse.toString();
-                    conversation.add(new AssistantMessage(reply));
+                    LocalDateTime assistantCreatedAt = LocalDateTime.now();
+                    // 挂上本轮用量，对话据此判断上下文是否超限
+                    AssistantMessage assistantMessage = AssistantMessage.builder()
+                            .content(reply)
+                            .properties(usage.get() != null ? Map.of(ChatMemory.USAGE_KEY, usage.get()) : Map.of())
+                            .build();
+                    MessageTimeMetadata.setTimeMillis(assistantMessage,
+                            assistantCreatedAt.atZone(ZoneId.systemDefault()).toInstant());
+                    conversation.add(assistantMessage);
                     turnCompleted.set(true);
-                    onTurnCompleted.accept(reply);
+                    onTurnCompleted.accept(reply, assistantCreatedAt);
                 })
                 .doOnError(e -> log.error("文本聊天流式响应失败: sessionId={}", conversation.sessionId(), e))
                 // 失败原因以 error token 推给前端，不混进正文，也不会被当成助手回复记进对话

@@ -1,14 +1,16 @@
 package com.xiaozhi.message.convert;
 
+import com.xiaozhi.common.model.bo.ConversationBO;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.MessageMetadataBO;
 import com.xiaozhi.common.model.resp.ConversationResp;
 import com.xiaozhi.common.model.resp.MessageResp;
+import com.xiaozhi.message.dal.mysql.dataobject.ConversationDO;
 import com.xiaozhi.message.dal.mysql.dataobject.MessageDO;
-import com.xiaozhi.message.model.ConversationProjection;
 import com.xiaozhi.message.model.MessageProjection;
 import com.xiaozhi.utils.JsonUtil;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.springframework.util.StringUtils;
 
 @Mapper(componentModel = "spring")
@@ -20,7 +22,11 @@ public interface MessageConvert {
 
     MessageResp toResp(MessageProjection projection);
 
-    ConversationResp toResp(ConversationProjection projection);
+    /** 角色名只在分页 SQL 里关联出来，单表读不带 */
+    @Mapping(target = "roleName", ignore = true)
+    ConversationBO toBO(ConversationDO conversation);
+
+    ConversationResp toResp(ConversationBO conversation);
 
     /**
      * DO.metadata (JSON 字符串) → BO.metadata (值对象)。

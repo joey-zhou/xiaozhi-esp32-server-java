@@ -18,7 +18,8 @@ import java.util.List;
  */
 public interface ChatMemory {
     String TIME_MILLIS_KEY = "TIME_MILLIS";
-    String USAGE_KEY = "llm_usage";  // 用于存储LLM使用情况的键
+    /** 助手消息元数据里挂本轮模型用量（Spring AI Usage） */
+    String USAGE_KEY = "llm_usage";
 
 
 
@@ -35,6 +36,11 @@ public interface ChatMemory {
      * @return
      */
     SummaryBO findLastSummary(String ownerId, int roleId);
+
+    /**
+     * 查询 Web 会话最近一次摘要（Web 场景：按会话隔离）。
+     */
+    SummaryBO findLastSummaryBySession(String sessionId);
 
     /**
      * 按 ownerId + roleId 获取历史对话消息列表（设备场景：跨 session 聚合）。
@@ -66,6 +72,11 @@ public interface ChatMemory {
      * @return
      */
     List<Message> find(String ownerId, int roleId, Instant since);
+
+    /**
+     * 按 sessionId 获取某个时间戳之后的历史对话消息（Web 场景：按会话隔离）。
+     */
+    List<Message> findBySession(String sessionId, Instant since);
     /**
      * 清除历史记录
      * 不是提供给Conversation使用，而是用于强制使其失忆的场景。

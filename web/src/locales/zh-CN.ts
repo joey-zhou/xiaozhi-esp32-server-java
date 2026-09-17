@@ -337,9 +337,6 @@ export default {
     confirmClearMemory: '确定要清除该设备的所有对话记忆吗？此操作不可恢复。',
     clearMemory: '清除记忆',
     clearingMemory: '正在清除记忆...',
-    windowMemory: '短期记忆',
-    summaryMemory: '摘要记忆',
-    allMemory: '全部记忆',
   },
 
   role: {
@@ -442,11 +439,6 @@ export default {
     mcpRefresh: '刷新',
     mcpRefreshSuccess: '刷新成功',
     mcpSaveFailed: '保存工具选择失败',
-    // 记忆类型配置
-    memoryTypeSettings: '记忆类型配置',
-    memoryTypeLabel: '记忆类型',
-    selectMemoryType: '请选择记忆类型',
-    memoryTypeTip: '选择该角色使用的记忆类型，不同记忆类型有不同的存储和召回机制',
 
     // MCP 工具
 
@@ -883,8 +875,7 @@ export default {
       ttsConfig: '语音合成配置',
       ossConfig: '存储配置',
       memoryManagement: '记忆管理',
-      shortTermMemory: '短期记忆',
-      summaryMemory: '记忆总结',
+      conversationRecords: '对话记录',
       chat: '聊天',
       account: '个人中心',
       personalConfig: '个人设置',
@@ -941,6 +932,14 @@ export default {
     thinkingDone: '已完成思考',
     thought: '思考',
     thoughtDuration: '了 {seconds} 秒',
+    rename: '重命名',
+    renameConversation: '重命名会话',
+    titlePlaceholder: '输入会话标题',
+    deleteConversation: '删除会话',
+    deleteConversationHint: '会话的聊天记录和摘要会一起删除。',
+    deleteSelected: '删除所选（{count}）',
+    renameFailed: '重命名失败：{error}',
+    deleteConversationsFailed: '删除会话失败：{error}',
     floating: {
       notLoggedIn: '请先登录后再使用聊天',
       roleChanged: '角色切换成功',
@@ -986,6 +985,8 @@ export default {
   memory: {
     summary: '摘要',
     content: '内容',
-    needRoleAndDevice: '请先创建角色或绑定设备',
+    role: '角色',
+    messagesTab: '聊天记录',
+    summariesTab: '对话摘要',
   },
 }

@@ -94,23 +94,13 @@ const routes: RouteRecordRaw[] = [
           hideInMenu: true
         },
       },
+      // 对话记录：逐条聊天记录与对话摘要两个 Tab
       {
         path: 'memory/chat',
         name: 'memory-chat',
         component: () => import('../views/MemoryManagementView.vue'),
         meta: {
-          title: 'router.title.shortTermMemory',
-          parent: 'router.parent.memoryManagement',
-          requiresAuth: true,
-          permission: 'system:role',
-        },
-      },
-      {
-        path: 'memory/summary',
-        name: 'memory-summary',
-        component: () => import('../views/MemoryManagementView.vue'),
-        meta: {
-          title: 'router.title.summaryMemory',
+          title: 'router.title.conversationRecords',
           parent: 'router.parent.memoryManagement',
           requiresAuth: true,
           permission: 'system:role',

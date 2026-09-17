@@ -34,6 +34,7 @@ import jakarta.annotation.Resource;
 import org.springframework.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.socket.CloseStatus;
 
 import java.net.URI;
 import java.net.URLDecoder;
@@ -435,7 +436,7 @@ class ProtocolTestHarness {
                 }
             }
             device.transport().close();
-            webSocketHandler.afterConnectionClosed(device.transport(), org.springframework.web.socket.CloseStatus.NORMAL);
+            webSocketHandler.afterConnectionClosed(device.transport(), CloseStatus.NORMAL);
         }
         connected.clear();
     }

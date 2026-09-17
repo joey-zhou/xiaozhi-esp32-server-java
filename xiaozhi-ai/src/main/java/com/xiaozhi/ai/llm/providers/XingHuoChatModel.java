@@ -1,6 +1,7 @@
 package com.xiaozhi.ai.llm.providers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xiaozhi.utils.JsonUtil;
 import okhttp3.*;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -14,6 +15,7 @@ import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -243,7 +245,7 @@ public class XingHuoChatModel implements ChatModel {
     /**
      * 处理流式响应的每一行
      */
-    private void processStreamLine(String jsonData, reactor.core.publisher.FluxSink<ChatResponse> sink, 
+    private void processStreamLine(String jsonData, FluxSink<ChatResponse> sink, 
                                    Prompt prompt, boolean[] hasToolCall,
                                    Map<String, Map<String, Object>> toolCallsAccumulator) {
         try {
@@ -405,7 +407,7 @@ public class XingHuoChatModel implements ChatModel {
      * 处理工具调用
      */
     private void processToolCalls(List<Map<String, Object>> toolCalls, 
-                                  reactor.core.publisher.FluxSink<ChatResponse> sink,
+                                  FluxSink<ChatResponse> sink,
                                   Prompt prompt) {
         if (toolCalls == null || toolCalls.isEmpty()) {
             return;
@@ -507,9 +509,9 @@ public class XingHuoChatModel implements ChatModel {
                     var toolDefinition = toolCallback.getToolDefinition();
                     if (toolDefinition != null) {
                         // 将ToolDefinition转为JSON字符串,再解析为Map
-                        String toolJson = com.xiaozhi.utils.JsonUtil.toJson(toolDefinition);
+                        String toolJson = JsonUtil.toJson(toolDefinition);
                         
-                        Map<String, Object> toolMap = com.xiaozhi.utils.JsonUtil.fromJson(toolJson, Map.class);
+                        Map<String, Object> toolMap = JsonUtil.fromJson(toolJson, Map.class);
                         
                         if (toolMap != null) {
                             // 构建符合讯飞星火格式的工具定义

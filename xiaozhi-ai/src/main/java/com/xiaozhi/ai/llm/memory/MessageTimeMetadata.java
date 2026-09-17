@@ -7,7 +7,7 @@ import java.time.Instant;
 /**
  * Conversation 运行时消息元数据工具。
  * 目前主要负责在 Spring AI Message 上读写对话时间戳，
- * 供 DialogueTurn、SummaryConversation 等运行时/记忆组件复用。
+ * 供 DialogueTurn、Conversation、摘要等运行时/记忆组件复用。
  */
 public final class MessageTimeMetadata {
 

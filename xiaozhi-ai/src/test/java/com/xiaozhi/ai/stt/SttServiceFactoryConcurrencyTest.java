@@ -4,6 +4,7 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import reactor.core.publisher.Flux;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -88,7 +89,7 @@ class SttServiceFactoryConcurrencyTest {
         }
 
         @Override
-        public SttResult stream(reactor.core.publisher.Flux<byte[]> audioSink) {
+        public SttResult stream(Flux<byte[]> audioSink) {
             return null;
         }
     }

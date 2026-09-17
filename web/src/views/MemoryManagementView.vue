@@ -5,24 +5,16 @@ import { useRoute, onBeforeRouteLeave } from 'vue-router'
 import { message as antMessage, type TableColumnsType } from 'ant-design-vue'
 import { useTable, type TablePageParams } from '@/composables/useTable'
 import { useExport, type ExportColumn } from '@/composables/useExport'
-import { useSelectLoadMore } from '@/composables/useSelectLoadMore'
 import { useRequest } from '@/composables/useRequest'
+import { useMemoryOwnerFilter } from '@/composables/useMemoryOwnerFilter'
 import { useLoadingStore } from '@/store/loading'
-import { queryRoles } from '@/services/role'
-import { queryDevices } from '@/services/device'
 import { deleteMessage } from '@/services/message'
 import { shouldIgnoreRequestError } from '@/services/request'
-import {
-  querySummaryMemory,
-  queryChatMemory,
-  deleteSummaryMemory,
-} from '@/services/memory'
+import { querySummaryMemory, queryChatMemory, deleteSummaryMemory } from '@/services/memory'
 import AudioPlayer from '@/components/AudioPlayer.vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
 import TableEmptyState from '@/components/TableEmptyState.vue'
 import type { PageResponse } from '@/types/api'
-import type { Role } from '@/types/role'
-import type { Device } from '@/types/device'
 import type { SummaryMemory, ChatMemory } from '@/types/memory'
 import dayjs, { Dayjs } from 'dayjs'
 import { useEventBus } from '@vueuse/core'
@@ -31,17 +23,15 @@ const { t } = useI18n()
 const route = useRoute()
 const loadingStore = useLoadingStore()
 
-// 从路由路径推导记忆类型
-const memoryType = computed<'chat' | 'summary'>(() => {
-  if (route.path.endsWith('/summary')) return 'summary'
-  return 'chat'
-})
+/** 对话记录页的两个 Tab：逐条的聊天记录与压缩出来的对话摘要，共用同一组设备与角色筛选 */
+type RecordTab = 'chat' | 'summary'
+const memoryType = ref<RecordTab>(route.query.tab === 'summary' ? 'summary' : 'chat')
 
 // 获取路由参数
 const roleId = computed(() => parseInt(route.query.roleId as string) || 0)
 const routeDeviceId = computed(() => route.query.deviceId as string || '')
 
-// 表格和分页：三种记忆共用一张表，请求按 memoryType 在 fetchMemoryPage 里分流
+// 表格和分页：两个 Tab 共用一份分页状态，请求按 memoryType 在 fetchMemoryPage 里分流
 const {
   loading,
   data,
@@ -55,13 +45,12 @@ const {
 
 type MemoryRecord = SummaryMemory | ChatMemory
 
-/** 短期记忆行走消息接口，比 ChatMemory 多一个工具调用字段 */
+/** 聊天记录行走消息接口，比 ChatMemory 多一个工具调用字段 */
 type ChatMemoryRow = ChatMemory & { toolCalls?: string }
 
 // 使用导出 composable
 const { exporting, exportToExcel } = useExport()
 
-const { execute: executeRouteDevice } = useRequest()
 // 行内删除：每个请求一个实例，失败文案互不干扰
 const { executeOk: executeDeleteMemory } = useRequest()
 const { executeOk: executeDeleteMessage } = useRequest()
@@ -69,36 +58,19 @@ const { executeOk: executeDeleteMessage } = useRequest()
 // 事件总线
 const stopAllAudioBus = useEventBus<void>('stop-all-audio')
 
-// 角色下拉（滚动加载）
+// 设备与角色下拉
 const {
-  list: roles,
-  loading: rolesLoading,
-  load: loadRoles,
-  onPopupScroll: onRolePopupScroll,
-} = useSelectLoadMore<Role>(queryRoles)
-const selectedRoleId = ref<number>(0)
-
-// 设备下拉（滚动加载）
-const {
-  list: devices,
-  loading: devicesLoading,
-  load: loadDevices,
-  onPopupScroll: onDevicePopupScroll,
-} = useSelectLoadMore<Device>(queryDevices)
-const selectedDeviceId = ref<string>('')
-
-// 路由带来的设备未必落在下拉已加载的那几页里，单查回来的那台挂在这里补进选项
-const routeDeviceOption = ref<Device | null>(null)
-
-// 补进来的设备一旦随翻页进了 devices，就不再单独占一项，避免出现重复 key
-const deviceOptions = computed<Device[]>(() => {
-  const extra = routeDeviceOption.value
-  const loaded = devices.value
-  if (!extra || loaded.some((d) => d.deviceId === extra.deviceId)) {
-    return loaded
-  }
-  return [extra, ...loaded]
-})
+  roles,
+  rolesLoading,
+  onRolePopupScroll,
+  deviceOptions,
+  devicesLoading,
+  onDevicePopupScroll,
+  selectedRoleId,
+  selectedDeviceId,
+  initOwner,
+  filterRoleOption,
+} = useMemoryOwnerFilter()
 
 // 时间范围
 const timeRange = ref<[Dayjs, Dayjs]>([dayjs().startOf('month'), dayjs().endOf('month')])
@@ -109,15 +81,8 @@ const rangePresets = computed(() => [
   { label: t('message.thisMonth'), value: [dayjs().startOf('month'), dayjs().endOf('month')] },
 ])
 
-// 当前选中的设备名称
-const selectedDeviceName = computed(() => {
-  if (!selectedDeviceId.value) return ''
-  return deviceOptions.value.find((d) => d.deviceId === selectedDeviceId.value)?.deviceName || selectedDeviceId.value
-})
-
 // 表格列配置
 const columns = computed<TableColumnsType>(() => {
-
   const baseColumns = [
     {
       title: t('message.conversationTime'),
@@ -137,6 +102,12 @@ const columns = computed<TableColumnsType>(() => {
     return [
       ...baseColumns,
       {
+        title: t('memory.role'),
+        dataIndex: 'roleName',
+        width: 120,
+        align: 'center' as const,
+      },
+      {
         title: t('memory.summary'),
         dataIndex: 'summary',
         width: 300,
@@ -150,96 +121,43 @@ const columns = computed<TableColumnsType>(() => {
         align: 'center' as const,
       },
     ]
-  } else {
-    // chat tab
-    return [
-      ...baseColumns,
-      {
-        title: t('message.messageSender'),
-        dataIndex: 'sender',
-        width: 100,
-        align: 'center' as const,
-      },
-      {
-        title: t('message.toolCalls'),
-        dataIndex: 'messageType',
-        width: 250,
-        align: 'center' as const,
-      },
-      {
-        title: t('message.messageContent'),
-        dataIndex: 'message',
-        width: 300,
-        align: 'center' as const,
-      },
-      {
-        title: t('message.voice'),
-        dataIndex: 'audioPath',
-        width: 400,
-        align: 'center' as const,
-      },
-      {
-        title: t('table.action'),
-        dataIndex: 'operation',
-        width: 160,
-        fixed: 'right' as const,
-        align: 'center' as const,
-      },
-    ]
   }
-})
 
-/**
- * 按 deviceId 单查一台设备，补进下拉选项
- * 下拉按页拉取，路由传来的设备可能不在已加载的页里，不补就会被静默换成第一台
- */
-async function loadRouteDeviceOption(deviceId: string) {
-  if (devices.value.some((d) => d.deviceId === deviceId)) {
-    return
-  }
-  // 补不到就保持不补，不打扰用户
-  await executeRouteDevice(() => queryDevices({ pageNo: 1, pageSize: 1, deviceId }), {
-    showError: false,
-    onSuccess: (data) => {
-      routeDeviceOption.value = data?.list?.[0] ?? null
+  return [
+    ...baseColumns,
+    {
+      title: t('message.messageSender'),
+      dataIndex: 'sender',
+      width: 100,
+      align: 'center' as const,
     },
-  })
-}
-
-/**
- * 初始化下拉数据并加载表格
- */
-async function initSelects() {
-  await Promise.all([loadRoles(), loadDevices()])
-
-  const needDefault = memoryType.value === 'summary'
-
-  // 优先使用路由传参，否则 summary 自动选第一个
-  if (roleId.value) {
-    selectedRoleId.value = roleId.value
-  } else if (needDefault && roles.value.length > 0) {
-    selectedRoleId.value = roles.value[0]!.roleId
-  }
-
-  if (routeDeviceId.value) {
-    await loadRouteDeviceOption(routeDeviceId.value)
-  }
-
-  if (routeDeviceId.value && deviceOptions.value.some((d) => d.deviceId === routeDeviceId.value)) {
-    selectedDeviceId.value = routeDeviceId.value
-  } else if (needDefault && deviceOptions.value.length > 0) {
-    selectedDeviceId.value = deviceOptions.value[0]!.deviceId
-  }
-
-  await fetchMemoryData()
-}
-
-/**
- * 角色筛选函数（按 a-select-option 上显式声明的 label 匹配）
- */
-function filterRoleOption(input: string, option: { label?: string }) {
-  return (option.label ?? '').toLowerCase().includes(input.toLowerCase())
-}
+    {
+      title: t('message.toolCalls'),
+      dataIndex: 'messageType',
+      width: 250,
+      align: 'center' as const,
+    },
+    {
+      title: t('message.messageContent'),
+      dataIndex: 'message',
+      width: 300,
+      align: 'center' as const,
+    },
+    {
+      title: t('message.voice'),
+      dataIndex: 'audioPath',
+      width: 400,
+      align: 'center' as const,
+    },
+    {
+      title: t('table.action'),
+      dataIndex: 'operation',
+      width: 160,
+      fixed: 'right' as const,
+      align: 'center' as const,
+    },
+  ]
+})
 
 /**
  * 处理角色切换
@@ -252,7 +170,16 @@ async function handleRoleChange(roleIdValue: number) {
 }
 
 /**
- * 按当前记忆类型分流请求，分页参数由 useTable 注入
+ * 切换 Tab：筛选条件原样保留，只按新 Tab 重新查
+ */
+async function handleTabChange() {
+  data.value = []
+  resetPagination()
+  await fetchMemoryData()
+}
+
+/**
+ * 按当前 Tab 分流请求，分页参数由 useTable 注入
  */
 async function fetchMemoryPage(
   { pageNo, pageSize }: TablePageParams
@@ -267,42 +194,27 @@ async function fetchMemoryPage(
       pageSize,
       startTime: timeRange.value[0].format('YYYY-MM-DD HH:mm:ss'),
       endTime: timeRange.value[1].format('YYYY-MM-DD HH:mm:ss'),
-      // queryChatMemory 把 roleId/deviceId 声明成必填，实际「全部」时要留空，
-      // 待 services/memory.ts 把这两项放宽为可选后可去掉这次断言
-      ...({ roleId, deviceId } as { roleId: number; deviceId: string }),
+      roleId,
+      deviceId,
     })
   }
 
-  // 摘要记忆按「设备+角色」存储，缺任一项会请求到 undefined/undefined，直接返回空页并提示
-  if (!roleId || !deviceId) {
-    antMessage.warning(t('memory.needRoleAndDevice'))
-    return { code: 200, message: '', data: { list: [], total: 0, pageNo, pageSize } }
-  }
-
-  return querySummaryMemory({ pageNo, pageSize, roleId, deviceId })
+  return querySummaryMemory({ pageNo, pageSize, deviceId, roleId })
 }
 
 /**
- * 处理删除记忆
+ * 删除摘要：id 是 createTime 的毫秒数；列表可能不限设备和角色，两者都取自这一行
  */
-// 摘要的 id 是 createTime 毫秒数
-async function handleDeleteMemory(record: { id: number }) {
-  // summary 用 id（createTime 的毫秒数）删指定条；其余类型没有删除接口
-  const requestFn = memoryType.value === 'summary'
-    ? () => deleteSummaryMemory(selectedRoleId.value, selectedDeviceId.value, record.id)
-    : null
-
-  if (!requestFn) {
-    antMessage.error(t('common.deleteFailed'))
-    return
-  }
-
-  const removed = await executeDeleteMemory(requestFn, {
-    loadingRef: loading,
-    showSuccess: true,
-    successText: t('common.deleteSuccess'),
-    errorText: t('common.deleteFailed'),
-  })
+async function handleDeleteMemory(record: { id: number; roleId: number; deviceId: string }) {
+  const removed = await executeDeleteMemory(
+    () => deleteSummaryMemory(record.roleId, record.deviceId, record.id),
+    {
+      loadingRef: loading,
+      showSuccess: true,
+      successText: t('common.deleteSuccess'),
+      errorText: t('common.deleteFailed'),
+    }
+  )
 
   if (removed) {
     await fetchMemoryData()
@@ -452,10 +364,11 @@ async function handleExport() {
         { key: 'message', title: t('message.messageContent') },
         { key: 'createTime', title: t('message.conversationTime') }
       ]
-    } else if (memoryType.value === 'summary') {
+    } else {
       filename = `summary_memory_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}`
       columns = [
         { key: 'deviceName', title: t('device.deviceName') },
+        { key: 'roleName', title: t('memory.role') },
         { key: 'summary', title: t('memory.summary') },
         { key: 'createTime', title: t('message.conversationTime') }
       ]
@@ -488,10 +401,11 @@ onBeforeUnmount(() => {
 // 初始化。失败必须在这里收住：async onMounted 抛出会冒泡到 ErrorBoundary，整个业务区被替换成错误页
 onMounted(async () => {
   try {
-    await initSelects()
+    await initOwner(roleId.value, routeDeviceId.value)
+    await fetchMemoryData()
   } catch (error) {
     if (shouldIgnoreRequestError(error)) return
-    console.error('初始化记忆管理页失败:', error)
+    console.error('初始化对话记录页失败:', error)
     antMessage.error(t('common.loadDataFailed'))
   }
 })
@@ -499,217 +413,220 @@ onMounted(async () => {
 
 <template>
   <div class="memory-management-view">
-    <!-- 筛选栏 -->
+    <!-- 筛选区域：两个 Tab 共用同一组条件 -->
     <a-card :bordered="false" style="margin-bottom: 16px" class="search-card">
-      <a-row :gutter="16">
-        <a-col :span="8">
-          <a-form-item :label="t('role.roleName')">
-            <a-select
-              v-model:value="selectedRoleId"
-              show-search
-              :filter-option="filterRoleOption"
-              :loading="rolesLoading"
-              @change="handleRoleChange"
-              @popup-scroll="onRolePopupScroll"
-            >
-              <a-select-option v-if="memoryType === 'chat'" :value="0">
-                {{ t('common.all') }}
-              </a-select-option>
-              <a-select-option
-                v-for="role in roles"
-                :key="role.roleId"
-                :value="role.roleId"
-                :label="role.roleName"
+      <a-form layout="horizontal" :colon="false">
+        <a-row :gutter="16">
+          <a-col :xl="6" :lg="12" :xs="24">
+            <a-form-item :label="t('role.roleName')">
+              <a-select
+                v-model:value="selectedRoleId"
+                show-search
+                :filter-option="filterRoleOption"
+                :loading="rolesLoading"
+                @change="handleRoleChange"
+                @popup-scroll="onRolePopupScroll"
               >
-                {{ role.roleName }}
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item :label="t('device.deviceName')">
-            <a-select
-              v-model:value="selectedDeviceId"
-              :loading="devicesLoading"
-              @change="handleDeviceChange"
-              @popup-scroll="onDevicePopupScroll"
-            >
-              <a-select-option v-if="memoryType === 'chat'" value="">
-                {{ t('common.all') }}
-              </a-select-option>
-              <a-select-option
-                v-for="device in deviceOptions"
-                :key="device.deviceId"
-                :value="device.deviceId"
+                <a-select-option :value="0">
+                  {{ t('common.all') }}
+                </a-select-option>
+                <a-select-option
+                  v-for="role in roles"
+                  :key="role.roleId"
+                  :value="role.roleId"
+                  :label="role.roleName"
+                >
+                  {{ role.roleName }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :xl="6" :lg="12" :xs="24">
+            <a-form-item :label="t('device.deviceName')">
+              <a-select
+                v-model:value="selectedDeviceId"
+                :loading="devicesLoading"
+                @change="handleDeviceChange"
+                @popup-scroll="onDevicePopupScroll"
               >
-                {{ device.deviceName }}
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-        </a-col>
+                <a-select-option value="">
+                  {{ t('common.all') }}
+                </a-select-option>
+                <a-select-option
+                  v-for="device in deviceOptions"
+                  :key="device.deviceId"
+                  :value="device.deviceId"
+                >
+                  {{ device.deviceName }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
 
-        <a-col v-if="memoryType === 'chat'" :span="8">
-          <a-form-item :label="t('message.conversationDate')">
-            <a-range-picker
-              v-model:value="timeRange"
-              :presets="rangePresets"
-              :allow-clear="false"
-              format="MM-DD"
-              @change="handleTimeRangeChange"
-            />
-          </a-form-item>
-        </a-col>
-      </a-row>
+          <a-col v-if="memoryType === 'chat'" :xl="6" :lg="12" :xs="24">
+            <a-form-item :label="t('message.conversationDate')">
+              <a-range-picker
+                v-model:value="timeRange"
+                :presets="rangePresets"
+                :allow-clear="false"
+                format="MM-DD"
+                @change="handleTimeRangeChange"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
     </a-card>
 
-    <!-- 记忆数据表格：class 挂在卡片上，内部几张 a-table（含展开行里的工具调用表）共用同一份省略号截断规则 -->
-    <a-card :bordered="false" class="ellipsis-table">
-      <template #title>
-        <a-space>
-          <span>{{ t(`router.title.${memoryType === 'chat' ? 'shortTermMemory' : 'summaryMemory'}`) }}</span>
-        </a-space>
-      </template>
-      <template #extra>
-        <a-button v-permission="'system:role:memory:export'" type="primary" @click="handleExport" :loading="exporting">
-          {{ t('common.export') }}
-        </a-button>
-      </template>
-
-      <!-- 短期记忆表格 -->
-      <a-table
-        v-if="memoryType === 'chat'"
-        row-key="messageId"
-        :columns="columns"
-        :data-source="data"
-        :loading="loading"
-        :pagination="pagination"
-        :scroll="{ x: 800 }"
-        size="middle"
-        :expandable="{
-          rowExpandable: (record: ChatMemoryRow) => !!record.toolCalls,
-        }"
-        @change="onTableChange"
-      >
-        <template #emptyText>
-          <TableEmptyState :error="loadError" @retry="retryLoad" />
+    <!-- 主内容 -->
+    <a-card :bordered="false" :body-style="{ padding: '0 24px 24px 24px' }">
+      <a-tabs v-model:active-key="memoryType" destroy-inactive-tab-pane @change="handleTabChange">
+        <template #rightExtra>
+          <a-button v-permission="'system:role:memory:export'" type="primary" :loading="exporting" @click="handleExport">
+            {{ t('common.export') }}
+          </a-button>
         </template>
 
-        <template #expandedRowRender="{ record }">
+        <!-- 聊天记录：class 挂在表格上，展开行里的工具调用表共用同一份省略号截断规则 -->
+        <a-tab-pane key="chat" :tab="t('memory.messagesTab')">
           <a-table
-            :columns="[
-              { title: t('message.toolName'), dataIndex: 'name', width: 300 },
-              { title: t('message.toolArguments'), dataIndex: 'arguments', width: 300 },
-              { title: t('message.toolResult'), dataIndex: 'result' },
-            ]"
-            :data-source="toolCallsOf(record.messageId)"
-            :pagination="false"
-            size="small"
-            :row-key="(r: { _key: number }) => r._key"
+            class="ellipsis-table"
+            row-key="messageId"
+            :columns="columns"
+            :data-source="data"
+            :loading="loading"
+            :pagination="pagination"
+            :scroll="{ x: 800 }"
+            size="middle"
+            :expandable="{
+              rowExpandable: (record: ChatMemoryRow) => !!record.toolCalls,
+            }"
+            @change="onTableChange"
           >
-            <template #bodyCell="{ column, record: tool }">
-              <template v-if="column.dataIndex === 'arguments'">
-                <pre class="tool-json">{{ tool.arguments }}</pre>
+            <template #emptyText>
+              <TableEmptyState :error="loadError" @retry="retryLoad" />
+            </template>
+
+            <template #expandedRowRender="{ record }">
+              <a-table
+                :columns="[
+                  { title: t('message.toolName'), dataIndex: 'name', width: 300 },
+                  { title: t('message.toolArguments'), dataIndex: 'arguments', width: 300 },
+                  { title: t('message.toolResult'), dataIndex: 'result' },
+                ]"
+                :data-source="toolCallsOf(record.messageId)"
+                :pagination="false"
+                size="small"
+                :row-key="(r: { _key: number }) => r._key"
+              >
+                <template #bodyCell="{ column, record: tool }">
+                  <template v-if="column.dataIndex === 'arguments'">
+                    <pre class="tool-json">{{ tool.arguments }}</pre>
+                  </template>
+                  <template v-else-if="column.dataIndex === 'result'">
+                    <pre class="tool-json">{{ tool.result }}</pre>
+                  </template>
+                </template>
+              </a-table>
+            </template>
+
+            <template #bodyCell="{ column, record }">
+              <!-- 发送方列 -->
+              <template v-if="column.dataIndex === 'sender'">
+                {{ getSenderText(record.sender) }}
               </template>
-              <template v-else-if="column.dataIndex === 'result'">
-                <pre class="tool-json">{{ tool.result }}</pre>
+
+              <!-- 消息类型列 -->
+              <template v-else-if="column.dataIndex === 'messageType'">
+                <template v-if="!!record.toolCalls">
+                  <a-tooltip placement="topLeft" :mouse-enter-delay="0.5" :overlay-style="{ maxWidth: '400px' }">
+                    <template #title>
+                      <div v-for="tool in toolCallsOf(record.messageId)" :key="tool._key">{{ tool.name }}</div>
+                    </template>
+                    <div v-for="tool in toolCallsOf(record.messageId)" :key="tool._key" class="ellipsis-text">{{ tool.name }}</div>
+                  </a-tooltip>
+                </template>
+                <span v-else>-</span>
+              </template>
+
+              <!-- 消息内容列 -->
+              <template v-else-if="column.dataIndex === 'message'">
+                <a-tooltip :title="record.message" :mouse-enter-delay="0.5" placement="topLeft">
+                  <span v-if="record.message" class="ellipsis-text">{{ record.message }}</span>
+                  <span v-else>-</span>
+                </a-tooltip>
+              </template>
+
+              <!-- 音频列 -->
+              <template v-else-if="column.dataIndex === 'audioPath'">
+                <div v-if="hasValidAudio(record.audioPath)" class="audio-player-container">
+                  <AudioPlayer :audio-url="record.audioPath" />
+                </div>
+                <span v-else>{{ t('message.noAudio') }}</span>
+              </template>
+
+              <!-- 操作列 -->
+              <template v-else-if="column.dataIndex === 'operation'">
+                <TableActionButtons
+                  :record="record"
+                  :permissions="{ delete: 'system:role:memory:chat:delete' }"
+                  :show-delete="record.state !== '0'"
+                  :delete-title="t('message.confirmDeleteMessage')"
+                  @delete="() => handleDeleteMessage(record)"
+                />
               </template>
             </template>
           </a-table>
-        </template>
+        </a-tab-pane>
 
-        <template #bodyCell="{ column, record }">
-          <!-- 发送方列 -->
-          <template v-if="column.dataIndex === 'sender'">
-            {{ getSenderText(record.sender) }}
-          </template>
-
-          <!-- 消息类型列 -->
-          <template v-else-if="column.dataIndex === 'messageType'">
-            <template v-if="!!record.toolCalls">
-              <a-tooltip placement="topLeft" :mouse-enter-delay="0.5" :overlay-style="{ maxWidth: '400px' }">
-                <template #title>
-                  <div v-for="tool in toolCallsOf(record.messageId)" :key="tool._key">{{ tool.name }}</div>
-                </template>
-                <div v-for="tool in toolCallsOf(record.messageId)" :key="tool._key" class="ellipsis-text">{{ tool.name }}</div>
-              </a-tooltip>
+        <!-- 对话摘要 -->
+        <a-tab-pane key="summary" :tab="t('memory.summariesTab')">
+          <a-table
+            class="ellipsis-table"
+            row-key="createTime"
+            :columns="columns"
+            :data-source="data"
+            :loading="loading"
+            :pagination="pagination"
+            :scroll="{ x: 800 }"
+            size="middle"
+            @change="onTableChange"
+          >
+            <template #emptyText>
+              <TableEmptyState :error="loadError" @retry="retryLoad" />
             </template>
-            <span v-else>-</span>
-          </template>
 
-          <!-- 消息内容列 -->
-          <template v-else-if="column.dataIndex === 'message'">
-            <a-tooltip :title="record.message" :mouse-enter-delay="0.5" placement="topLeft">
-              <span v-if="record.message" class="ellipsis-text">{{ record.message }}</span>
-              <span v-else>-</span>
-            </a-tooltip>
-          </template>
+            <template #bodyCell="{ column, record }">
+              <!-- 设备名列：设备被删掉时后端补不到名字，退回显示设备 ID -->
+              <template v-if="column.dataIndex === 'deviceName'">
+                {{ record.deviceName || record.deviceId }}
+              </template>
+              <!-- 角色列 -->
+              <template v-else-if="column.dataIndex === 'roleName'">
+                {{ record.roleName || '-' }}
+              </template>
+              <!-- 摘要内容列 -->
+              <template v-else-if="column.dataIndex === 'summary'">
+                <a-tooltip :title="record.summary" :mouse-enter-delay="0.5" placement="topLeft">
+                  <span v-if="record.summary" class="ellipsis-text">{{ record.summary }}</span>
+                  <span v-else>-</span>
+                </a-tooltip>
+              </template>
 
-          <!-- 音频列 -->
-          <template v-else-if="column.dataIndex === 'audioPath'">
-            <div v-if="hasValidAudio(record.audioPath)" class="audio-player-container">
-              <AudioPlayer :audio-url="record.audioPath" />
-            </div>
-            <span v-else>{{ t('message.noAudio') }}</span>
-          </template>
-
-          <!-- 操作列 -->
-          <template v-else-if="column.dataIndex === 'operation'">
-            <a-space>
-              <TableActionButtons
-                :record="record"
-                :permissions="{ delete: 'system:role:memory:chat:delete' }"
-                :show-delete="record.state !== '0'"
-                :delete-title="t('message.confirmDeleteMessage')"
-                @delete="() => handleDeleteMessage(record)"
-              />
-            </a-space>
-          </template>
-        </template>
-      </a-table>
-
-      <!-- 摘要记忆表格 -->
-      <a-table
-        v-else-if="memoryType === 'summary'"
-        row-key="createTime"
-        :columns="columns"
-        :data-source="data"
-        :loading="loading"
-        :pagination="pagination"
-        :scroll="{ x: 800 }"
-        size="middle"
-        @change="onTableChange"
-      >
-        <template #emptyText>
-          <TableEmptyState :error="loadError" @retry="retryLoad" />
-        </template>
-
-        <template #bodyCell="{ column, record }">
-
-          <!-- 设备名列（后端不返回，直接用当前选中设备名） -->
-          <template v-if="column.dataIndex === 'deviceName'">
-            {{ selectedDeviceName }}
-          </template>
-          <!-- 摘要内容列 -->
-          <template v-if="column.dataIndex === 'summary'">
-            <a-tooltip :title="record.summary" :mouse-enter-delay="0.5" placement="topLeft">
-              <span v-if="record.summary" class="ellipsis-text">{{ record.summary }}</span>
-              <span v-else>-</span>
-            </a-tooltip>
-          </template>
-
-          <!-- 操作列 -->
-          <template v-else-if="column.dataIndex === 'operation'">
-            <TableActionButtons
-              :record="record"
-              :permissions="{ delete: 'system:role:memory:summary:delete' }"
-              show-delete
-              :delete-title="t('common.confirmDelete')"
-              @delete="() => handleDeleteMemory(record)"
-            />
-          </template>
-        </template>
-      </a-table>
-
+              <!-- 操作列 -->
+              <template v-else-if="column.dataIndex === 'operation'">
+                <TableActionButtons
+                  :record="record"
+                  :permissions="{ delete: 'system:role:memory:summary:delete' }"
+                  show-delete
+                  :delete-title="t('common.confirmDelete')"
+                  @delete="() => handleDeleteMemory(record as SummaryMemory)"
+                />
+              </template>
+            </template>
+          </a-table>
+        </a-tab-pane>
+      </a-tabs>
     </a-card>
 
     <!-- 回到顶部 -->

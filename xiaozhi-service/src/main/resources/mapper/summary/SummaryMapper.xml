@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaozhi.summary.dal.mysql.mapper.SummaryMapper">
+
+    <!-- 摘要分页带设备名与角色名；指定设备只查这一台，否则查该用户名下全部设备（web:* 不在设备表里，天然排除） -->
+    <select id="selectPage" resultType="com.xiaozhi.common.model.bo.SummaryBO">
+        SELECT
+            s.deviceId,
+            d.deviceName,
+            s.roleId,
+            r.roleName,
+            s.sessionId,
+            s.lastMessageTimestamp,
+            s.summary,
+            s.promptTokens,
+            s.completionTokens,
+            s.createTime
+        FROM sys_summary s
+        LEFT JOIN sys_device d ON s.deviceId = d.deviceId
+        LEFT JOIN sys_role r ON s.roleId = r.roleId
+        <where>
+            <choose>
+                <when test="deviceId != null and deviceId != ''">
+                    s.deviceId = #{deviceId}
+                </when>
+                <otherwise>
+                    d.userId = #{userId}
+                </otherwise>
+            </choose>
+            <if test="roleId != null">
+                AND s.roleId = #{roleId}
+            </if>
+        </where>
+        ORDER BY s.createTime DESC
+    </select>
+</mapper>

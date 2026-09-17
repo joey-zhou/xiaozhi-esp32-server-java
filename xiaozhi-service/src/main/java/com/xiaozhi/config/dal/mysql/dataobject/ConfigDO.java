@@ -30,4 +30,6 @@ public class ConfigDO extends BaseDO {
     private String state;
     private String isDefault;
     private Boolean enableThinking;
+    /** 模型上下文长度(token)，对话按它做压缩预算 */
+    private Integer contextLength;
 }

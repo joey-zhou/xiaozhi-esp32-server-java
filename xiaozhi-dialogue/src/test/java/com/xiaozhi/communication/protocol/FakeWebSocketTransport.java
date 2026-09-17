@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -131,7 +132,7 @@ class FakeWebSocketTransport implements WebSocketSession {
     List<byte[]> binaryPayloads(int protocolVersion) {
         return binaryFrames().stream()
                 .map(f -> BinaryProtocolCodec.decode(protocolVersion, f))
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .map(BinaryProtocolCodec.Frame::payload)
                 .toList();
     }
@@ -140,7 +141,7 @@ class FakeWebSocketTransport implements WebSocketSession {
     List<Long> binaryTimestamps(int protocolVersion) {
         return binaryFrames().stream()
                 .map(f -> BinaryProtocolCodec.decode(protocolVersion, f))
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .map(BinaryProtocolCodec.Frame::timestamp)
                 .toList();
     }

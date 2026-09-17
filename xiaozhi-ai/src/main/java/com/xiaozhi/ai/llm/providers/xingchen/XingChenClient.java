@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * 讯飞星辰Agent API 客户端实现
@@ -104,7 +105,7 @@ public class XingChenClient {
      * @param onCallCreated 请求发出前回调，调用方可以拿到 Call 在外部取消（如用户打断对话）
      */
     public void sendChatMessageStream(XingChenRequest request, XingChenChatStreamCallback callback,
-                                       java.util.function.Consumer<Call> onCallCreated) throws IOException {
+                                       Consumer<Call> onCallCreated) throws IOException {
         log.debug("发送流式对话消息: flowId={}, uid={}", request.getFlowId(), request.getUid());
 
         // 确保流式模式
@@ -215,7 +216,7 @@ public class XingChenClient {
      * @param onCallCreated 请求发出前回调，调用方可以拿到 Call 在外部取消（如用户打断对话）
      */
     public void resume(XingChenResume resume, XingChenChatStreamCallback callback,
-                        java.util.function.Consumer<Call> onCallCreated) throws IOException {
+                        Consumer<Call> onCallCreated) throws IOException {
         log.debug("发送Resume请求: {}", JsonUtil.toJson(resume));
 
         String jsonBody = JsonUtil.toJson(resume);

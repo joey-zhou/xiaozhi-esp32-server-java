@@ -10,6 +10,7 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -138,7 +139,7 @@ public class AudioUtils {
                     sourcePath = Paths.get(AUDIO_PATH, audioPaths.getFirst());
                 }
                 Files.createDirectories(path.getParent());
-                Files.move(sourcePath, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Files.move(sourcePath, path, StandardCopyOption.REPLACE_EXISTING);
                 return;
             } catch (Exception e) {
                 log.warn("文件移动失败，回退到合并逻辑: {}", e.getMessage());

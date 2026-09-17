@@ -1,25 +1,21 @@
 import { http } from './request'
 import api from './api'
-import type { MemoryQueryParams, SummaryMemory, ChatMemory } from '@/types/memory'
+import type { ChatMemory, SummaryMemory, SummaryQueryParams } from '@/types/memory'
 import type { MessageQueryParams } from '@/types/message'
 
 /**
- * 查询摘要记忆
+ * 查询设备的对话摘要，不传角色时不限角色
  */
-export function querySummaryMemory(params: MemoryQueryParams) {
-  const { roleId, deviceId, pageNo = 1, pageSize = 10 } = params
-  return http.getPage<SummaryMemory>(
-    `${api.memory.summary}/${roleId}/${deviceId}`,
-    { pageNo, pageSize }
-  )
+export function querySummaryMemory(params: SummaryQueryParams) {
+  return http.getPage<SummaryMemory>(api.memory.summary, params)
 }
 
 /**
- * 查询聊天记忆（使用现有的message接口）
+ * 查询聊天记录（使用现有的message接口），角色与设备不传时不限
  */
 export function queryChatMemory(params: {
-  roleId: number
-  deviceId: string
+  roleId?: number
+  deviceId?: string
   pageNo?: number
   pageSize?: number
   startTime?: string

@@ -24,9 +24,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+
 @RestController
 @RequestMapping("/api/memory")
-@Tag(name = "记忆管理", description = "管理聊天相关的摘要记忆与长期记忆")
+@Tag(name = "记忆管理", description = "管理设备的对话摘要")
 public class MemoryController extends BaseController {
 
     private static final int MAX_PAGE_SIZE = 1000;
@@ -37,17 +38,19 @@ public class MemoryController extends BaseController {
     @Resource
     private SummaryConvert summaryConvert;
 
-    @GetMapping("/summary/{roleId}/{deviceId}")
+    @GetMapping("/summary")
     @SaCheckPermission("system:role:memory:summary:api:list")
-    @CheckOwner(resource = "role", id = "#roleId")
     @CheckOwner(resource = "device", id = "#deviceId")
-    @Operation(summary = "查询指定角色的摘要记忆", description = "返回摘要记忆列表，可按设备 ID 筛选")
-    public ApiResponse<PageResult<SummaryResp>> querySummary(@PathVariable Integer roleId,
-                                      @PathVariable String deviceId,
-                                      @RequestParam(defaultValue = "1") Integer pageNo,
-                                      @RequestParam(defaultValue = "10") Integer pageSize) {
+    @CheckOwner(resource = "role", id = "#roleId")
+    @Operation(summary = "查询对话摘要", description = "不传设备时查当前用户全部设备，不传角色时不限角色")
+    public ApiResponse<PageResult<SummaryResp>> querySummary(@RequestParam(required = false) String deviceId,
+                                                             @RequestParam(required = false) Integer roleId,
+                                                             @RequestParam(defaultValue = "1") Integer pageNo,
+                                                             @RequestParam(defaultValue = "10") Integer pageSize) {
         pageSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
-        return ApiResponse.success(summaryService.page(deviceId, roleId, pageNo, pageSize).map(summaryConvert::toResp));
+        // 指定设备时归属已由 @CheckOwner 校验；不指定时按当前用户名下的设备查
+        return ApiResponse.success(summaryService.page(deviceId, StpUtil.getLoginIdAsInt(), roleId, pageNo, pageSize)
+            .map(summaryConvert::toResp));
     }
 
     @DeleteMapping("/summary/{roleId}/{deviceId}")

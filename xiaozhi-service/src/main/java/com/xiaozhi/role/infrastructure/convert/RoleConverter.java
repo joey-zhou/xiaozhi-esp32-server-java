@@ -5,7 +5,6 @@ import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
 import com.xiaozhi.role.domain.Role;
 import com.xiaozhi.role.domain.vo.AudioConfig;
 import com.xiaozhi.role.domain.vo.LlmConfig;
-import com.xiaozhi.role.domain.vo.MemoryStrategy;
 import com.xiaozhi.role.domain.vo.VoiceConfig;
 import org.springframework.stereotype.Component;
 
@@ -28,13 +27,11 @@ public class RoleConverter {
         AudioConfig audio = new AudioConfig(d.getVadEnergyTh(), d.getVadSpeechTh(),
                 d.getVadSilenceTh(), d.getVadSilenceMs());
 
-        MemoryStrategy memory = new MemoryStrategy(d.getMemoryType());
-
         return new Role(
                 d.getRoleId(), d.getUserId(), d.getAvatar(),
                 d.getRoleName(), d.getRoleDesc(), d.getState(),
                 "1".equals(d.getIsDefault()), d.getInactiveTimeoutSeconds(),
-                llm, voice, audio, memory,
+                llm, voice, audio,
                 d.getCreateTime(), d.getUpdateTime()
         );
     }
@@ -75,11 +72,6 @@ public class RoleConverter {
             d.setVadSilenceMs(audio.vadSilenceMs());
         }
 
-        MemoryStrategy memory = r.getMemoryStrategy();
-        if (memory != null) {
-            d.setMemoryType(memory.type());
-        }
-
         return d;
     }
 
@@ -117,11 +109,6 @@ public class RoleConverter {
             bo.setVadSpeechTh(audio.vadSpeechTh());
             bo.setVadSilenceTh(audio.vadSilenceTh());
             bo.setVadSilenceMs(audio.vadSilenceMs());
-        }
-
-        MemoryStrategy memory = r.getMemoryStrategy();
-        if (memory != null) {
-            bo.setMemoryType(memory.type());
         }
 
         return bo;

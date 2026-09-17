@@ -30,17 +30,6 @@ export interface Message {
 }
 
 /**
- * 会话信息接口（对齐后端 ConversationResp）
- */
-export interface Conversation {
-  sessionId: string
-  roleId: number
-  roleName: string
-  title: string
-  updateTime: string
-}
-
-/**
  * 消息查询参数（对齐后端 MessagePageReq）
  */
 export interface MessageQueryParams extends PageQueryParams {
@@ -52,15 +41,6 @@ export interface MessageQueryParams extends PageQueryParams {
   startTime?: string
   endTime?: string
   sessionId?: string
-  /** 消息来源过滤: 'web' | 'device' */
-  source?: string
-}
-
-/**
- * 会话查询参数（对齐后端 ConversationPageReq）
- */
-export interface ConversationQueryParams extends PageQueryParams {
-  roleId?: number
   /** 消息来源过滤: 'web' | 'device' */
   source?: string
 }

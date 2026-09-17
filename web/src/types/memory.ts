@@ -5,12 +5,14 @@ import type { PageQueryParams } from './api'
  */
 
 /**
- * 摘要记忆
+ * 对话摘要
  */
 export interface SummaryMemory {
   id: number
   deviceId: string
+  deviceName?: string | null
   roleId: number
+  roleName?: string | null
   lastMessageTimestamp: string
   summary: string
   promptTokens: number
@@ -19,7 +21,7 @@ export interface SummaryMemory {
 }
 
 /**
- * 聊天消息（短期/窗口记忆）
+ * 聊天消息（逐条对话记录）
  */
 export interface ChatMemory {
   messageId: number
@@ -35,9 +37,9 @@ export interface ChatMemory {
 }
 
 /**
- * 记忆查询参数
+ * 摘要查询参数：不传设备时查当前用户全部设备，不传角色时不限角色
  */
-export interface MemoryQueryParams extends PageQueryParams {
-  roleId: number
-  deviceId: string
+export interface SummaryQueryParams extends PageQueryParams {
+  deviceId?: string
+  roleId?: number
 }

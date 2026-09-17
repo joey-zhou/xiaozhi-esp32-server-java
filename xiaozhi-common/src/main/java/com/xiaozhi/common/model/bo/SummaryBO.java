@@ -11,7 +11,13 @@ import java.time.Instant;
 public class SummaryBO implements Serializable {
 
     private String deviceId;
+    /** 分页查询时由 SQL 关联设备表带出，其它路径为 null */
+    private String deviceName;
     private Integer roleId;
+    /** 分页查询时由 SQL 关联角色表带出，其它路径为 null */
+    private String roleName;
+    /** Web 会话的摘要按会话隔离，设备端为空 */
+    private String sessionId;
 
     private Instant lastMessageTimestamp;
 

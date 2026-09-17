@@ -47,4 +47,6 @@ public class ConfigUpdateReq {
 
     @Schema(description = "是否启用思考模式(模型支持时生效)")
     private Boolean enableThinking;
+    /** 模型上下文长度(token)，对话按它做压缩预算 */
+    private Integer contextLength;
 }

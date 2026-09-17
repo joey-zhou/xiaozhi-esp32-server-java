@@ -147,7 +147,7 @@ class ConfigAppServiceWriteRespTest {
     /** 库里已有的一条配置，字段全带值，用于钉住局部更新的出参一个字段都不少 */
     private static AiConfig storedAggregate() {
         return AiConfig.reconstitute(CONFIG_ID, 7, "llm", "aliyun", "通义千问", "对话模型", "chat",
-            "app-1", "key", "secret", null, null, "https://api.test/v1", true,
+            "app-1", "key", "secret", null, null, "https://api.test/v1", true, null,
             AiConfig.STATE_ENABLED, false, CREATED_AT, LocalDateTime.of(2026, 2, 1, 8, 0));
     }
 }

@@ -108,4 +108,35 @@ describe('chat service', () => {
 
     expect(handleAuthExpiredMock).toHaveBeenCalledOnce()
   })
+
+  // 开流前失败走的是通用异常处理器，返回 ApiResponse JSON；Accept 必须带 application/json 后端才写得出来
+  it('开流前失败时把后端 message 原样抛出', async () => {
+    stubFetch({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({ code: 400, message: '会话不存在或已删除: s-1', data: null }),
+    })
+
+    const consume = async () => {
+      for await (const token of chatStream('s-1', '你好')) {
+        void token
+      }
+    }
+
+    await expect(consume()).rejects.toThrow('会话不存在或已删除: s-1')
+    expect(new Headers(capturedInit?.headers).get('Accept')).toContain('application/json')
+    expect(handleAuthExpiredMock).not.toHaveBeenCalled()
+  })
+
+  it('开流前失败且响应体不是 JSON 时退回状态码', async () => {
+    stubFetch({ ok: false, status: 500, json: () => Promise.reject(new Error('not json')) })
+
+    const consume = async () => {
+      for await (const token of chatStream('s-1', '你好')) {
+        void token
+      }
+    }
+
+    await expect(consume()).rejects.toThrow('chat stream failed: HTTP 500')
+  })
 })

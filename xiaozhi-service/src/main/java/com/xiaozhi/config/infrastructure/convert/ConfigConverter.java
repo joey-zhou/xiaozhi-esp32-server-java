@@ -21,7 +21,7 @@ public class ConfigConverter {
                 d.getConfigName(), d.getConfigDesc(), d.getModelType(),
                 d.getAppId(), d.getApiKey(), d.getApiSecret(),
                 d.getAk(), d.getSk(), d.getApiUrl(),
-                d.getEnableThinking(),
+                d.getEnableThinking(), d.getContextLength(),
                 d.getState(), "1".equals(d.getIsDefault()),
                 d.getCreateTime(), d.getUpdateTime());
     }
@@ -45,6 +45,7 @@ public class ConfigConverter {
         d.setState(StringUtils.hasText(c.getState()) ? c.getState() : AiConfig.STATE_ENABLED);
         d.setIsDefault(c.isDefault() ? "1" : "0");
         d.setEnableThinking(c.getEnableThinking());
+        d.setContextLength(c.getContextLength());
         return d;
     }
 
@@ -68,6 +69,7 @@ public class ConfigConverter {
         bo.setState(c.getState());
         bo.setIsDefault(c.isDefault() ? "1" : "0");
         bo.setEnableThinking(c.getEnableThinking());
+        bo.setContextLength(c.getContextLength());
         bo.setCreateTime(c.getCreateTime());
         bo.setUpdateTime(c.getUpdateTime());
         return bo;

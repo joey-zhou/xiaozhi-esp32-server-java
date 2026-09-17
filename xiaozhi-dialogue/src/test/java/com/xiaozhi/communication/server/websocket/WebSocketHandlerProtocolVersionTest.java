@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketMessage;
 
 import java.nio.ByteBuffer;
 
@@ -57,8 +58,8 @@ class WebSocketHandlerProtocolVersionTest {
         handler.handleTextMessage(springSession, new TextMessage("{\"type\":\"hello\",\"version\":2}"));
 
         assertThat(chatSession.getProtocolVersion()).isEqualTo(2);
-        ArgumentCaptor<org.springframework.web.socket.WebSocketMessage<?>> captor =
-                ArgumentCaptor.forClass(org.springframework.web.socket.WebSocketMessage.class);
+        ArgumentCaptor<WebSocketMessage<?>> captor =
+                ArgumentCaptor.forClass(WebSocketMessage.class);
         verify(springSession).sendMessage(captor.capture());
         assertThat((String) captor.getValue().getPayload()).contains("\"version\":2");
     }
@@ -69,8 +70,8 @@ class WebSocketHandlerProtocolVersionTest {
 
         assertThat(chatSession.getProtocolVersion()).isEqualTo(1);
         // 回包里的 version 取自会话当前值，不能是写死的默认值
-        ArgumentCaptor<org.springframework.web.socket.WebSocketMessage<?>> captor =
-                ArgumentCaptor.forClass(org.springframework.web.socket.WebSocketMessage.class);
+        ArgumentCaptor<WebSocketMessage<?>> captor =
+                ArgumentCaptor.forClass(WebSocketMessage.class);
         verify(springSession).sendMessage(captor.capture());
         assertThat((String) captor.getValue().getPayload()).contains("\"version\":1");
     }
@@ -83,8 +84,8 @@ class WebSocketHandlerProtocolVersionTest {
         handler.handleTextMessage(springSession, new TextMessage("{\"type\":\"hello\"}"));
 
         assertThat(chatSession.getProtocolVersion()).isEqualTo(2);
-        ArgumentCaptor<org.springframework.web.socket.WebSocketMessage<?>> captor =
-                ArgumentCaptor.forClass(org.springframework.web.socket.WebSocketMessage.class);
+        ArgumentCaptor<WebSocketMessage<?>> captor =
+                ArgumentCaptor.forClass(WebSocketMessage.class);
         verify(springSession).sendMessage(captor.capture());
         assertThat((String) captor.getValue().getPayload()).contains("\"version\":2");
     }

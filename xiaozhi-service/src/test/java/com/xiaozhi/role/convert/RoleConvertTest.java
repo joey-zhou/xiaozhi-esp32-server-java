@@ -47,7 +47,6 @@ class RoleConvertTest {
         projection.setTtsProvider("edge");
         projection.setIsDefault("1");
         projection.setTotalDevice(2);
-        projection.setMemoryType("summary");
         projection.setCreateTime(LocalDateTime.of(2026, 1, 1, 0, 0));
         projection.setUpdateTime(LocalDateTime.of(2026, 9, 1, 0, 0));
 

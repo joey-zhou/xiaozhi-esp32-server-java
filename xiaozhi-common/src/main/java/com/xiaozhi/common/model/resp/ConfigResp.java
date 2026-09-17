@@ -45,6 +45,8 @@ public class ConfigResp {
 
     @Schema(description = "是否启用思考模式")
     private Boolean enableThinking;
+    /** 模型上下文长度(token)，对话按它做压缩预算 */
+    private Integer contextLength;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "创建时间")

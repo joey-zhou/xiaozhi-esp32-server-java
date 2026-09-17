@@ -5,13 +5,13 @@ import com.xiaozhi.common.model.req.RolePageReq;
 import com.xiaozhi.common.model.req.RoleUpdateReq;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.RoleResp;
+import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.role.convert.RoleConvert;
 import com.xiaozhi.role.domain.Role;
 import com.xiaozhi.role.domain.repository.RoleRepository;
 import com.xiaozhi.role.domain.vo.AudioConfig;
 import com.xiaozhi.role.domain.vo.LlmConfig;
-import com.xiaozhi.role.domain.vo.MemoryStrategy;
 import com.xiaozhi.role.domain.vo.VoiceConfig;
 import com.xiaozhi.role.service.RoleService;
 import jakarta.annotation.Resource;
@@ -55,7 +55,6 @@ public class RoleAppService {
                 new LlmConfig(req.getModelId(), req.getTemperature(), req.getTopP()),
                 new VoiceConfig(req.getTtsId(), req.getSttId(), req.getVoiceName(), req.getTtsPitch(), req.getTtsSpeed()),
                 new AudioConfig(req.getVadEnergyTh(), req.getVadSpeechTh(), req.getVadSilenceTh(), req.getVadSilenceMs()),
-                new MemoryStrategy(req.getMemoryType()),
                 "1".equals(req.getIsDefault()),
                 req.getInactiveTimeoutSeconds());
         roleRepository.save(role);
@@ -66,13 +65,12 @@ public class RoleAppService {
     @Transactional
     public RoleResp update(Integer roleId, RoleUpdateReq req) {
         Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new com.xiaozhi.common.exception.ResourceNotFoundException("角色不存在或无权访问"));
+                .orElseThrow(() -> new ResourceNotFoundException("角色不存在或无权访问"));
 
         role.update(req.getRoleName(), req.getRoleDesc(), req.getAvatar(),
                 new LlmConfig(req.getModelId(), req.getTemperature(), req.getTopP()),
                 new VoiceConfig(req.getTtsId(), req.getSttId(), req.getVoiceName(), req.getTtsPitch(), req.getTtsSpeed()),
                 new AudioConfig(req.getVadEnergyTh(), req.getVadSpeechTh(), req.getVadSilenceTh(), req.getVadSilenceMs()),
-                new MemoryStrategy(req.getMemoryType()),
                 req.getIsDefault() == null ? null : "1".equals(req.getIsDefault()),
                 req.getInactiveTimeoutSeconds());
         

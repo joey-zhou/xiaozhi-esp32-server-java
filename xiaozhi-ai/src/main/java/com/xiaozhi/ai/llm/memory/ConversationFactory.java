@@ -4,13 +4,24 @@ import com.xiaozhi.common.model.bo.RoleBO;
 
 public interface ConversationFactory {
     /**
-     * 不同的ChatMemory实现类，可以有不同的处理策略，可以初始化不同的Conversation子类。
+     * 设备对话：历史与摘要按 ownerId + roleId 跨会话延续。
      *
-     * @param ownerId   聊天参与者标识（设备场景: deviceId, Web 场景: userId）
+     * @param ownerId   设备 ID
      * @param userId    用户ID
      * @param role      角色
      * @param sessionId 会话ID
      * @return 会话
      */
     Conversation initConversation(String ownerId, Integer userId, RoleBO role, String sessionId);
+
+    /**
+     * Web 对话：历史与摘要按 sessionId 隔离，新会话为空，续接会拉到该会话的历史。
+     *
+     * @param ownerId   Web 聊天参与者标识
+     * @param userId    用户ID
+     * @param role      角色
+     * @param sessionId 会话ID
+     * @return 会话
+     */
+    Conversation initSessionConversation(String ownerId, Integer userId, RoleBO role, String sessionId);
 }

@@ -30,7 +30,6 @@
             FROM sys_device d
             WHERE d.roleId = r.roleId
         ) AS totalDevice,
-        r.memoryType,
         r.createTime,
         r.updateTime
     </sql>

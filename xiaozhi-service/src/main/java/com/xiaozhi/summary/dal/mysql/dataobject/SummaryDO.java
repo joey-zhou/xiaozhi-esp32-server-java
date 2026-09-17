@@ -11,6 +11,7 @@ public class SummaryDO {
 
     private String deviceId;
     private Integer roleId;
+    private String sessionId;
     private LocalDateTime lastMessageTimestamp;
     private String summary;
     private Integer promptTokens;

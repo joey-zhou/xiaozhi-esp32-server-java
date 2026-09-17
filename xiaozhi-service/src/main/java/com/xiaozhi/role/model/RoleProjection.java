@@ -31,7 +31,6 @@ public class RoleProjection {
     private String ttsProvider;
     private String isDefault;
     private Integer totalDevice;
-    private String memoryType;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

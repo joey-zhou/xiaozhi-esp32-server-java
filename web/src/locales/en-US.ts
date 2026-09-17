@@ -337,9 +337,6 @@ export default {
     confirmClearMemory: 'Are you sure to clear all conversation memory for this device? This operation cannot be undone.',
     clearMemory: 'Clear Memory',
     clearingMemory: 'Clearing memory...',
-    windowMemory: 'Window Memory',
-    summaryMemory: 'Summary Memory',
-    allMemory: 'All Memory',
   },
 
   role: {
@@ -442,11 +439,6 @@ export default {
     mcpRefresh: 'Refresh',
     mcpRefreshSuccess: 'Refreshed successfully',
     mcpSaveFailed: 'Failed to save tool selection',
-    // Memory type configuration
-    memoryTypeSettings: 'Memory Type Configuration',
-    memoryTypeLabel: 'Memory Type',
-    selectMemoryType: 'Please select memory type',
-    memoryTypeTip: 'Select the memory type for this role, different types have different storage and recall mechanisms',
 
     // MCP Tools
 
@@ -884,8 +876,7 @@ export default {
       ttsConfig: 'TTS Configuration',
       ossConfig: 'Storage Configuration',
       memoryManagement: 'Memory Management',
-      shortTermMemory: 'Short-term Memory',
-      summaryMemory: 'Memory Summary',
+      conversationRecords: 'Conversation Records',
       chat: 'Chat',
       account: 'Account',
       personalConfig: 'Settings',
@@ -943,6 +934,14 @@ export default {
     thinkingDone: 'Thought complete',
     thought: 'Thought',
     thoughtDuration: ' for {seconds}s',
+    rename: 'Rename',
+    renameConversation: 'Rename conversation',
+    titlePlaceholder: 'Enter a conversation title',
+    deleteConversation: 'Delete conversation',
+    deleteConversationHint: 'Its messages and summaries will be deleted too.',
+    deleteSelected: 'Delete selected ({count})',
+    renameFailed: 'Failed to rename: {error}',
+    deleteConversationsFailed: 'Failed to delete conversations: {error}',
     floating: {
       notLoggedIn: 'Please log in before chatting',
       roleChanged: 'Role switched',
@@ -988,6 +987,8 @@ export default {
   memory: {
     summary: 'Summary',
     content: 'Content',
-    needRoleAndDevice: 'Please create a role or bind a device first',
+    role: 'Role',
+    messagesTab: 'Messages',
+    summariesTab: 'Summaries',
   },
 }

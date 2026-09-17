@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 会话终止时清理 Persona 相关资源（上游合成订阅、播放器、Conversation 历史）。
+ * 会话终止时清理 Persona 相关资源（上游合成订阅、播放器），并把这段对话剩下的内容压进摘要。
  */
 @Slf4j
 @Component
@@ -48,7 +48,8 @@ public class PersonaCleanup {
         if (persona != null) {
             Conversation conversation = persona.getConversation();
             if (conversation != null) {
-                conversation.clear();
+                // 设备断开就是这段对话的结束：没到上限的剩余轮次在这里进摘要，否则短对话永远进不了摘要
+                conversation.flush();
             }
         }
     }

@@ -14,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -21,7 +22,9 @@ import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -47,35 +50,34 @@ class SummaryServiceImplTest {
     @InjectMocks
     private SummaryServiceImpl summaryService;
 
+    // 分页由 XML 的 JOIN 直出 BO（含设备名、角色名），Service 只透传条件与分页参数
     @Test
-    void pageReturnsDefaultEmptyResponseWhenInputInvalid() {
-        var result = summaryService.page(" ", null, null, null);
-
-        assertThat(result.getList()).isEmpty();
-        assertThat(result.getTotal()).isZero();
-        assertThat(result.getPageNo()).isEqualTo(1);
-        assertThat(result.getPageSize()).isEqualTo(10);
-        verifyNoInteractions(summaryMapper, summaryConvert);
-    }
-
-    @Test
-    void pageReturnsConvertedRecordsWhenInputValid() {
-        SummaryDO summaryDO = new SummaryDO();
+    void pagePassesScopeThroughAndReturnsRowsAsIs() {
         SummaryBO summaryBO = new SummaryBO();
-
-        Page<SummaryDO> page = new Page<>(2, 5);
-        page.setRecords(List.of(summaryDO));
+        Page<SummaryBO> page = new Page<>(2, 5);
+        page.setRecords(List.of(summaryBO));
         page.setTotal(7);
+        when(summaryMapper.selectPage(any(Page.class), eq("device-1"), eq(9), eq(1))).thenReturn(page);
 
-        when(summaryMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
-        when(summaryConvert.toBOList(List.of(summaryDO))).thenReturn(List.of(summaryBO));
-
-        var result = summaryService.page("device-1", 1, 2, 5);
+        var result = summaryService.page("device-1", 9, 1, 2, 5);
 
         assertThat(result.getList()).containsExactly(summaryBO);
         assertThat(result.getTotal()).isEqualTo(7);
         assertThat(result.getPageNo()).isEqualTo(2);
         assertThat(result.getPageSize()).isEqualTo(5);
+        verifyNoInteractions(summaryConvert);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void deleteBySessionIdsRemovesSummariesOfThoseSessions() {
+        when(summaryMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(2);
+
+        assertThat(summaryService.deleteBySessionIds(List.of("s-1"))).isEqualTo(2);
+
+        ArgumentCaptor<LambdaQueryWrapper<SummaryDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(summaryMapper).delete(captor.capture());
+        assertThat(captor.getValue().getTargetSql()).contains("sessionId IN");
     }
 
     @Test
@@ -95,6 +97,19 @@ class SummaryServiceImplTest {
         assertThat(captor.getValue().getPromptTokens()).isZero();
         assertThat(captor.getValue().getCompletionTokens()).isZero();
         assertThat(captor.getValue().getCreateTime()).isNotNull();
+    }
+
+    // 主键是设备、角色加批次最后一条消息的时间：另一个对话实例已经存过同一批的摘要时不算失败，否则这批会反复重试到被丢弃
+    @Test
+    void saveTreatsADuplicateOfTheSameBatchAsAlreadySaved() {
+        SummaryBO summary = new SummaryBO();
+        summary.setDeviceId("device-1");
+        summary.setRoleId(1);
+        summary.setLastMessageTimestamp(Instant.now());
+        when(summaryConvert.toDO(summary)).thenReturn(new SummaryDO());
+        when(summaryMapper.insert(any(SummaryDO.class))).thenThrow(new DuplicateKeyException("dup"));
+
+        assertThatCode(() -> summaryService.save(summary)).doesNotThrowAnyException();
     }
 
     @Test

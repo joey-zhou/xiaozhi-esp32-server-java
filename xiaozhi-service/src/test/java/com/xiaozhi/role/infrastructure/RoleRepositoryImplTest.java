@@ -8,7 +8,6 @@ import com.xiaozhi.role.dal.mysql.mapper.RoleMapper;
 import com.xiaozhi.role.domain.Role;
 import com.xiaozhi.role.domain.vo.AudioConfig;
 import com.xiaozhi.role.domain.vo.LlmConfig;
-import com.xiaozhi.role.domain.vo.MemoryStrategy;
 import com.xiaozhi.role.domain.vo.VoiceConfig;
 import com.xiaozhi.role.infrastructure.convert.RoleConverter;
 import com.xiaozhi.support.MybatisPlusTestHelper;
@@ -128,7 +127,7 @@ class RoleRepositoryImplTest {
     /** 用 newRole 工厂方法构造：只有它才会往聚合根上挂 UPDATED 信号，直接调重建用构造函数不会。 */
     private static Role newDefaultRole(Integer userId) {
         return Role.newRole(userId, "role", "desc", null,
-                LlmConfig.defaults(), VoiceConfig.defaults(), AudioConfig.defaults(), MemoryStrategy.defaults(),
+                LlmConfig.defaults(), VoiceConfig.defaults(), AudioConfig.defaults(),
                 true, null);
     }
 

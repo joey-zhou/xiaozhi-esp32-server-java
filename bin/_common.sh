@@ -150,6 +150,8 @@ start_service() {
   _info "  java: $java_bin"
   mkdir -p "$LOGS_DIR"
   rotate_console_log "$LOGS_DIR/$name.out"
+  # 记下启动前 .out 的大小，follow_logs 据此只输出本次启动之后的内容
+  printf -v "OUT_OFFSET_${name//-/_}" '%d' "$(( $(wc -c < "$LOGS_DIR/$name.out" 2>/dev/null || echo 0) ))"
 
   # cd 到 ROOT_DIR 启动，确保:
   #   1. Logback 配置中的 ./logs 写到 $ROOT_DIR/logs/
@@ -208,6 +210,45 @@ status_service() {
   fi
 }
 
+# ---- 跟随控制台日志 ----
+# follow_logs <name>... — 合并跟随多个服务的 logs/<name>.out，每行带服务名前缀
+# 刚由 start_service 启动的服务只输出本次启动之后的内容，其余服务先回显最近 30 行
+# Ctrl+C 只退出跟随，服务继续在后台运行
+follow_logs() {
+  local colors=("$CYAN" "$YELLOW" "$BLUE") pids=() name i=0
+  for name in "$@"; do
+    local file="$LOGS_DIR/$name.out" var="OUT_OFFSET_${name//-/_}" tag
+    if [[ ! -f "$file" ]]; then
+      _warn "$name 尚无控制台日志 (logs/$name.out)"
+      continue
+    fi
+    tag="$(printf '%b' "${colors[i % ${#colors[@]}]}[${name#xiaozhi-}]${NC} ")"
+    if [[ -n "${!var:-}" ]]; then
+      tail -c "+$(( ${!var} + 1 ))" -F "$file" 2>/dev/null > >(awk -v tag="$tag" '{ print tag $0; fflush() }') &
+    else
+      tail -n 30 -F "$file" 2>/dev/null > >(awk -v tag="$tag" '{ print tag $0; fflush() }') &
+    fi
+    pids+=("$!")
+    i=$((i + 1))
+  done
+  (( ${#pids[@]} > 0 )) || return 1
+
+  echo ""
+  _info "正在跟随日志，Ctrl+C 退出（服务不受影响）"
+  echo ""
+  # kill 后在 trap 里就地 wait 回收，否则 bash 会额外打印一行 "Terminated: 15 tail ..."
+  trap 'kill "${pids[@]}" 2>/dev/null; wait "${pids[@]}" 2>/dev/null; trap - INT TERM; echo ""; _info "已退出日志跟随，服务仍在后台运行"' INT TERM
+  wait "${pids[@]}" 2>/dev/null
+  trap - INT TERM
+}
+
+# ---- 启动后自动跟随日志 ----
+# follow_logs_if_tty <name>... — 只在交互终端里才跟随，管道/CI 等非交互场景直接返回
+follow_logs_if_tty() {
+  [[ -t 1 ]] || return 0
+  follow_logs "$@"
+}
+
 # ---- 重启 ----
 restart_service() {
   local name="$1" module="$2" port="$3" profile="$4"
@@ -219,10 +260,11 @@ restart_service() {
 # ---- 用法提示 ----
 usage() {
   local script="$1"
-  echo -e "用法: ${BOLD}$script${NC} <start|stop|restart|status> [dev|prod]"
-  echo "  start    编译并启动"
+  echo -e "用法: ${BOLD}$script${NC} <start|stop|restart|status|logs> [dev|prod]"
+  echo "  start    编译并启动，随后在终端里跟随日志（Ctrl+C 退出跟随，服务不受影响）"
   echo "  stop     停止"
-  echo "  restart  停止后重新编译并启动"
+  echo "  restart  停止后重新编译并启动，随后跟随日志"
   echo "  status   查看运行状态"
+  echo "  logs     跟随控制台日志"
   echo "  运行环境默认 dev；可在命令后加 prod，或先 export SPRING_PROFILES_ACTIVE=prod"
 }

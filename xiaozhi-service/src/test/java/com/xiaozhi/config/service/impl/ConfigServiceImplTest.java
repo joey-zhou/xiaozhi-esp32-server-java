@@ -1,6 +1,7 @@
 package com.xiaozhi.config.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -211,7 +212,7 @@ class ConfigServiceImplTest {
     @Test
     void saveAgentModelUpdatesTheLoadedAggregateWhenIdGiven() {
         AiConfig existing = AiConfig.reconstitute(9, 7, "llm", "coze", "bot-1", "旧说明", null,
-            null, null, null, null, null, null, null, ConfigBO.STATE_ENABLED, false, null, null);
+            null, null, null, null, null, null, null, null, ConfigBO.STATE_ENABLED, false, null, null);
         when(configRepository.findById(9)).thenReturn(Optional.of(existing));
 
         configService.saveAgentModel(new ConfigBO().setConfigId(9).setUserId(7).setConfigDesc("新说明"));

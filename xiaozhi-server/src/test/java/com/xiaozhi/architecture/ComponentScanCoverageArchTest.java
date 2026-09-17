@@ -5,6 +5,8 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import com.xiaozhi.DialogueApplication;
+import com.xiaozhi.XiaozhiApplication;
 import org.apache.ibatis.annotations.Mapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -58,8 +60,8 @@ class ComponentScanCoverageArchTest {
      * XiaozhiApplication 的 basePackages 对 xiaozhi-service 是"全量"扫描，不需要例外。
      */
     private static final Map<Class<?>, Set<String>> NOT_SCANNED_BY_DESIGN = Map.of(
-        com.xiaozhi.XiaozhiApplication.class, Set.of(),
-        com.xiaozhi.DialogueApplication.class, Set.of(
+        XiaozhiApplication.class, Set.of(),
+        DialogueApplication.class, Set.of(
             "com.xiaozhi.agent",
             "com.xiaozhi.authrole",
             "com.xiaozhi.authrolepermission",
@@ -93,28 +95,28 @@ class ComponentScanCoverageArchTest {
 
     @Test
     void serverEntryPointScansEveryInjectedPackage() {
-        assertThat(missingPackages(com.xiaozhi.XiaozhiApplication.class, serverRuntimeClasses))
+        assertThat(missingPackages(XiaozhiApplication.class, serverRuntimeClasses))
             .as("XiaozhiApplication 的 @ComponentScan/@MapperScan 漏了这些包，启动时注入会失败")
             .isEmpty();
     }
 
     @Test
     void dialogueEntryPointScansEveryInjectedPackage() {
-        assertThat(missingPackages(com.xiaozhi.DialogueApplication.class, dialogueRuntimeClasses))
+        assertThat(missingPackages(DialogueApplication.class, dialogueRuntimeClasses))
             .as("DialogueApplication 的 @ComponentScan/@MapperScan 漏了这些包，dialogue 进程启动时注入会失败")
             .isEmpty();
     }
 
     @Test
     void serverEntryPointScansEveryBeanPackage() {
-        assertThat(unscannedBeanPackages(com.xiaozhi.XiaozhiApplication.class, serverRuntimeClasses))
+        assertThat(unscannedBeanPackages(XiaozhiApplication.class, serverRuntimeClasses))
             .as("XiaozhiApplication 的 @ComponentScan/@MapperScan 漏了这些 bean 所在的包，且未登记进 NOT_SCANNED_BY_DESIGN")
             .isEmpty();
     }
 
     @Test
     void dialogueEntryPointScansEveryBeanPackage() {
-        assertThat(unscannedBeanPackages(com.xiaozhi.DialogueApplication.class, dialogueRuntimeClasses))
+        assertThat(unscannedBeanPackages(DialogueApplication.class, dialogueRuntimeClasses))
             .as("DialogueApplication 的 @ComponentScan/@MapperScan 漏了这些 bean 所在的包，且未登记进 NOT_SCANNED_BY_DESIGN")
             .isEmpty();
     }
@@ -125,7 +127,7 @@ class ComponentScanCoverageArchTest {
      */
     @Test
     void scanListsAndModulesAreActuallyRead() {
-        for (Class<?> entryPoint : List.of(com.xiaozhi.XiaozhiApplication.class, com.xiaozhi.DialogueApplication.class)) {
+        for (Class<?> entryPoint : List.of(XiaozhiApplication.class, DialogueApplication.class)) {
             assertThat(componentScanPackages(entryPoint))
                 .as(entryPoint.getSimpleName() + " 的 @ComponentScan 没读到")
                 .hasSizeGreaterThan(5);

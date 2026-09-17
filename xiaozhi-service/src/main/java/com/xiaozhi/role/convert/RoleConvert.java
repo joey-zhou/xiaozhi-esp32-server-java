@@ -48,7 +48,6 @@ public interface RoleConvert {
     @Mapping(target = "vadSpeechTh", source = "audioConfig.vadSpeechTh")
     @Mapping(target = "vadSilenceTh", source = "audioConfig.vadSilenceTh")
     @Mapping(target = "vadSilenceMs", source = "audioConfig.vadSilenceMs")
-    @Mapping(target = "memoryType", source = "memoryStrategy.type")
     @Mapping(target = "modelName", ignore = true)
     @Mapping(target = "modelProvider", ignore = true)
     @Mapping(target = "ttsProvider", ignore = true)

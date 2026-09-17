@@ -71,10 +71,11 @@ public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
                                 deviceWriter.bindRole(device.getDeviceId(), role.getRoleId());
                                 device.setRoleId(role.getRoleId());
                                 device.setRoleName(role.getRoleName());
-                                // 切换了角色，需要更换Conversation
+                                // 切换了角色，旧角色的对话到此结束：剩下的压成摘要，
+                                // 否则要等设备下次再用这个角色才有机会压缩
                                 Persona current = chatSession.getPersona();
                                 if(current != null && current.getConversation() != null){
-                                    current.getConversation().clear();
+                                    current.getConversation().flush();
                                 }
 
                                 // buildPersona 对已有 Persona 幂等，先摘掉旧的才会按新角色重建；

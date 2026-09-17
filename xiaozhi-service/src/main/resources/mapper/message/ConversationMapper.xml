@@ -1,48 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xiaozhi.message.dal.mysql.mapper.ConversationMapper">
-    <select id="selectConversationPage" resultType="com.xiaozhi.message.model.ConversationProjection">
-        SELECT
-            m.sessionId,
-            m.roleId,
-            r.roleName,
-            MAX(m.createTime) AS updateTime,
-            (SELECT message FROM sys_message sm WHERE sm.sessionId = m.sessionId AND sm.sender = 'user' AND sm.state = '1' ORDER BY sm.createTime ASC LIMIT 1) AS title
-        FROM sys_message m
-        LEFT JOIN sys_role r ON m.roleId = r.roleId
-        WHERE m.state = '1'
-        AND m.sessionId IS NOT NULL AND m.sessionId != ''
-        <if test="userId != null">
-            AND m.userId = #{userId}
-        </if>
-        <if test="roleId != null">
-            AND m.roleId = #{roleId}
-        </if>
-        <if test="source != null and source != ''">
-            AND m.source = #{source}
-        </if>
-        GROUP BY m.sessionId, m.roleId, r.roleName
-        ORDER BY MAX(m.createTime) DESC
-    </select>
 
-    <!-- 只统计会话组数，不关联 sys_role、不跑 title 相关子查询，供分页跳过自动 COUNT 时使用 -->
-    <select id="selectConversationCount" resultType="java.lang.Long">
-        SELECT COUNT(*) FROM (
-            SELECT 1
-            FROM sys_message m
-            WHERE m.state = '1'
-            AND m.sessionId IS NOT NULL AND m.sessionId != ''
-            <if test="userId != null">
-                AND m.userId = #{userId}
-            </if>
-            <if test="roleId != null">
-                AND m.roleId = #{roleId}
-            </if>
-            <if test="source != null and source != ''">
-                AND m.source = #{source}
-            </if>
-            GROUP BY m.sessionId, m.roleId
-        ) t
+    <!-- 当前用户的会话按最后对话时间倒序，带角色名 -->
+    <select id="selectPage" resultType="com.xiaozhi.common.model.bo.ConversationBO">
+        SELECT
+            c.sessionId,
+            c.userId,
+            c.roleId,
+            r.roleName,
+            c.title,
+            c.createTime,
+            c.updateTime
+        FROM sys_conversation c
+        LEFT JOIN sys_role r ON c.roleId = r.roleId
+        WHERE c.userId = #{userId}
+        <if test="roleId != null">
+            AND c.roleId = #{roleId}
+        </if>
+        ORDER BY c.updateTime DESC
     </select>
 </mapper>

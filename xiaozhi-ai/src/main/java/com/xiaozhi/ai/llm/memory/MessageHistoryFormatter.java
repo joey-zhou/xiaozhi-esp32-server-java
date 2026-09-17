@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  *       （不落文本内容，避免把未解析的 JSON 喂回摘要模型）</li>
  *   <li>其它 → {@code <TYPE>:<text>}</li>
  * </ul>
- * 原本此逻辑在 {@code SummaryConversation#summaryMessages}
+ * 摘要合成时把一批消息整理成这个格式。
  */
 public final class MessageHistoryFormatter {
 

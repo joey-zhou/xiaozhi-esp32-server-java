@@ -2,11 +2,12 @@ package com.xiaozhi.message.service;
 
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.PageResult;
-import com.xiaozhi.message.model.ConversationProjection;
 import com.xiaozhi.message.model.MessageProjection;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
@@ -17,11 +18,13 @@ public interface MessageService {
                                        Date startTime, Date endTime, Integer userId, String sessionId,
                                        String source);
 
-    PageResult<ConversationProjection> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source);
 
     void delete(Long messageId);
 
     int deleteByDeviceId(String deviceId);
+
+    /** 逻辑删除这些会话的全部消息。Web 会话没有录音，不清理文件。 */
+    int deleteBySessionIds(Collection<String> sessionIds);
 
     MessageBO getBO(Long messageId);
 
@@ -48,11 +51,17 @@ public interface MessageService {
     List<MessageBO> listHistoryAfter(String deviceId, Integer roleId, Instant time);
 
     /**
+     * 按 sessionId 查询 createTime 严格晚于 time 的历史消息，排序同 {@link #listHistoryAfter(String, Integer, Instant)}。
+     * 适用于 Web 场景（按会话隔离）；不做重载，漏写 roleId 时不会悄悄变成按会话查。
+     */
+    List<MessageBO> listSessionHistoryAfter(String sessionId, Instant time);
+
+    /**
      * 更新 assistant 消息的音频路径，并更新关联的 metrics 记录中的 ttsDuration。
      */
     void updateAssistantAudio(String deviceId, Integer roleId,
                               LocalDateTime createTime, String audioPath,
-                              java.math.BigDecimal ttsDuration);
+                              BigDecimal ttsDuration);
 
     /**
      * 把播放途中被打断的 assistant 消息截到用户听到的文本；spokenText 为空则连同 metrics 一起删除。

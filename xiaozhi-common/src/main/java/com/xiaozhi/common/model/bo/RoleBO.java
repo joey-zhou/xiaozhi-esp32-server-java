@@ -25,5 +25,4 @@ public class RoleBO {
     private Integer vadSilenceMs;
     private Integer inactiveTimeoutSeconds = 60;
     private String isDefault;
-    private String memoryType;
 }

@@ -3,13 +3,15 @@ package com.xiaozhi.summary.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.common.model.PageResult;
+import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.summary.convert.SummaryConvert;
 import com.xiaozhi.summary.dal.mysql.dataobject.SummaryDO;
 import com.xiaozhi.summary.dal.mysql.mapper.SummaryMapper;
 import com.xiaozhi.summary.service.SummaryService;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -18,13 +20,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
+import java.util.Collection;
 
+@Slf4j
 @Service
 public class SummaryServiceImpl implements SummaryService {
-
-    private static final int DEFAULT_PAGE_NO = 1;
-    private static final int DEFAULT_PAGE_SIZE = 10;
 
     @Resource
     private SummaryMapper summaryMapper;
@@ -33,24 +33,19 @@ public class SummaryServiceImpl implements SummaryService {
     private SummaryConvert summaryConvert;
 
     @Override
-    public PageResult<SummaryBO> page(String deviceId, Integer roleId, Integer pageNo, Integer pageSize) {
-        int currentPage = pageNo == null || pageNo < 1 ? DEFAULT_PAGE_NO : pageNo;
-        int currentSize = pageSize == null || pageSize < 1 ? DEFAULT_PAGE_SIZE : pageSize;
-        if (!StringUtils.hasText(deviceId) || roleId == null) {
-            return new PageResult<>(List.of(), 0L, currentPage, currentSize);
-        }
+    public PageResult<SummaryBO> page(String deviceId, Integer userId, Integer roleId, int pageNo, int pageSize) {
+        IPage<SummaryBO> result = summaryMapper.selectPage(new Page<>(pageNo, pageSize), deviceId, userId, roleId);
+        return new PageResult<>(result.getRecords(), result.getTotal(), pageNo, pageSize);
+    }
 
-        Page<SummaryDO> page = new Page<>(currentPage, currentSize);
-        IPage<SummaryDO> result = summaryMapper.selectPage(page, new LambdaQueryWrapper<SummaryDO>()
-            .eq(SummaryDO::getDeviceId, deviceId)
-            .eq(SummaryDO::getRoleId, roleId)
-            .orderByDesc(SummaryDO::getCreateTime));
-        return new PageResult<>(
-            summaryConvert.toBOList(result.getRecords()),
-            result.getTotal(),
-            Math.toIntExact(result.getCurrent()),
-            Math.toIntExact(result.getSize())
-        );
+    @Override
+    @Transactional
+    public int deleteBySessionIds(Collection<String> sessionIds) {
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return 0;
+        }
+        return summaryMapper.delete(new LambdaQueryWrapper<SummaryDO>()
+            .in(SummaryDO::getSessionId, sessionIds));
     }
 
     @Override
@@ -87,7 +82,14 @@ public class SummaryServiceImpl implements SummaryService {
         if (summaryDO.getCreateTime() == null) {
             summaryDO.setCreateTime(LocalDateTime.now());
         }
-        summaryMapper.insert(summaryDO);
+        try {
+            summaryMapper.insert(summaryDO);
+        } catch (DuplicateKeyException e) {
+            // 主键是设备、角色加批次最后一条消息的时间：同一段历史被两个对话实例各压缩了一次
+            // （两个标签页续接同一会话、重连时上一实例还在收尾），先到的那份已经落库，这份不必再存，也不算失败
+            log.info("摘要已由另一个对话实例保存，跳过: deviceId={}, roleId={}, lastMessageTimestamp={}",
+                summaryDO.getDeviceId(), summaryDO.getRoleId(), summaryDO.getLastMessageTimestamp());
+        }
     }
 
     @Override
@@ -109,6 +111,18 @@ public class SummaryServiceImpl implements SummaryService {
         SummaryDO summaryDO = summaryMapper.selectOne(new LambdaQueryWrapper<SummaryDO>()
             .eq(SummaryDO::getDeviceId, deviceId)
             .eq(SummaryDO::getRoleId, roleId)
+            .orderByDesc(SummaryDO::getCreateTime)
+            .last("LIMIT 1"));
+        return summaryConvert.toBO(summaryDO);
+    }
+
+    @Override
+    public SummaryBO findLastBySession(String sessionId) {
+        if (!StringUtils.hasText(sessionId)) {
+            return null;
+        }
+        SummaryDO summaryDO = summaryMapper.selectOne(new LambdaQueryWrapper<SummaryDO>()
+            .eq(SummaryDO::getSessionId, sessionId)
             .orderByDesc(SummaryDO::getCreateTime)
             .last("LIMIT 1"));
         return summaryConvert.toBO(summaryDO);

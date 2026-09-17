@@ -10,9 +10,7 @@ import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.event.ConversationHistoryClearedEvent;
 import com.xiaozhi.message.convert.MessageConvert;
 import com.xiaozhi.message.dal.mysql.dataobject.MessageDO;
-import com.xiaozhi.message.dal.mysql.mapper.ConversationMapper;
 import com.xiaozhi.message.dal.mysql.mapper.MessageMapper;
-import com.xiaozhi.message.model.ConversationProjection;
 import com.xiaozhi.message.model.MessageProjection;
 import com.xiaozhi.storage.service.StorageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
@@ -31,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -60,9 +59,6 @@ class MessageServiceImplTest {
 
     @Mock
     private MessageMapper messageMapper;
-
-    @Mock
-    private ConversationMapper conversationMapper;
 
     @Mock
     private MessageConvert messageConvert;
@@ -119,27 +115,25 @@ class MessageServiceImplTest {
         assertThat(result.getPageSize()).isEqualTo(5);
     }
 
+    // 删会话时按 sessionId 逻辑删除，只动还没删过的消息
     @Test
-    void conversationPageReturnsProjectionRecordsUntouched() {
-        ConversationProjection projection = new ConversationProjection();
-        projection.setSessionId("s-1");
-        projection.setTitle("今天天气怎么样");
+    @SuppressWarnings("unchecked")
+    void deleteBySessionIdsSoftDeletesEnabledMessagesOfThoseSessions() {
+        when(messageMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(4);
 
-        Page<ConversationProjection> page = new Page<>(1, 10);
-        page.setRecords(List.of(projection));
+        assertThat(messageService.deleteBySessionIds(List.of("s-1", "s-2"))).isEqualTo(4);
 
-        when(conversationMapper.selectConversationPage(any(Page.class), eq(7), eq(3), eq("web"))).thenReturn(page);
-        when(conversationMapper.selectConversationCount(7, 3, "web")).thenReturn(42L);
+        ArgumentCaptor<LambdaUpdateWrapper<MessageDO>> captor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(messageMapper).update(isNull(), captor.capture());
+        assertThat(captor.getValue().getTargetSql()).contains("sessionId IN").contains("state =");
+        assertThat(captor.getValue().getSqlSet()).contains("state");
+    }
 
-        PageResult<ConversationProjection> result = messageService.conversationPage(1, 10, 7, 3, "web");
+    @Test
+    void deleteBySessionIdsWithoutSessionsSkipsTheDatabase() {
+        assertThat(messageService.deleteBySessionIds(List.of())).isZero();
 
-        assertThat(result.getList()).containsExactly(projection);
-        // 总数走轻量 count 查询，不能再依赖 MyBatis-Plus 对带子查询的主查询自动 COUNT
-        assertThat(result.getTotal()).isEqualTo(42);
-
-        ArgumentCaptor<Page<ConversationProjection>> pageCaptor = ArgumentCaptor.forClass(Page.class);
-        verify(conversationMapper).selectConversationPage(pageCaptor.capture(), eq(7), eq(3), eq("web"));
-        assertThat(pageCaptor.getValue().searchCount()).isFalse();
+        verifyNoInteractions(messageMapper);
     }
 
     /**
@@ -218,7 +212,7 @@ class MessageServiceImplTest {
     void deleteMarksMessageAsDeletedWhenMessageExists() {
         MessageDO messageDO = new MessageDO();
         messageDO.setMessageId(1L);
-        var messageBO = new com.xiaozhi.common.model.bo.MessageBO();
+        var messageBO = new MessageBO();
         messageBO.setMessageId(1L);
         messageBO.setAudioPath("");
 
@@ -323,7 +317,7 @@ class MessageServiceImplTest {
         int purged = messageService.purgeExpiredAudio(30, 1);
 
         assertThat(purged).isEqualTo(2);
-        verify(messageMapper, org.mockito.Mockito.times(2)).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(messageMapper, times(2)).update(isNull(), any(LambdaUpdateWrapper.class));
     }
 
     @Test
@@ -360,7 +354,7 @@ class MessageServiceImplTest {
         assertThat(messageDO.getMessage())
             .hasSizeLessThan(40000)
             .endsWith("...(内容过长已截断)");
-        assertThat(messageDO.getMessage().getBytes(java.nio.charset.StandardCharsets.UTF_8).length)
+        assertThat(messageDO.getMessage().getBytes(StandardCharsets.UTF_8).length)
             .isLessThanOrEqualTo(65000);
         assertThat(messageDO.getToolCalls()).endsWith("...(内容过长已截断)");
     }

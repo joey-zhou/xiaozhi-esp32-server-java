@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # 所有服务管理脚本（server + dialogue）
-# 用法: bin/all.sh <start|stop|restart|status> [dev|prod]，运行环境默认 dev
+# 用法: bin/all.sh <start|stop|restart|status|logs> [dev|prod]，运行环境默认 dev
 # =============================================================================
 source "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 
@@ -13,6 +13,7 @@ case "${1:-}" in
     start_service "xiaozhi-dialogue" "xiaozhi-dialogue" 8092 "$PROFILE"
     echo ""
     _ok "全部启动完成"
+    follow_logs_if_tty "xiaozhi-server" "xiaozhi-dialogue"
     ;;
   stop)
     stop_service "xiaozhi-server"
@@ -29,6 +30,7 @@ case "${1:-}" in
     start_service "xiaozhi-dialogue" "xiaozhi-dialogue" 8092 "$PROFILE"
     echo ""
     _ok "全部重启完成"
+    follow_logs_if_tty "xiaozhi-server" "xiaozhi-dialogue"
     ;;
   status)
     echo ""
@@ -36,9 +38,11 @@ case "${1:-}" in
     status_service "xiaozhi-dialogue" 8092
     echo ""
     ;;
+  logs)
+    follow_logs "xiaozhi-server" "xiaozhi-dialogue"
+    ;;
   *)
-    echo -e "用法: ${BOLD}bin/all.sh${NC} <start|stop|restart|status> [dev|prod]"
-    echo "  运行环境默认 dev；可在命令后加 prod，或先 export SPRING_PROFILES_ACTIVE=prod"
+    usage "bin/all.sh"
     exit 1
     ;;
 esac

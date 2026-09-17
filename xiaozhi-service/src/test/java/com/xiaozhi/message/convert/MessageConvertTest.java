@@ -2,7 +2,7 @@ package com.xiaozhi.message.convert;
 
 import com.xiaozhi.common.model.resp.ConversationResp;
 import com.xiaozhi.common.model.resp.MessageResp;
-import com.xiaozhi.message.model.ConversationProjection;
+import com.xiaozhi.message.dal.mysql.dataobject.ConversationDO;
 import com.xiaozhi.message.model.MessageProjection;
 import org.junit.jupiter.api.Test;
 
@@ -42,17 +42,23 @@ class MessageConvertTest {
         assertThat(resp.getMessageId()).isEqualTo(123456L);
     }
 
+    // 会话表的列经 BO 带到 Resp；角色名不在会话表里，留给接口层补
     @Test
-    void toRespFromConversationProjectionCarriesEveryColumn() {
-        ConversationProjection projection = new ConversationProjection();
-        projection.setSessionId("s-1");
-        projection.setRoleId(3);
-        projection.setRoleName("小智");
-        projection.setTitle("今天天气怎么样");
-        projection.setUpdateTime(LocalDateTime.of(2025, 9, 4, 22, 13, 20));
+    void conversationCarriesEveryColumnThroughToResp() {
+        ConversationDO conversation = new ConversationDO();
+        conversation.setSessionId("s-1");
+        conversation.setUserId(7);
+        conversation.setRoleId(3);
+        conversation.setTitle("今天天气怎么样");
+        conversation.setCreateTime(LocalDateTime.of(2025, 9, 4, 22, 0));
+        conversation.setUpdateTime(LocalDateTime.of(2025, 9, 4, 22, 13, 20));
 
-        ConversationResp resp = convert.toResp(projection);
+        ConversationResp resp = convert.toResp(convert.toBO(conversation));
 
-        assertThat(resp).usingRecursiveComparison().isEqualTo(projection);
+        assertThat(resp.getSessionId()).isEqualTo("s-1");
+        assertThat(resp.getRoleId()).isEqualTo(3);
+        assertThat(resp.getTitle()).isEqualTo("今天天气怎么样");
+        assertThat(resp.getUpdateTime()).isEqualTo(conversation.getUpdateTime());
+        assertThat(resp.getRoleName()).isNull();
     }
 }

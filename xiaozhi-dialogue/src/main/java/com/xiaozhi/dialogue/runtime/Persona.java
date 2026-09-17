@@ -3,6 +3,7 @@ package com.xiaozhi.dialogue.runtime;
 import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
+import com.xiaozhi.ai.llm.memory.ChatMemory;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.memory.ConversationContext;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
@@ -169,9 +170,6 @@ public class Persona {
      */
     private Flux<ChatResponse> chatStream(Turn turn, boolean useFunctionCall) {
         try {
-            UserMessage userMessage = turn.userMessage;
-            String ownerId = conversation.getOwnerId();
-
             // 从 ToolsSessionHolder 获取实时工具列表（包含后注册的设备 MCP 工具）
             List<ToolCallback> liveTools = getSession().getToolsSessionHolder().getAllFunction();
 
@@ -180,7 +178,7 @@ public class Persona {
             ChatOptions chatOptions = ToolCallingChatOptions.builder()
                     .toolCallbacks(effectiveTools)
                     .toolContext(TOOL_CONTEXT_SESSION_ID_KEY, sessionId)
-                    .toolContext("deviceId", ownerId)
+                    .toolContext("deviceId", conversation.getOwnerId())
                     .toolContext("conversationTimestamp", turn.turnId)
                     .build();
 
@@ -211,7 +209,7 @@ public class Persona {
             });
             return new MessageAggregator().aggregate(chatFlux, chatResponse -> completeTurn(turn, chatResponse));
         } catch (Exception e) {
-            // 工具路由、RAG 召回、记忆装配都在订阅时同步跑，抛到这里等于本轮只剩内存里的用户消息，
+            // 取工具表、记忆装配都在订阅时同步跑，抛到这里等于本轮只剩内存里的用户消息，
             // 必须自己收尾，否则聊天记录里这一轮彻底消失
             listener.onError(e);
             // 准备期就失败时先把阶段推到生成中，failTurn 的 CAS 才生效
@@ -235,6 +233,10 @@ public class Persona {
             }
             AssistantMessage assistant = stripMetaTags(chatResponse.getResult().getOutput());
             Usage usage = chatResponse.getMetadata() != null ? chatResponse.getMetadata().getUsage() : null;
+            if (usage != null) {
+                // 与落库的是同一份用量，对话据此判断上下文是否超限
+                assistant.getMetadata().put(ChatMemory.USAGE_KEY, usage);
+            }
             DialogueTurn dialogueTurn = buildTurn(turn, assistant, usage, snapshot, false);
             commitTurn(turn, dialogueTurn, snapshot.chains());
             turn.completedTurn = dialogueTurn;
@@ -479,7 +481,7 @@ public class Persona {
             return;
         }
 
-        // 工具路由、RAG 召回都在订阅时才执行，准备期间被打断就不再调 LLM
+        // 取工具表在订阅时才执行，准备期间被打断就不再调 LLM
         Flux<ChatResponse> chatResponseFlux = Flux.defer(() -> chatStream(turn, useFunctionCall));
         Flux<ChatToken> tokenFlux = TextChatService.toChatTokens(chatResponseFlux);
         // 设备对话管道：过滤掉思考内容，只将正式回复传给语音合成，括号舞台指示与元数据标签整组去掉
@@ -541,7 +543,7 @@ public class Persona {
         player.setFunctionAfterChat(() -> {
             session.setPersona(null);
             session.setPlayer(null);
-            conversation.clear();
+            conversation.flush();
             if (sessionManager != null) {
                 sessionManager.closeSession(session);
             } else {

@@ -38,6 +38,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -106,7 +108,7 @@ public class DeviceAppService {
         }
 
         // 设备已存在：幂等返回（同一用户）或抛出冲突
-        java.util.Optional<Device> existingDevice = deviceRepository.findById(verifyCode.deviceId());
+        Optional<Device> existingDevice = deviceRepository.findById(verifyCode.deviceId());
         if (existingDevice.isPresent()) {
             Device d = existingDevice.get();
             if (userId != null && userId.equals(d.getUserId())) {
@@ -145,7 +147,7 @@ public class DeviceAppService {
         }
 
         // 设备已存在：幂等返回（同一用户）或抛出冲突
-        java.util.Optional<Device> existingDevice = deviceRepository.findById(deviceId);
+        Optional<Device> existingDevice = deviceRepository.findById(deviceId);
         if (existingDevice.isPresent()) {
             Device d = existingDevice.get();
             if (userId != null && userId.equals(d.getUserId())) {

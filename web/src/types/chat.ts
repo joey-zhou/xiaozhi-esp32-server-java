@@ -2,6 +2,8 @@
  * Web 聊天相关类型定义
  */
 
+import type { PageQueryParams } from './api'
+
 /**
  * LLM 流式输出的 Token 单元，区分思考过程和正式回复；error 表示模型调用失败，text 是失败原因
  */
@@ -28,4 +30,24 @@ export interface ChatMessage {
   timestamp: Date
   /** 流式接收中 */
   streaming?: boolean
+}
+
+/**
+ * 网页聊天会话（对齐后端 ConversationResp）
+ */
+export interface Conversation {
+  sessionId: string
+  roleId: number
+  roleName: string
+  /** 默认取第一句话的开头，可重命名；为空时显示「新对话」 */
+  title: string | null
+  /** 最后一次对话的时间 */
+  updateTime: string
+}
+
+/**
+ * 会话查询参数（对齐后端 ConversationPageReq）
+ */
+export interface ConversationQueryParams extends PageQueryParams {
+  roleId?: number
 }

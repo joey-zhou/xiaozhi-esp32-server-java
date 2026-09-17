@@ -9,6 +9,7 @@ import com.xiaozhi.utils.AudioUtils;
 
 import java.io.*;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -236,7 +237,7 @@ public class SherpaOnnxTtsService implements TtsService {
             return false;
         });
         if (files == null || files.length == 0) {
-            throw new RuntimeException("未找到匹配 " + java.util.Arrays.toString(patterns) + " 的 .onnx 文件，目录: " + dir.getAbsolutePath());
+            throw new RuntimeException("未找到匹配 " + Arrays.toString(patterns) + " 的 .onnx 文件，目录: " + dir.getAbsolutePath());
         }
         return files[0].getAbsolutePath();
     }

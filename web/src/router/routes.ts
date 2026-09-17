@@ -11,7 +11,6 @@ export const ROUTES = {
   ROLE: '/role',
   TEMPLATE: '/template',
   MEMORY_CHAT: '/memory/chat',
-  MEMORY_SUMMARY: '/memory/summary',
   AUTH_ROLE: '/auth-role',
   SETTING_ACCOUNT: '/setting/account',
   ERROR_403: '/403',

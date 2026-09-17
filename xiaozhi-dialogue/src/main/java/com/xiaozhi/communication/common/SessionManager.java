@@ -24,6 +24,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
@@ -305,7 +306,7 @@ public class SessionManager {
     public void updateLastActivity(String sessionId) {
         ChatSession session = sessions.get(sessionId);
         if (session != null) {
-            session.setLastActivityTime(java.time.Instant.now());
+            session.setLastActivityTime(Instant.now());
         }
     }
 

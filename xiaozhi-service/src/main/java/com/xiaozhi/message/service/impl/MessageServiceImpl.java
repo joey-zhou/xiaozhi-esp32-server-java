@@ -11,9 +11,7 @@ import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.event.ConversationHistoryClearedEvent;
 import com.xiaozhi.message.convert.MessageConvert;
 import com.xiaozhi.message.dal.mysql.dataobject.MessageDO;
-import com.xiaozhi.message.dal.mysql.mapper.ConversationMapper;
 import com.xiaozhi.message.dal.mysql.mapper.MessageMapper;
-import com.xiaozhi.message.model.ConversationProjection;
 import com.xiaozhi.message.model.MessageProjection;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.storage.service.StorageService;
@@ -36,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -59,9 +58,6 @@ public class MessageServiceImpl implements MessageService {
     @Resource
     private ApplicationEventPublisher eventPublisher;
 
-    @Resource
-    private ConversationMapper conversationMapper;
-
     @Override
     public PageResult<MessageProjection> page(int pageNo, int pageSize, String deviceId, String deviceName,
                                               String sender, String messageType, Integer roleId,
@@ -73,14 +69,15 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public PageResult<ConversationProjection> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source) {
-        Page<ConversationProjection> page = new Page<>(pageNo, pageSize);
-        // 主查询是 GROUP BY + 相关子查询，MyBatis-Plus 自动 COUNT 会把整段再跑一遍；
-        // 关掉自动 COUNT，改用不带子查询的轻量统计
-        page.setSearchCount(false);
-        long total = conversationMapper.selectConversationCount(userId, roleId, source);
-        IPage<ConversationProjection> iPage = conversationMapper.selectConversationPage(page, userId, roleId, source);
-        return new PageResult<>(iPage.getRecords(), total, pageNo, pageSize);
+    @Transactional
+    public int deleteBySessionIds(Collection<String> sessionIds) {
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return 0;
+        }
+        return messageMapper.update(null, new LambdaUpdateWrapper<MessageDO>()
+            .in(MessageDO::getSessionId, sessionIds)
+            .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
+            .set(MessageDO::getState, MessageBO.STATE_DELETED));
     }
 
     @Override
@@ -276,12 +273,27 @@ public class MessageServiceImpl implements MessageService {
         if (!StringUtils.hasText(deviceId) || roleId == null || time == null) {
             return Collections.emptyList();
         }
-        LocalDateTime createTime = LocalDateTime.ofInstant(time, ZoneId.systemDefault());
-        // 按时间倒序取最近 N 条再翻正序：积压超限时优先保留离当前对话最近的历史
-        List<MessageBO> desc = messageMapper.selectList(new LambdaQueryWrapper<MessageDO>()
-                .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
+        return latestAfter(new LambdaQueryWrapper<MessageDO>()
                 .eq(MessageDO::getDeviceId, deviceId)
-                .eq(MessageDO::getRoleId, roleId)
+                .eq(MessageDO::getRoleId, roleId), time);
+    }
+
+    @Override
+    public List<MessageBO> listSessionHistoryAfter(String sessionId, Instant time) {
+        if (!StringUtils.hasText(sessionId) || time == null) {
+            return Collections.emptyList();
+        }
+        return latestAfter(new LambdaQueryWrapper<MessageDO>()
+                .eq(MessageDO::getSessionId, sessionId), time);
+    }
+
+    /**
+     * 按时间倒序取最近 N 条再翻正序：积压超限时优先保留离当前对话最近的历史
+     */
+    private List<MessageBO> latestAfter(LambdaQueryWrapper<MessageDO> filter, Instant time) {
+        LocalDateTime createTime = LocalDateTime.ofInstant(time, ZoneId.systemDefault());
+        List<MessageBO> desc = messageMapper.selectList(filter
+                .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
                 .gt(MessageDO::getCreateTime, createTime)
                 .orderByDesc(MessageDO::getCreateTime)
                 .orderByDesc(MessageDO::getMessageId)

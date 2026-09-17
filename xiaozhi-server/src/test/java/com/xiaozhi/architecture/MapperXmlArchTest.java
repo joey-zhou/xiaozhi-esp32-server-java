@@ -41,8 +41,9 @@ class MapperXmlArchTest {
     private static final Set<String> STATEMENT_INVENTORY = Set.of(
         "com.xiaozhi.authrolepermission.dal.mysql.mapper.AuthRolePermissionMapper#insertBatch",
         "com.xiaozhi.device.dal.mysql.mapper.DeviceMapper#selectPage",
-        "com.xiaozhi.message.dal.mysql.mapper.ConversationMapper#selectConversationCount",
-        "com.xiaozhi.message.dal.mysql.mapper.ConversationMapper#selectConversationPage",
+        // 会话与摘要两个列表页 JOIN 设备/角色表直出名字
+        "com.xiaozhi.message.dal.mysql.mapper.ConversationMapper#selectPage",
+        "com.xiaozhi.summary.dal.mysql.mapper.SummaryMapper#selectPage",
         "com.xiaozhi.message.dal.mysql.mapper.MessageMapper#selectPage",
         "com.xiaozhi.role.dal.mysql.mapper.RoleMapper#selectPage",
         "com.xiaozhi.user.dal.mysql.mapper.UserMapper#selectPage"

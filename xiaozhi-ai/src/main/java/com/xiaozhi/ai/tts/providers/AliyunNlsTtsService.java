@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -216,7 +217,7 @@ public class AliyunNlsTtsService implements TtsService {
                 synthesizer.start();
 
                 // 设置超时时间，避免无限等待
-                if (!latch.await(30, java.util.concurrent.TimeUnit.SECONDS)) {
+                if (!latch.await(30, TimeUnit.SECONDS)) {
                     log.error("NLS语音合成超时");
                     throw new RuntimeException("语音合成超时");
                 }

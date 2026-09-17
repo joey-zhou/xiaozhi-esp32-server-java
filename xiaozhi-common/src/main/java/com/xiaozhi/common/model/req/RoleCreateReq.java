@@ -89,6 +89,4 @@ public class RoleCreateReq {
     @Schema(description = "是否默认角色(1是 0否)")
     private String isDefault;
 
-    @Schema(description = "记忆类型")
-    private String memoryType;
 }

@@ -20,6 +20,7 @@ import com.xiaozhi.device.support.DeviceCacheKeys;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.Cache;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -71,7 +72,7 @@ public class DeviceServiceImpl implements DeviceService {
             return null;
         }
         String cacheKey = DeviceCacheKeys.of(deviceId);
-        org.springframework.cache.Cache cache = cacheManager.getCache(CacheNames.DEVICE);
+        Cache cache = cacheManager.getCache(CacheNames.DEVICE);
         return cacheHelper.getWithLock(
             "device:" + cacheKey,
             () -> cache == null ? null : cache.get(cacheKey, DeviceBO.class),
@@ -93,6 +94,18 @@ public class DeviceServiceImpl implements DeviceService {
         }
         return deviceMapper.selectList(new LambdaQueryWrapper<DeviceDO>()
                 .in(DeviceDO::getDeviceId, deviceIds))
+            .stream()
+            .map(deviceConvert::toBO)
+            .toList();
+    }
+
+    @Override
+    public List<DeviceBO> listByUserId(Integer userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        return deviceMapper.selectList(new LambdaQueryWrapper<DeviceDO>()
+                .eq(DeviceDO::getUserId, userId))
             .stream()
             .map(deviceConvert::toBO)
             .toList();

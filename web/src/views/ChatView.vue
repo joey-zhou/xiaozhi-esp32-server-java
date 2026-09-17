@@ -1,20 +1,22 @@
 <script setup lang="ts">
 import { ref, nextTick, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Modal } from 'ant-design-vue'
 import {
   PlusOutlined,
   ClockCircleOutlined,
   DeleteOutlined,
   DownOutlined,
   CheckOutlined,
-  SettingOutlined,
+  EditOutlined,
+  MoreOutlined,
   MenuFoldOutlined,
 } from '@ant-design/icons-vue'
 import { useSelectLoadMore } from '@/composables/useSelectLoadMore'
 import { useChatSession } from '@/composables/useChatSession'
 import { queryRoles } from '@/services/role'
 import { formatShortDateTime } from '@/utils/date'
-import type { Conversation } from '@/types/message'
+import type { Conversation } from '@/types/chat'
 import type { Role } from '@/types/role'
 import ChatMessageItem from '@/components/chat/ChatMessageItem.vue'
 import ChatComposer from '@/components/chat/ChatComposer.vue'
@@ -31,6 +33,8 @@ const {
   thinkingExpanded,
   loadConversations,
   selectConversation: selectConversationRaw,
+  renameConversation,
+  removeConversations,
   startNewChat,
   sendMessage: sendMessageToSession,
   stopGeneration,
@@ -57,12 +61,102 @@ watch(roles, (newRoles) => {
 }, { immediate: true })
 
 // UI 状态：历史记录抽屉
-const showHistory = ref(false)
+const HISTORY_WIDTH = 320
+const showHistory = ref(true)
+
+const contentPaddingRight = computed(() => (showHistory.value ? `${HISTORY_WIDTH}px` : '0'))
 
 function toggleHistory() {
   showHistory.value = !showHistory.value
   if (showHistory.value && conversations.value.length === 0) {
     loadConversations()
+  }
+}
+
+// 批量删除：进入选择模式后点会话是勾选，不是切换
+const selecting = ref(false)
+const selectedSessionIds = ref<string[]>([])
+
+function exitSelecting() {
+  selecting.value = false
+  selectedSessionIds.value = []
+}
+
+function toggleSelecting() {
+  if (selecting.value) {
+    exitSelecting()
+  } else {
+    selecting.value = true
+  }
+}
+
+function toggleSelected(id: string) {
+  const index = selectedSessionIds.value.indexOf(id)
+  if (index < 0) {
+    selectedSessionIds.value.push(id)
+  } else {
+    selectedSessionIds.value.splice(index, 1)
+  }
+}
+
+watch(showHistory, (open) => {
+  if (!open) exitSelecting()
+})
+
+async function deleteSelected() {
+  if (selectedSessionIds.value.length === 0) return
+  if (await removeConversations([...selectedSessionIds.value])) {
+    exitSelecting()
+  }
+}
+
+function confirmDelete(conv: Conversation) {
+  Modal.confirm({
+    title: t('chat.deleteConversation'),
+    content: t('chat.deleteConversationHint'),
+    okText: t('common.delete'),
+    okType: 'danger',
+    cancelText: t('common.cancel'),
+    onOk: () => removeConversations([conv.sessionId]),
+  })
+}
+
+// 重命名
+const renameTarget = ref<Conversation | null>(null)
+const renameTitle = ref('')
+const renaming = ref(false)
+
+const renameOpen = computed({
+  get: () => renameTarget.value !== null,
+  set: (open: boolean) => {
+    if (!open) renameTarget.value = null
+  },
+})
+
+function openRename(conv: Conversation) {
+  renameTarget.value = conv
+  renameTitle.value = conv.title ?? ''
+}
+
+async function submitRename() {
+  const target = renameTarget.value
+  const title = renameTitle.value.trim()
+  if (!target || !title || renaming.value) return
+  renaming.value = true
+  try {
+    if (await renameConversation(target, title)) {
+      renameTarget.value = null
+    }
+  } finally {
+    renaming.value = false
+  }
+}
+
+function onConversationAction(conv: Conversation, key: string) {
+  if (key === 'rename') {
+    openRename(conv)
+  } else if (key === 'delete') {
+    confirmDelete(conv)
   }
 }
 
@@ -132,6 +226,14 @@ async function selectConversation(conv: Conversation) {
   const switched = await selectConversationRaw(conv, () => forceScrollToBottom(true))
   if (switched) {
     selectedRoleId.value = conv.roleId
+  }
+}
+
+function onHistoryItemClick(conv: Conversation) {
+  if (selecting.value) {
+    toggleSelected(conv.sessionId)
+  } else {
+    void selectConversation(conv)
   }
 }
 
@@ -212,19 +314,15 @@ async function sendMessage() {
             {{ t('chat.newChat') }}
           </a-button>
           <a-divider type="vertical" />
-          <a-button type="text" @click="toggleHistory">
+          <a-button type="text" :title="t('chat.history')" @click="toggleHistory">
             <template #icon><ClockCircleOutlined /></template>
-          </a-button>
-          <a-divider type="vertical" />
-          <a-button type="text">
-            <template #icon><SettingOutlined /></template>
           </a-button>
         </a-space>
       </a-flex>
     </a-layout-header>
 
     <!-- 主体对话区域 -->
-    <div class="chat-content" :style="{ paddingRight: showHistory ? '320px' : '0' }">
+    <div class="chat-content" :style="{ paddingRight: contentPaddingRight }">
       <!-- 消息列表 -->
       <div class="chat-messages" ref="chatContainerRef" @scroll="onMessagesScroll">
         <div class="chat-messages-inner">
@@ -266,12 +364,12 @@ async function sendMessage() {
         v-model:open="showHistory"
         :title="t('chat.history')"
         placement="right"
-        :width="320"
+        :width="HISTORY_WIDTH"
         :mask="false"
         :mask-closable="false"
         :closable="false"
         :get-container="false"
-        :content-wrapper-style="{ width: '320px' }"
+        :content-wrapper-style="{ width: `${HISTORY_WIDTH}px` }"
       >
         <template #extra>
           <a-space>
@@ -279,7 +377,14 @@ async function sendMessage() {
               <template #icon><MenuFoldOutlined :rotate="180" /></template>
             </a-button>
             <a-divider type="vertical" />
-            <a-button type="text" size="small" :title="t('chat.batchDelete')">
+            <a-button
+              type="text"
+              size="small"
+              :title="t('chat.batchDelete')"
+              :class="{ 'batch-active': selecting }"
+              :disabled="conversations.length === 0"
+              @click="toggleSelecting"
+            >
               <template #icon><DeleteOutlined /></template>
             </a-button>
           </a-space>
@@ -292,24 +397,79 @@ async function sendMessage() {
               :key="conv.sessionId"
               :color="sessionId === conv.sessionId ? '#1677ff' : 'gray'"
             >
-              <button
-                type="button"
-                class="history-item"
-                :class="{ active: sessionId === conv.sessionId }"
-                @click="selectConversation(conv)"
-              >
-                <a-typography-paragraph :ellipsis="{ rows: 2 }" :content="conv.title || t('chat.newConversation')" :style="{ marginBottom: '4px' }" />
-                <a-flex justify="space-between" class="history-item-meta">
-                  <span>{{ conv.roleName }}</span>
-                  <span>{{ formatShortDateTime(conv.updateTime) }}</span>
-                </a-flex>
-              </button>
+              <div class="history-row">
+                <a-checkbox
+                  v-if="selecting"
+                  :checked="selectedSessionIds.includes(conv.sessionId)"
+                  class="history-check"
+                  @change="toggleSelected(conv.sessionId)"
+                />
+                <button
+                  type="button"
+                  class="history-item"
+                  :class="{ active: !selecting && sessionId === conv.sessionId }"
+                  @click="onHistoryItemClick(conv)"
+                >
+                  <a-typography-paragraph :ellipsis="{ rows: 2 }" :content="conv.title || t('chat.newConversation')" :style="{ marginBottom: '4px' }" />
+                  <a-flex justify="space-between" class="history-item-meta">
+                    <span>{{ conv.roleName }}</span>
+                    <span>{{ formatShortDateTime(conv.updateTime) }}</span>
+                  </a-flex>
+                </button>
+                <a-dropdown v-if="!selecting" :trigger="['click']" placement="bottomRight">
+                  <a-button type="text" size="small" class="history-more" :title="t('common.more')">
+                    <template #icon><MoreOutlined /></template>
+                  </a-button>
+                  <template #overlay>
+                    <a-menu @click="(info: { key: string | number }) => onConversationAction(conv, String(info.key))">
+                      <a-menu-item key="rename">
+                        <EditOutlined />
+                        {{ t('chat.rename') }}
+                      </a-menu-item>
+                      <a-menu-item key="delete" danger>
+                        <DeleteOutlined />
+                        {{ t('common.delete') }}
+                      </a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
+              </div>
             </a-timeline-item>
           </a-timeline>
           <a-empty v-else :description="t('chat.noHistory')" />
         </a-spin>
+
+        <template v-if="selecting" #footer>
+          <a-flex justify="space-between" align="center">
+            <a-button size="small" @click="exitSelecting">{{ t('common.cancel') }}</a-button>
+            <a-popconfirm
+              :title="t('chat.deleteConversationHint')"
+              :disabled="selectedSessionIds.length === 0"
+              @confirm="deleteSelected"
+            >
+              <a-button size="small" type="primary" danger :disabled="selectedSessionIds.length === 0">
+                {{ t('chat.deleteSelected', { count: selectedSessionIds.length }) }}
+              </a-button>
+            </a-popconfirm>
+          </a-flex>
+        </template>
       </a-drawer>
     </div>
+
+    <a-modal
+      v-model:open="renameOpen"
+      :title="t('chat.renameConversation')"
+      :confirm-loading="renaming"
+      :ok-button-props="{ disabled: !renameTitle.trim() }"
+      @ok="submitRename"
+    >
+      <a-input
+        v-model:value="renameTitle"
+        :maxlength="100"
+        :placeholder="t('chat.titlePlaceholder')"
+        @press-enter="submitRename"
+      />
+    </a-modal>
   </a-layout>
 </template>
 
@@ -460,10 +620,21 @@ async function sendMessage() {
   padding-top: 4px;
 }
 
+.history-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.history-check {
+  margin-top: 10px;
+}
+
 /* 原来是 div，现在是真正的 button，重置原生按钮外观（宽度/字体/边框/对齐），视觉保持不变 */
 .history-item {
   display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   background: none;
   border: none;
   font: inherit;
@@ -491,6 +662,23 @@ async function sendMessage() {
   color: var(--ant-color-text-tertiary);
 }
 
+/* 更多操作只在悬停或键盘聚焦时出现，不挤占标题 */
+.history-more {
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.history-row:hover .history-more,
+.history-more:focus-visible,
+.history-more.ant-dropdown-open {
+  opacity: 1;
+}
+
+.batch-active {
+  color: var(--ant-color-primary);
+}
+
 @media (max-width: 600px) {
   .chat-header {
     padding: 0 12px;
@@ -502,6 +690,10 @@ async function sendMessage() {
 
   .chat-input-wrapper {
     padding: 10px 12px 0;
+  }
+
+  .history-more {
+    opacity: 1;
   }
 }
 </style>

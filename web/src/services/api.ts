@@ -29,8 +29,9 @@ export default {
   template: '/template',
   message: {
     root: '/message',
-    conversations: '/message/conversations',
   },
+  // 网页聊天会话：GET 列表、PATCH /{sessionId} 重命名、DELETE 批量删除
+  conversation: '/conversations',
   config: {
     root: '/config',
     test: '/config/test',

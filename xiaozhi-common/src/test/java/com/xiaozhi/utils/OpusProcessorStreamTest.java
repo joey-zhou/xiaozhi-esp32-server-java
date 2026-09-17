@@ -4,6 +4,7 @@ import io.github.jaredmdobson.concentus.OpusException;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -223,6 +224,6 @@ class OpusProcessorStreamTest {
 
     /** 取 PCM 中第 fromSample 个样本起的 count 个样本 */
     private static byte[] slice(byte[] pcm, int fromSample, int count) {
-        return java.util.Arrays.copyOfRange(pcm, fromSample * 2, (fromSample + count) * 2);
+        return Arrays.copyOfRange(pcm, fromSample * 2, (fromSample + count) * 2);
     }
 }

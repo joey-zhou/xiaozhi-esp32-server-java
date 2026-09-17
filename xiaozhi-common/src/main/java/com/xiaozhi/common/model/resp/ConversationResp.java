@@ -19,7 +19,7 @@ public class ConversationResp {
     @Schema(description = "角色名称")
     private String roleName;
 
-    @Schema(description = "会话标题（第一条消息内容）")
+    @Schema(description = "会话标题，默认取第一句话的开头，可重命名")
     private String title;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

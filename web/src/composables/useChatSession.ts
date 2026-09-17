@@ -7,9 +7,14 @@ import { ref, onBeforeUnmount } from 'vue'
 import { message as antMessage } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { openChatSession, closeChatSession, chatStream } from '@/services/chat'
-import { queryConversations, queryMessages } from '@/services/message'
-import type { ChatMessage } from '@/types/chat'
-import type { Conversation, Message } from '@/types/message'
+import { queryMessages } from '@/services/message'
+import {
+  queryConversations,
+  renameConversation as renameConversationApi,
+  deleteConversations as deleteConversationsApi,
+} from '@/services/conversation'
+import type { ChatMessage, Conversation } from '@/types/chat'
+import type { Message } from '@/types/message'
 
 /** 把任意异常转成可展示的文本 */
 function errorText(e: unknown): string {
@@ -48,8 +53,10 @@ export function useChatSession() {
   async function loadConversations() {
     loadingConversations.value = true
     try {
-      // 仅加载 Web 来源的会话，避免混入设备对话（每次连接都会产生新 sessionId）
-      const res = await queryConversations({ pageNo: 1, pageSize: 50, source: 'web' })
+      const res = await queryConversations({ pageNo: 1, pageSize: 50 })
+      if (res.code !== 200) {
+        throw new Error(res.message)
+      }
       conversations.value = res.data.list
     } catch (e: unknown) {
       antMessage.error(t('chat.loadConversationsFailed', { error: errorText(e) }))
@@ -103,6 +110,54 @@ export function useChatSession() {
       antMessage.error(t('chat.loadMessagesFailed', { error: errorText(e) }))
       return false
     }
+  }
+
+  /**
+   * 重命名会话，服务端接受后直接改列表里的这一项
+   */
+  async function renameConversation(conv: Conversation, title: string): Promise<boolean> {
+    try {
+      const res = await renameConversationApi(conv.sessionId, title)
+      if (res.code !== 200) {
+        antMessage.error(res.message || t('common.updateFailed'))
+        return false
+      }
+      conv.title = title
+      return true
+    } catch (e: unknown) {
+      antMessage.error(t('chat.renameFailed', { error: errorText(e) }))
+      return false
+    }
+  }
+
+  /**
+   * 删除会话。删掉的正好是当前会话时清空对话区：服务端已经把它移除，不用再调 close
+   */
+  async function removeConversations(sessionIds: string[]): Promise<boolean> {
+    if (sending.value && sessionIds.includes(sessionId.value)) {
+      antMessage.warning(t('chat.chatInProgress'))
+      return false
+    }
+    try {
+      const res = await deleteConversationsApi(sessionIds)
+      if (res.code !== 200) {
+        antMessage.error(res.message || t('common.deleteFailed'))
+        return false
+      }
+    } catch (e: unknown) {
+      antMessage.error(t('chat.deleteConversationsFailed', { error: errorText(e) }))
+      return false
+    }
+
+    const removed = new Set(sessionIds)
+    conversations.value = conversations.value.filter((conv) => !removed.has(conv.sessionId))
+    if (removed.has(sessionId.value)) {
+      abortCurrentStream()
+      activeSessionId.value = ''
+      sessionId.value = ''
+      messages.value = []
+    }
+    return true
   }
 
   async function startNewChat() {
@@ -323,6 +378,8 @@ export function useChatSession() {
     // 操作
     loadConversations,
     selectConversation,
+    renameConversation,
+    removeConversations,
     startNewChat,
     sendMessage,
     stopGeneration,

@@ -27,6 +27,7 @@ import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.utils.OpusProcessor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
@@ -87,7 +88,7 @@ public class DialogueService{
     @Resource
     private StorageServiceFactory storageServiceFactory;
 
-    @org.springframework.context.event.EventListener
+    @EventListener
     public void onApplicationEvent(ChatAbortedEvent event) {
         ChatSession chatSession = sessionManager.getSession(event.getSessionId());
         if (chatSession == null) return;

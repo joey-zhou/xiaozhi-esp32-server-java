@@ -2,7 +2,6 @@ package com.xiaozhi.role.domain;
 
 import com.xiaozhi.role.domain.vo.AudioConfig;
 import com.xiaozhi.role.domain.vo.LlmConfig;
-import com.xiaozhi.role.domain.vo.MemoryStrategy;
 import com.xiaozhi.role.domain.vo.VoiceConfig;
 import lombok.Getter;
 
@@ -16,7 +15,7 @@ import java.util.stream.Collectors;
 /**
  * Role 聚合根。
  * <p>
- * 职责：持有角色配置（LLM / 语音 / VAD / 记忆策略），
+ * 职责：持有角色配置（LLM / 语音 / VAD），
  * 通过行为方法修改状态，收集领域信号供 Repository 发布事件。
  */
 @Getter
@@ -48,7 +47,6 @@ public class Role {
     private LlmConfig llmConfig;
     private VoiceConfig voiceConfig;
     private AudioConfig audioConfig;
-    private MemoryStrategy memoryStrategy;
 
     // --- Timestamps ---
     private final LocalDateTime createTime;
@@ -60,7 +58,7 @@ public class Role {
     public Role(Integer roleId, Integer userId, String avatar, String roleName, String roleDesc,
                 String state, boolean isDefault, Integer inactiveTimeoutSeconds,
                 LlmConfig llmConfig, VoiceConfig voiceConfig,
-                AudioConfig audioConfig, MemoryStrategy memoryStrategy,
+                AudioConfig audioConfig,
                 LocalDateTime createTime, LocalDateTime updateTime) {
         this.roleId = roleId;
         this.userId = userId;
@@ -75,7 +73,6 @@ public class Role {
         this.llmConfig = llmConfig != null ? llmConfig.withDefaults() : LlmConfig.defaults();
         this.voiceConfig = voiceConfig != null ? voiceConfig.withDefaults() : VoiceConfig.defaults();
         this.audioConfig = audioConfig != null ? audioConfig : AudioConfig.defaults();
-        this.memoryStrategy = memoryStrategy != null ? memoryStrategy : MemoryStrategy.defaults();
         this.createTime = createTime;
         this.updateTime = updateTime;
     }
@@ -83,11 +80,11 @@ public class Role {
     /** 工厂方法：创建新角色 */
     public static Role newRole(Integer userId, String roleName, String roleDesc, String avatar,
                                LlmConfig llmConfig, VoiceConfig voiceConfig,
-                               AudioConfig audioConfig, MemoryStrategy memoryStrategy,
+                               AudioConfig audioConfig,
                                boolean isDefault, Integer inactiveTimeoutSeconds) {
         Role role = new Role(null, userId, avatar, roleName, roleDesc, "1", isDefault,
                 inactiveTimeoutSeconds,
-                llmConfig, voiceConfig, audioConfig, memoryStrategy,
+                llmConfig, voiceConfig, audioConfig,
                 null, null);
         role.signals.add(DomainSignal.UPDATED);
         return role;
@@ -98,7 +95,7 @@ public class Role {
     /** 更新可编辑字段及配置值对象 */
     public void update(String roleName, String roleDesc, String avatar,
                        LlmConfig llmConfig, VoiceConfig voiceConfig,
-                       AudioConfig audioConfig, MemoryStrategy memoryStrategy,
+                       AudioConfig audioConfig,
                        Boolean isDefault, Integer inactiveTimeoutSeconds) {
         if (roleName != null && !roleName.isBlank()) this.roleName = roleName;
         if (roleDesc != null) this.roleDesc = roleDesc;
@@ -108,7 +105,6 @@ public class Role {
         if (llmConfig != null) this.llmConfig = this.llmConfig.merge(llmConfig);
         if (voiceConfig != null) this.voiceConfig = this.voiceConfig.merge(voiceConfig);
         if (audioConfig != null) this.audioConfig = this.audioConfig.merge(audioConfig);
-        if (memoryStrategy != null) this.memoryStrategy = this.memoryStrategy.merge(memoryStrategy);
         if (isDefault != null) this.isDefault = isDefault;
         if (inactiveTimeoutSeconds != null) this.inactiveTimeoutSeconds = inactiveTimeoutSeconds;
         signals.add(DomainSignal.UPDATED);

@@ -10,7 +10,6 @@ import com.xiaozhi.role.domain.Role;
 import com.xiaozhi.role.domain.repository.RoleRepository;
 import com.xiaozhi.role.domain.vo.AudioConfig;
 import com.xiaozhi.role.domain.vo.LlmConfig;
-import com.xiaozhi.role.domain.vo.MemoryStrategy;
 import com.xiaozhi.role.domain.vo.VoiceConfig;
 import com.xiaozhi.role.service.RoleService;
 import org.junit.jupiter.api.BeforeEach;
@@ -104,7 +103,6 @@ class RoleAppServiceTest {
         req.setVadSilenceTh(0.3f);
         req.setVadSilenceMs(500);
         req.setInactiveTimeoutSeconds(120);
-        req.setMemoryType("memory_window");
         req.setIsDefault("1");
 
         RoleResp resp = roleAppService.create(req, 7);
@@ -126,7 +124,6 @@ class RoleAppServiceTest {
         assertThat(resp.getVadSilenceTh()).isEqualTo(0.3f);
         assertThat(resp.getVadSilenceMs()).isEqualTo(500);
         assertThat(resp.getInactiveTimeoutSeconds()).isEqualTo(120);
-        assertThat(resp.getMemoryType()).isEqualTo("memory_window");
         assertThat(resp.getIsDefault()).isEqualTo("1");
         assertThat(resp.getState()).isEqualTo(Role.STATE_ENABLED);
         // JOIN 出来的展示列与时间戳本来就不在这个接口的返回里
@@ -162,7 +159,6 @@ class RoleAppServiceTest {
         assertThat(resp.getTtsSpeed()).isEqualTo(0.8);
         assertThat(resp.getVadSilenceMs()).isEqualTo(500);
         assertThat(resp.getInactiveTimeoutSeconds()).isEqualTo(120);
-        assertThat(resp.getMemoryType()).isEqualTo("memory_window");
         assertThat(resp.getState()).isEqualTo(Role.STATE_ENABLED);
         assertThat(resp.getIsDefault()).isEqualTo("0");
         verify(roleService, never()).getBO(any());
@@ -218,7 +214,6 @@ class RoleAppServiceTest {
                 new LlmConfig(5, 0.2, 0.5),
                 new VoiceConfig(3, 4, "xiaoyun", 1.3, 0.8),
                 new AudioConfig(0.1f, 0.2f, 0.3f, 500),
-                new MemoryStrategy("memory_window"),
                 CREATED_AT, CREATED_AT);
     }
 
@@ -228,7 +223,6 @@ class RoleAppServiceTest {
                 new LlmConfig(5, null, null),
                 new VoiceConfig(3, null, null, null, null),
                 new AudioConfig(null, null, null, null),
-                new MemoryStrategy(null),
                 CREATED_AT, CREATED_AT);
     }
 }

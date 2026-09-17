@@ -98,7 +98,6 @@ const formData = reactive<RoleFormData>({
   gender: '',
   ttsPitch: 1.0,
   ttsSpeed: 1.0,
-  memoryType: 'window'
 })
 
 // 编辑状态
@@ -206,12 +205,6 @@ const columns = computed<TableColumnsType>(() => [
     align: 'center'
   },
   {
-    title: t('role.memoryTypeLabel'),
-    dataIndex: 'memoryType',
-    width: 120,
-    align: 'center'
-  },
-  {
     title: t('role.totalDevice'),
     dataIndex: 'totalDevice',
     width: 100,
@@ -282,7 +275,6 @@ const handleEdit = (record: Role) => {
       gender: voiceInfo?.gender || '',
       ttsPitch: record.ttsPitch ?? 1.0,
       ttsSpeed: record.ttsSpeed ?? 1.0,
-      memoryType: record.memoryType || 'window'
     })
     lastInactiveTimeoutSeconds.value = record.inactiveTimeoutSeconds && record.inactiveTimeoutSeconds > 0
       ? record.inactiveTimeoutSeconds
@@ -428,7 +420,6 @@ const resetForm = () => {
     gender: '',
     ttsPitch: 1.0,
     ttsSpeed: 1.0,
-    memoryType: 'window'
   })
   lastInactiveTimeoutSeconds.value = 60
 }
@@ -528,18 +519,6 @@ const getAvatar = (avatar?: string) => {
 const getVoiceDisplayName = (record: Role) => {
   if (!record.voiceName) return ''
   return voiceLabelMap.value.get(record.voiceName) || record.voiceName
-}
-
-// 获取记忆类型显示信息
-const getMemoryTypeInfo = (memoryType?: string) => {
-  switch (memoryType) {
-    case 'window':
-      return { label: t('device.windowMemory'), color: 'orange' }
-    case 'summary':
-      return { label: t('device.summaryMemory'), color: 'blue' }
-    default:
-      return { label: t('device.windowMemory'), color: 'orange' }
-  }
 }
 
 // 列表加载失败提示。业务码失败交回的是响应体，静默保留原列表；只有传输层异常才提示，
@@ -729,13 +708,6 @@ Promise.all([
                     {{ getSttLabel(record.sttId) }}
                   </span>
                 </a-tooltip>
-              </template>
-
-              <!-- 记忆类型 -->
-              <template v-else-if="column.dataIndex === 'memoryType'">
-                <a-tag :color="getMemoryTypeInfo(record.memoryType).color">
-                  {{ getMemoryTypeInfo(record.memoryType).label }}
-                </a-tag>
               </template>
 
               <!-- 默认状态 -->
@@ -1259,29 +1231,6 @@ Promise.all([
                 </a-col>
               </a-row>
             </div>
-            <!-- 记忆类型配置 -->
-            <a-divider orientation="left">{{ t('role.memoryTypeSettings') }}</a-divider>
-
-            <a-row :gutter="20">
-              <a-col :xl="8" :lg="12" :xs="24">
-                <a-form-item :label="t('role.memoryTypeLabel')">
-                  <a-select
-                    v-model:value="formData.memoryType"
-                    :placeholder="t('role.selectMemoryType')"
-                  >
-                    <a-select-option value="window">
-                      {{ t('device.windowMemory') }}
-                    </a-select-option>
-                    <a-select-option value="summary">
-                      {{ t('device.summaryMemory') }}
-                    </a-select-option>
-                  </a-select>
-                  <div style="margin-top: 8px; color: var(--ant-color-text-tertiary); font-size: 12px">
-                    {{ t('role.memoryTypeTip') }}
-                  </div>
-                </a-form-item>
-              </a-col>
-            </a-row>
 
             <!-- 角色提示词 -->
             <a-divider orientation="left">{{ t('role.rolePrompt') }}</a-divider>

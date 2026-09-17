@@ -10,7 +10,9 @@ import java.time.Instant;
 public class SummaryResp {
 
     private String deviceId;
+    private String deviceName;
     private Integer roleId;
+    private String roleName;
 
     // Instant 是绝对时刻，格式化成 yyyy-MM-dd HH:mm:ss 必须指定时区，去掉 timezone 会直接抛
     // UnsupportedTemporalTypeException。这里的 GMT+8 与全局的 Asia/Shanghai 假设一致

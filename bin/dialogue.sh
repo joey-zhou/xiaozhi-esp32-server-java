@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # xiaozhi-dialogue 管理脚本
-# 用法: bin/dialogue.sh <start|stop|restart|status> [dev|prod]，运行环境默认 dev
+# 用法: bin/dialogue.sh <start|stop|restart|status|logs> [dev|prod]，运行环境默认 dev
 # =============================================================================
 source "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 
@@ -14,6 +14,7 @@ case "${1:-}" in
     PROFILE="$(resolve_profile "${2:-}")" || exit 1
     build "$MODULE"
     start_service "$NAME" "$MODULE" "$PORT" "$PROFILE"
+    follow_logs_if_tty "$NAME"
     ;;
   stop)
     stop_service "$NAME"
@@ -24,9 +25,13 @@ case "${1:-}" in
     sleep 1
     build "$MODULE"
     start_service "$NAME" "$MODULE" "$PORT" "$PROFILE"
+    follow_logs_if_tty "$NAME"
     ;;
   status)
     status_service "$NAME" "$PORT"
+    ;;
+  logs)
+    follow_logs "$NAME"
     ;;
   *)
     usage "bin/dialogue.sh"

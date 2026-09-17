@@ -331,7 +331,10 @@ async function handleSubmit() {
         submitData.provider || '',
         submitData.modelType || 'chat'
       )
-      const isValid = validModels.some((m: LLMModel) => m.llm_name === submitData.configName)
+      const knownModel = validModels.find((m: LLMModel) => m.llm_name === submitData.configName)
+      const isValid = knownModel !== undefined
+      // 上下文长度用户不用关心：清单里查得到就静默带给后端，查不到留空由后端按默认值处理
+      submitData.contextLength = knownModel?.max_tokens
       
       // 模型名称不在已知列表里时问一句，取消则中断提交
       if (!isValid && validModels.length > 0) {
@@ -724,6 +727,7 @@ fetchData()
                 {{ t('config.enableThinkingTip') }}
               </span>
             </a-form-item>
+
 
             <a-divider>{{ t('config.parameterConfig') }}</a-divider>
 

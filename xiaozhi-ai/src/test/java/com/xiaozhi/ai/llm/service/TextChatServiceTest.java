@@ -3,34 +3,40 @@ package com.xiaozhi.ai.llm.service;
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.ai.llm.memory.ChatMemory;
 import com.xiaozhi.ai.llm.memory.Conversation;
+import com.xiaozhi.ai.llm.memory.ConversationFactory;
+import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.common.model.bo.RoleBO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,7 +56,7 @@ class TextChatServiceTest {
     private ChatModelFactory chatModelFactory;
 
     @Mock
-    private ChatMemory chatMemory;
+    private ConversationFactory conversationFactory;
 
     @Mock
     private ChatModel chatModel;
@@ -62,13 +68,13 @@ class TextChatServiceTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(textChatService, "maxMessages", 16);
         role.setRoleId(1);
         role.setRoleDesc("测试角色");
     }
 
     private Conversation openConversation() {
-        when(chatMemory.findBySession(SESSION_ID, 16)).thenReturn(List.of());
+        when(conversationFactory.initSessionConversation("web:9", 9, role, SESSION_ID))
+                .thenReturn(new Conversation("web:9", 1, SESSION_ID, "测试角色", 9));
         return textChatService.openConversation("web:9", 9, role, SESSION_ID);
     }
 
@@ -89,24 +95,23 @@ class TextChatServiceTest {
         return new ChatResponse(List.of(new Generation(message)));
     }
 
-    private static final class RecordingCallback implements Consumer<String> {
+    private static final class RecordingCallback implements BiConsumer<String, LocalDateTime> {
         private final List<String> replies = new ArrayList<>();
+        private final List<LocalDateTime> assistantCreatedAts = new ArrayList<>();
 
         @Override
-        public void accept(String reply) {
+        public void accept(String reply, LocalDateTime assistantCreatedAt) {
             replies.add(reply);
+            assistantCreatedAts.add(assistantCreatedAt);
         }
     }
 
     @Test
-    void openConversationLoadsHistoryBySessionId() {
+    void openConversationIsScopedToTheSession() {
         Conversation conversation = openConversation();
 
-        verify(chatMemory).findBySession(SESSION_ID, 16);
+        verify(conversationFactory).initSessionConversation("web:9", 9, role, SESSION_ID);
         assertThat(conversation.sessionId()).isEqualTo(SESSION_ID);
-        assertThat(conversation.getOwnerId()).isEqualTo("web:9");
-        assertThat(conversation.getUserId()).isEqualTo(9);
-        assertThat(conversation.getRoleId()).isEqualTo(1);
     }
 
     /** 回调只触发一次且只含正文，思考过程不落库；对话里留下 User + Assistant 一组。 */
@@ -129,6 +134,43 @@ class TextChatServiceTest {
         assertThat(messages.get(0).getText()).isEqualTo("在吗");
         assertThat(messages.get(1)).isInstanceOf(AssistantMessage.class);
         assertThat(messages.get(1).getText()).isEqualTo("你好");
+    }
+
+    /**
+     * 助手消息的时间元数据必须和回调给落库的时间是同一个。
+     * 没有时间元数据时摘要会拿「写摘要的时刻」当切点，重载历史时摘要之后到那一刻之间的消息全部丢失。
+     */
+    @Test
+    void assistantMessageCarriesTheSameTimeAsHandedToCallback() {
+        Conversation conversation = openConversation();
+        modelStreams(Flux.just(content("好")));
+        RecordingCallback callback = new RecordingCallback();
+
+        textChatService.streamTurn(conversation, role, "在吗", LocalDateTime.now(), callback)
+                .collectList().block();
+
+        Message assistant = conversation.rawMessages().get(1);
+        assertThat(callback.assistantCreatedAts).hasSize(1);
+        assertThat(MessageTimeMetadata.getTimeMillis(assistant))
+                .isEqualTo(callback.assistantCreatedAts.getFirst().atZone(ZoneId.systemDefault()).toInstant());
+    }
+
+    /** 流式最后一块带回的用量挂到助手消息上，对话据此判断上下文是否超限。 */
+    @Test
+    void completedTurnCarriesUsageOnAssistantMessage() {
+        Conversation conversation = openConversation();
+        ChatResponse last = ChatResponse.builder()
+                .generations(List.of(new Generation(new AssistantMessage("好"))))
+                .metadata(ChatResponseMetadata.builder().usage(new DefaultUsage(1200, 20)).build())
+                .build();
+        modelStreams(Flux.just(content("你"), last));
+
+        textChatService.streamTurn(conversation, role, "在吗", LocalDateTime.now(), new RecordingCallback())
+                .collectList().block();
+
+        Object usage = conversation.rawMessages().get(1).getMetadata().get(ChatMemory.USAGE_KEY);
+        assertThat(usage).isInstanceOf(Usage.class);
+        assertThat(((Usage) usage).getPromptTokens()).isEqualTo(1200);
     }
 
     /** 服务商返回错误响应时，状态码与响应体作为 error token 推给前端，流正常结束不抛异常。 */

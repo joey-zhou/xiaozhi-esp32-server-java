@@ -92,7 +92,8 @@ export async function* chatStream(
     const response = await fetch(`${API_BASE_URL}${api.chat.stream}`, {
       method: 'POST',
       headers: {
-        Accept: 'text/event-stream',
+        // 开流前就失败（会话已删、角色不存在、越权）时后端返回的是普通 JSON 错误，Accept 不带它会写不出响应体
+        Accept: 'text/event-stream, application/json',
         'Content-Type': 'application/json',
         Authorization: userStore.token ? `Bearer ${userStore.token}` : '',
       },
@@ -104,8 +105,9 @@ export async function* chatStream(
     if (!response.ok) {
       if (response.status === 401) {
         handleAuthExpired()
+        throw new Error(`chat stream failed: HTTP ${response.status}`)
       }
-      throw new Error(`chat stream failed: HTTP ${response.status}`)
+      throw new Error(await streamErrorMessage(response))
     }
 
     const reader = response.body?.getReader()
@@ -148,6 +150,17 @@ export async function* chatStream(
     signal?.removeEventListener('abort', forwardAbort)
     // 调用方提前 break 出 for await 时，响应体还开着，中断掉才会释放连接
     controller.abort()
+  }
+}
+
+/** 开流前失败的响应体是 ApiResponse JSON，取其 message 给用户看；解析不出来就退回状态码 */
+async function streamErrorMessage(response: Response): Promise<string> {
+  const fallback = `chat stream failed: HTTP ${response.status}`
+  try {
+    const body = (await response.json()) as { message?: unknown }
+    return typeof body?.message === 'string' && body.message ? body.message : fallback
+  } catch {
+    return fallback
   }
 }
 

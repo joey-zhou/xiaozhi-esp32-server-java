@@ -16,6 +16,7 @@ import org.springframework.web.socket.handler.AbstractWebSocketHandler;
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
 import org.springframework.web.socket.WebSocketSession;
 import java.io.IOException;
+import java.io.EOFException;
 import java.nio.ByteBuffer;
 
 import lombok.extern.slf4j.Slf4j;
@@ -164,7 +165,7 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
      * 判断异常是否由客户端主动关闭连接导致
      */
     private boolean isClientCloseRequest(Throwable exception) {
-        if (exception instanceof java.io.EOFException) {
+        if (exception instanceof EOFException) {
             return true;
         }
         if (!(exception instanceof IOException)) {

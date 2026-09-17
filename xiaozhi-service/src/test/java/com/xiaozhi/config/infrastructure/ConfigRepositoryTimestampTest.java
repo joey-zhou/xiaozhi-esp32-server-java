@@ -88,7 +88,7 @@ class ConfigRepositoryTimestampTest {
         });
 
         AiConfig config = AiConfig.reconstitute(11, 7, "llm", "aliyun", "通义千问", null, "chat",
-            null, "key", null, null, null, null, null,
+            null, "key", null, null, null, null, null, null,
             AiConfig.STATE_ENABLED, false, CREATED_AT, LocalDateTime.of(2026, 2, 1, 8, 0));
         config.update(new ConfigBO().setConfigName("改过的名字"));
         repository.save(config);

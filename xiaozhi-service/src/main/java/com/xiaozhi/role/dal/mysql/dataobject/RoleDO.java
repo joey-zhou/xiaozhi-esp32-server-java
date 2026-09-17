@@ -34,5 +34,4 @@ public class RoleDO extends BaseDO {
     private Integer vadSilenceMs;
     private Integer inactiveTimeoutSeconds;
     private String isDefault;
-    private String memoryType;
 }

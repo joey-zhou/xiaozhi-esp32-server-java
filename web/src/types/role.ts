@@ -9,9 +9,6 @@ export type VoiceProvider = 'edge' | 'aliyun' | 'aliyun-nls' | 'volcengine' | 'x
 // 语音性别
 export type VoiceGender = '' | 'male' | 'female'
 
-// 记忆类型
-export type MemoryType = 'window' | 'summary'
-
 // 角色数据
 export interface Role {
   createTime?: string
@@ -40,9 +37,8 @@ export interface Role {
   ttsProvider?: string
   isDefault?: string | number // 服务器返回字符串 '1' 或 '0'，前端可能转为数字
   totalDevice?: number
-  ttsPitch?: number // 语音音调(0.5-2.0)
-  ttsSpeed?: number // 语音语速(0.5-2.0)
-  memoryType?: MemoryType // 记忆类型
+  ttsPitch?: number
+  ttsSpeed?: number
 }
 
 export interface RoleQueryParams extends PageQueryParams {
@@ -101,8 +97,6 @@ export interface RoleFormData {
   gender?: VoiceGender
   ttsPitch?: number
   ttsSpeed?: number
-  // 记忆类型
-  memoryType?: MemoryType
 }
 
 // 测试语音参数

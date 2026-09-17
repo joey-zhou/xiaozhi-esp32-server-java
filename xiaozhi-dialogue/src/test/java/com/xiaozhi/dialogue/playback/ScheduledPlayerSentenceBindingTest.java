@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -187,7 +188,7 @@ class ScheduledPlayerSentenceBindingTest {
     }
 
     /** 轮询等待条件成立，禁止用固定时长 sleep 做同步 */
-    private static void awaitUntil(java.util.function.BooleanSupplier condition) {
+    private static void awaitUntil(BooleanSupplier condition) {
         long deadline = System.currentTimeMillis() + 5000;
         while (!condition.getAsBoolean() && System.currentTimeMillis() < deadline) {
             Thread.onSpinWait();

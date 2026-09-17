@@ -1,6 +1,7 @@
 package com.xiaozhi.ai.llm.factory.providers;
 
 import com.xiaozhi.ai.llm.factory.ChatModelProvider;
+import com.xiaozhi.common.AppVirtualThreads;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import io.micrometer.observation.ObservationRegistry;
@@ -26,6 +27,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.concurrent.ExecutorService;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -37,7 +39,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 public class OpenAiModelProvider implements ChatModelProvider {
-    
+
+    private static final ExecutorService HTTP_EXECUTOR = AppVirtualThreads.newPerTaskExecutor("openai-http-");
+
     @Lazy
     @Autowired
     private ToolCallingManager toolCallingManager;
@@ -57,18 +61,14 @@ public class OpenAiModelProvider implements ChatModelProvider {
         String model = config.getConfigName();
         Double temperature = role.getTemperature();
         Double topP = role.getTopP();
-        
-        // LM Studio不支持Http/2，所以需要强制使用HTTP/1.1
+
         var openAiApi = OpenAiApi.builder()
                 .apiKey(StringUtils.hasText(apiKey) ? new SimpleApiKey(apiKey) : new NoopApiKey())
                 .baseUrl(endpoint)
                 .completionsPath("/chat/completions")
                 .webClientBuilder(WebClient.builder()
                         // Force HTTP/1.1 for streaming
-                        .clientConnector(new JdkClientHttpConnector(HttpClient.newBuilder()
-                                .version(HttpClient.Version.HTTP_1_1)
-                                .connectTimeout(Duration.ofSeconds(30))
-                                .build())))
+                        .clientConnector(new JdkClientHttpConnector(newHttpClient())))
                 .restClientBuilder(RestClient.builder()
                         .requestFactory(createRequestFactory()))
                 .build();
@@ -132,10 +132,7 @@ public class OpenAiModelProvider implements ChatModelProvider {
                 .baseUrl(config.getApiUrl())
                 .embeddingsPath("/embeddings")
                 .webClientBuilder(WebClient.builder()
-                        .clientConnector(new JdkClientHttpConnector(HttpClient.newBuilder()
-                                .version(HttpClient.Version.HTTP_1_1)
-                                .connectTimeout(Duration.ofSeconds(30))
-                                .build())))
+                        .clientConnector(new JdkClientHttpConnector(newHttpClient())))
                 .restClientBuilder(RestClient.builder()
                         .requestFactory(createRequestFactory()))
                 .build();
@@ -144,11 +141,21 @@ public class OpenAiModelProvider implements ChatModelProvider {
         return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED, options);
     }
 
-    private JdkClientHttpRequestFactory createRequestFactory() {
-        var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
+    /**
+     * LM Studio 不支持 HTTP/2，统一走 HTTP/1.1。
+     * 必须显式给执行器：HttpClient 自带线程的上下文类加载器是系统类加载器，fat jar 下看不到 BOOT-INF/lib，
+     * 流式回调里派生出去的压缩、落库线程会继承这个错的加载器。
+     */
+    private static HttpClient newHttpClient() {
+        return HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofSeconds(30))
-                .build());
+                .executor(HTTP_EXECUTOR)
+                .build();
+    }
+
+    private JdkClientHttpRequestFactory createRequestFactory() {
+        var factory = new JdkClientHttpRequestFactory(newHttpClient());
         factory.setReadTimeout(Duration.ofSeconds(30));
         return factory;
     }

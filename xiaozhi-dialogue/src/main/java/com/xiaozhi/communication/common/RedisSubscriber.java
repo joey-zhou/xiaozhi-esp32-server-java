@@ -179,7 +179,8 @@ public class RedisSubscriber {
             }
             Persona persona = session.getPersona();
             if (persona != null) {
-                persona.getConversation().clear();
+                // 旧角色的对话到此结束，剩下的压成摘要
+                persona.getConversation().flush();
                 session.setPersona(null);
             }
             log.info("已清理设备 Persona（来自跨实例广播） - deviceId: {}", deviceId);

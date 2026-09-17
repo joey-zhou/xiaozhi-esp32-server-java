@@ -2,6 +2,7 @@ package com.xiaozhi.communication.protocol;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 
 import java.lang.reflect.InvocationTargetException;
@@ -48,7 +49,7 @@ class TestEventBus {
     }
 
     /** 供 MessageSender / DialogueService 这类只需要 ApplicationEventPublisher 的协作者直接引用 */
-    org.springframework.context.ApplicationEventPublisher publisher() {
+    ApplicationEventPublisher publisher() {
         return this::publish;
     }
 

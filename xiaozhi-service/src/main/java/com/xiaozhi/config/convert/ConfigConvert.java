@@ -51,6 +51,7 @@ public interface ConfigConvert {
     @Mapping(target = "userId", ignore = true)
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
+    @Mapping(target = "contextLength", ignore = true)
     @Mapping(target = "apiKey", source = "apiKey", qualifiedByName = "blankToNull")
     @Mapping(target = "apiSecret", source = "apiSecret", qualifiedByName = "blankToNull")
     @Mapping(target = "ak", source = "ak", qualifiedByName = "blankToNull")

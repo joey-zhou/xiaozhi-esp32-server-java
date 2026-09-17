@@ -11,6 +11,7 @@ import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 
 import java.io.IOException;
 import java.util.*;
@@ -254,7 +255,7 @@ public class XingChenChatModel implements ChatModel {
         return responseFlux;
     }
 
-    public void resume(XingChenResume resume, reactor.core.publisher.FluxSink<ChatResponse> sink) {
+    public void resume(XingChenResume resume, FluxSink<ChatResponse> sink) {
         try {
             log.debug("XingChen resume消息: {}", JsonUtil.toJson(resume));
             chatClient.resume(resume, new XingChenChatStreamCallback() {

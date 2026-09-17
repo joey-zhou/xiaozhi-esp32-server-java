@@ -3,6 +3,7 @@ package com.xiaozhi.utils;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URL;
 import java.util.Collections;
@@ -451,7 +452,7 @@ public class IpLocationClient {
                 } else {
                     log.warn("IP信息服务返回非200状态码: {} - {}", service, connection.getResponseCode());
                 }
-            } catch (java.net.SocketTimeoutException e) {
+            } catch (SocketTimeoutException e) {
                 log.warn("获取IP信息超时，切换到下一个服务: {} - {}", service, e.getMessage());
             } catch (Exception e) {
                 log.warn("获取IP信息失败: {} - {}", service, e.getMessage());

@@ -159,7 +159,7 @@ class ConfigTestAppServiceTest {
                 "语音配置", null, null,
                 null, "saved-key", null,
                 null, null, "https://saved.example.com",
-                null, AiConfig.STATE_ENABLED, false,
+                null, null, AiConfig.STATE_ENABLED, false,
                 LocalDateTime.of(2026, 1, 1, 0, 0), LocalDateTime.of(2026, 1, 2, 0, 0));
     }
 

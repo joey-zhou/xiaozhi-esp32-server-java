@@ -52,16 +52,6 @@ public class MessageController extends BaseController {
             .map(messageConvert::toResp));
     }
 
-    @GetMapping("/conversations")
-    @ResponseBody
-    @SaCheckPermission("system:chat")
-    @Operation(summary = "查询用户的会话列表", description = "返回当前用户的历史会话列表，基于sessionId聚合")
-    public ApiResponse<PageResult<ConversationResp>> conversations(@Valid ConversationPageReq req) {
-        return ApiResponse.success(messageService
-            .conversationPage(req.getPageNo(), req.getPageSize(), StpUtil.getLoginIdAsInt(), req.getRoleId(), req.getSource())
-            .map(messageConvert::toResp));
-    }
-
     @DeleteMapping("/{messageId}")
     @ResponseBody
     @SaCheckPermission("system:role:memory:chat:api:delete")

@@ -9,8 +9,13 @@ const chatMock = vi.hoisted(() => ({
 }))
 
 const messageServiceMock = vi.hoisted(() => ({
-  queryConversations: vi.fn(),
   queryMessages: vi.fn(),
+}))
+
+const conversationServiceMock = vi.hoisted(() => ({
+  queryConversations: vi.fn(),
+  renameConversation: vi.fn(),
+  deleteConversations: vi.fn(),
 }))
 
 const antMessageMock = vi.hoisted(() => ({
@@ -27,9 +32,10 @@ vi.mock('vue-i18n', () => ({
 vi.mock('ant-design-vue', () => ({ message: antMessageMock }))
 vi.mock('@/services/chat', () => chatMock)
 vi.mock('@/services/message', () => messageServiceMock)
+vi.mock('@/services/conversation', () => conversationServiceMock)
 
 import { useChatSession } from '../useChatSession'
-import type { Conversation } from '@/types/message'
+import type { Conversation } from '@/types/chat'
 
 const otherConversation: Conversation = {
   sessionId: 'other',
@@ -188,6 +194,74 @@ describe('useChatSession', () => {
 
     release?.()
     await pending
+  })
+
+  describe('会话管理', () => {
+    it('删掉当前会话时从列表移除并清空对话区，服务端已移除的会话不再调 close', async () => {
+      chatMock.chatStream.mockImplementation(streamOf({ type: 'content', text: 'ok' }))
+      conversationServiceMock.queryConversations.mockResolvedValue({
+        code: 200,
+        data: { list: [otherConversation, { ...otherConversation, sessionId: 's-1' }], total: 2 },
+        message: '',
+      })
+      conversationServiceMock.deleteConversations.mockResolvedValue({ code: 200, data: 1, message: '' })
+
+      const session = mountSession()
+      await session.sendMessage('hi', 1)
+      await session.loadConversations()
+
+      const removed = await session.removeConversations(['s-1'])
+
+      expect(removed).toBe(true)
+      expect(conversationServiceMock.deleteConversations).toHaveBeenCalledWith(['s-1'])
+      expect(session.conversations.value.map((conv) => conv.sessionId)).toEqual(['other'])
+      expect(session.sessionId.value).toBe('')
+      expect(session.activeSessionId.value).toBe('')
+      expect(session.messages.value).toEqual([])
+      expect(chatMock.closeChatSession).not.toHaveBeenCalled()
+    })
+
+    it('服务端拒绝删除时列表保持不变，并弹出后端原文', async () => {
+      conversationServiceMock.deleteConversations.mockResolvedValue({ code: 500, data: null, message: '删除失败了' })
+
+      const session = mountSession()
+      session.conversations.value = [otherConversation]
+
+      expect(await session.removeConversations(['other'])).toBe(false)
+      expect(antMessageMock.error).toHaveBeenCalledWith('删除失败了')
+      expect(session.conversations.value).toHaveLength(1)
+    })
+
+    it('回复还在输出时不能删除当前会话', async () => {
+      let release: (() => void) | undefined
+      chatMock.chatStream.mockImplementation(async function* () {
+        await new Promise<void>((resolve) => {
+          release = resolve
+        })
+        yield { type: 'content', text: 'done' }
+      })
+
+      const session = mountSession()
+      const pending = session.sendMessage('hi', 1)
+      await vi.waitUntil(() => session.sending.value)
+
+      expect(await session.removeConversations(['s-1'])).toBe(false)
+      expect(conversationServiceMock.deleteConversations).not.toHaveBeenCalled()
+
+      release?.()
+      await pending
+    })
+
+    it('重命名成功后直接改列表里的标题', async () => {
+      conversationServiceMock.renameConversation.mockResolvedValue({ code: 200, data: null, message: '' })
+
+      const session = mountSession()
+      session.conversations.value = [{ ...otherConversation }]
+
+      expect(await session.renameConversation(session.conversations.value[0]!, '周末计划')).toBe(true)
+      expect(conversationServiceMock.renameConversation).toHaveBeenCalledWith('other', '周末计划')
+      expect(session.conversations.value[0]?.title).toBe('周末计划')
+    })
   })
 
   describe('按帧合并 token', () => {

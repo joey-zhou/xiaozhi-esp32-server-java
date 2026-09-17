@@ -81,8 +81,6 @@ public class RoleResp {
     @Schema(description = "总设备数")
     private Integer totalDevice;
 
-    @Schema(description = "记忆类型")
-    private String memoryType;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "创建时间")
