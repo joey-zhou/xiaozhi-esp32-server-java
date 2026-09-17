@@ -3,6 +3,7 @@ package com.xiaozhi.device.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.DeviceBO;
@@ -11,7 +12,6 @@ import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
 import com.xiaozhi.device.model.DeviceProjection;
-import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.support.MybatisPlusTestHelper;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
 import org.junit.jupiter.api.BeforeAll;
@@ -96,16 +96,6 @@ class DeviceServiceImplTest {
     }
 
     @Test
-    void getReadsProjectionByDeviceIdWithoutCache() {
-        DeviceProjection projection = new DeviceProjection();
-        when(deviceMapper.selectProjectionById("00:11:22")).thenReturn(projection);
-
-        assertThat(deviceService.get("00:11:22")).isSameAs(projection);
-
-        verifyNoInteractions(cacheManager, cacheHelper, deviceConvert);
-    }
-
-    @Test
     void getBOReturnsNullWithoutTouchingCacheWhenDeviceIdBlank() {
         assertThat(deviceService.getBO(" ")).isNull();
 
@@ -118,7 +108,7 @@ class DeviceServiceImplTest {
         deviceDO.setDeviceId("00:11:22");
         DeviceBO deviceBO = new DeviceBO();
 
-        when(cacheManager.getCache(DeviceService.CACHE_NAME)).thenReturn(cache);
+        when(cacheManager.getCache(CacheNames.DEVICE)).thenReturn(cache);
         when(cache.get("00-11-22", DeviceBO.class)).thenReturn(null);
         stubCacheHelperPreferringCache();
         when(deviceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(deviceDO);
@@ -140,7 +130,7 @@ class DeviceServiceImplTest {
     void getBOReturnsCachedValueWithoutQueryingDb() {
         DeviceBO cached = new DeviceBO();
 
-        when(cacheManager.getCache(DeviceService.CACHE_NAME)).thenReturn(cache);
+        when(cacheManager.getCache(CacheNames.DEVICE)).thenReturn(cache);
         when(cache.get("00-11-22", DeviceBO.class)).thenReturn(cached);
         stubCacheHelperPreferringCache();
 

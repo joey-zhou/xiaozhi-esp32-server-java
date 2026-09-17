@@ -1,19 +1,17 @@
 <script setup lang="ts">
 import { ref, reactive, computed, toRef } from 'vue'
-import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { UserOutlined, CameraOutlined } from '@ant-design/icons-vue'
 import type { FormInstance } from 'ant-design-vue'
 import type { Rule } from 'ant-design-vue/es/form'
 import { useUserStore } from '@/store/user'
 import { useAvatar } from '@/composables/useAvatar'
+import { useAvatarUpload } from '@/composables/useAvatarUpload'
 import { useFormValidation } from '@/composables/useFormValidation'
 import { useRequest } from '@/composables/useRequest'
 import { PASSWORD_MIN_LENGTH } from '@/constants/api'
 import { updateUser } from '@/services/user'
-import { uploadFile } from '@/services/upload'
 import type { User, UpdateUserParams } from '@/types/user'
-import type { UploadProps } from 'ant-design-vue'
 
 const { t } = useI18n()
 
@@ -21,6 +19,8 @@ const userStore = useUserStore()
 const { getAvatarUrl } = useAvatar()
 const { confirmPasswordRules, passwordRules } = useFormValidation()
 const { executeOk: executeUpdateAvatar } = useRequest()
+// 资料保存：成功后要用后端回写的用户信息刷新本地缓存
+const { executeFull: executeUpdateProfile } = useRequest()
 
 // 账号页的密码是「留空即不修改」，所以去掉 passwordRules 里的 required，
 // 只保留与后端 UserUpdateReq.password 的 @Size(min=6,max=20) 一致的长度约束
@@ -28,8 +28,6 @@ const optionalPasswordRules = passwordRules.filter((rule) => !rule.required)
 
 const userInfo = computed(() => userStore.userInfo)
 const avatarUrl = computed(() => getAvatarUrl(userInfo.value?.avatar))
-// 头像上传相关状态
-const avatarLoading = ref(false)
 
 // 表单相关
 const formRef = ref<FormInstance>()
@@ -120,8 +118,6 @@ const handleSubmit = async () => {
   try {
     await formRef.value?.validate()
 
-    submitLoading.value = true
-
     const updateData: UpdateUserParams = {
       userId: userInfo.value?.userId,
       username: userInfo.value?.username,
@@ -136,55 +132,34 @@ const handleSubmit = async () => {
       updateData.password = formData.password
     }
     
-    const res = await updateUser(updateData)
-    
-    if (res.code === 200) {
-      // 更新本地用户信息
-      userStore.updateUserInfo(res.data as Partial<User>)
-      message.success(t('account.updateSuccess'))
-      
-      // 清空密码字段（强度条跟着 formData.password 自动回到 0）
-      formData.oldPassword = ''
-      formData.password = ''
-      formData.confirmPassword = ''
-    } else {
-      message.error(res.message || t('account.updateFailed'))
+    const { ok, data } = await executeUpdateProfile(() => updateUser(updateData), {
+      loadingRef: submitLoading,
+      showSuccess: true,
+      successText: t('account.updateSuccess'),
+      errorText: t('account.updateFailed'),
+      networkErrorText: null,
+    })
+
+    if (!ok) {
+      return
     }
+
+    // 更新本地用户信息
+    userStore.updateUserInfo(data as Partial<User>)
+
+    // 清空密码字段（强度条跟着 formData.password 自动回到 0）
+    formData.oldPassword = ''
+    formData.password = ''
+    formData.confirmPassword = ''
   } catch (error) {
     console.error('表单验证失败:', error)
-  } finally {
-    submitLoading.value = false
   }
 }
 
-// 头像上传前检查
-const beforeAvatarUpload: UploadProps['beforeUpload'] = (file) => {
-  const isImage = file.type.startsWith('image/')
-  const isLt2M = file.size / 1024 / 1024 < 2
-
-  if (!isImage) {
-    message.error(t('common.onlyImageFiles'))
-    return false
-  }
-  if (!isLt2M) {
-    message.error(t('common.imageSizeLimit'))
-    return false
-  }
-
-  avatarLoading.value = true
-  uploadFile(file, 'avatar', { fullResponse: true })
-    .then(data => {
-      // 本地存储返回 relativePath（相对路径，避免把主机名写死进库）；
-      // 云存储（MinIO/S3）无 relativePath，存签名 URL，后端会剥签名入库、读取时自动重签
-      updateUserAvatar(data.relativePath || data.url)
-    })
-    .catch(error => {
-      message.error(`${t('common.avatarUploadFailed')}: ${error}`)
-      avatarLoading.value = false
-    })
-
-  return false
-}
+// 头像上传：校验/上传/loading 收敛进 useAvatarUpload，这里只负责拿到路径后立即持久化
+const { avatarAccept, avatarLoading, beforeAvatarUpload } = useAvatarUpload({
+  onUploaded: (avatarPath) => updateUserAvatar(avatarPath)
+})
 
 // 更新用户头像
 // avatarPath 已是待入库值：本地为相对路径，云端为完整 URL（后端负责剥签名/重签名）
@@ -206,9 +181,6 @@ const updateUserAvatar = async (avatarPath: string) => {
       })
     },
   })
-
-  // 上传阶段点亮的遮罩，成败都要在这里熄灭
-  avatarLoading.value = false
 }
 </script>
 
@@ -315,7 +287,7 @@ const updateUserAvatar = async (avatarPath: string) => {
               name="file"
               :show-upload-list="false"
               :before-upload="beforeAvatarUpload"
-              accept=".jpg,.jpeg,.png,.gif"
+              :accept="avatarAccept"
               class="avatar-uploader"
             >
               <div class="avatar-preview">

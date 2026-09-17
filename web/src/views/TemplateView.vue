@@ -41,6 +41,7 @@
       </template>
 
       <a-table
+        class="ellipsis-table"
         :columns="columns"
         :data-source="dataSource"
         :loading="loading"
@@ -49,6 +50,10 @@
         row-key="templateId"
         @change="onTableChange"
       >
+        <template #emptyText>
+          <TableEmptyState :error="loadError" @retry="retryLoad" />
+        </template>
+
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'templateContent'">
             <a-tooltip :title="record.templateContent" placement="leftTop">
@@ -90,7 +95,7 @@
       :title="modal.isEdit.value ? t('template.editTemplate') : t('template.createTemplate')"
       :confirm-loading="modal.submitLoading.value"
       :mask-closable="false"
-      width="800px"
+      width="var(--modal-width-wide)"
       @cancel="modal.close"
     >
       <template #footer>
@@ -180,7 +185,7 @@
       v-model:open="previewVisible"
       :title="t('template.templatePreview')"
       :footer="null"
-      width="800px"
+      width="var(--modal-width-wide)"
     >
       <a-typography v-if="previewTemplate">
         <a-typography-title :level="3">
@@ -218,7 +223,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
-import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { PlusOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
 import type { FormInstance, TableColumnsType } from 'ant-design-vue'
@@ -234,6 +238,7 @@ import { useTable } from '@/composables/useTable'
 import { useModal } from '@/composables/useModal'
 import { useRequest } from '@/composables/useRequest'
 import TableActionButtons from '@/components/TableActionButtons.vue'
+import TableEmptyState from '@/components/TableEmptyState.vue'
 
 const { t } = useI18n()
 
@@ -314,6 +319,8 @@ const {
   data: dataSource,
   loading,
   pagination,
+  loadError,
+  retryLoad,
   fetchData,
   onTableChange,
   debouncedSearch
@@ -341,6 +348,9 @@ const {
 })
 
 const { executeOk: executeSubmit } = useRequest()
+// 行内操作：每个请求一个实例，失败文案互不干扰
+const { executeOk: executeDeleteTemplate } = useRequest()
+const { executeOk: executeSetDefaultTemplate } = useRequest()
 
 const formRef = ref<FormInstance>()
 const modal = useModal<PromptTemplate>({
@@ -418,41 +428,35 @@ const handleEdit = (record: PromptTemplate) => {
 
 // 删除（快速操作，只用 table loading）
 const handleDelete = async (record: PromptTemplate) => {
-  if (!record.templateId) return
-  
-  loading.value = true
-  try {
-    const res = await deleteTemplate(record.templateId!)
-    if (res.code === 200) {
-      message.success(t('template.deleteSuccess'))
-      await fetchData()
-    } else {
-      message.error(res.message || t('template.deleteFailed'))
-    }
-  } catch {
-    message.error(t('template.deleteFailed'))
-  } finally {
-    loading.value = false
+  const templateId = record.templateId
+  if (!templateId) return
+
+  const removed = await executeDeleteTemplate(() => deleteTemplate(templateId), {
+    loadingRef: loading,
+    showSuccess: true,
+    successText: t('template.deleteSuccess'),
+    errorText: t('template.deleteFailed'),
+  })
+
+  if (removed) {
+    await fetchData()
   }
 }
 
 // 设为默认（快速操作，只用 table loading）
 const handleSetDefault = async (record: PromptTemplate) => {
-  if (!record.templateId) return
-  
-  loading.value = true
-  try {
-    const res = await setDefaultTemplate(record.templateId)
-    if (res.code === 200) {
-      message.success(t('template.setDefaultSuccess'))
-      await fetchData()
-    } else {
-      message.error(res.message || t('template.operationFailed'))
-    }
-  } catch {
-    message.error(t('template.operationFailed'))
-  } finally {
-    loading.value = false
+  const templateId = record.templateId
+  if (!templateId) return
+
+  const updated = await executeSetDefaultTemplate(() => setDefaultTemplate(templateId), {
+    loadingRef: loading,
+    showSuccess: true,
+    successText: t('template.setDefaultSuccess'),
+    errorText: t('template.operationFailed'),
+  })
+
+  if (updated) {
+    await fetchData()
   }
 }
 
@@ -510,23 +514,6 @@ fetchData()
 <style scoped>
 .template-container {
   padding: 16px;
-}
-
-.search-card :deep(.ant-form-item) {
-  margin-bottom: 0;
-}
-
-/* 表格文字省略样式，与角色等页面保持一致 */
-.ellipsis-text {
-  display: inline-block;
-  width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-:deep(.ant-table) .ant-table-tbody > tr > td {
-  max-width: 0;
 }
 
 .template-preview-content {

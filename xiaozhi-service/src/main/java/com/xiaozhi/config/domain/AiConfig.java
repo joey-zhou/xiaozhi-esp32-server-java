@@ -202,6 +202,16 @@ public class AiConfig {
         this.configId = configId;
     }
 
+    /**
+     * 回填本次实际落库的时间戳（Repository 专用，不产生信号）。
+     * <p>两个时间戳由 MyBatis-Plus 自动填充生成，聚合根自己算不出来。写路径靠这次回填拿到与库里
+     * 一致的值，出参就不必再查一遍配置表。传 null 表示本次写入没有产生该时间戳，保留原值。
+     */
+    public void markPersisted(LocalDateTime createTime, LocalDateTime updateTime) {
+        if (createTime != null) this.createTime = createTime;
+        if (updateTime != null) this.updateTime = updateTime;
+    }
+
     /** 取出并清空信号队列，供 Repository 发布领域事件。 */
     public List<DomainSignal> pullSignals() {
         List<DomainSignal> s = List.copyOf(signals);

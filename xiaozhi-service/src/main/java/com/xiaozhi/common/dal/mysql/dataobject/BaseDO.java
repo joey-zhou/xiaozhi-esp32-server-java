@@ -1,4 +1,4 @@
-package com.xiaozhi.common.model.dataobject;
+package com.xiaozhi.common.dal.mysql.dataobject;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;

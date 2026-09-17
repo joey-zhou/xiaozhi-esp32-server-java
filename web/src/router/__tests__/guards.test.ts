@@ -88,6 +88,30 @@ describe('router guards', () => {
     expect(next).toHaveBeenCalledWith({ path: '/dashboard' })
   })
 
+  it('已登录但无对应权限时兜底到 403（与登录后落地页计算共用同一份判断）', () => {
+    const hooks = installGuards()
+    const next = vi.fn()
+    userStoreMock.token = 'token-1'
+    userStoreMock.isAdmin = false
+    userStoreMock.hasPermission.mockReturnValue(false)
+
+    hooks.beforeEach?.call(undefined, route('/user', '/user', { permission: 'system:user' }), route('/'), next)
+
+    expect(next).toHaveBeenCalledWith('/403')
+  })
+
+  it('已登录且有对应权限时正常放行', () => {
+    const hooks = installGuards()
+    const next = vi.fn()
+    userStoreMock.token = 'token-1'
+    userStoreMock.isAdmin = false
+    userStoreMock.hasPermission.mockReturnValue(true)
+
+    hooks.beforeEach?.call(undefined, route('/user', '/user', { permission: 'system:user' }), route('/'), next)
+
+    expect(next).toHaveBeenCalledWith()
+  })
+
   it('chunk 加载失败连续发生时不再自动刷新，改为提示用户', () => {
     // 首次失败会挂一个延时刷新，用假定时器挡住，避免 jsdom 真去导航
     vi.useFakeTimers()

@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @Slf4j
@@ -70,13 +71,13 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
         return verifyCodeConvert.toBO(matched.get(0));
     }
 
-    /** 设备码查询条件：非空维度才参与过滤；email 为空把邮箱码那半张表排除在外。 */
+    /** 设备码查询条件：非空维度才参与过滤；account 为空把账号码那半张表排除在外。 */
     private LambdaQueryWrapper<VerifyCodeDO> deviceCodeQuery(String code, String deviceId, String sessionId) {
         return new LambdaQueryWrapper<VerifyCodeDO>()
             .eq(StringUtils.hasLength(deviceId), VerifyCodeDO::getDeviceId, deviceId)
             .eq(StringUtils.hasLength(sessionId), VerifyCodeDO::getSessionId, sessionId)
             .eq(StringUtils.hasLength(code), VerifyCodeDO::getCode, code)
-            .isNull(VerifyCodeDO::getEmail)
+            .isNull(VerifyCodeDO::getAccount)
             .ge(VerifyCodeDO::getCreateTime, validSince());
     }
 
@@ -136,14 +137,22 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
     }
 
     @Override
-    public int createForEmail(String email, String code) {
-        deleteByAccount(email);
-        resetAttempts(email);
+    public String generateForAccount(String account) {
+        if (!StringUtils.hasText(account)) {
+            throw new IllegalArgumentException("账号不能为空");
+        }
+        deleteByAccount(account);
+        resetAttempts(account);
+
+        String code = String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
         VerifyCodeDO verifyCode = new VerifyCodeDO();
-        verifyCode.setEmail(email);
+        verifyCode.setAccount(account);
         verifyCode.setCode(code);
         verifyCode.setCreateTime(LocalDateTime.now());
-        return verifyCodeMapper.insert(verifyCode);
+        if (verifyCodeMapper.insert(verifyCode) <= 0) {
+            throw new IllegalStateException("生成验证码失败");
+        }
+        return code;
     }
 
     @Override
@@ -164,7 +173,7 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
 
         // delete 的影响行数天然是原子的，并发只有一个调用方能拿到 1，重放拿到 0
         int consumed = verifyCodeMapper.delete(new LambdaQueryWrapper<VerifyCodeDO>()
-            .eq(VerifyCodeDO::getEmail, account)
+            .eq(VerifyCodeDO::getAccount, account)
             .eq(VerifyCodeDO::getCode, code)
             .ge(VerifyCodeDO::getCreateTime, validSince()));
         if (consumed > 0) {
@@ -196,7 +205,7 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
             return 0;
         }
         return verifyCodeMapper.delete(new LambdaQueryWrapper<VerifyCodeDO>()
-            .eq(VerifyCodeDO::getEmail, account));
+            .eq(VerifyCodeDO::getAccount, account));
     }
 
     /** 验证码有效期起点。 */

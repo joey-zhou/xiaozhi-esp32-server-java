@@ -11,9 +11,10 @@ import { queryDevices, addDevice, updateDevice, deleteDevice, clearDeviceMemory 
 import { queryRoles } from '@/services/role'
 import DeviceEditDialog from '@/components/DeviceEditDialog.vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
+import TableEmptyState from '@/components/TableEmptyState.vue'
 import type { Device, DeviceQueryParams } from '@/types/device'
 import type { Role } from '@/types/role'
-import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
+import type { TableColumnsType } from 'ant-design-vue'
 
 const { t } = useI18n()
 const { navigateToMemory } = useMemoryView()
@@ -22,16 +23,36 @@ const { navigateToMemory } = useMemoryView()
 const { loading: addingDevice, executeOk: executeAdd } = useRequest()
 const { executeOk: executeInlineUpdate } = useRequest()
 const { loading: clearingMemory, executeOk: executeClearMemory } = useRequest()
+const { execute: executeQueryRoles } = useRequest()
+const { executeOk: executeDeleteDevice } = useRequest()
+const { executeOk: executeUpdateDevice } = useRequest()
 
-// 表格和分页
+// 表格和分页：分页参数由 useTable 注入，查询条件从 queryForm 现取
 const {
   loading,
   data,
   pagination,
-  handleTableChange,
-  loadData,
-  createDebouncedSearch
-} = useTable<Device>()
+  loadError,
+  retryLoad,
+  fetchData,
+  onTableChange,
+  debouncedSearch,
+} = useTable<Device>((params) => {
+  // 重新拉列表时退出行内编辑，避免旧行的编辑框留在新数据上
+  editingKey.value = ''
+
+  const queryParams: DeviceQueryParams = {
+    pageNo: params.pageNo,
+    pageSize: params.pageSize,
+  }
+
+  if (queryForm.deviceId) queryParams.deviceId = queryForm.deviceId
+  if (queryForm.deviceName) queryParams.deviceName = queryForm.deviceName
+  if (queryForm.roleName) queryParams.roleName = queryForm.roleName
+  if (queryForm.state !== '') queryParams.state = queryForm.state
+
+  return queryDevices(queryParams)
+})
 
 
 // 查询表单
@@ -69,23 +90,15 @@ const {
   updateField
 } = useInlineEdit(data, {
   getKey: (item) => item.deviceId,
-  // 表格 loading 由多处共用，仍在这里自己开合
+  // 行内保存与随后的列表刷新共占表格 loading，交给 loadingRef 计数，中间不断
   onSave: async (item) => {
-    loading.value = true
-    try {
-      const updated = await executeInlineUpdate(() => updateDevice(item), {
-        showSuccess: true,
-        successText: t('common.updateSuccess'),
-        errorText: t('common.updateFailed'),
-      })
-
-      if (updated) {
-        await fetchData()
-      }
-      return updated
-    } finally {
-      loading.value = false
-    }
+    return await executeInlineUpdate(() => updateDevice(item), {
+      loadingRef: loading,
+      showSuccess: true,
+      successText: t('common.updateSuccess'),
+      errorText: t('common.updateFailed'),
+      onSuccess: () => fetchData(),
+    })
   }
 })
 
@@ -174,43 +187,18 @@ const columns = computed<TableColumnsType>(() => [
   },
 ])
 
-// 获取设备数据
-async function fetchData() {
-  // 重置编辑状态
-  editingKey.value = ''
-  
-  await loadData((params) => {
-    const queryParams: DeviceQueryParams = {
-      pageNo: params.pageNo,
-      pageSize: params.pageSize,
-    }
-
-    if (queryForm.deviceId) queryParams.deviceId = queryForm.deviceId
-    if (queryForm.deviceName) queryParams.deviceName = queryForm.deviceName
-    if (queryForm.roleName) queryParams.roleName = queryForm.roleName
-    if (queryForm.state !== '') queryParams.state = queryForm.state
-
-    return queryDevices(queryParams)
-  })
-}
-
-// 防抖搜索
-const debouncedSearch = createDebouncedSearch(fetchData, 500)
 
 // 获取角色列表
 async function getRoles() {
-  try {
-    const res = await queryRoles({})
-    if (res.code === 200 && res.data) {
-      roleItems.value = res.data.list
-    }
-  } catch (error) {
-    console.error('获取角色列表失败:', error)
+  // 只是「添加设备」前的可用角色校验，拉不到不打断页面，也不额外弹提示
+  const page = await executeQueryRoles(() => queryRoles({}), { showError: false })
+  if (page) {
+    roleItems.value = page.list
   }
 }
 
 /**
- * 添加设备（保留全局 loading）
+ * 添加设备（有明确的输入框+按钮，用 addingDevice 驱动按钮自身的 loading 即可，不用全屏遮罩）
  */
 async function handleAddDevice(code: string) {
   if (!code) {
@@ -229,8 +217,6 @@ async function handleAddDevice(code: string) {
   }
 
   const added = await executeAdd(() => addDevice(code), {
-    showLoading: true,
-    loadingText: t('common.adding'),
     showSuccess: true,
     successText: t('common.addSuccess'),
     errorText: t('common.addFailed'),
@@ -246,20 +232,16 @@ async function handleAddDevice(code: string) {
  * 删除设备（快速操作，只用 table loading）
  */
 async function handleDeleteDevice(record: Device) {
-  loading.value = true
-  try {
-    const res = await deleteDevice(record.deviceId)
-    if (res.code === 200) {
-      message.success(t('common.deleteSuccess'))
-      await fetchData()
-    } else {
-      message.error(res.message || t('common.deleteFailed'))
-    }
-  } catch (error) {
-    console.error('删除设备失败:', error)
-    message.error(t('common.serverMaintenance'))
-  } finally {
-    loading.value = false
+  const removed = await executeDeleteDevice(() => deleteDevice(record.deviceId), {
+    loadingRef: loading,
+    showSuccess: true,
+    successText: t('common.deleteSuccess'),
+    errorText: t('common.deleteFailed'),
+    networkErrorText: t('common.serverMaintenance'),
+  })
+
+  if (removed) {
+    await fetchData()
   }
 }
 
@@ -267,26 +249,22 @@ async function handleDeleteDevice(record: Device) {
  * 更新设备（弹窗编辑后的更新，只用 table loading）
  */
 async function handleUpdate(device: Device) {
-  loading.value = true
-  try {
-    const res = await updateDevice(device)
-    if (res.code === 200) {
-      message.success(t('common.updateSuccess'))
-      editVisible.value = false
-      await fetchData()
-    } else {
-      message.error(res.message || t('common.updateFailed'))
-    }
-  } catch (error) {
-    console.error('更新设备失败:', error)
-    message.error(t('common.serverMaintenance'))
-  } finally {
-    loading.value = false
+  const updated = await executeUpdateDevice(() => updateDevice(device), {
+    loadingRef: loading,
+    showSuccess: true,
+    successText: t('common.updateSuccess'),
+    errorText: t('common.updateFailed'),
+    networkErrorText: t('common.serverMaintenance'),
+  })
+
+  if (updated) {
+    editVisible.value = false
+    await fetchData()
   }
 }
 
 /**
- * 清除设备记忆（保留全局 loading）
+ * 清除设备记忆（危险操作，全程用全屏遮罩挡住页面，避免误触其他操作）
  */
 async function handleClearMemory(device: Device) {
   const cleared = await executeClearMemory(() => clearDeviceMemory(device.deviceId), {
@@ -351,12 +329,6 @@ function getRoleName(roleId?: number) {
 function getRoleDesc(roleId?: number) {
   if (!roleId) return ''
   return roleItems.value.find((r) => r.roleId === roleId)?.roleDesc || ''
-}
-
-// 处理分页变化
-const onTableChange = (pag: TablePaginationConfig) => {
-  handleTableChange(pag)
-  fetchData()
 }
 
 // 初始化（非阻塞式加载）
@@ -428,6 +400,7 @@ fetchData()
       </template>
 
       <a-table
+        class="ellipsis-table"
         row-key="deviceId"
         :columns="columns"
         :data-source="data"
@@ -437,6 +410,10 @@ fetchData()
         size="middle"
         @change="onTableChange"
       >
+        <template #emptyText>
+          <TableEmptyState :error="loadError" @retry="retryLoad" />
+        </template>
+
         <template #bodyCell="{ column, record }">
           <!-- 设备编号列 -->
           <template v-if="column.dataIndex === 'deviceId'">
@@ -542,8 +519,12 @@ fetchData()
           <!-- 操作列 -->
           <template v-else-if="column.dataIndex === 'operation'">
             <a-space v-if="record.editable">
-              <a @click="() => handleSave(record)">{{ t('common.save') }}</a>
-              <a @click="() => handleCancel(record.deviceId)">{{ t('common.cancel') }}</a>
+              <a-button type="link" size="small" class="table-action-link" @click="() => handleSave(record)">
+                {{ t('common.save') }}
+              </a-button>
+              <a-button type="link" size="small" class="table-action-link" @click="() => handleCancel(record.deviceId)">
+                {{ t('common.cancel') }}
+              </a-button>
             </a-space>
             <TableActionButtons
               v-else
@@ -558,12 +539,15 @@ fetchData()
               @delete="() => handleDeleteDevice(record)"
             >
               <template #actions>
-                <a
+                <a-button
                   v-permission="'system:device:memory'"
+                  type="link"
+                  size="small"
+                  class="table-action-link"
                   @click="() => navigateToMemory({ roleId: record.roleId, deviceId: record.deviceId })"
                 >
                   {{ t('role.memory') }}
-                </a>
+                </a-button>
               </template>
             </TableActionButtons>
           </template>
@@ -592,28 +576,8 @@ fetchData()
   padding: 24px;
 }
 
-.search-card :deep(.ant-form-item) {
-  margin-bottom: 0;
-}
-
 // 表格中的下拉框居中
 :deep(.ant-select-selection-item) {
   text-align: center;
-}
-
-// 表格文字省略样式
-.ellipsis-text {
-  display: inline-block;
-  width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-// 表格单元格样式
-:deep(.ant-table) {
-  .ant-table-tbody > tr > td {
-    max-width: 0;
-  }
 }
 </style>

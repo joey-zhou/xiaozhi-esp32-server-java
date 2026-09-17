@@ -2,11 +2,13 @@
 import { ref, computed } from 'vue'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
-import type { FormInstance, TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
+import type { FormInstance, TableColumnsType } from 'ant-design-vue'
 import { useConfigManager } from '@/composables/useConfigManager'
 import { useUserStore } from '@/store/user'
 import { useConfirm } from '@/composables/useConfirm'
+import { useRequest } from '@/composables/useRequest'
 import TableActionButtons from '@/components/TableActionButtons.vue'
+import TableEmptyState from '@/components/TableEmptyState.vue'
 import type { ConfigType, Config, ConfigField, LLMModel, LlmModelOption } from '@/types/config'
 import { addConfig, updateConfig, testConfig } from '@/services/config'
 import { CODE_CONFIRM_REQUIRED } from '@/constants/api'
@@ -14,6 +16,9 @@ import { CODE_CONFIRM_REQUIRED } from '@/constants/api'
 const { t } = useI18n()
 const userStore = useUserStore()
 const { confirmAsync } = useConfirm()
+// 测试连接与表单提交各自一个实例，失败文案互不干扰
+const { executeOk: executeTestConfig } = useRequest()
+const { executeOk: executeSubmitConfig } = useRequest()
 
 interface Props {
   configType: ConfigType
@@ -31,6 +36,9 @@ const {
   modelOptions,
   pagination,
   queryForm,
+  loadError,
+  retryLoad,
+  typeOptionsLoading,
   configTypeInfo,
   typeOptions,
   currentTypeFields,
@@ -39,11 +47,9 @@ const {
   setAsDefault,
   updateModelOptions,
   getModelsByProviderAndType,
-  handleTableChange,
-  createDebouncedSearch,
+  onTableChange,
+  debouncedSearch,
 } = useConfigManager(props.configType)
-
-const debouncedSearch = createDebouncedSearch(fetchData, 500)
 
 // 敏感字段：编辑时留空表示保持原值
 const SECRET_FIELDS = ['apiKey', 'apiSecret', 'ak', 'sk']
@@ -271,20 +277,19 @@ async function handleTest() {
     }
     submitData.isDefault = formData.value.isDefault == '1' ? '1' : '0'
 
-    testing.value = true
-    const res = await testConfig(submitData)
-
-    if (res.code === 200) {
-      Modal.success({
-        title: t('config.testSuccess'),
-        content: res.message,
-      })
-    } else {
-      Modal.error({
-        title: t('config.testFailed'),
-        content: res.message,
-      })
-    }
+    // 测试结果无论成败都要把后端原文摊给用户看，所以走 Modal 展示、不弹 toast
+    await executeTestConfig(() => testConfig(submitData), {
+      loadingRef: testing,
+      showError: false,
+      networkErrorText: t('config.testFailed'),
+      onSuccess: (_data, res) => {
+        Modal.success({ title: t('config.testSuccess'), content: res.message })
+      },
+      onFailure: (res) => {
+        Modal.error({ title: t('config.testFailed'), content: res.message })
+        return true
+      },
+    })
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'errorFields' in error) {
       antMessage.error(t('config.fillRequiredFields'))
@@ -292,8 +297,6 @@ async function handleTest() {
       console.error('测试配置失败:', error)
       antMessage.error(t('config.testFailed'))
     }
-  } finally {
-    testing.value = false
   }
 }
 
@@ -341,7 +344,6 @@ async function handleSubmit() {
       }
     }
 
-    submitLoading.value = true
     await submitConfig(submitData, false)
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'errorFields' in error) {
@@ -350,8 +352,6 @@ async function handleSubmit() {
       console.error('提交配置失败:', error)
       antMessage.error(t('common.operationFailed'))
     }
-  } finally {
-    submitLoading.value = false
   }
 }
 
@@ -362,32 +362,39 @@ async function handleSubmit() {
  */
 async function submitConfig(submitData: Partial<Config>, confirmStorageSwitch: boolean) {
   const isEditing = !!editingConfigId.value
-  const res = isEditing
-    ? await updateConfig(submitData, confirmStorageSwitch)
-    : await addConfig(submitData, confirmStorageSwitch)
 
-  if (res.code === 200) {
-    antMessage.success(isEditing ? t('config.updateSuccess') : t('config.createSuccess'))
-    resetForm()
-    activeTabKey.value = '1'
-    await fetchData()
-    return
-  }
-
-  if (res.code === CODE_CONFIRM_REQUIRED) {
-    const confirmed = await confirmAsync({
-      title: t('config.storageSwitchTitle'),
-      content: res.message,
-      okText: t('config.storageSwitchOk'),
-      okType: 'danger',
-    })
-    if (confirmed) {
-      await submitConfig(submitData, true)
-    }
-    return
-  }
-
-  antMessage.error(res.message || t('common.operationFailed'))
+  await executeSubmitConfig(
+    () => (isEditing
+      ? updateConfig(submitData, confirmStorageSwitch)
+      : addConfig(submitData, confirmStorageSwitch)),
+    {
+      loadingRef: submitLoading,
+      showSuccess: true,
+      successText: isEditing ? t('config.updateSuccess') : t('config.createSuccess'),
+      errorText: t('common.operationFailed'),
+      networkErrorText: t('common.operationFailed'),
+      onSuccess: async () => {
+        resetForm()
+        activeTabKey.value = '1'
+        await fetchData()
+      },
+      onFailure: async (res) => {
+        if (res.code !== CODE_CONFIRM_REQUIRED) {
+          return false
+        }
+        const confirmed = await confirmAsync({
+          title: t('config.storageSwitchTitle'),
+          content: res.message,
+          okText: t('config.storageSwitchOk'),
+          okType: 'danger',
+        })
+        if (confirmed) {
+          await submitConfig(submitData, true)
+        }
+        return true
+      },
+    },
+  )
 }
 
 /**
@@ -468,12 +475,6 @@ function getModelTypeTag(modelType: string) {
   return tags[modelType] || { text: '-', color: 'default' }
 }
 
-// 处理表格变化
-const onTableChange = (pag: TablePaginationConfig) => {
-  handleTableChange(pag)
-  fetchData()
-}
-
 // 初始化
 fetchData()
 </script>
@@ -486,7 +487,7 @@ fetchData()
         <a-row :gutter="16">
           <a-col :xxl="8" :xl="8" :lg="12" :xs="24">
             <a-form-item :label="t('config.category')">
-              <a-select v-model:value="queryForm.provider" @change="debouncedSearch">
+              <a-select v-model:value="queryForm.provider" :loading="typeOptionsLoading" @change="debouncedSearch">
                 <a-select-option value="">{{ t('common.all') }}</a-select-option>
                 <a-select-option
                   v-for="item in typeOptions"
@@ -543,6 +544,10 @@ fetchData()
             :scroll="{ x: 800 }"
             size="middle"
           >
+            <template #emptyText>
+              <TableEmptyState :error="loadError" @retry="retryLoad" />
+            </template>
+
             <template #bodyCell="{ column, record }">
               <!-- 模型类型列 -->
               <template v-if="column.dataIndex === 'modelType' && configType === 'llm'">
@@ -613,6 +618,7 @@ fetchData()
                   <a-select
                     v-model:value="formData.provider"
                     :placeholder="t('config.selectCategory', { type: t(configTypeInfo.label) })"
+                    :loading="typeOptionsLoading"
                     @change="handleTypeChange"
                   >
                     <a-select-option
@@ -810,21 +816,9 @@ fetchData()
   padding: 24px;
 }
 
-.search-card :deep(.ant-form-item) {
-  margin-bottom: 0;
-}
-
 .field-help {
   margin-top: 4px;
   font-size: 12px;
   color: var(--ant-color-text-tertiary);
-}
-
-.ellipsis-text {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>

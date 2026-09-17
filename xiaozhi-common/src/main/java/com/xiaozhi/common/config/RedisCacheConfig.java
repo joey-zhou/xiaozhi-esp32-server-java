@@ -44,11 +44,12 @@ public class RedisCacheConfig {
         RedisCacheConfiguration defaultConfig = buildConfig(serializer, Duration.ofDays(1));
 
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
-        cacheConfigurations.put("XiaoZhi:Device",        buildConfig(serializer, Duration.ofDays(1)));
-        cacheConfigurations.put("XiaoZhi:Permission",    buildConfig(serializer, Duration.ofDays(7)));
-        cacheConfigurations.put("XiaoZhi:User",          buildConfig(serializer, Duration.ofDays(1)));
-        cacheConfigurations.put("XiaoZhi:SysConfig",     buildConfig(serializer, Duration.ofDays(7)));
-        cacheConfigurations.put("XiaoZhi:McpToolExclude",buildConfig(serializer, Duration.ofDays(7)));
+        cacheConfigurations.put(CacheNames.DEVICE,           buildConfig(serializer, Duration.ofDays(1)));
+        cacheConfigurations.put(CacheNames.PERMISSION,       buildConfig(serializer, Duration.ofDays(7)));
+        cacheConfigurations.put(CacheNames.USER,             buildConfig(serializer, Duration.ofDays(1)));
+        cacheConfigurations.put(CacheNames.SYS_CONFIG,       buildConfig(serializer, Duration.ofDays(7)));
+        cacheConfigurations.put(CacheNames.MCP_TOOL_EXCLUDE, buildConfig(serializer, Duration.ofDays(7)));
+        cacheConfigurations.put(CacheNames.ROLE,             buildConfig(serializer, Duration.ofDays(1)));
 
         // transactionAware：事务回滚时不能把已经写进去的淘汰/回填算数，所以推迟到提交后执行。
         // 代价是事务内的 evict 当次不生效，写完立刻回读会命中旧值——写路径一律走 CacheHelper.evictNow。

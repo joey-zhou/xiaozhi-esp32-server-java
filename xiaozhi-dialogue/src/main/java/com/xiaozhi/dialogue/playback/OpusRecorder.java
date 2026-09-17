@@ -8,6 +8,7 @@ import com.xiaozhi.common.SerialTaskRegistry;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.OpusProcessor;
 import io.jsonwebtoken.lang.Assert;
 import lombok.Getter;
 import lombok.Setter;
@@ -67,9 +68,19 @@ public class OpusRecorder {
         }
     }
 
-    public void onSendOpusFrame(byte[] opusFrame, long timestamp) {
+    /**
+     * 本会话是否在做服务端 AEC。没做的话下发帧不必带着编码前的 PCM，留着只是白占内存
+     */
+    public boolean needsReferencePcm() {
+        return aecService != null && aecService.isActive(session.getSessionId());
+    }
+
+    /**
+     * @param referencePcm 该帧编码前的 PCM，缓存命中直读的帧没有源 PCM，为 null
+     */
+    public void onSendOpusFrame(byte[] opusFrame, byte[] referencePcm, long timestamp) {
         if (aecService != null) {
-            aecService.feedReference(session.getSessionId(), opusFrame, timestamp);
+            aecService.feedReference(session.getSessionId(), opusFrame, referencePcm, timestamp);
         }
 
         if (opusFile == null && assistantMessageCreatedAt != null) {
@@ -84,11 +95,11 @@ public class OpusRecorder {
     }
 
     /**
-     * 静音帧只作为 AEC 参考，不写入录音
+     * 静音帧只作为 AEC 参考，不写入录音。静音帧的源 PCM 是常量，不必解码
      */
     public void onSendSilenceFrame(byte[] opusFrame, long timestamp) {
         if (aecService != null) {
-            aecService.feedReference(session.getSessionId(), opusFrame, timestamp);
+            aecService.feedReference(session.getSessionId(), opusFrame, OpusProcessor.silencePcm(), timestamp);
         }
     }
 

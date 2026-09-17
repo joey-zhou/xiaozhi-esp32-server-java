@@ -198,6 +198,7 @@ public class S3StorageService implements StorageService {
         return queryIdx >= 0 ? url.substring(0, queryIdx) : url;
     }
 
+    @Override
     public void shutdown() {
         s3Client.close();
         s3Presigner.close();

@@ -41,10 +41,11 @@ public class DialogueTurn {
     /** 助手消息创建时间（首 token 时刻），assistantMessage 为 null 时也为 null */
     Instant assistantMessageCreatedAt;
     List<DialogueContext.ToolCallInfo> toolCallDetails;
-    /** 用户音频持久化路径（本地相对路径或云存储完整 URL）。用原始字符串，避免 Path 破坏 URL。 */
-    String userSpeechStoredPath;
-    /** 用户音频时长（秒），在保存音频时用本地文件算好，避免此处重复读文件（云端已删本地文件）。 */
-    Double sttDuration;
+    /**
+     * 本轮用户音频的落盘结果（路径与时长），纯文本轮次为 null。
+     * 落盘与上传异步执行，取值必须等到持久化那一刻——本轮落库排在音频任务之后，届时结果已回填。
+     */
+    UserSpeechAudio userSpeechAudio;
     /**
      * 一轮内按时间顺序排列的工具调用链（可能为空）
      */
@@ -60,8 +61,7 @@ public class DialogueTurn {
             AssistantMessage assistantMessage,
             Usage usage,
             Conversation conversation,
-            String userSpeechStoredPath,
-            Double sttDuration,
+            UserSpeechAudio userSpeechAudio,
             Instant userMessageCreatedAt,
             Instant assistantMessageCreatedAt,
             List<DialogueContext.ToolCallInfo> toolCallDetails,
@@ -77,8 +77,7 @@ public class DialogueTurn {
         this.assistantMessage = assistantMessage;
         this.usage = usage;
         this.conversation = conversation;
-        this.userSpeechStoredPath = userSpeechStoredPath;
-        this.sttDuration = sttDuration;
+        this.userSpeechAudio = userSpeechAudio;
         this.userMessageCreatedAt = userMessageCreatedAt.truncatedTo(ChronoUnit.SECONDS);
         this.assistantMessageCreatedAt = assistantMessageCreatedAt != null
                 ? assistantMessageCreatedAt.truncatedTo(ChronoUnit.SECONDS) : null;
@@ -87,6 +86,22 @@ public class DialogueTurn {
         this.toolCallDetails = toolCallDetails != null ? toolCallDetails : List.of();
         this.toolChains = toolChains != null ? toolChains : List.of();
         this.interrupted = interrupted;
+    }
+
+    /**
+     * 用户音频持久化路径（本地相对路径或云存储完整 URL），没有音频时为 null。
+     * 用原始字符串，避免 Path 把 URL 的 "//" 规整掉。
+     */
+    public String getUserSpeechStoredPath() {
+        return userSpeechAudio != null ? userSpeechAudio.storedPath() : null;
+    }
+
+    /** 用户音频时长（秒），没有音频或还没算出时为 null */
+    public Double getSttDuration() {
+        if (userSpeechAudio == null) {
+            return null;
+        }
+        return userSpeechAudio.duration();
     }
 
     public void injectInstants() {

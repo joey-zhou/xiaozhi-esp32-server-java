@@ -109,7 +109,11 @@ describe('TemplateView 写接口', () => {
 
     expect(message.success).not.toHaveBeenCalled()
     expect(message.error).toHaveBeenCalledTimes(1)
-    expect(message.error).toHaveBeenCalledWith('template.deleteFailed')
+    // 与 request.ts 拦截器共用 message key，覆盖它那条而不是叠第二条
+    expect(message.error).toHaveBeenCalledWith({
+      content: 'template.deleteFailed',
+      key: 'request-error',
+    })
     expect(templateApiMock.queryTemplates).toHaveBeenCalledTimes(1)
   })
 })

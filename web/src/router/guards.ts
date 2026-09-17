@@ -3,6 +3,7 @@ import type { RouteLocationNormalized, Router } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useUserStore } from '@/store/user'
 import { ROUTES, defaultRouteFor } from '@/router/routes'
+import { resolveAuthNavigation } from '@/router/authNavigation'
 import { cancelPendingRequests, isRequestCanceledError } from '@/services/request'
 import { checkToken } from '@/services/user'
 import { i18n } from '@/locales'
@@ -11,9 +12,6 @@ import 'nprogress/nprogress.css'
 
 // 配置 NProgress
 NProgress.configure({ showSpinner: false, speed: 500 })
-
-// 不需要登录的白名单
-const whiteList: string[] = [ROUTES.LOGIN, ROUTES.REGISTER, ROUTES.FORGET]
 
 // chunk 加载失败自动刷新的熔断标记，两次刷新间隔小于该值就不再刷新
 const CHUNK_RELOAD_KEY = 'chunk-reload-at'
@@ -75,72 +73,44 @@ export function setupRouterGuards(router: Router) {
 
     const userStore = useUserStore()
     const hasToken = !!userStore.token
-    const { isAdmin } = userStore
 
-    // 1. 未登录处理
-    if (!hasToken) {
-      if (whiteList.includes(to.path)) {
-        // 在白名单中，直接访问
-        next()
-      } else {
-        // 不在白名单中，跳转到登录页
-        next(`${ROUTES.LOGIN}?redirect=${encodeURIComponent(to.fullPath)}`)
-        NProgress.done()
+    // 权限判断统一走 resolveAuthNavigation，登录后落地页计算（useAuth）与这里共用同一份逻辑，
+    // 避免两处各写一份、后续改一处漏改一处导致放行结果不一致
+    const decision = resolveAuthNavigation(
+      { path: to.path, fullPath: to.fullPath, meta: to.meta },
+      {
+        hasToken,
+        isAdmin: userStore.isAdmin,
+        hasPermission: userStore.hasPermission,
+        hasAnyPermission: userStore.hasAnyPermission,
+      },
+    )
+
+    if (decision.action === 'redirect') {
+      if (decision.reason === 'forbidden') {
+        console.warn(`用户无权限访问: ${to.path}`)
       }
+      next(decision.to)
+      NProgress.done()
       return
     }
 
-    // 2. 已登录处理
+    if (!hasToken) {
+      // 未登录但命中白名单（登录/注册/找回密码），直接放行
+      next()
+      return
+    }
+
+    // 已登录：用后端实时权限覆盖本地缓存，不阻塞本次导航
     syncPermissions(userStore)
 
-    if (to.path === ROUTES.LOGIN) {
-      // 如果已登录，访问登录页则跳转到默认落地页
-      next({ path: defaultRouteFor(isAdmin) })
+    if (to.path === ROUTES.LOGIN || to.path === '/') {
+      // 已登录还访问登录页/根路径，跳转到对应角色的默认落地页
+      next({ path: defaultRouteFor(userStore.isAdmin) })
       NProgress.done()
       return
     }
 
-    // 2.1 处理根路径重定向（根据用户类型跳转到不同首页）
-    if (to.path === '/') {
-      next({ path: defaultRouteFor(isAdmin) })
-      NProgress.done()
-      return
-    }
-
-    // 3. 权限检查
-    if (to.meta.requiresAuth) {
-      // 检查是否需要管理员权限
-      if (to.meta.isAdmin && !isAdmin) {
-        console.warn(`用户无权限访问: ${to.path}`)
-        next(ROUTES.ERROR_403)
-        NProgress.done()
-        return
-      }
-
-      // 检查特定权限
-      if (to.meta.permission) {
-        const hasPermission = userStore.hasPermission(to.meta.permission)
-        if (!hasPermission) {
-          console.warn(`用户无权限访问: ${to.path}, 需要权限: ${to.meta.permission}`)
-          next(ROUTES.ERROR_403)
-          NProgress.done()
-          return
-        }
-      }
-
-      // 检查多个权限（任一即可）
-      if (to.meta.permissions && to.meta.permissions.length > 0) {
-        const hasAnyPermission = userStore.hasAnyPermission(to.meta.permissions)
-        if (!hasAnyPermission) {
-          console.warn(`用户无权限访问: ${to.path}, 需要权限之一: ${to.meta.permissions.join(', ')}`)
-          next(ROUTES.ERROR_403)
-          NProgress.done()
-          return
-        }
-      }
-    }
-
-    // 4. 放行
     next()
   })
 

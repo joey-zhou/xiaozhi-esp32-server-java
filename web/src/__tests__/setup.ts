@@ -5,6 +5,7 @@
 
 // Mock ant-design-vue message 组件（避免在测试中调用真实 DOM 通知）
 // theme 也要给：useAntdTheme 在模块顶层就读 theme.darkAlgorithm，缺了会让引用它的组件整份加载失败
+// ConfigProvider 同理：useAntdTheme 的主题监听里会调 ConfigProvider.config() 同步给静态方法
 vi.mock('ant-design-vue', () => ({
   message: {
     success: vi.fn(),
@@ -25,6 +26,9 @@ vi.mock('ant-design-vue', () => ({
     error: vi.fn(),
     warning: vi.fn(),
   },
+  ConfigProvider: {
+    config: vi.fn(),
+  },
 }))
 
 // Mock vue-i18n
@@ -40,12 +44,14 @@ vi.mock('vue-i18n', () => ({
     locale: { value: 'zh-CN' },
   }),
   // locales/index.ts 在模块顶层就 `export const { t } = i18n.global`，
-  // 返回 undefined 会让任何 import 到 '@/locales' 的模块在求值阶段直接炸
+  // 返回 undefined 会让任何 import 到 '@/locales' 的模块在求值阶段直接炸；
+  // setLocaleMessage 也要给：语言包改成异步加载后，locales/index.ts 顶层就会调用它
   createI18n: vi.fn(() => ({
     global: {
       t: (key: string, params?: Record<string, unknown>) =>
         params ? `${key}:${JSON.stringify(params)}` : key,
       locale: { value: 'zh-CN' },
+      setLocaleMessage: vi.fn(),
     },
   })),
 }))

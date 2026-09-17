@@ -67,7 +67,7 @@ public class SttServiceFactory {
             
             // 检查模型是否真正加载成功
             if (voskService instanceof VoskSttService && !((VoskSttService)voskService).isModelLoaded()) {
-                throw new Exception("Vosk model was not properly loaded");
+                throw new Exception("Vosk 模型加载失败");
             }
             
             serviceCache.put(DEFAULT_PROVIDER, voskService);

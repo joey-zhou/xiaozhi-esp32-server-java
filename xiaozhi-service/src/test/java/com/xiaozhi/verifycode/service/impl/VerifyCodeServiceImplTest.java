@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -130,8 +131,8 @@ class VerifyCodeServiceImplTest {
 
         ArgumentCaptor<LambdaQueryWrapper<VerifyCodeDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(verifyCodeMapper).selectOne(captor.capture());
-        // 设备码与邮箱码同表，漏掉 email IS NULL 会把邮箱码当成设备码返回
-        assertThat(captor.getValue().getTargetSql()).contains("email IS NULL");
+        // 设备码与账号码同表，漏掉 account IS NULL 会把账号码当成设备码返回
+        assertThat(captor.getValue().getTargetSql()).contains("account IS NULL");
     }
 
     @Test
@@ -155,7 +156,7 @@ class VerifyCodeServiceImplTest {
         // 只凭 code 定位设备，多取一条就是为了判断有没有撞码
         assertThat(captor.getValue().getTargetSql())
             .contains("code =")
-            .contains("email IS NULL")
+            .contains("account IS NULL")
             .contains("LIMIT 2");
         assertThat(captor.getValue().getParamNameValuePairs().values()).contains("123456");
     }
@@ -184,7 +185,7 @@ class VerifyCodeServiceImplTest {
         ArgumentCaptor<LambdaQueryWrapper<VerifyCodeDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(verifyCodeMapper).delete(captor.capture());
         assertThat(captor.getValue().getTargetSql())
-            .contains("email =")
+            .contains("account =")
             .contains("code =")
             .contains("createTime >=");
         assertThat(captor.getValue().getParamNameValuePairs().values()).contains("a@b.com", "123456");
@@ -228,7 +229,7 @@ class VerifyCodeServiceImplTest {
         ArgumentCaptor<LambdaQueryWrapper<VerifyCodeDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(verifyCodeMapper).delete(captor.capture());
         assertThat(captor.getValue().getTargetSql())
-            .contains("email =")
+            .contains("account =")
             .doesNotContain("code =");
     }
 
@@ -253,29 +254,50 @@ class VerifyCodeServiceImplTest {
         assertThat(captor.getValue().getSessionId()).isEqualTo("session-1");
         assertThat(captor.getValue().getType()).isEqualTo("bind");
         assertThat(captor.getValue().getCode()).isEqualTo("123456");
-        assertThat(captor.getValue().getEmail()).isNull();
+        assertThat(captor.getValue().getAccount()).isNull();
         assertThat(captor.getValue().getCreateTime()).isBetween(beforeCall, LocalDateTime.now());
     }
 
     @Test
-    void createForEmailDropsPreviousCodesAndAttemptsOfSameAccount() {
+    void generateForAccountDropsPreviousCodesAndAttemptsOfSameAccount() {
         LocalDateTime beforeCall = LocalDateTime.now();
         when(verifyCodeMapper.insert(any(VerifyCodeDO.class))).thenReturn(1);
 
-        assertThat(verifyCodeService.createForEmail("a@b.com", "123456")).isEqualTo(1);
+        String code = verifyCodeService.generateForAccount("a@b.com");
+
+        assertThat(code).matches("\\d{6}");
 
         ArgumentCaptor<LambdaQueryWrapper<VerifyCodeDO>> deleteCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(verifyCodeMapper).delete(deleteCaptor.capture());
-        assertThat(deleteCaptor.getValue().getTargetSql()).contains("email =");
+        assertThat(deleteCaptor.getValue().getTargetSql()).contains("account =");
         assertThat(deleteCaptor.getValue().getParamNameValuePairs().values()).containsExactly("a@b.com");
         verify(stringRedisTemplate).delete(ATTEMPT_KEY);
 
         ArgumentCaptor<VerifyCodeDO> captor = ArgumentCaptor.forClass(VerifyCodeDO.class);
         verify(verifyCodeMapper).insert(captor.capture());
-        assertThat(captor.getValue().getEmail()).isEqualTo("a@b.com");
-        assertThat(captor.getValue().getCode()).isEqualTo("123456");
+        assertThat(captor.getValue().getAccount()).isEqualTo("a@b.com");
+        assertThat(captor.getValue().getCode()).isEqualTo(code);
         assertThat(captor.getValue().getDeviceId()).isNull();
         assertThat(captor.getValue().getCreateTime()).isBetween(beforeCall, LocalDateTime.now());
+    }
+
+    @Test
+    void generateForAccountRejectsBlankAccountWithoutTouchingStorage() {
+        assertThatThrownBy(() -> verifyCodeService.generateForAccount(" "))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("账号不能为空");
+
+        verifyNoInteractions(verifyCodeMapper, stringRedisTemplate);
+    }
+
+    @Test
+    void generateForAccountThrowsWhenInsertMissed() {
+        when(verifyCodeMapper.insert(any(VerifyCodeDO.class))).thenReturn(0);
+
+        // 落库没成功还把码发出去，用户拿着一个库里查不到的码，怎么填都错
+        assertThatThrownBy(() -> verifyCodeService.generateForAccount("a@b.com"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("生成验证码失败");
     }
 
     @Test

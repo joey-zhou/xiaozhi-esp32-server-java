@@ -40,3 +40,46 @@ body {
 .ant-pagination-item-link {
   display: contents;
 }
+
+/* 表格行内操作：用 a-button type="link" 承载键盘可达性，去掉按钮的固定高度与内边距，排版与文字链接一致 */
+.ant-btn.table-action-link {
+  height: auto;
+  padding: 0;
+  border: 0;
+}
+
+/* 搜索区表单：字段之间不需要底部间距，一行铺开显示。原来 12 个页面各自拷贝一份同样的规则，收到这里统一维护 */
+.search-card .ant-form-item {
+  margin-bottom: 0;
+}
+
+/* 表格单元格文字过长时用省略号截断，配合 a-tooltip 展示完整内容。
+   要生效必须搭配 .ellipsis-table：inline-block 自身不会收缩，得靠单元格先把宽度收紧 */
+.ellipsis-text {
+  display: inline-block;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 给 a-table 加这个类，配合 .ellipsis-text 使用：把单元格最大宽度收紧到 0，
+   逼着列宽由 columns 里的 width 决定，内容多的单元格才会走省略号而不是撑开表格 */
+.ellipsis-table .ant-table-tbody > tr > td {
+  max-width: 0;
+}
+
+/*
+ * 弹窗宽度分档：按内容量选一档，不做统一宽度。
+ * compact  520px  单值编辑 / 快速操作（改名、新增一个编码、注册声纹等 1~2 个字段）
+ * form     640px  常规表单（单栏布局，3~8 个字段）
+ * wide     800px  宽表单（多栏布局、长文本域、文件上传等内容较多的表单）
+ * content  960px  超宽展示/工具型内容（并排对比、内嵌结果列表等不涉及表单保存的弹窗）
+ * 纯数据浏览类弹窗（如工具列表）本身就是一张表格，仍按 100% 处理，不纳入以下分档
+ */
+:root {
+  --modal-width-compact: 520px;
+  --modal-width-form: 640px;
+  --modal-width-wide: 800px;
+  --modal-width-content: 960px;
+}

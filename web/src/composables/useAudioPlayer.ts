@@ -3,15 +3,41 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { testVoice } from '@/services/role'
 import { getResourceUrl } from '@/utils/resource'
+import { useRequest } from '@/composables/useRequest'
+
+/**
+ * 通过 API 试听音色的参数
+ */
+export interface PlayAudioFromApiParams {
+  /** 音色名称（标准音色名，或克隆音色的 cloneId） */
+  voiceName: string
+  /** TTS 配置 ID */
+  ttsId: number
+  /** TTS 提供商 */
+  provider: string
+  /** 播放态标识：isPlaying/loading 与调用方 UI 高亮都按它匹配 */
+  audioId: string
+  /** 测试文本，缺省时用统一的试听文案 */
+  testMessage?: string
+  ttsPitch?: number
+  ttsSpeed?: number
+  /**
+   * 音频缓存 key，默认等于 audioId。
+   * 语速/语调等参数变了就是另一段音频，需要单独区分时传入区分好的 key，
+   * 否则命中缓存会放出旧参数合成的试听音频
+   */
+  cacheKey?: string
+}
 
 /**
  * 音频播放 Composable
  * 统一封装音频播放逻辑，支持两种模式：
- * 1. 直接播放音频路径
- * 2. 通过API获取音频再播放
+ * 1. 直接播放已知地址的音频（已合成好的试听音频等）
+ * 2. 通过 API 合成音色试听音频再播放，命中缓存时直接复用，不重复调用（可能计费的）合成接口
  */
 export function useAudioPlayer() {
   const { t } = useI18n()
+  const { executeFull: executeTestVoice } = useRequest()
 
   // 播放状态
   const playingAudioId = ref<string>('')
@@ -19,150 +45,140 @@ export function useAudioPlayer() {
   const audioCache = new Map<string, HTMLAudioElement>()
 
   /**
-   * 直接播放音频文件（用于剧本脚本播放）
+   * 绑定播放结束/出错回调。出错时把缓存一并删掉，避免一段坏链接的音频卡在缓存里，
+   * 下次点播放永远失败也永远不会重新去请求
+   */
+  const bindAudioEvents = (audio: HTMLAudioElement, audioId: string, cacheKey: string) => {
+    audio.onended = () => {
+      if (playingAudioId.value === audioId) {
+        playingAudioId.value = ''
+      }
+    }
+
+    audio.onerror = () => {
+      message.error(t('common.audioPlayFailed'))
+      if (playingAudioId.value === audioId) {
+        playingAudioId.value = ''
+      }
+      audioCache.delete(cacheKey)
+    }
+  }
+
+  /**
+   * 直接播放已知地址的音频（已合成好的试听音频等）
    * @param audioPath 音频路径
-   * @param audioId 音频唯一标识
+   * @param audioId 音频唯一标识，同时用作缓存 key
    */
   const playAudioDirect = async (audioPath: string, audioId: string): Promise<boolean> => {
     try {
       // 如果正在播放同一个音频，则停止
       if (playingAudioId.value === audioId) {
-        const audio = audioCache.get(audioId)
-        if (audio) {
-          audio.pause()
-          audio.currentTime = 0
-        }
-        playingAudioId.value = ''
+        stopAllAudio()
         return true
       }
 
       // 停止其他正在播放的音频
       stopAllAudio()
 
-      // 创建或获取音频元素
+      // 命中缓存直接复用，不重复解析地址
       let audio = audioCache.get(audioId)
       if (!audio) {
-        audio = new Audio()
+        const audioUrl = getResourceUrl(audioPath)
+        if (!audioUrl) {
+          message.error(t('common.audioPathInvalid'))
+          return false
+        }
+
+        audio = new Audio(audioUrl)
         audioCache.set(audioId, audio)
-
-        // 设置音频结束回调
-        audio.onended = () => {
-          if (playingAudioId.value === audioId) {
-            playingAudioId.value = ''
-          }
-        }
-
-        // 设置错误回调
-        audio.onerror = () => {
-          message.error(t('common.audioPlayFailed'))
-          if (playingAudioId.value === audioId) {
-            playingAudioId.value = ''
-          }
-        }
+        bindAudioEvents(audio, audioId, audioId)
       }
 
-      // 设置音频源并播放
-      const audioUrl = getResourceUrl(audioPath)
-      if (!audioUrl) {
-        message.error(t('common.audioPathInvalid'))
-        return false
-      }
-      
-      audio.src = audioUrl
-      
       await audio.play()
       playingAudioId.value = audioId
 
       return true
-    } catch {
-      // 播放失败，清除播放状态
-      // 注意：不在这里显示错误提示，因为 audio.onerror 会处理错误提示
+    } catch (error) {
+      // audio.onerror 已经报过一次；这里捕获的是 play() 本身被拒绝的情况（如浏览器自动播放限制）
+      console.error('直接播放音频失败:', error)
       playingAudioId.value = ''
       return false
     }
   }
 
   /**
-   * 通过API测试音色并播放（用于音色测试）
-   * @param voiceName 音色名称
-   * @param ttsId TTS配置ID
-   * @param provider TTS提供商
-   * @param audioId 音频唯一标识
-   * @param testMessage 测试文本
+   * 通过 API 合成音色试听音频并播放。
+   * 命中缓存时直接复用已播放过的音频、不再调用合成接口，避免每次点听都对按次计费的音色重复扣费
    */
-  const playAudioFromApi = async (
-    voiceName: string,
-    ttsId: number,
-    provider: string,
-    audioId: string,
-    testMessage?: string
-  ): Promise<boolean> => {
+  const playAudioFromApi = async (params: PlayAudioFromApiParams): Promise<boolean> => {
+    const {
+      voiceName,
+      ttsId,
+      provider,
+      audioId,
+      testMessage,
+      ttsPitch,
+      ttsSpeed,
+      cacheKey = audioId,
+    } = params
+
     try {
       // 如果正在播放同一个音频，则停止
       if (playingAudioId.value === audioId) {
-        const audio = audioCache.get(audioId)
-        if (audio) {
-          audio.pause()
-          audio.currentTime = 0
-        }
-        playingAudioId.value = ''
+        stopAllAudio()
         return true
       }
 
       // 停止其他正在播放的音频
       stopAllAudio()
 
-      // 设置loading状态（API请求期间）
-      loadingAudioId.value = audioId
-      
-      const res = await testVoice({
-        voiceName,
-        ttsId,
-        provider,
-        message: testMessage || t('role.voiceTestMessage')
-      })
-
-      // 清除loading状态
-      loadingAudioId.value = ''
-
-      if (res.code !== 200 || !res.data?.audioUrl) {
-        message.error(res.message || t('common.audioGenerateFailed'))
-        return false
-      }
-
-      // 创建或获取音频元素
-      let audio = audioCache.get(audioId)
+      // 命中缓存直接复用，跳过合成接口
+      let audio = audioCache.get(cacheKey)
       if (!audio) {
-        audio = new Audio()
-        audioCache.set(audioId, audio)
+        // 设置loading状态（API请求期间）
+        loadingAudioId.value = audioId
 
-        // 设置音频结束回调
-        audio.onended = () => {
-          if (playingAudioId.value === audioId) {
-            playingAudioId.value = ''
-          }
+        const { ok, data } = await executeTestVoice(
+          () => testVoice({
+            voiceName,
+            ttsId,
+            provider,
+            message: testMessage || t('role.voiceTestMessage'),
+            ttsPitch,
+            ttsSpeed,
+          }),
+          {
+            errorText: t('common.audioGenerateFailed'),
+            networkErrorText: t('common.audioTestFailed'),
+          },
+        )
+
+        // 清除loading状态
+        loadingAudioId.value = ''
+
+        if (!ok) {
+          return false
         }
 
-        // 设置错误回调
-        audio.onerror = () => {
-          message.error(t('common.audioPlayFailed'))
-          if (playingAudioId.value === audioId) {
-            playingAudioId.value = ''
-          }
+        // 业务码 200 但没给音频地址，同样按合成失败处理
+        if (!data?.audioUrl) {
+          message.error(t('common.audioGenerateFailed'))
+          return false
         }
+
+        const audioUrl = getResourceUrl(data.audioUrl)
+        if (!audioUrl) {
+          message.error(t('common.audioPathInvalid'))
+          return false
+        }
+
+        audio = new Audio(audioUrl)
+        audioCache.set(cacheKey, audio)
+        bindAudioEvents(audio, audioId, cacheKey)
       }
 
-      // 设置音频源并播放
-      const audioUrl = getResourceUrl(res.data.audioUrl)
-      if (!audioUrl) {
-        message.error(t('common.audioPathInvalid'))
-        return false
-      }
-      
-      audio.src = audioUrl
-      
       await audio.play()
-      
+
       // 播放成功后设置playing状态
       playingAudioId.value = audioId
 
@@ -237,4 +253,3 @@ export function useAudioPlayer() {
     clearAudioCache
   }
 }
-

@@ -10,7 +10,6 @@ import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.dal.mysql.dataobject.UserDO;
 import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
 import com.xiaozhi.user.model.UserProjection;
-import com.xiaozhi.verifycode.service.VerifyCodeService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,12 +23,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -49,9 +46,6 @@ class UserServiceImplTest {
 
     @Mock
     private UserConvert userConvert;
-
-    @Mock
-    private VerifyCodeService verifyCodeService;
 
     @Mock
     private CacheManager cacheManager;
@@ -135,6 +129,30 @@ class UserServiceImplTest {
     }
 
     @Test
+    void updateReturnsThePersistedRowSoCallersNeedNoSecondQuery() {
+        UserBO patch = new UserBO();
+        patch.setUserId(7);
+        patch.setName("新名字");
+
+        UserDO stored = new UserDO();
+        stored.setUserId(7);
+        UserBO persisted = new UserBO();
+        persisted.setUserId(7);
+        persisted.setName("新名字");
+
+        when(userMapper.selectById(7)).thenReturn(stored);
+        when(userMapper.updateById(stored)).thenReturn(1);
+        when(userConvert.toBO(stored)).thenReturn(persisted);
+
+        UserBO result = userService.update(patch);
+
+        // 出参就是「库里那行 + 本次改动」，调用方不必写完再查一遍
+        assertThat(result).isSameAs(persisted);
+        verify(userMapper).selectById(7);
+        verify(userConvert).updateDO(patch, stored);
+    }
+
+    @Test
     void updateThrowsWhenUserNotFound() {
         UserBO user = new UserBO();
         user.setUserId(999);
@@ -144,40 +162,6 @@ class UserServiceImplTest {
         assertThatThrownBy(() -> userService.update(user))
             .isInstanceOf(ResourceNotFoundException.class)
             .hasMessage("用户不存在");
-    }
-
-    @Test
-    void generateCaptchaThrowsWhenAccountBlank() {
-        assertThatThrownBy(() -> userService.generateCaptcha(" "))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("账号不能为空");
-    }
-
-    @Test
-    void generateCaptchaReturnsSixDigitCodeItPersisted() {
-        when(verifyCodeService.createForEmail(eq("a@b.com"), anyString())).thenReturn(1);
-
-        String code = userService.generateCaptcha("a@b.com");
-
-        assertThat(code).matches("\\d{6}");
-        verify(verifyCodeService).createForEmail("a@b.com", code);
-    }
-
-    @Test
-    void consumeCaptchaReturnsFalseWithoutQueryWhenArgumentBlank() {
-        assertThat(userService.consumeCaptcha(" ", "123456")).isFalse();
-        assertThat(userService.consumeCaptcha("a@b.com", " ")).isFalse();
-
-        verifyNoInteractions(verifyCodeService);
-    }
-
-    @Test
-    void consumeCaptchaConsumesCodeThroughVerifyCodeService() {
-        when(verifyCodeService.consumeByAccount("a@b.com", "123456")).thenReturn(true);
-
-        assertThat(userService.consumeCaptcha("a@b.com", "123456")).isTrue();
-
-        verify(verifyCodeService).consumeByAccount("a@b.com", "123456");
     }
 
     @Test

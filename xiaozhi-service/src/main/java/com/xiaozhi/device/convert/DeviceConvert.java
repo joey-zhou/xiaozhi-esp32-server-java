@@ -4,6 +4,7 @@ import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
+import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.model.DeviceProjection;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -34,4 +35,16 @@ public interface DeviceConvert {
     @Mapping(target = "audioPath", ignore = true)
     @Mapping(target = "mcpList", ignore = true)
     DeviceResp toResp(DeviceProjection projection);
+
+    /**
+     * 写路径出参：设备字段取自刚落库的聚合根，角色名由调用方把手上已有的传进来
+     * （聚合根上只有 roleId，roleName 是分页 SQL 才 JOIN 出来的列）。
+     * <p>sessionId / code / audioPath / mcpList 不属于这几个写接口的返回内容，保持留空。
+     */
+    @Mapping(target = "roleName", source = "roleName")
+    @Mapping(target = "sessionId", ignore = true)
+    @Mapping(target = "code", ignore = true)
+    @Mapping(target = "audioPath", ignore = true)
+    @Mapping(target = "mcpList", ignore = true)
+    DeviceResp toResp(Device device, String roleName);
 }

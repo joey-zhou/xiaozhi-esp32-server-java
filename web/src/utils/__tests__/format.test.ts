@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   formatCompact,
   formatDecimal,
+  formatDuration,
   formatMilliseconds,
   formatPercentage,
   formatBytes,
+  formatSecondsToClock,
 } from '../format'
 
 describe('formatCompact', () => {
@@ -91,6 +93,43 @@ describe('formatMilliseconds', () => {
   })
 })
 
+describe('formatDuration', () => {
+  it('返回 "--" 当值为 undefined、null 或 NaN', () => {
+    expect(formatDuration(undefined)).toBe('--')
+    expect(formatDuration(null as unknown as undefined)).toBe('--')
+    expect(formatDuration(NaN)).toBe('--')
+  })
+
+  it('返回 "--" 当值为 0：这类耗时指标的 0 通常代表尚无样本，不是真测出来的零耗时', () => {
+    expect(formatDuration(0)).toBe('--')
+  })
+
+  it('可自定义空值/0 时的返回', () => {
+    expect(formatDuration(undefined, '-')).toBe('-')
+    expect(formatDuration(0, '-')).toBe('-')
+  })
+
+  it('小于1ms保留2位小数', () => {
+    expect(formatDuration(0.456)).toBe('0.46 ms')
+  })
+
+  it('1ms~1000ms取整显示', () => {
+    expect(formatDuration(1)).toBe('1 ms')
+    expect(formatDuration(123.6)).toBe('124 ms')
+    expect(formatDuration(999)).toBe('999 ms')
+  })
+
+  it('大于等于1000ms换算成秒并保留2位小数', () => {
+    expect(formatDuration(1000)).toBe('1.00 s')
+    expect(formatDuration(5234)).toBe('5.23 s')
+  })
+
+  it('负数按绝对值判断量级，符号保留在结果里', () => {
+    expect(formatDuration(-5000)).toBe('-5.00 s')
+    expect(formatDuration(-500)).toBe('-500 ms')
+  })
+})
+
 describe('formatPercentage', () => {
   it('返回 "--" 当值为 undefined', () => {
     expect(formatPercentage(undefined)).toBe('--')
@@ -144,5 +183,31 @@ describe('formatBytes', () => {
   it('负数保留符号：脏数据要看得见，不能抹成正数', () => {
     expect(formatBytes(-1024)).toBe('-1.0 KB')
     expect(formatBytes(-512)).toBe('-512 B')
+  })
+})
+
+describe('formatSecondsToClock', () => {
+  it('格式化为 "分:秒"，秒数不足两位补零', () => {
+    expect(formatSecondsToClock(5)).toBe('0:05')
+    expect(formatSecondsToClock(65)).toBe('1:05')
+    expect(formatSecondsToClock(125)).toBe('2:05')
+  })
+
+  it('秒数刚好两位不额外补零', () => {
+    expect(formatSecondsToClock(90)).toBe('1:30')
+  })
+
+  it('超过99分钟不封顶，直接显示三位及以上分钟数', () => {
+    expect(formatSecondsToClock(6000)).toBe('100:00')
+  })
+
+  it('小数部分舍去', () => {
+    expect(formatSecondsToClock(65.9)).toBe('1:05')
+  })
+
+  it('空值、NaN、负数一律按0秒处理', () => {
+    expect(formatSecondsToClock(undefined)).toBe('0:00')
+    expect(formatSecondsToClock(NaN)).toBe('0:00')
+    expect(formatSecondsToClock(-5)).toBe('0:00')
   })
 })

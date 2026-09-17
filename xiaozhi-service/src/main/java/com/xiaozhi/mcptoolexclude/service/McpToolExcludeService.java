@@ -5,8 +5,6 @@ import java.util.Set;
 
 public interface McpToolExcludeService {
 
-    String CACHE_NAME = "XiaoZhi:McpToolExclude";
-
     Set<String> getExcludedTools(Integer roleId);
 
     void toggleRoleToolStatus(Integer roleId, String toolName, String serverName, boolean enabled);

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.bo.UserBO;
@@ -13,15 +14,12 @@ import com.xiaozhi.user.dal.mysql.dataobject.UserDO;
 import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
 import com.xiaozhi.user.model.UserProjection;
 import com.xiaozhi.user.service.UserService;
-import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -33,9 +31,6 @@ public class UserServiceImpl implements UserService {
 
     @Resource
     private UserConvert userConvert;
-
-    @Resource
-    private VerifyCodeService verifyCodeService;
 
     @Resource
     private CacheManager cacheManager;
@@ -54,7 +49,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Cacheable(value = CACHE_NAME, key = "'bo:' + #userId", condition = "#userId != null",
+    @Cacheable(value = CacheNames.USER, key = "'bo:' + #userId", condition = "#userId != null",
         unless = "#result == null")
     public UserBO getBO(Integer userId) {
         if (userId == null) {
@@ -134,7 +129,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void update(UserBO user) {
+    public UserBO update(UserBO user) {
         if (user == null || user.getUserId() == null) {
             throw new IllegalArgumentException("用户信息不完整");
         }
@@ -168,27 +163,10 @@ public class UserServiceImpl implements UserService {
         }
         // 不用 @CacheEvict：缓存是事务感知的，注解那次淘汰要等提交后才生效，
         // 同一个事务里写完紧接着 getBO 会读到旧值，接口返回给前端的就是改动前的资料
-        CacheHelper.evictNow(cacheManager.getCache(CACHE_NAME), "bo:" + user.getUserId());
-    }
-
-    @Override
-    public String generateCaptcha(String account) {
-        if (!StringUtils.hasText(account)) {
-            throw new IllegalArgumentException("账号不能为空");
-        }
-        String code = String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
-        if (verifyCodeService.createForEmail(account, code) <= 0) {
-            throw new IllegalStateException("生成验证码失败");
-        }
-        return code;
-    }
-
-    @Override
-    public boolean consumeCaptcha(String account, String code) {
-        if (!StringUtils.hasText(account) || !StringUtils.hasText(code)) {
-            return false;
-        }
-        return verifyCodeService.consumeByAccount(account, code);
+        CacheHelper.evictNow(cacheManager.getCache(CacheNames.USER), "bo:" + user.getUserId());
+        // existing 是「库里那行 + 本次改动」，updateTime 也已由自动填充写回，
+        // 直接转成 BO 返回，调用方拿完整资料不必再查一次用户表
+        return userConvert.toBO(existing);
     }
 
     @Override

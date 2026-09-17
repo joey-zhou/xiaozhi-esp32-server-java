@@ -60,7 +60,7 @@ class OpusRecorderTest {
         recorder.setAssistantMessageCreatedAt(createdAt);
         List<byte[]> frames = opusFrames(3);
 
-        frames.forEach(frame -> recorder.onSendOpusFrame(frame, 1000L));
+        frames.forEach(frame -> recorder.onSendOpusFrame(frame, PCM, 1000L));
         recorder.onSendStop();
 
         long samplesPerFrame = new OpusAudioData(frames.get(0)).getNumberOfSamples();
@@ -76,14 +76,15 @@ class OpusRecorderTest {
         recorder.setAssistantMessageCreatedAt(createdAt);
         byte[] silence = OpusProcessor.silenceFrame();
 
-        recorder.onSendOpusFrame(opusFrames(1).get(0), 1000L);
+        recorder.onSendOpusFrame(opusFrames(1).get(0), PCM, 1000L);
         recorder.onSendSilenceFrame(silence, 1060L);
         recorder.onSendSilenceFrame(silence, 1120L);
         recorder.onSendStop();
 
         // 三帧都作为 AEC 参考出让，只有真帧写进录音
-        verify(aecService, times(3)).feedReference(any(), any(), anyLong());
-        verify(aecService).feedReference(any(), eq(silence), eq(1060L));
+        verify(aecService, times(3)).feedReference(any(), any(), any(), anyLong());
+        // 静音帧的参考信号是常量 PCM，不走解码
+        verify(aecService).feedReference(any(), eq(silence), eq(OpusProcessor.silencePcm()), eq(1060L));
         assertThat(granulePositions(audioPath(createdAt))).hasSize(1);
     }
 
@@ -91,14 +92,14 @@ class OpusRecorderTest {
     void newStartClosesPreviousFileAndRestartsGranule() throws IOException {
         Instant first = Instant.ofEpochMilli(1_700_000_002_000L);
         recorder.setAssistantMessageCreatedAt(first);
-        recorder.onSendOpusFrame(opusFrames(1).get(0), 1000L);
+        recorder.onSendOpusFrame(opusFrames(1).get(0), PCM, 1000L);
 
         // 上一条回复的文件没关就来了新一轮，必须先收尾再开新文件
         Instant second = Instant.ofEpochMilli(1_700_000_003_000L);
         recorder.setAssistantMessageCreatedAt(second);
         recorder.onSendStart();
         List<byte[]> frames = opusFrames(2);
-        frames.forEach(frame -> recorder.onSendOpusFrame(frame, 2000L));
+        frames.forEach(frame -> recorder.onSendOpusFrame(frame, PCM, 2000L));
         recorder.onSendStop();
 
         long samplesPerFrame = new OpusAudioData(frames.get(0)).getNumberOfSamples();
@@ -110,11 +111,11 @@ class OpusRecorderTest {
     @Test
     void noFileCreatedWithoutAssistantTimestamp() throws IOException {
         // 问候语、告别语没有对应的 assistant 消息，不建文件但仍要喂 AEC
-        recorder.onSendOpusFrame(opusFrames(1).get(0), 1000L);
+        recorder.onSendOpusFrame(opusFrames(1).get(0), PCM, 1000L);
         recorder.onSendStop();
 
         verify(session, never()).getAudioPath(any(), any());
-        verify(aecService).feedReference(any(), any(), anyLong());
+        verify(aecService).feedReference(any(), any(), any(), anyLong());
         try (Stream<Path> files = Files.list(tempDir)) {
             assertThat(files).isEmpty();
         }
@@ -147,6 +148,9 @@ class OpusRecorderTest {
         return positions;
     }
 
+    /** 编码前的 PCM 占位，只用于占住 onSendOpusFrame 的参考信号入参 */
+    private static final byte[] PCM = new byte[AudioUtils.FRAME_SIZE * 2];
+
     /** 由真实编码器生成 count 个 60ms 非静音 Opus 帧 */
     private static List<byte[]> opusFrames(int count) {
         int samples = AudioUtils.FRAME_SIZE * count;
@@ -156,7 +160,9 @@ class OpusRecorderTest {
             pcm[i * 2] = (byte) (value & 0xFF);
             pcm[i * 2 + 1] = (byte) ((value >> 8) & 0xFF);
         }
-        List<byte[]> frames = new OpusProcessor().pcmToOpus(pcm, false);
+        List<byte[]> frames = new OpusProcessor().pcmToOpus(pcm, false).stream()
+                .map(OpusProcessor.EncodedFrame::opus)
+                .toList();
         assertThat(frames).hasSize(count);
         return frames;
     }

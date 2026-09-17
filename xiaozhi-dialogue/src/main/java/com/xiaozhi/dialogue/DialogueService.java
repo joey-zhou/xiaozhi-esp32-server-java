@@ -17,9 +17,11 @@ import com.xiaozhi.dialogue.audio.AecService;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.runtime.GoodbyeMessageSupplier;
 import com.xiaozhi.dialogue.runtime.Persona;
+import com.xiaozhi.dialogue.runtime.UserSpeechAudio;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.event.ChatAbortedEvent;
 import com.xiaozhi.event.SpeechRecognizedEvent;
+import com.xiaozhi.common.SerialTaskRegistry;
 
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
@@ -325,15 +327,16 @@ public class DialogueService{
                 // 从这里到 chat 接管之间本轮也算活跃，紧接着的第二句才能打断本句
                 long epoch = persona.prepareTurn();
                 try {
+                    // 音频保存：只在这里定路径，落盘与上传异步做，不占首字时间。
+                    // 必须排在本轮任何可能触发落库的动作之前入队，落库才读得到回填后的路径
+                    UserSpeechAudio userAudio =
+                            new UserSpeechAudio(session.getAudioPath(MessageBO.SENDER_USER, Instant.now()));
+                    session.setUserSpeechAudio(userAudio);
+                    saveUserAudio(session, userAudio);
+
                     // 发布语音识别完成事件
                     eventPublisher.publishEvent(new SpeechRecognizedEvent(this, sessionId, sttResult.text(),
                             sttResult.hasEmotion() ? sttResult.emotion() : null));
-
-                    // 音频保存
-                    Instant userInstant = Instant.now();
-                    Path userAudioPath = session.getAudioPath(MessageBO.SENDER_USER, userInstant);
-                    session.setUserAudioPath(userAudioPath);
-                    saveUserAudio(session, userAudioPath);
 
                     handleText(session, sttResult, epoch);
                 } finally {
@@ -398,6 +401,8 @@ public class DialogueService{
      * @param sttResult STT结果（纯文本使用 SttResult.textOnly() 包装）
      */
     public void handleText(ChatSession session, SttResult sttResult) {
+        // 文本入口没有本轮音频，清掉上一轮的落盘结果，否则这条文本消息会挂上一轮的录音
+        session.setUserSpeechAudio(null);
         handleText(session, sttResult, null);
     }
 
@@ -545,9 +550,6 @@ public class DialogueService{
     }
 
     /**
-     * 保存用户音频数据为WAV文件
-     */
-    /**
      * 落盘唤醒词前置音频。解码与上传都不能拖慢问候语，整段放虚拟线程。
      */
     private void saveWakeWordAudio(ChatSession session) {
@@ -576,28 +578,47 @@ public class DialogueService{
         });
     }
 
-    private void saveUserAudio(ChatSession session, Path path) {
+    /**
+     * 保存本轮用户音频：写 WAV + 上传对象存储。
+     * <p>
+     * 整段排进会话串行队列异步执行。这段磁盘 I/O 加网络 I/O 原本卡在 STT 终稿与 LLM 请求之间，
+     * 直接叠加在每轮的首字延迟上，对象存储抖动时用户能明显感知。
+     * 结果回填到本轮的 {@link UserSpeechAudio}，本轮消息落库排在同一条队列的后面，读得到。
+     * 代价是对象存储卡住时本轮消息落库会一起延后，但落库本来就不在用户能感知的路径上。
+     * <p>
+     * PCM 必须在当前线程取走：下一轮 SPEECH_START 会清空 VAD 缓冲，异步任务里再取就是空的。
+     */
+    void saveUserAudio(ChatSession session, UserSpeechAudio audio) {
         List<byte[]> pcmFrames = vadService.getPcmData(session.getSessionId());
-        byte[] fullPcmData = AudioUtils.joinPcmFrames(pcmFrames);
-        if (fullPcmData.length == 0) {
-            return;
-        }
-        AudioUtils.saveAsWav(path, fullPcmData);
-        log.debug("用户音频已保存: {}", path);
+        SerialTaskRegistry.submit(session.getSessionId(), () -> {
+            Path path = audio.localPath();
+            String storedPath = null;
+            double duration = -1;
+            try {
+                byte[] fullPcmData = AudioUtils.joinPcmFrames(pcmFrames);
+                if (fullPcmData.length > 0) {
+                    AudioUtils.saveAsWav(path, fullPcmData);
+                    log.debug("用户音频已保存: {}", path);
 
-        // 时长必须在上传前用本地文件算好：上传云存储后本地文件会被删除，
-        // 且云端 storedPath（完整 URL）无法当作本地文件读取。
-        session.setSttDuration(AudioUtils.getAudioDuration(path));
+                    // 时长必须在上传前用本地文件算好：上传云存储后本地文件会被删除，
+                    // 且云端 storedPath（完整 URL）无法当作本地文件读取。
+                    duration = AudioUtils.getAudioDuration(path);
 
-        // 默认持久化路径为本地相对路径；上传成功则替换为云存储返回的 storedPath（可能是完整 URL）。
-        // storedPath 以原始 String 保存，不能经 Path.of 转换——否则 URL 的 "//" 会被规整成 "/"。
-        String storedPath = path.toString();
-        try {
-            storedPath = storageServiceFactory.getStorageService().upload(path, path.toString());
-        } catch (Exception e) {
-            log.warn("上传用户音频失败，保留本地路径: {}", path, e);
-        }
-        session.setUserAudioStoredPath(storedPath);
+                    // 默认持久化路径为本地相对路径；上传成功则替换为云存储返回的 storedPath（可能是完整 URL）。
+                    storedPath = path.toString();
+                    try {
+                        storedPath = storageServiceFactory.getStorageService().upload(path, path.toString());
+                    } catch (Exception e) {
+                        log.warn("上传用户音频失败，保留本地路径: {}", path, e);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("保存用户音频失败: {}", path, e);
+            } finally {
+                // 失败也要回填，否则等这条结果的调用方只能干等到超时
+                audio.complete(storedPath, duration);
+            }
+        });
     }
 
 }

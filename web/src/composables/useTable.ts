@@ -8,8 +8,14 @@ import { isForbiddenError, shouldIgnoreRequestError } from '@/services/request'
 import { DEBOUNCE_DELAY } from '@/constants/api'
 import { usePagination } from './usePagination'
 
-/** 列表请求函数，分页参数由 useTable 注入，其余查询条件由调用方闭包带入 */
-export type TableFetchFn<T> = (params: { pageNo: number; pageSize: number }) => Promise<PageResponse<T>>
+/** 分页参数，由 useTable 按当前分页器注入 */
+export interface TablePageParams {
+  pageNo: number
+  pageSize: number
+}
+
+/** 列表请求函数，入参是分页参数与 getQuery 返回的查询条件合并后的结果 */
+export type TableFetchFn<T, Q extends object = object> = (params: TablePageParams & Q) => Promise<PageResponse<T>>
 
 /**
  * 表格分页管理 Composable
@@ -17,11 +23,20 @@ export type TableFetchFn<T> = (params: { pageNo: number; pageSize: number }) => 
  *
  * 传入 fetchFn 时直接用 fetchData / onTableChange / debouncedSearch；
  * 一次翻页要做多件事的场景仍可只用 loadData / handleTableChange / createDebouncedSearch 自己拼
+ *
+ * @param defaultFetchFn 列表请求函数
+ * @param getQuery 返回当前查询条件，每次请求前求值并入分页参数；查询条件在闭包里的场景可以不传
  */
-export function useTable<T = unknown>(defaultFetchFn?: TableFetchFn<T>) {
+export function useTable<T = unknown, Q extends object = object>(
+  defaultFetchFn?: TableFetchFn<T, Q>,
+  getQuery?: () => Q
+) {
   const { t } = useI18n()
   const loading = ref<boolean>(false)
   const data = ref<T[]>([])
+
+  /** 最近一次加载的失败说明，null 表示当前没有失败；表格空态据此区分「加载失败」与「真的没有数据」 */
+  const loadError = ref<string | null>(null)
 
   const pg = usePagination()
   const { pagination } = pg
@@ -39,11 +54,18 @@ export function useTable<T = unknown>(defaultFetchFn?: TableFetchFn<T>) {
   /** 已发起的请求序号，只认最后一次：防抖搜索与翻页并发时，先返回的旧响应不能覆盖新数据 */
   let loadSeq = 0
 
+  /** 最近一次加载的重放函数，重试按钮据此用同一组请求参数与回调重来一次 */
+  let lastLoad: (() => Promise<void>) | null = null
+
+  /** 分页参数与当前查询条件合并成一次请求的入参；分页放在后面，查询条件不能盖掉 useTable 自己管的页码 */
+  const buildParams = (): TablePageParams & Q =>
+    ({ ...(getQuery ? getQuery() : undefined), ...pg.getRequestParams() }) as TablePageParams & Q
+
   /**
    * 加载数据（带错误处理）
    */
   const loadData = async (
-    fetchFn: TableFetchFn<T>,
+    fetchFn: TableFetchFn<T, Q>,
     options?: {
       showError?: boolean
       onSuccess?: () => void
@@ -52,10 +74,12 @@ export function useTable<T = unknown>(defaultFetchFn?: TableFetchFn<T>) {
   ) => {
     const { showError = true, onSuccess, onError } = options || {}
     const seq = ++loadSeq
+    lastLoad = () => loadData(fetchFn, options)
 
     try {
       loading.value = true
-      const res = await fetchFn(pg.getRequestParams())
+      loadError.value = null
+      const res = await fetchFn(buildParams())
 
       // 已有更新的请求在途，这一份结果连同它的报错一并丢弃
       if (seq !== loadSeq) {
@@ -67,6 +91,7 @@ export function useTable<T = unknown>(defaultFetchFn?: TableFetchFn<T>) {
         pg.setTotal(res.data?.total || 0)
         onSuccess?.()
       } else {
+        loadError.value = res.message || t('common.loadDataFailed')
         if (showError) {
           message.error(res.message || t('common.loadDataFailed'))
         }
@@ -76,16 +101,19 @@ export function useTable<T = unknown>(defaultFetchFn?: TableFetchFn<T>) {
       if (seq !== loadSeq) {
         return
       }
+      // 请求被取消或登录已过期时页面正在被替换，标成失败态反而会闪一下错误
       if (shouldIgnoreRequestError(error)) {
         onError?.(error)
         return
       }
       // 403 的「权限不足」由 request.ts 弹出，这里再覆盖就只剩一句笼统的加载失败
       if (isForbiddenError(error)) {
+        loadError.value = t('error.forbidden')
         onError?.(error)
         return
       }
       console.error('Error loading data:', error)
+      loadError.value = t('common.loadDataFailed')
       // 传输层错误由 request.ts 的拦截器统一弹提示，这里用同一个 key 覆盖成本地化文案，
       // 不叠第二条、也不把 axios 的英文原文弹给用户
       if (showError) {
@@ -118,6 +146,18 @@ export function useTable<T = unknown>(defaultFetchFn?: TableFetchFn<T>) {
   }
 
   /**
+   * 重试最近一次加载：先清掉失败态，再用同一组参数重新请求
+   */
+  const retryLoad = async () => {
+    loadError.value = null
+    if (lastLoad) {
+      await lastLoad()
+      return
+    }
+    await fetchData()
+  }
+
+  /**
    * 直接绑到 a-table 的 @change：先记录分页再重新拉数据
    */
   const onTableChange = (pag: TablePaginationConfig) => {
@@ -145,6 +185,10 @@ export function useTable<T = unknown>(defaultFetchFn?: TableFetchFn<T>) {
     fetchData,
     onTableChange,
     debouncedSearch,
+
+    // 失败态与重试，接到表格的 emptyText 上就能与「真的没有数据」区分开
+    loadError,
+    retryLoad,
 
     // usePagination 的派生量与页码操作
     currentPage: pg.currentPage,

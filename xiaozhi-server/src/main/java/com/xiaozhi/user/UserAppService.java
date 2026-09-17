@@ -26,6 +26,7 @@ import com.xiaozhi.template.service.TemplateService;
 import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.userauth.service.UserAuthService;
+import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,6 +79,9 @@ public class UserAppService {
     private UserAuthService userAuthService;
 
     @Resource
+    private VerifyCodeService verifyCodeService;
+
+    @Resource
     private AuthRoleService authRoleService;
 
     @Resource
@@ -110,7 +114,7 @@ public class UserAppService {
         if (!StringUtils.hasText(account)) {
             throw new IllegalArgumentException("邮箱或手机号至少填写一个");
         }
-        if (!userService.consumeCaptcha(account, req.getCode())) {
+        if (!verifyCodeService.consumeByAccount(account, req.getCode())) {
             throw new IllegalArgumentException("无效验证码");
         }
 
@@ -156,15 +160,14 @@ public class UserAppService {
             existing.setPassword(authenticationService.encryptPassword(req.getPassword()));
         }
         existing.setUserId(userId);
-        userService.update(existing);
-        return userConvert.toResp(userService.getBO(userId));
+        return userConvert.toResp(userService.update(existing));
     }
 
     // ==================== 密码重置 ====================
 
     @Transactional
     public void resetPassword(UserResetPasswordReq req) {
-        if (!userService.consumeCaptcha(req.getEmail(), req.getCode())) {
+        if (!verifyCodeService.consumeByAccount(req.getEmail(), req.getCode())) {
             throw new IllegalArgumentException("验证码错误或已过期");
         }
         UserBO user = userService.getByEmail(req.getEmail());
@@ -272,16 +275,15 @@ public class UserAppService {
         if (!UserBO.STATE_ENABLED.equals(state) && !UserBO.STATE_DISABLED.equals(state)) {
             throw new IllegalArgumentException("账号状态取值不合法");
         }
-        UserBO existing = userService.getBO(userId);
-        if (existing == null) {
+        // 先确认账号存在：update 里查不到会抛「用户不存在」，与本接口一贯的提示文案不一致
+        if (userService.getBO(userId) == null) {
             throw new ResourceNotFoundException("无此用户，更新失败");
         }
 
         UserBO update = new UserBO();
         update.setUserId(userId);
         update.setState(state);
-        userService.update(update);
-        return userConvert.toResp(userService.getBO(userId));
+        return userConvert.toResp(userService.update(update));
     }
 
     public void recordLoginInfo(UserBO user, String loginIp) {

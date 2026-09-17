@@ -6,6 +6,7 @@ import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.common.model.req.DeviceCreateReq;
 import com.xiaozhi.common.model.req.DeviceScanBindReq;
+import com.xiaozhi.common.model.req.DeviceUpdateReq;
 import com.xiaozhi.common.model.req.OtaReq;
 import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.communication.ServerAddressProvider;
@@ -15,7 +16,6 @@ import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.domain.vo.VerifyCode;
-import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
@@ -24,11 +24,10 @@ import com.xiaozhi.utils.CmsUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mapstruct.factory.Mappers;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -40,6 +39,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -50,6 +51,8 @@ import static org.mockito.Mockito.when;
 class DeviceAppServiceTest {
 
     private static final String DEVICE_ID = "aa:bb:cc:dd:ee:ff";
+    private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 1, 1, 8, 0);
+    private static final LocalDateTime UPDATED_AT = LocalDateTime.of(2026, 9, 5, 12, 0);
 
     @Mock
     private DeviceService deviceService;
@@ -69,20 +72,25 @@ class DeviceAppServiceTest {
     @Mock
     private SummaryService summaryService;
 
-    @InjectMocks
     private DeviceAppService deviceAppService;
 
     @BeforeEach
     void setUp() {
+        deviceAppService = new DeviceAppService();
+        ReflectionTestUtils.setField(deviceAppService, "deviceService", deviceService);
+        ReflectionTestUtils.setField(deviceAppService, "deviceRepository", deviceRepository);
         ReflectionTestUtils.setField(deviceAppService, "deviceConvert", deviceConvert);
+        ReflectionTestUtils.setField(deviceAppService, "roleService", roleService);
+        ReflectionTestUtils.setField(deviceAppService, "serverAddressProvider", serverAddressProvider);
+        ReflectionTestUtils.setField(deviceAppService, "dialogueServerRegistry", dialogueServerRegistry);
+        ReflectionTestUtils.setField(deviceAppService, "deviceAuthService", deviceAuthService);
+        ReflectionTestUtils.setField(deviceAppService, "messageService", messageService);
+        ReflectionTestUtils.setField(deviceAppService, "summaryService", summaryService);
         DeviceBO boundDevice = new DeviceBO();
         boundDevice.setDeviceId(DEVICE_ID);
         boundDevice.setDeviceName("客厅音箱");
         lenient().when(deviceService.getBO(DEVICE_ID)).thenReturn(boundDevice);
-        DeviceProjection projection = new DeviceProjection();
-        projection.setDeviceId(DEVICE_ID);
-        projection.setRoleName("小智");
-        lenient().when(deviceService.get(DEVICE_ID)).thenReturn(projection);
+        lenient().when(serverAddressProvider.getWebsocketAddress()).thenReturn("ws://server.test/xiaozhi/v1/");
     }
 
     @Test
@@ -99,23 +107,7 @@ class DeviceAppServiceTest {
     }
 
     @Test
-    void handleOtaIssuesActivationCodeWhenDeviceUnbound() {
-        when(deviceService.getBO(DEVICE_ID)).thenReturn(null);
-        VerifyCodeBO code = new VerifyCodeBO();
-        code.setCode("123456");
-        when(deviceService.generateCode(DEVICE_ID, null, "dual-board")).thenReturn(code);
-
-        Map<String, Object> response = deviceAppService.handleOta(otaRequest());
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> activation = (Map<String, Object>) response.get("activation");
-        assertThat(activation).containsEntry("code", "123456").containsEntry("challenge", DEVICE_ID);
-        assertThat(response).containsKey("websocket");
-        verify(deviceService, never()).get(any());
-    }
-
-    @Test
-    void handleOtaSyncsBoundDeviceWithoutReadingProjection() {
+    void handleOtaSyncsBoundDevice() {
         OtaReq req = otaRequest();
         req.setIp("10.0.0.8");
         when(deviceRepository.findById(DEVICE_ID))
@@ -125,7 +117,6 @@ class DeviceAppServiceTest {
 
         assertThat(response).containsKey("websocket").doesNotContainKey("activation");
         verify(deviceRepository).save(any(Device.class));
-        verify(deviceService, never()).get(any());
     }
 
     @Test
@@ -166,16 +157,13 @@ class DeviceAppServiceTest {
 
         when(deviceService.getBO(DEVICE_ID)).thenReturn(null);
         assertThat(deviceAppService.checkOtaActivation(DEVICE_ID)).isFalse();
-        verify(deviceService, never()).get(any());
     }
 
     @Test
     void createBindsDeviceLocatedByCodeAndInvalidatesRemainingCodes() {
         when(deviceRepository.findVerifyCodeByCode("123456")).thenReturn(Optional.of(verifyCode("toy-v1")));
         when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
-        RoleBO role = new RoleBO();
-        role.setRoleId(3);
-        when(roleService.getDefaultOrFirstBO(7)).thenReturn(role);
+        when(roleService.getDefaultOrFirstBO(7)).thenReturn(role(3, "小智"));
 
         DeviceResp result = deviceAppService.create(createReq("123456"), 7);
 
@@ -204,9 +192,7 @@ class DeviceAppServiceTest {
         when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
         when(deviceRepository.findVerifyCode(null, DEVICE_ID, null))
                 .thenReturn(Optional.of(verifyCode("toy-v1")));
-        RoleBO role = new RoleBO();
-        role.setRoleId(3);
-        when(roleService.getDefaultOrFirstBO(7)).thenReturn(role);
+        when(roleService.getDefaultOrFirstBO(7)).thenReturn(role(3, "小智"));
 
         // 贴纸上是大写 '-' 分隔的 MAC，应归一化为设备上报的小写冒号格式
         DeviceResp result = deviceAppService.scanBind(scanBindReq("AA-BB-CC-DD-EE-FF"), 7);
@@ -226,10 +212,13 @@ class DeviceAppServiceTest {
     void scanBindReturnsExistingDeviceWhenAlreadyBoundToSameUser() {
         Device existing = Device.newDevice(DEVICE_ID, "小智", null, 7, 3);
         when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.of(existing));
+        when(roleService.getBO(3)).thenReturn(role(3, "管家"));
 
         DeviceResp result = deviceAppService.scanBind(scanBindReq(DEVICE_ID), 7);
 
         assertThat(result.getDeviceId()).isEqualTo(DEVICE_ID);
+        // 幂等返回同样不再回查设备表，角色名按主键单独取
+        assertThat(result.getRoleName()).isEqualTo("管家");
         verify(deviceRepository, never()).save(any());
     }
 
@@ -263,6 +252,119 @@ class DeviceAppServiceTest {
     }
 
     @Test
+    void createReturnsEveryResponseFieldFromTheAggregate() {
+        when(deviceRepository.findVerifyCodeByCode("123456")).thenReturn(Optional.of(verifyCode("toy-v1")));
+        when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
+        when(roleService.getDefaultOrFirstBO(7)).thenReturn(role(3, "小智"));
+        stampOnSave(CREATED_AT, CREATED_AT);
+
+        DeviceResp result = deviceAppService.create(createReq("123456"), 7);
+
+        assertThat(result.getDeviceId()).isEqualTo(DEVICE_ID);
+        assertThat(result.getDeviceName()).isEqualTo("toy-v1");
+        assertThat(result.getRoleId()).isEqualTo(3);
+        assertThat(result.getRoleName()).isEqualTo("小智");
+        assertThat(result.getType()).isEqualTo("toy-v1");
+        assertThat(result.getState()).isEqualTo(Device.STATE_OFFLINE);
+        assertThat(result.getCreateTime()).isEqualTo(CREATED_AT);
+        assertThat(result.getUpdateTime()).isEqualTo(CREATED_AT);
+        // 新设备还没上报过硬件信息，这几列本来就是空的
+        assertThat(result.getIp()).isNull();
+        assertThat(result.getLocation()).isNull();
+        assertThat(result.getWifiName()).isNull();
+        assertThat(result.getChipModelName()).isNull();
+        assertThat(result.getVersion()).isNull();
+        // sessionId/code/audioPath/mcpList 从来不在这几个写接口的出参里
+        assertThat(result.getSessionId()).isNull();
+        assertThat(result.getCode()).isNull();
+        assertThat(result.getAudioPath()).isNull();
+        assertThat(result.getMcpList()).isNull();
+        // 出参全部来自聚合根：设备表只在幂等判断时读了一次，写完不再回读
+        verify(deviceRepository).findById(DEVICE_ID);
+    }
+
+    @Test
+    void scanBindReturnsEveryResponseFieldFromTheAggregate() {
+        when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceRepository.findVerifyCode(null, DEVICE_ID, null))
+                .thenReturn(Optional.of(verifyCode("toy-v1")));
+        when(roleService.getDefaultOrFirstBO(7)).thenReturn(role(3, "小智"));
+        stampOnSave(CREATED_AT, CREATED_AT);
+
+        DeviceResp result = deviceAppService.scanBind(scanBindReq(DEVICE_ID), 7);
+
+        assertThat(result.getDeviceId()).isEqualTo(DEVICE_ID);
+        assertThat(result.getDeviceName()).isEqualTo("toy-v1");
+        assertThat(result.getRoleId()).isEqualTo(3);
+        assertThat(result.getRoleName()).isEqualTo("小智");
+        assertThat(result.getType()).isEqualTo("toy-v1");
+        assertThat(result.getState()).isEqualTo(Device.STATE_OFFLINE);
+        assertThat(result.getCreateTime()).isEqualTo(CREATED_AT);
+        assertThat(result.getUpdateTime()).isEqualTo(CREATED_AT);
+        assertThat(result.getIp()).isNull();
+        assertThat(result.getLocation()).isNull();
+        assertThat(result.getWifiName()).isNull();
+        assertThat(result.getChipModelName()).isNull();
+        assertThat(result.getVersion()).isNull();
+        assertThat(result.getSessionId()).isNull();
+        assertThat(result.getCode()).isNull();
+        assertThat(result.getAudioPath()).isNull();
+        assertThat(result.getMcpList()).isNull();
+        verify(deviceRepository).findById(DEVICE_ID);
+    }
+
+    @Test
+    void updateReturnsEveryResponseFieldFromTheAggregate() {
+        when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.of(storedDevice()));
+        when(roleService.getBO(9)).thenReturn(role(9, "管家"));
+        stampOnSave(null, UPDATED_AT);
+
+        DeviceUpdateReq req = new DeviceUpdateReq();
+        req.setDeviceName("书房音箱");
+        req.setRoleId(9);
+        req.setLocation("上海");
+
+        DeviceResp result = deviceAppService.update(DEVICE_ID, req);
+
+        assertThat(result.getDeviceId()).isEqualTo(DEVICE_ID);
+        assertThat(result.getDeviceName()).isEqualTo("书房音箱");
+        assertThat(result.getRoleId()).isEqualTo(9);
+        assertThat(result.getRoleName()).isEqualTo("管家");
+        assertThat(result.getLocation()).isEqualTo("上海");
+        assertThat(result.getState()).isEqualTo("1");
+        assertThat(result.getWifiName()).isEqualTo("home");
+        assertThat(result.getIp()).isEqualTo("10.0.0.8");
+        assertThat(result.getChipModelName()).isEqualTo("esp32s3");
+        assertThat(result.getType()).isEqualTo("dual-board");
+        assertThat(result.getVersion()).isEqualTo("2.4.0");
+        assertThat(result.getCreateTime()).isEqualTo(CREATED_AT);
+        // 更新时间取本次写库实际落的值，不是聚合根加载时那份
+        assertThat(result.getUpdateTime()).isEqualTo(UPDATED_AT);
+        assertThat(result.getSessionId()).isNull();
+        assertThat(result.getCode()).isNull();
+        assertThat(result.getAudioPath()).isNull();
+        // 设备表里存着 mcpList，但这个接口本来就不返回它
+        assertThat(result.getMcpList()).isNull();
+        // 校验角色时已经查过角色，出参不再多查一次
+        verify(roleService).getBO(9);
+    }
+
+    @Test
+    void updateWithoutRoleChangeStillCarriesCurrentRoleName() {
+        when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.of(storedDevice()));
+        when(roleService.getBO(3)).thenReturn(role(3, "小智"));
+        stampOnSave(null, UPDATED_AT);
+
+        DeviceUpdateReq req = new DeviceUpdateReq();
+        req.setDeviceName("书房音箱");
+
+        DeviceResp result = deviceAppService.update(DEVICE_ID, req);
+
+        assertThat(result.getRoleId()).isEqualTo(3);
+        assertThat(result.getRoleName()).isEqualTo("小智");
+    }
+
+    @Test
     void deleteThrowsWhenDeviceNotFoundWithoutTouchingRelatedData() {
         when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
 
@@ -271,6 +373,29 @@ class DeviceAppServiceTest {
 
         verify(deviceRepository, never()).delete(any());
         verify(messageService, never()).deleteByDeviceId(any());
+    }
+
+    /** 库里已有的一台设备，字段全带值，用于钉住写接口出参一个字段都不少 */
+    private Device storedDevice() {
+        return new Device(DEVICE_ID, "客厅音箱", 7, 3, "[\"tool\"]", "10.0.0.8", "北京",
+                "home", "esp32s3", "dual-board", "2.4.0", "1",
+                CREATED_AT, LocalDateTime.of(2026, 2, 1, 8, 0));
+    }
+
+    private RoleBO role(Integer roleId, String roleName) {
+        RoleBO role = new RoleBO();
+        role.setRoleId(roleId);
+        role.setRoleName(roleName);
+        role.setUserId(7);
+        return role;
+    }
+
+    /** 模拟仓储 save()：自动填充生成的时间戳在落库后被回填进聚合根 */
+    private void stampOnSave(LocalDateTime createTime, LocalDateTime updateTime) {
+        doAnswer(invocation -> {
+            invocation.getArgument(0, Device.class).markPersisted(createTime, updateTime);
+            return null;
+        }).when(deviceRepository).save(any(Device.class));
     }
 
     private DeviceScanBindReq scanBindReq(String deviceId) {

@@ -5,9 +5,16 @@ import type { ConfigType, Config, ConfigField, LlmModelOption, LLMModel, LLMFact
 import { queryConfigs, updateConfig, deleteConfig as deleteConfigRequest } from '@/services/config'
 import { configTypeMap } from '@/config/providerConfig'
 import { CODE_CONFIRM_REQUIRED } from '@/constants/api'
-import llmFactoriesData from '@/config/llm_factories.json'
+import { i18n } from '@/locales'
 import { useTable } from './useTable'
 import { useConfirm } from './useConfirm'
+import { useRequest } from './useRequest'
+
+/**
+ * llm_factories.json 的模块类型：只取类型、不产生运行时静态 import，
+ * 真正加载走下面的动态 import，两者共用这份类型定义
+ */
+type LlmFactoriesModule = typeof import('@/config/llm_factories.json')
 
 /** 按模型类型分组的工厂模型表 */
 interface LLMFactoryModelInfo {
@@ -28,14 +35,11 @@ interface LLMFactoryIndex {
 
 const EMPTY_LLM_FACTORY_INDEX: LLMFactoryIndex = { models: {}, urls: {}, providers: [] }
 
-// llm_factories.json 是不变常量，索引在模块作用域只建一次，多个 useConfigManager 实例共用
-let llmFactoryIndex: LLMFactoryIndex | null = null
-
 /**
  * 构建 LLM 工厂索引
  */
-function buildLlmFactoryIndex(): LLMFactoryIndex {
-  if (!llmFactoriesData || !llmFactoriesData.factory_llm_infos) {
+function buildLlmFactoryIndex(raw: LlmFactoriesModule | undefined): LLMFactoryIndex {
+  if (!raw || !raw.factory_llm_infos) {
     console.warn('llm_factories.json 数据格式不正确')
     return EMPTY_LLM_FACTORY_INDEX
   }
@@ -45,7 +49,7 @@ function buildLlmFactoryIndex(): LLMFactoryIndex {
   const ranks: Record<string, number> = {}
   const providers: Array<{ value: string; label: string }> = []
 
-  llmFactoriesData.factory_llm_infos.forEach((factory: LLMFactory) => {
+  raw.factory_llm_infos.forEach((factory: LLMFactory) => {
     const providerName = factory.name
     providers.push({ value: providerName, label: providerName })
 
@@ -99,26 +103,49 @@ function buildLlmFactoryIndex(): LLMFactoryIndex {
   return { models, urls, providers }
 }
 
-function getLlmFactoryIndex(): LLMFactoryIndex {
-  if (!llmFactoryIndex) {
-    llmFactoryIndex = buildLlmFactoryIndex()
+// llm_factories.json 有 233KB，只有配置 LLM 类型的页面才用得到，静态 import 会把它打进首屏必经的入口 chunk，
+// 改成动态 import 按需加载。promise 直接当缓存用：并发的多个 useConfigManager('llm') 实例共享同一次加载，
+// 加载成功后长期复用，不会重复请求
+let llmFactoryIndexPromise: Promise<LLMFactoryIndex> | null = null
+
+function loadLlmFactoryIndex(): Promise<LLMFactoryIndex> {
+  if (!llmFactoryIndexPromise) {
+    llmFactoryIndexPromise = import('@/config/llm_factories.json')
+      .then((mod) => buildLlmFactoryIndex(mod))
+      .catch((error) => {
+        console.error('加载 llm_factories.json 失败', error)
+        message.error(i18n.global.t('common.loadFailed'))
+        // 允许下一次调用重新尝试加载，而不是把失败结果长期缓存住
+        llmFactoryIndexPromise = null
+        return EMPTY_LLM_FACTORY_INDEX
+      })
   }
-  return llmFactoryIndex
+  return llmFactoryIndexPromise
 }
 
 export function useConfigManager(configType: ConfigType) {
   const { t } = useI18n()
   const { confirmAsync } = useConfirm()
+  // 两个行内操作各自一个实例，失败文案互不干扰
+  const { executeOk: executeDeleteConfig } = useRequest()
+  const { executeOk: executeSetDefault } = useRequest()
 
-  // 使用统一的表格管理
+  // 使用统一的表格管理：分页参数由 useTable 注入，查询条件从 queryForm 现取
   const {
     loading,
     data: configItems,
     pagination,
-    loadData,
-    handleTableChange,
-    createDebouncedSearch,
-  } = useTable<Config>()
+    loadError,
+    retryLoad,
+    fetchData,
+    onTableChange,
+    debouncedSearch,
+  } = useTable<Config>(({ pageNo, pageSize }) => queryConfigs({
+    pageNo,
+    pageSize,
+    configType,
+    ...queryForm.value,
+  }))
 
   // 状态
   const currentType = ref('')
@@ -126,8 +153,26 @@ export function useConfigManager(configType: ConfigType) {
   const activeTabKey = ref('1')
   const modelOptions = ref<LlmModelOption[]>([])
 
-  // LLM 工厂数据（常量索引，非 llm 类型不构建）
-  const llmFactory = configType === 'llm' ? getLlmFactoryIndex() : EMPTY_LLM_FACTORY_INDEX
+  // LLM 工厂数据：非 llm 类型的配置页永远用不到，保持空索引即可；
+  // llm 类型异步加载，加载完成前 typeOptionsLoading 为 true，供下拉框显示加载态而不是空白无提示
+  const llmFactory = ref<LLMFactoryIndex>(EMPTY_LLM_FACTORY_INDEX)
+  const typeOptionsLoading = ref(configType === 'llm')
+  // 记住最近一次被请求的 provider/modelType：如果用户在数据到位前就打开了编辑页，
+  // 数据加载完成后据此重新算一次模型下拉选项，不然选项会一直空着
+  let pendingModelSelection: { provider: string; modelType: string } | null = null
+
+  if (configType === 'llm') {
+    loadLlmFactoryIndex()
+      .then((index) => {
+        llmFactory.value = index
+        if (pendingModelSelection) {
+          updateModelOptions(pendingModelSelection.provider, pendingModelSelection.modelType)
+        }
+      })
+      .finally(() => {
+        typeOptionsLoading.value = false
+      })
+  }
 
   // 查询表单
   const queryForm = ref({
@@ -144,7 +189,7 @@ export function useConfigManager(configType: ConfigType) {
   // 类型选项
   const typeOptions = computed(() => {
     if (configType === 'llm') {
-      return llmFactory.providers
+      return llmFactory.value.providers
     }
     return configTypeInfo.value.typeOptions || []
   })
@@ -160,7 +205,7 @@ export function useConfigManager(configType: ConfigType) {
       if (typeFieldsMap[currentType.value]) {
         const fields = [...(typeFieldsMap[currentType.value] || [])]
         // 如果没有 apiUrl 字段但工厂有 URL，自动追加
-        const factoryUrl = llmFactory.urls[currentType.value]
+        const factoryUrl = llmFactory.value.urls[currentType.value]
         if (factoryUrl && !fields.some(f => f.name === 'apiUrl')) {
           fields.push({
             name: 'apiUrl',
@@ -176,7 +221,7 @@ export function useConfigManager(configType: ConfigType) {
       }
 
       // 没有明确定义：根据工厂数据自动生成默认字段
-      const factoryUrl = llmFactory.urls[currentType.value] || ''
+      const factoryUrl = llmFactory.value.urls[currentType.value] || ''
       return [
         {
           name: 'apiKey',
@@ -205,7 +250,7 @@ export function useConfigManager(configType: ConfigType) {
    * 根据 provider 和 modelType 获取模型列表
    */
   function getModelsByProviderAndType(provider: string, modelType: string): LLMModel[] {
-    const providerData = llmFactory.models[provider]
+    const providerData = llmFactory.value.models[provider]
     if (!providerData) {
       return []
     }
@@ -220,6 +265,8 @@ export function useConfigManager(configType: ConfigType) {
       return
     }
 
+    // 工厂数据还没加载完时也记下来，加载完成后会自动重放这次请求
+    pendingModelSelection = { provider, modelType }
     const models = getModelsByProviderAndType(provider, modelType)
     modelOptions.value = models.map((model: LLMModel) => ({
       value: model.llm_name,
@@ -228,29 +275,10 @@ export function useConfigManager(configType: ConfigType) {
   }
 
   /**
-   * 获取配置列表
-   */
-  async function fetchData() {
-    await loadData(async ({ pageNo, pageSize }) => {
-      return queryConfigs({
-        pageNo,
-        pageSize,
-        configType,
-        ...queryForm.value,
-      })
-    })
-  }
-
-  /**
    * 删除配置（快速操作，只用 table loading）
    */
   async function deleteConfig(configId: number) {
-    loading.value = true
-    try {
-      await submitDelete(configId, false)
-    } finally {
-      loading.value = false
-    }
+    await submitDelete(configId, false)
   }
 
   /**
@@ -258,28 +286,28 @@ export function useConfigManager(configType: ConfigType) {
    * 这里弹确认框、确认后带标记重发，与「设为默认」走同一套交互
    */
   async function submitDelete(configId: number, confirmStorageSwitch: boolean) {
-    const res = await deleteConfigRequest(configId, confirmStorageSwitch)
-
-    if (res.code === 200) {
-      message.success(t('common.deleteSuccess'))
-      await fetchData()
-      return
-    }
-
-    if (res.code === CODE_CONFIRM_REQUIRED) {
-      const confirmed = await confirmAsync({
-        title: t('config.storageSwitchTitle'),
-        content: res.message,
-        okText: t('config.storageSwitchOk'),
-        okType: 'danger',
-      })
-      if (confirmed) {
-        await submitDelete(configId, true)
-      }
-      return
-    }
-
-    message.error(res.message || t('common.deleteFailed'))
+    await executeDeleteConfig(() => deleteConfigRequest(configId, confirmStorageSwitch), {
+      loadingRef: loading,
+      showSuccess: true,
+      successText: t('common.deleteSuccess'),
+      errorText: t('common.deleteFailed'),
+      onSuccess: () => fetchData(),
+      onFailure: async (res) => {
+        if (res.code !== CODE_CONFIRM_REQUIRED) {
+          return false
+        }
+        const confirmed = await confirmAsync({
+          title: t('config.storageSwitchTitle'),
+          content: res.message,
+          okText: t('config.storageSwitchOk'),
+          okType: 'danger',
+        })
+        if (confirmed) {
+          await submitDelete(configId, true)
+        }
+        return true
+      },
+    })
   }
 
   /**
@@ -288,15 +316,7 @@ export function useConfigManager(configType: ConfigType) {
   async function setAsDefault(record: Config) {
     if (configType === 'tts') return
 
-    loading.value = true
-    try {
-      await submitAsDefault(record, false)
-    } catch (error) {
-      console.error('设置默认配置失败:', error)
-      message.error(t('common.serverMaintenance'))
-    } finally {
-      loading.value = false
-    }
+    await submitAsDefault(record, false)
   }
 
   /**
@@ -304,33 +324,37 @@ export function useConfigManager(configType: ConfigType) {
    * 换掉当前生效的对象存储时后端先回待确认并带上存量条数，问过用户再带确认参数重发。
    */
   async function submitAsDefault(record: Config, confirmStorageSwitch: boolean) {
-    const res = await updateConfig({
-      configId: record.configId,
-      configType,
-      modelType: configType === 'llm' ? record.modelType : undefined,
-      isDefault: '1',
-    }, confirmStorageSwitch)
-
-    if (res.code === 200) {
-      message.success(t('common.setDefaultSuccess', { name: record.configName }))
-      await fetchData()
-      return
-    }
-
-    if (res.code === CODE_CONFIRM_REQUIRED) {
-      const confirmed = await confirmAsync({
-        title: t('config.storageSwitchTitle'),
-        content: res.message,
-        okText: t('config.storageSwitchOk'),
-        okType: 'danger',
-      })
-      if (confirmed) {
-        await submitAsDefault(record, true)
-      }
-      return
-    }
-
-    message.error(res.message || t('common.setDefaultFailed'))
+    await executeSetDefault(
+      () => updateConfig({
+        configId: record.configId,
+        configType,
+        modelType: configType === 'llm' ? record.modelType : undefined,
+        isDefault: '1',
+      }, confirmStorageSwitch),
+      {
+        loadingRef: loading,
+        showSuccess: true,
+        successText: t('common.setDefaultSuccess', { name: record.configName }),
+        errorText: t('common.setDefaultFailed'),
+        networkErrorText: t('common.serverMaintenance'),
+        onSuccess: () => fetchData(),
+        onFailure: async (res) => {
+          if (res.code !== CODE_CONFIRM_REQUIRED) {
+            return false
+          }
+          const confirmed = await confirmAsync({
+            title: t('config.storageSwitchTitle'),
+            content: res.message,
+            okText: t('config.storageSwitchOk'),
+            okType: 'danger',
+          })
+          if (confirmed) {
+            await submitAsDefault(record, true)
+          }
+          return true
+        },
+      },
+    )
   }
 
   return {
@@ -343,7 +367,12 @@ export function useConfigManager(configType: ConfigType) {
     modelOptions,
     pagination,
     queryForm,
-    
+    // 加载失败说明与重试，接到表格 emptyText 上区分「加载失败」与「真的没有数据」
+    loadError,
+    retryLoad,
+    // llm 类型的工厂数据（233KB）异步加载中：true 时下拉框应显示加载态而不是当作"没有选项"
+    typeOptionsLoading,
+
     // 计算属性
     configTypeInfo,
     typeOptions,
@@ -355,7 +384,7 @@ export function useConfigManager(configType: ConfigType) {
     setAsDefault,
     updateModelOptions,
     getModelsByProviderAndType,
-    handleTableChange,
-    createDebouncedSearch,
+    onTableChange,
+    debouncedSearch,
   }
 }

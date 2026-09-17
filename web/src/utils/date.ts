@@ -54,6 +54,18 @@ export function formatShortDateTime(value?: DateInput, defaultValue: string = '-
 }
 
 /**
+ * 格式化为「HH:mm:ss」，不含日期，24 小时制，用于图表 X 轴这类只需要区分同一天内时刻的场景
+ * @param value - 时间值，缺省取当前时刻
+ * @param defaultValue - 非法值时的返回
+ */
+export function formatClockTime(value: DateInput = new Date(), defaultValue: string = '-'): string {
+  const date = toDate(value)
+  if (!date) return defaultValue
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+/**
  * 格式化为「yyyy-MM-dd HH:mm:ss」，与后端 @JsonFormat 的书写一致，不随语言变化
  * @param value - 时间值
  * @param defaultValue - 空值或非法值时的返回

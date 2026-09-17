@@ -149,16 +149,18 @@ onMounted(() => {
                     <SafetyCertificateOutlined />
                   </template>
                   <template #suffix>
-                    <span
+                    <button
+                      type="button"
                       class="send-code-btn"
                       :class="{
                         disabled: !mobileFormState.tel || !canSendCode,
                         loading: sendCodeLoading,
                       }"
+                      :disabled="!mobileFormState.tel || !canSendCode"
                       @click="handleSendCode"
                     >
                       {{ buttonText }}
-                    </span>
+                    </button>
                   </template>
                 </a-input>
               </a-form-item>
@@ -232,116 +234,44 @@ onMounted(() => {
 </template>
 
 <style lang="scss" scoped>
+@use '../styles/auth-shared' as *;
+
 .login-container {
-  position: relative;
-  min-height: 100vh;
-  max-width: 1280px;
-  margin: 0 auto;
-  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  @include auth-page;
 }
 
 .earth-background {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: url('/static/img/galaxy.jpg') center center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  z-index: 0;
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    z-index: 1;
-  }
+  @include auth-background;
 }
 
 .login-card {
-  background: rgba(42, 42, 42, 0.35) !important;
-  backdrop-filter: blur(10px);
-  border: none !important;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5) !important;
-  position: relative;
-  z-index: 10;
-
-  :deep(.ant-card-body) {
-    padding: 40px;
-  }
+  @include auth-card;
 }
 
 .welcome-title {
-  text-align: center;
-  color: #ffffff;
-  font-size: 28px;
-  font-weight: 600;
-  margin-bottom: 32px;
-  letter-spacing: 1px;
+  @include auth-title;
 }
 
 .input-field {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border: none !important;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.13) !important;
-  }
-
-  &:focus,
-  &.ant-input-focused {
-    background: #888888 !important;
-    box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2) !important;
-  }
-
-  :deep(input) {
-    background: transparent !important;
-    color: #ffffff !important;
-
-    &::placeholder {
-      color: rgba(255, 255, 255, 0.7) !important;
-    }
-  }
-
-  :deep(.ant-input-prefix),
-  :deep(.ant-input-password-icon) {
-    color: rgba(255, 255, 255, 0.6) !important;
-  }
-
-  :deep(.ant-input-affix-wrapper) {
-    background: transparent !important;
-    border: none !important;
-  }
+  @include auth-input;
 }
 
 /* 这三页压在一张固定的深色背景图上，标签色不跟随明暗主题，保持浅灰即可 */
 :deep(.ant-form-item-label > label) {
-  color: #cccccc !important;
-  font-weight: 500;
+  @include auth-form-label;
 }
 
 .form-options {
   margin-bottom: 20px;
 
+  @include auth-checkbox-look;
+
   :deep(.ant-checkbox-wrapper) {
     color: rgba(255, 255, 255, 0.8);
   }
 
-  :deep(.ant-checkbox-inner) {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    border-color: rgba(255, 255, 255, 0.3) !important;
-  }
-
-  :deep(.ant-checkbox-checked .ant-checkbox-inner) {
-    background-color: #4285f4 !important;
-    border-color: #4285f4 !important;
-  }
-
+  // 这里不能用 auth-link：它是「忘记密码」路由链接，原来就没设 text-decoration:none，
+  // 一直保留浏览器默认下划线，和其余几个纯文字链接不是同一种效果
   a {
     color: #4285f4;
 
@@ -372,12 +302,7 @@ onMounted(() => {
 }
 
 .terms-link {
-  color: #4285f4;
-  text-decoration: none;
-
-  &:hover {
-    color: #3367d6;
-  }
+  @include auth-link;
 }
 
 .register-wrapper {
@@ -386,17 +311,11 @@ onMounted(() => {
 }
 
 .register-text {
-  color: rgba(255, 255, 255, 0.6);
-  margin-right: 8px;
+  @include auth-hint-text;
 }
 
 .register-link {
-  color: #4285f4;
-  text-decoration: none;
-
-  &:hover {
-    color: #3367d6;
-  }
+  @include auth-link;
 }
 
 .social-button {
@@ -442,16 +361,7 @@ onMounted(() => {
 
 // 发送验证码按钮
 .send-code-btn {
-  color: #4285f4;
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
-  user-select: none;
-  transition: all 0.3s;
-
-  &:hover:not(.disabled) {
-    color: #3367d6;
-  }
+  @include auth-send-code-base;
 
   &.disabled {
     color: rgba(255, 255, 255, 0.4);

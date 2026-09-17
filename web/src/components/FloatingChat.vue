@@ -9,6 +9,7 @@ import { useWebSocket } from '@/composables/useWebSocket'
 import { useScroll } from '@/composables/useScroll'
 import { queryRoles } from '@/services/role'
 import { updateDevice } from '@/services/device'
+import { getRelativeTime } from '@/utils/date'
 import type { Role } from '@/types/role'
 import RobotAvatar from '@/components/RobotAvatar.vue'
 
@@ -217,19 +218,6 @@ const clearMessages = () => {
   clearAllMessages()
 }
 
-// 格式化时间
-const formatTime = (date: Date) => {
-  const minutes = Math.floor((Date.now() - date.getTime()) / 60000)
-
-  if (minutes < 1) return t('chat.floating.justNow')
-  if (minutes < 60) return t('chat.floating.minutesAgo', { count: minutes })
-
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return t('chat.floating.hoursAgo', { count: hours })
-
-  return date.toLocaleString()
-}
-
 // 情绪标签到表情，取值与后端 EmojiUtils.EMOTION_TO_EMOJIS 的首项一致
 const EMOTION_EMOJI: Record<string, string> = {
   neutral: '\u{1F610}', happy: '\u{1F60A}', laughing: '\u{1F600}', funny: '\u{1F602}',
@@ -352,7 +340,7 @@ const connectionStatusDot = computed(() => {
             <div v-for="(message, index) in wsMessages" :key="message.id">
               <!-- 时间戳 -->
               <div v-if="showTimestamp(index)" class="message-timestamp">
-                {{ formatTime(message.timestamp) }}
+                {{ getRelativeTime(message.timestamp) }}
               </div>
 
               <!-- 消息内容 -->

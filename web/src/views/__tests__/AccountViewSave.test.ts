@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { message } from 'ant-design-vue'
+import type { UploadOptions, UploadResponse } from '@/services/upload'
 
 const userApiMock = vi.hoisted(() => ({
   updateUser: vi.fn(),
 }))
 
 vi.mock('@/services/user', () => userApiMock)
+
 vi.mock('@/services/upload', () => ({
   uploadFile: vi.fn(),
 }))
@@ -30,6 +32,7 @@ interface AccountViewState {
   avatarLoading: boolean
   handleSubmit: () => Promise<void>
   updateUserAvatar: (avatarPath: string) => Promise<void>
+  beforeAvatarUpload: (file: File) => boolean
 }
 
 describe('AccountView 保存账号资料', () => {
@@ -109,11 +112,23 @@ describe('AccountView 保存账号资料', () => {
   })
 
   it('头像入库请求抛错时也要熄灭上传遮罩', async () => {
+    // avatarLoading 现在由 useAvatarUpload 统一收起，走完整的 beforeAvatarUpload 流程才能验到
+    const { uploadFile } = await import('@/services/upload')
+    // uploadFile 是重载函数，vi.mocked 只会挑到返回路径字符串的那条；这里走的是 fullResponse: true 那条
+    const uploadFullResponse = uploadFile as (
+      file: File, type: string, options: UploadOptions & { fullResponse: true }
+    ) => Promise<UploadResponse>
+    vi.mocked(uploadFullResponse).mockResolvedValue({
+      code: 200,
+      message: '',
+      url: '',
+      relativePath: 'avatar/1.png',
+    })
     userApiMock.updateUser.mockRejectedValue(new Error('network down'))
     const view = mountView()
-    view.avatarLoading = true
 
-    await view.updateUserAvatar('avatar/1.png')
+    const file = new File([], 'avatar.png', { type: 'image/png' })
+    view.beforeAvatarUpload(file)
     await flushPromises()
 
     expect(view.avatarLoading).toBe(false)

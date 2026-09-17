@@ -266,6 +266,6 @@ class VadServiceTest {
             pcm[i * 2] = (byte) (sample & 0xFF);
             pcm[i * 2 + 1] = (byte) ((sample >> 8) & 0xFF);
         }
-        return new OpusProcessor().pcmToOpus(pcm, false).get(0);
+        return new OpusProcessor().pcmToOpus(pcm, false).get(0).opus();
     }
 }

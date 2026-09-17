@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { message, type TableColumnsType, type TablePaginationConfig } from 'ant-design-vue'
+import { message, type TableColumnsType } from 'ant-design-vue'
 import { useTable } from '@/composables/useTable'
 import { useExport } from '@/composables/useExport'
+import { useRequest } from '@/composables/useRequest'
+import TableEmptyState from '@/components/TableEmptyState.vue'
 import { queryAuthRoles } from '@/services/authRole'
 import { useLoadingStore } from '@/store/loading'
 import { queryUsers } from '@/services/user'
-import { shouldIgnoreRequestError } from '@/services/request'
 import { useAvatar } from '@/composables/useAvatar'
 import type { AuthRole } from '@/types/authRole'
 import type { User, UserQueryParams } from '@/types/user'
@@ -17,19 +18,22 @@ const { t } = useI18n()
 const { getAvatarUrl } = useAvatar()
 const { exporting, exportToCSV } = useExport()
 
-// 表格和分页
+// 表格和分页：分页参数由 useTable 注入，查询条件走 buildQueryParams
 const {
   loading,
   data,
   pagination,
-  handleTableChange,
-  loadData,
-  createDebouncedSearch
-} = useTable<User>()
+  loadError,
+  retryLoad,
+  fetchData,
+  onTableChange,
+  debouncedSearch,
+} = useTable<User, UserQueryParams>((params) => queryUsers(params), buildQueryParams)
 
 // 全局 Loading
 const loadingStore = useLoadingStore()
 const authRoleOptions = ref<AuthRole[]>([])
+const { execute: executeAuthRoles } = useRequest()
 
 // 查询表单
 const queryForm = reactive({
@@ -127,9 +131,9 @@ const columns = computed<TableColumnsType>(() => [
 // 后端 BasePageReq 限制每页最多 1000 条
 const EXPORT_PAGE_SIZE = 1000
 
-// 组装查询条件（列表与导出共用）
-function buildQueryParams(pageNo: number, pageSize: number): UserQueryParams {
-  const queryParams: UserQueryParams = { pageNo, pageSize }
+// 组装查询条件（列表与导出共用），分页参数不在这里给：列表由 useTable 注入，导出自己按页累加
+function buildQueryParams(): UserQueryParams {
+  const queryParams: UserQueryParams = {}
 
   if (queryForm.name) queryParams.name = queryForm.name
   if (queryForm.email) queryParams.email = queryForm.email
@@ -141,27 +145,15 @@ function buildQueryParams(pageNo: number, pageSize: number): UserQueryParams {
   return queryParams
 }
 
-// 获取用户数据
-async function fetchData() {
-  await loadData((params) => queryUsers(buildQueryParams(params.pageNo, params.pageSize)))
-}
-
 async function loadAuthRoleOptions() {
-  try {
-    const res = await queryAuthRoles({ pageNo: 1, pageSize: 100 })
-    if (res.code === 200 && res.data?.list) {
-      authRoleOptions.value = res.data.list
-    }
-  } catch (error) {
-    // 只是筛选项加载失败，不打断页面；传输层错误已由 request.ts 拦截器弹过提示
-    if (!shouldIgnoreRequestError(error)) {
-      console.error('加载角色选项失败:', error)
-    }
+  // 只是筛选项加载失败，不打断页面；传输层错误已由 request.ts 拦截器弹过提示
+  const page = await executeAuthRoles(() => queryAuthRoles({ pageNo: 1, pageSize: 100 }), {
+    showError: false,
+  })
+  if (page?.list) {
+    authRoleOptions.value = page.list
   }
 }
-
-// 防抖搜索
-const debouncedSearch = createDebouncedSearch(fetchData, 500)
 
 // 导出用户数据（按页累加，单页不能超过后端上限）
 async function handleExport() {
@@ -172,7 +164,7 @@ async function handleExport() {
     let total = 0
 
     do {
-      const res = await queryUsers(buildQueryParams(pageNo, EXPORT_PAGE_SIZE))
+      const res = await queryUsers({ ...buildQueryParams(), pageNo, pageSize: EXPORT_PAGE_SIZE })
       if (res.code !== 200 || !res.data?.list) {
         break
       }
@@ -231,13 +223,6 @@ function getAvatar(avatar?: string) {
   return getAvatarUrl(avatar)
 }
 
-// 处理分页变化
-const onTableChange = (pag: TablePaginationConfig) => {
-  handleTableChange(pag)
-  fetchData()
-}
-
-
 loadAuthRoleOptions()
 fetchData()
 </script>
@@ -295,6 +280,7 @@ fetchData()
       </template>
       
       <a-table
+        class="ellipsis-table"
         row-key="userId"
         :columns="columns"
         :data-source="data"
@@ -304,6 +290,10 @@ fetchData()
         size="middle"
         @change="onTableChange"
       >
+        <template #emptyText>
+          <TableEmptyState :error="loadError" @retry="retryLoad" />
+        </template>
+
         <!-- 头像列 -->
         <template #bodyCell="{ column, record }">
           <!-- 姓名列 -->
@@ -366,25 +356,5 @@ fetchData()
 <style scoped lang="scss">
 .user-view {
   padding: 24px;
-}
-
-.search-card :deep(.ant-form-item) {
-  margin-bottom: 0;
-}
-
-// 表格文字省略样式
-.ellipsis-text {
-  display: inline-block;
-  width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-// 表格单元格样式
-:deep(.ant-table) {
-  .ant-table-tbody > tr > td {
-    max-width: 0;
-  }
 }
 </style>

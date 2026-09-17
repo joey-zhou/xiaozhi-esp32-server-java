@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const requestMock = vi.hoisted(() => ({
   shouldIgnoreRequestError: vi.fn(() => false),
@@ -54,6 +54,8 @@ describe('useTable 返回契约', () => {
       'fetchData',
       'onTableChange',
       'debouncedSearch',
+      'loadError',
+      'retryLoad',
       'currentPage',
       'pageSize',
       'total',
@@ -231,6 +233,128 @@ describe('useTable 传入 fetchFn 后的三件套', () => {
     const table = useTable<Row>()
     await table.fetchData()
     expect(table.loading.value).toBe(false)
+  })
+})
+
+// 查询条件塞不进 TableFetchFn 的签名，是九个列表页各写一遍 onTableChange 的直接原因
+describe('useTable 查询条件', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    requestMock.shouldIgnoreRequestError.mockReturnValue(false)
+  })
+
+  it('getQuery 的返回值与分页参数一起传给 fetchFn', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(pageOk([], 0))
+    const query = { keyword: 'abc' }
+    const table = useTable<Row, { keyword: string }>(fetchFn, () => query)
+
+    await table.fetchData()
+
+    expect(fetchFn).toHaveBeenCalledWith({ pageNo: 1, pageSize: 10, keyword: 'abc' })
+  })
+
+  it('每次请求前重新求值，取的是最新的查询条件', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(pageOk([], 0))
+    let keyword = 'first'
+    const table = useTable<Row, { keyword: string }>(fetchFn, () => ({ keyword }))
+
+    await table.fetchData()
+    keyword = 'second'
+    await table.fetchData()
+
+    expect(fetchFn).toHaveBeenLastCalledWith({ pageNo: 1, pageSize: 10, keyword: 'second' })
+  })
+})
+
+// 没有失败态时，请求失败后表格只剩「暂无数据」，与真的没数据分不开
+describe('useTable 失败态与重试', () => {
+  // clearAllMocks 不会还原 mockReturnValue，两个判定都得逐个复位
+  beforeEach(() => {
+    vi.clearAllMocks()
+    requestMock.shouldIgnoreRequestError.mockReturnValue(false)
+    requestMock.isForbiddenError.mockReturnValue(false)
+  })
+
+  afterEach(() => {
+    requestMock.isForbiddenError.mockReturnValue(false)
+  })
+
+  it('初始没有失败态', () => {
+    expect(useTable<Row>().loadError.value).toBeNull()
+  })
+
+  it('业务码非 200 时把后端原文暴露成失败态', async () => {
+    const table = useTable<Row>()
+    await table.loadData(vi.fn().mockResolvedValue({ code: 500, message: 'boom', data: null }))
+    expect(table.loadError.value).toBe('boom')
+  })
+
+  it('传输层错误落成本地化的加载失败文案', async () => {
+    const table = useTable<Row>()
+    await table.loadData(vi.fn().mockRejectedValue(new Error('Network Error')))
+    expect(table.loadError.value).toBe('common.loadDataFailed')
+  })
+
+  it('403 用「无权限访问」而不是笼统的加载失败', async () => {
+    requestMock.isForbiddenError.mockReturnValue(true)
+    const table = useTable<Row>()
+    await table.loadData(vi.fn().mockRejectedValue(new Error('forbidden')))
+    expect(table.loadError.value).toBe('error.forbidden')
+  })
+
+  // 请求被取消或登录过期时页面正在被替换，标失败态只会闪一下红字
+  it('被忽略的请求错误不进失败态', async () => {
+    requestMock.shouldIgnoreRequestError.mockReturnValue(true)
+    const table = useTable<Row>()
+    await table.loadData(vi.fn().mockRejectedValue(new Error('canceled')))
+    expect(table.loadError.value).toBeNull()
+  })
+
+  it('重新加载成功后清掉失败态', async () => {
+    const table = useTable<Row>()
+    const fetchFn = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValue(pageOk([{ id: 1 }], 1))
+
+    await table.loadData(fetchFn)
+    expect(table.loadError.value).toBe('common.loadDataFailed')
+
+    await table.loadData(fetchFn)
+    expect(table.loadError.value).toBeNull()
+  })
+
+  it('retryLoad 用同一组参数重发请求并清掉失败态', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValue(pageOk([{ id: 9 }], 1))
+    const table = useTable<Row, { keyword: string }>(fetchFn, () => ({ keyword: 'kw' }))
+    table.pagination.total = 100
+    table.pagination.current = 2
+
+    await table.fetchData()
+    expect(table.loadError.value).toBe('common.loadDataFailed')
+
+    await table.retryLoad()
+
+    expect(fetchFn).toHaveBeenCalledTimes(2)
+    expect(fetchFn).toHaveBeenLastCalledWith({ pageNo: 2, pageSize: 10, keyword: 'kw' })
+    expect(table.loadError.value).toBeNull()
+    expect(table.data.value).toEqual([{ id: 9 }])
+  })
+
+  // loadData 直接调用的页面（ConfigManager 等）也要能重试，重试重放的是最后那次 loadData
+  it('retryLoad 重放最近一次 loadData 而不是默认 fetchFn', async () => {
+    const defaultFetch = vi.fn().mockResolvedValue(pageOk([], 0))
+    const adHocFetch = vi.fn().mockRejectedValue(new Error('boom'))
+    const table = useTable<Row>(defaultFetch)
+
+    await table.loadData(adHocFetch)
+    await table.retryLoad()
+
+    expect(adHocFetch).toHaveBeenCalledTimes(2)
+    expect(defaultFetch).not.toHaveBeenCalled()
   })
 })
 

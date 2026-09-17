@@ -21,7 +21,6 @@ import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.domain.vo.VerifyCode;
-import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
@@ -111,9 +110,7 @@ public class DeviceAppService {
         if (existingDevice.isPresent()) {
             Device d = existingDevice.get();
             if (userId != null && userId.equals(d.getUserId())) {
-                DeviceProjection result = deviceService.get(d.getDeviceId());
-                if (result == null) throw new IllegalStateException("查询设备失败");
-                return deviceConvert.toResp(result);
+                return deviceConvert.toResp(d, roleNameOf(d.getRoleId()));
             }
             throw new IllegalStateException("设备已被其他用户绑定");
         }
@@ -130,9 +127,7 @@ public class DeviceAppService {
         // 绑定成功后作废该设备的验证码，避免同一个码在有效期内被继续试探
         deviceRepository.invalidateVerifyCodes(verifyCode.deviceId());
 
-        DeviceProjection result = deviceService.get(device.getDeviceId());
-        if (result == null) throw new IllegalStateException("添加设备失败");
-        return deviceConvert.toResp(result);
+        return deviceConvert.toResp(device, selectedRole.getRoleName());
     }
 
     /**
@@ -154,9 +149,7 @@ public class DeviceAppService {
         if (existingDevice.isPresent()) {
             Device d = existingDevice.get();
             if (userId != null && userId.equals(d.getUserId())) {
-                DeviceProjection result = deviceService.get(d.getDeviceId());
-                if (result == null) throw new IllegalStateException("查询设备失败");
-                return deviceConvert.toResp(result);
+                return deviceConvert.toResp(d, roleNameOf(d.getRoleId()));
             }
             throw new IllegalStateException("设备已被其他用户绑定");
         }
@@ -175,9 +168,7 @@ public class DeviceAppService {
         deviceRepository.save(device);
         deviceRepository.invalidateVerifyCodes(deviceId);
 
-        DeviceProjection result = deviceService.get(device.getDeviceId());
-        if (result == null) throw new IllegalStateException("添加设备失败");
-        return deviceConvert.toResp(result);
+        return deviceConvert.toResp(device, selectedRole.getRoleName());
     }
 
     /** 归一化二维码中的 MAC：贴纸可能印大写或 '-' 分隔，设备上报为小写冒号格式 */
@@ -190,8 +181,9 @@ public class DeviceAppService {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new ResourceNotFoundException("设备不存在或无权访问"));
 
+        RoleBO role = null;
         if (req.getRoleId() != null) {
-            RoleBO role = roleService.getBO(req.getRoleId());
+            role = roleService.getBO(req.getRoleId());
             if (role == null) throw new IllegalArgumentException("角色不存在或无权访问");
             if (!Objects.equals(role.getUserId(), device.getUserId()))
                 throw new IllegalArgumentException("角色不属于设备所属用户");
@@ -200,9 +192,18 @@ public class DeviceAppService {
         device.update(req.getDeviceName(), req.getRoleId(), req.getLocation());
         deviceRepository.save(device);
 
-        DeviceProjection result = deviceService.get(deviceId);
-        if (result == null) throw new IllegalStateException("更新设备失败");
-        return deviceConvert.toResp(result);
+        // 改了角色的话校验时已经把角色查出来了，没改才按设备当前 roleId 取一次角色名
+        return deviceConvert.toResp(device,
+                role != null ? role.getRoleName() : roleNameOf(device.getRoleId()));
+    }
+
+    /** 角色名只为出参而取，按主键读一次角色（走角色缓存），不为它多跑一次设备与角色的关联查询 */
+    private String roleNameOf(Integer roleId) {
+        if (roleId == null) {
+            return null;
+        }
+        RoleBO role = roleService.getBO(roleId);
+        return role == null ? null : role.getRoleName();
     }
 
     @Transactional

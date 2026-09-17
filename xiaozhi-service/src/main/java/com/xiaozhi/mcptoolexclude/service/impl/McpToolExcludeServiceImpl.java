@@ -3,6 +3,7 @@ package com.xiaozhi.mcptoolexclude.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.mcptoolexclude.dal.mysql.dataobject.McpToolExcludeDO;
 import com.xiaozhi.mcptoolexclude.dal.mysql.mapper.McpToolExcludeMapper;
@@ -37,7 +38,7 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    @Cacheable(value = CACHE_NAME, key = "'excluded_tools:' + #roleId")
+    @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "'excluded_tools:' + #roleId")
     public Set<String> getExcludedTools(Integer roleId) {
         Set<String> excludedTools = new LinkedHashSet<>(getGlobalDisabledTools());
         if (roleId != null) {
@@ -48,20 +49,20 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
 
     @Override
     @Transactional
-    @CacheEvict(value = CACHE_NAME, allEntries = true)
+    @CacheEvict(value = CacheNames.MCP_TOOL_EXCLUDE, allEntries = true)
     public void toggleRoleToolStatus(Integer roleId, String toolName, String serverName, boolean enabled) {
         toggleToolStatus(EXCLUDE_TYPE_ROLE, serverName, String.valueOf(roleId), toolName, enabled);
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = CACHE_NAME, allEntries = true)
+    @CacheEvict(value = CacheNames.MCP_TOOL_EXCLUDE, allEntries = true)
     public void toggleGlobalToolStatus(String toolName, String serverName, boolean enabled) {
         toggleToolStatus(EXCLUDE_TYPE_GLOBAL, serverName, GLOBAL_BIND_KEY, toolName, enabled);
     }
 
     @Override
-    @Cacheable(value = CACHE_NAME, key = "'role_disabled:' + #roleId")
+    @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "'role_disabled:' + #roleId")
     public List<String> getRoleDisabledTools(Integer roleId) {
         if (roleId == null) {
             return new ArrayList<>();
@@ -78,7 +79,7 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
     }
 
     @Override
-    @Cacheable(value = CACHE_NAME, key = "'global_disabled'")
+    @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "'global_disabled'")
     public List<String> getGlobalDisabledTools() {
         List<String> disabledTools = new ArrayList<>();
         List<McpToolExcludeDO> configs = mcpToolExcludeMapper.selectList(new LambdaQueryWrapper<McpToolExcludeDO>()
@@ -93,7 +94,7 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
 
     @Override
     @Transactional
-    @CacheEvict(value = CACHE_NAME, allEntries = true)
+    @CacheEvict(value = CacheNames.MCP_TOOL_EXCLUDE, allEntries = true)
     public void batchSetRoleExcludeTools(Integer roleId, List<String> excludeTools, String serverName) {
         if (roleId == null) {
             return;

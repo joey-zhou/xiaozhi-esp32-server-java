@@ -17,7 +17,10 @@ public class VerifyCodeDO {
 
     private String code;
     private String type;
-    private String email;
+
+    /** 收码账号：邮箱或手机号，两种渠道共用一列；设备码这一半为 NULL */
+    private String account;
+
     private String deviceId;
     private String sessionId;
     private String audioPath;

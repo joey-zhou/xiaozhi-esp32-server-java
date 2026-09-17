@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { fileValidators } from '@/utils/fileValidators'
+import { formatSecondsToClock } from '@/utils/format'
 import { message } from 'ant-design-vue'
 import { 
   UploadOutlined, 
@@ -50,7 +51,7 @@ const hasAudio = computed(() => {
 
 const recordingStatusText = computed(() => {
   if (props.recordingTime > 0) {
-    return `${t('common.recordedTime')} ${formatTime(props.recordingTime)}`
+    return `${t('common.recordedTime')} ${formatSecondsToClock(props.recordingTime)}`
   }
   return t('common.clickToRecord')
 })
@@ -58,13 +59,6 @@ const recordingStatusText = computed(() => {
 const isOverRecommendedTime = computed(() => {
   return props.recordingTime > 15
 })
-
-// 方法
-const formatTime = (seconds: number) => {
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
-  return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`
-}
 
 const beforeUpload = (file: File) => {
   const invalidKey = fileValidators.audio.validate(file)
@@ -114,9 +108,9 @@ const handleRestoreOriginal = () => {
             <a-upload 
               name="file" 
               :multiple="false" 
-              :before-upload="beforeUpload" 
+              :before-upload="beforeUpload"
               :file-list="fileList"
-              accept=".wav,.mp3,.m4a,.flac,.ogg,.opus,.aac"
+              :accept="fileValidators.audio.accept"
             >
               <a-button>
                 <template #icon><UploadOutlined /></template>

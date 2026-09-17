@@ -1,6 +1,6 @@
 import { useStorage, usePreferredDark } from '@vueuse/core'
 import { computed, watch } from 'vue'
-import { theme } from 'ant-design-vue'
+import { ConfigProvider, theme } from 'ant-design-vue'
 import type { ThemeConfig } from 'ant-design-vue/es/config-provider/context'
 import { STORAGE_THEME_MODE } from '@/constants/storage'
 
@@ -84,28 +84,44 @@ function injectCssVariables(isDark: boolean) {
   root.style.setProperty('--ant-color-border-secondary', isDark ? '#303030' : '#f0f0f0')
 }
 
+/**
+ * Modal.confirm / message 等静态方法不挂在 <a-config-provider> 的组件树下，拿不到它的 theme，
+ * 暗色模式下会一直按亮色渲染。ant-design-vue 源码里这些静态方法会读 ConfigProvider.config()
+ * 写入的全局配置，各自套一层 <ConfigProvider> 再渲染内容
+ *（见 modal/confirm.js 的 Wrapper、vc-notification/Notification.js 的 newInstance），
+ * 所以在主题切换时同步调这个全局配置，就能让它们跟着页面主题变暗/变亮。
+ * 官方类型只认旧版 Theme（primaryColor 等几个色值），但运行时其实原样透传给内部的
+ * <ConfigProvider>，新版 ThemeConfig（algorithm + token）一样生效，这里按真实签名断言类型。
+ */
+type ConfigProviderConfig = (params: { theme?: ThemeConfig }) => void
+
+function syncStaticMethodsTheme(themeConfig: ThemeConfig) {
+  ;(ConfigProvider.config as unknown as ConfigProviderConfig)({ theme: themeConfig })
+}
+
+// 主题是全局唯一的一份状态，放模块作用域：AudioPlayer 这类组件是按表格行渲染的，
+// 若把状态和 watch 放进函数体，挂 N 行就注册 N 个 watch，切一次主题要重复注入 N 遍 CSS 变量
+const themeMode = useStorage<ThemeMode>(STORAGE_THEME_MODE, 'auto')
+const prefersDark = usePreferredDark()
+
+const actualTheme = computed<'light' | 'dark'>(() => {
+  if (themeMode.value === 'auto') {
+    return prefersDark.value ? 'dark' : 'light'
+  }
+  return themeMode.value
+})
+
+const antdTheme = computed<ThemeConfig>(() => {
+  return actualTheme.value === 'dark' ? darkTheme : lightTheme
+})
+
+// 监听主题变化，注入 CSS 变量，并把主题同步给 Modal.confirm / message 这类静态方法
+watch(actualTheme, (mode) => {
+  injectCssVariables(mode === 'dark')
+  syncStaticMethodsTheme(mode === 'dark' ? darkTheme : lightTheme)
+}, { immediate: true })
+
 export function useAntdTheme() {
-  const themeMode = useStorage<ThemeMode>(STORAGE_THEME_MODE, 'auto')
-  const prefersDark = usePreferredDark()
-
-  // 计算实际应用的主题
-  const actualTheme = computed<'light' | 'dark'>(() => {
-    if (themeMode.value === 'auto') {
-      return prefersDark.value ? 'dark' : 'light'
-    }
-    return themeMode.value
-  })
-
-  // 获取 Ant Design Vue 的主题配置
-  const antdTheme = computed<ThemeConfig>(() => {
-    return actualTheme.value === 'dark' ? darkTheme : lightTheme
-  })
-
-  // 监听主题变化，注入 CSS 变量
-  watch(actualTheme, (theme) => {
-    injectCssVariables(theme === 'dark')
-  }, { immediate: true })
-
   // 切换主题（循环切换：light -> dark -> auto）
   const toggleTheme = () => {
     if (themeMode.value === 'light') {

@@ -31,6 +31,9 @@ public class DialogueListener implements PersonaListener {
 
     /**
      * 落库排进本会话队列执行：调用线程是 LLM 流的事件循环线程，不能在上面开阻塞事务。
+     * <p>
+     * 用户音频路径也在这一刻才从 DialogueTurn 取：落盘任务在 STT 出终稿时就排进了同一条队列、
+     * 排在本任务之前，执行到这里时路径已回填，不用等也不会丢。
      */
     @Override
     public void onDialogueTurn(DialogueTurn turn) {

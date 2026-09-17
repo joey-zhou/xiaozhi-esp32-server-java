@@ -25,7 +25,7 @@ class VerifyCodeConvertTest {
         source.setCodeId(11);
         source.setCode("123456");
         source.setType("device");
-        source.setEmail("someone@example.com");
+        source.setAccount("someone@example.com");
         source.setDeviceId("dev-1");
         source.setSessionId("session-1");
         source.setAudioPath("audio/verify/abc.wav");
@@ -35,7 +35,7 @@ class VerifyCodeConvertTest {
 
         assertThat(bo.getCode()).isEqualTo("123456");
         assertThat(bo.getType()).isEqualTo("device");
-        assertThat(bo.getEmail()).isEqualTo("someone@example.com");
+        assertThat(bo.getAccount()).isEqualTo("someone@example.com");
         assertThat(bo.getDeviceId()).isEqualTo("dev-1");
         assertThat(bo.getSessionId()).isEqualTo("session-1");
         assertThat(bo.getAudioPath())

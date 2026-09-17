@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.common.model.PageResult;
@@ -69,7 +70,7 @@ public class DeviceServiceImpl implements DeviceService {
             return null;
         }
         String cacheKey = deviceId.replace(":", "-");
-        org.springframework.cache.Cache cache = cacheManager.getCache(CACHE_NAME);
+        org.springframework.cache.Cache cache = cacheManager.getCache(CacheNames.DEVICE);
         return cacheHelper.getWithLock(
             "device:" + cacheKey,
             () -> cache == null ? null : cache.get(cacheKey, DeviceBO.class),
@@ -108,11 +109,6 @@ public class DeviceServiceImpl implements DeviceService {
         return deviceMapper.selectList(queryWrapper).stream()
             .map(deviceConvert::toBO)
             .toList();
-    }
-
-    @Override
-    public DeviceProjection get(String deviceId) {
-        return deviceMapper.selectProjectionById(deviceId);
     }
 
     @Override

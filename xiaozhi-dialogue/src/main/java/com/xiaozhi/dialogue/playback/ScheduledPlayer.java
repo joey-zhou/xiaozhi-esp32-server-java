@@ -6,6 +6,7 @@ import com.xiaozhi.utils.EmojiUtils;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.OpusProcessor;
 import io.jsonwebtoken.lang.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -67,10 +68,14 @@ public class ScheduledPlayer extends Player {
     private static final int SENTENCE_GAP_FRAMES = 4;
 
     // 句子间隔标记（空帧），发送线程遇到时转为句间静音帧
-    private static final Frame SENTENCE_GAP_MARKER = new Frame(new Speech(new byte[0]), false);
+    private static final Frame SENTENCE_GAP_MARKER = new Frame(new Speech(new byte[0]), false, null);
 
-    /** 队列里的一帧，带来源标记：是否本轮 LLM 回复 */
-    private record Frame(Speech speech, boolean reply) {}
+    /**
+     * 队列里的一帧，带来源标记：是否本轮 LLM 回复。
+     * referencePcm 是这帧编码前的 PCM，下发时直接当服务端 AEC 的参考信号；
+     * 缓存命中直读的帧没有源 PCM，为 null，由 AEC 侧解码补上。
+     */
+    private record Frame(Speech speech, boolean reply, byte[] referencePcm) {}
 
     /** 排队等待订阅的音频流，带来源标记 */
     private record QueuedFlux(Flux<Speech> flux, boolean reply) {}
@@ -185,7 +190,7 @@ public class ScheduledPlayer extends Player {
                                 if (StringUtils.hasText(speech.getText())) {
                                     flushPreviousSentence(pendingText, reply);
                                 }
-                                allOpusFrames.add(new Frame(speech, reply));
+                                allOpusFrames.add(new Frame(speech, reply, null));
                                 return;
                             }
 
@@ -203,22 +208,13 @@ public class ScheduledPlayer extends Player {
                                 text = pendingText.getAndSet(null);
                             }
 
-                            List<byte[]> opusFrames = opusProcessor.pcmToOpus(pcmData, true);
+                            List<OpusProcessor.EncodedFrame> encoded = opusProcessor.pcmToOpus(pcmData, true);
 
-                            if (!CollectionUtils.isEmpty(opusFrames)) {
-                                // 创建Speech列表，第一帧附带文本
-                                List<Speech> speechList = opusFrames.stream()
-                                        .map(Speech::new)
-                                        .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-
+                            if (!CollectionUtils.isEmpty(encoded)) {
                                 if (StringUtils.hasText(text)) {
-                                    // 将第一帧替换为带文本的Speech
-                                    Speech firstSpeech = speechList.remove(0);
-                                    speechList.add(0, new Speech(firstSpeech.getOutput(), text));
                                     pendingText.set(null);
                                 }
-
-                                allOpusFrames.addAll(frames(speechList, reply));
+                                allOpusFrames.addAll(frames(encoded, reply, text));
                             } else if (StringUtils.hasText(text)) {
                                 // PCM不足一个Opus帧（已进入编码器内部缓冲），暂存文本等待下一帧
                                 pendingText.set(text);
@@ -241,20 +237,10 @@ public class ScheduledPlayer extends Player {
                                 return;
                             }
                             // 当前Flux完成，flush剩余数据
-                            List<byte[]> opusFrames = opusProcessor.flushLeftover();
-                            if (!CollectionUtils.isEmpty(opusFrames)) {
-                                List<Speech> speechList = opusFrames.stream()
-                                        .map(Speech::new)
-                                        .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-
+                            List<OpusProcessor.EncodedFrame> encoded = opusProcessor.flushLeftover();
+                            if (!CollectionUtils.isEmpty(encoded)) {
                                 // 若有暂存文本（最后一句的第一帧太小），附加到flush出来的第一帧
-                                String pt = pendingText.getAndSet(null);
-                                if (pt != null) {
-                                    Speech firstSpeech = speechList.remove(0);
-                                    speechList.add(0, new Speech(firstSpeech.getOutput(), pt));
-                                }
-
-                                allOpusFrames.addAll(frames(speechList, reply));
+                                allOpusFrames.addAll(frames(encoded, reply, pendingText.getAndSet(null)));
                             }
 
                             // 添加句子间隔标记，避免句子粘连
@@ -282,28 +268,27 @@ public class ScheduledPlayer extends Player {
      * （字幕相对音频提前、末句字幕丢失）。调用方须持有 encodeLock
      */
     private void flushPreviousSentence(AtomicReference<String> pendingText, boolean reply) {
-        List<byte[]> tailFrames = opusProcessor.flushLeftover();
+        List<OpusProcessor.EncodedFrame> tailFrames = opusProcessor.flushLeftover();
         if (CollectionUtils.isEmpty(tailFrames)) {
             return;
         }
-        // 上一句的收尾帧不带文本，归属上一句
-        String carriedText = pendingText.getAndSet(null);
-        List<Speech> tailList = tailFrames.stream()
-                .map(Speech::new)
-                .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-        // 若上一句因首帧 PCM 过小而暂存了文本却一直没凑够帧，
-        // 此刻补绑到其收尾帧，避免上一句字幕彻底丢失
-        if (StringUtils.hasText(carriedText)) {
-            Speech firstTail = tailList.remove(0);
-            tailList.add(0, new Speech(firstTail.getOutput(), carriedText));
-        }
-        allOpusFrames.addAll(frames(tailList, reply));
+        // 上一句的收尾帧不带文本，归属上一句；
+        // 若上一句因首帧 PCM 过小而暂存了文本却一直没凑够帧，此刻补绑到其收尾帧，避免上一句字幕彻底丢失
+        allOpusFrames.addAll(frames(tailFrames, reply, pendingText.getAndSet(null)));
     }
 
-    private static List<Frame> frames(List<Speech> speeches, boolean reply) {
-        List<Frame> frames = new ArrayList<>(speeches.size());
-        for (Speech speech : speeches) {
-            frames.add(new Frame(speech, reply));
+    /**
+     * 编码结果转成待发送帧，文本绑在第一帧上
+     */
+    private List<Frame> frames(List<OpusProcessor.EncodedFrame> encoded, boolean reply, String text) {
+        boolean keepPcm = needsReferencePcm();
+        List<Frame> frames = new ArrayList<>(encoded.size());
+        for (int i = 0; i < encoded.size(); i++) {
+            OpusProcessor.EncodedFrame frame = encoded.get(i);
+            Speech speech = i == 0 && StringUtils.hasText(text)
+                    ? new Speech(frame.opus(), text)
+                    : new Speech(frame.opus());
+            frames.add(new Frame(speech, reply, keepPcm ? frame.pcm() : null));
         }
         return frames;
     }
@@ -663,7 +648,7 @@ public class ScheduledPlayer extends Player {
         }
 
         // 发送音频帧
-        sendOpusFrame(speech.getOutput());
+        sendOpusFrame(speech.getOutput(), queued.referencePcm());
 
         // 更新播放位置（每帧增加60ms）
         playPosition += OPUS_FRAME_SEND_INTERVAL_NS;

@@ -14,6 +14,7 @@ import {
 import { useSelectLoadMore } from '@/composables/useSelectLoadMore'
 import { useChatSession } from '@/composables/useChatSession'
 import { queryRoles } from '@/services/role'
+import { formatShortDateTime } from '@/utils/date'
 import type { Conversation } from '@/types/message'
 import type { Role } from '@/types/role'
 import RobotAvatar from '@/components/RobotAvatar.vue'
@@ -67,11 +68,6 @@ function toggleHistory() {
   if (showHistory.value && conversations.value.length === 0) {
     loadConversations()
   }
-}
-
-function formatTime(timeStr: string) {
-  const d = new Date(timeStr)
-  return `${d.getMonth() + 1}-${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
 }
 
 // 视图状态：输入框 / 滚动 / 角色弹窗
@@ -193,9 +189,10 @@ async function sendMessage() {
           </a-button>
           <template #content>
             <div class="role-panel">
-              <div
+              <button
                 v-for="role in roles"
                 :key="role.roleId"
+                type="button"
                 class="role-card"
                 :class="{ active: selectedRoleId === role.roleId }"
                 @click="selectRole(role)"
@@ -208,7 +205,7 @@ async function sendMessage() {
                   <div v-if="role.roleDesc" class="role-card-desc">{{ role.roleDesc }}</div>
                 </div>
                 <CheckOutlined v-if="selectedRoleId === role.roleId" class="role-card-check" />
-              </div>
+              </button>
             </div>
           </template>
         </a-popover>
@@ -320,7 +317,8 @@ async function sendMessage() {
               :key="conv.sessionId"
               :color="sessionId === conv.sessionId ? '#1677ff' : 'gray'"
             >
-              <div
+              <button
+                type="button"
                 class="history-item"
                 :class="{ active: sessionId === conv.sessionId }"
                 @click="selectConversation(conv)"
@@ -328,9 +326,9 @@ async function sendMessage() {
                 <a-typography-paragraph :ellipsis="{ rows: 2 }" :content="conv.title || t('chat.newConversation')" :style="{ marginBottom: '4px' }" />
                 <a-flex justify="space-between" class="history-item-meta">
                   <span>{{ conv.roleName }}</span>
-                  <span>{{ formatTime(conv.updateTime) }}</span>
+                  <span>{{ formatShortDateTime(conv.updateTime) }}</span>
                 </a-flex>
-              </div>
+              </button>
             </a-timeline-item>
           </a-timeline>
           <a-empty v-else :description="t('chat.noHistory')" />
@@ -390,12 +388,18 @@ async function sendMessage() {
   padding: 6px;
 }
 
+/* 原来是 div，现在是真正的 button，重置原生按钮外观（宽度/字体/边框），视觉保持不变 */
 .role-card {
   display: flex;
   align-items: center;
+  width: 100%;
   gap: 12px;
   padding: 10px 12px;
   border-radius: 8px;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -523,7 +527,14 @@ async function sendMessage() {
   padding-top: 4px;
 }
 
+/* 原来是 div，现在是真正的 button，重置原生按钮外观（宽度/字体/边框/对齐），视觉保持不变 */
 .history-item {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
   border-radius: 8px;
   padding: 8px 10px;

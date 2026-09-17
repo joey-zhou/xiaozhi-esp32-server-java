@@ -5,20 +5,29 @@ import { i18n } from '@/locales'
 /**
  * 全屏遮罩 loading，按 showLoading/hideLoading 成对计数
  * 与 composables/useLoadingState 的 withLoading 职责正交（那个是页内多路 key 的局部 loading），不要混用
+ *
+ * 采用「延迟显示」策略而非「最小显示时间」策略：
+ * showLoading 后不会立刻挂遮罩，先等 SHOW_DELAY，快速结束的操作（在延迟内 hideLoading）
+ * 遮罩根本不会出现；只有真正显示出来的遮罩才应用 MIN_DISPLAY_TIME 防止一闪而过
  */
 export const useLoadingStore = defineStore('loading', () => {
-  // 全局 loading 状态
+  // 全局 loading 状态（遮罩是否真的挂出来了）
   const isLoading = ref(false)
   const loadingText = ref(i18n.global.t('common.loading'))
 
   // 请求计数器（处理多个并发请求）
   const requestCount = ref(0)
 
-  // 最低显示时间（毫秒）- 防止快速操作时的闪烁
-  const MIN_DISPLAY_TIME = 300
+  // 延迟显示时间（毫秒）- 短操作在这段时间内结束就不会挂遮罩
+  const SHOW_DELAY = 250
+  // 最低显示时间（毫秒）- 遮罩一旦显示出来，至少保留这么久，防止闪烁
+  const MIN_DISPLAY_TIME = 200
 
-  // 记录显示时间
-  let showTime = 0
+  // 遮罩真正显示出来的时间点，仅在 isLoading 为 true 时有意义
+  let shownAt = 0
+  // 等待展示遮罩的延迟定时器（遮罩还没显示）
+  let showTimer: ReturnType<typeof setTimeout> | null = null
+  // 等待达到最低显示时间后再隐藏的定时器（遮罩已经显示）
   let hideTimer: ReturnType<typeof setTimeout> | null = null
 
   // 显示 loading
@@ -33,28 +42,22 @@ export const useLoadingStore = defineStore('loading', () => {
     requestCount.value++
     loadingText.value = text
 
-    // 如果已经在显示，只更新文字
+    // 遮罩已经显示，只更新文字
     if (isLoading.value) {
       return
     }
 
-    // 记录显示时间
-    showTime = Date.now()
-    isLoading.value = true
-  }
+    // 已经在等待展示期内，沿用同一个延迟定时器，不重复排期
+    if (showTimer) {
+      return
+    }
 
-  // 等待最小显示时间
-  const awaitMinDisplay = (): Promise<void> => {
-    return new Promise((resolve) => {
-      const displayedTime = Date.now() - showTime
-      const remainingTime = MIN_DISPLAY_TIME - displayedTime
-
-      if (remainingTime > 0) {
-        setTimeout(resolve, remainingTime)
-      } else {
-        resolve()
-      }
-    })
+    // 进入延迟展示期：这段时间内请求结束的话遮罩根本不会出现
+    showTimer = setTimeout(() => {
+      showTimer = null
+      shownAt = Date.now()
+      isLoading.value = true
+    }, SHOW_DELAY)
   }
 
   // 隐藏 loading
@@ -66,18 +69,27 @@ export const useLoadingStore = defineStore('loading', () => {
 
     requestCount.value = 0
 
-    // 计算已显示时间
-    const displayedTime = Date.now() - showTime
+    // 还在延迟展示期内就结束了，遮罩全程都不会出现
+    if (showTimer) {
+      clearTimeout(showTimer)
+      showTimer = null
+      return
+    }
+
+    if (!isLoading.value) {
+      return
+    }
+
+    // 计算已显示时间，不足最低时间则延迟隐藏
+    const displayedTime = Date.now() - shownAt
     const remainingTime = MIN_DISPLAY_TIME - displayedTime
 
-    // 如果显示时间不足最低时间，延迟隐藏
     if (remainingTime > 0) {
       hideTimer = setTimeout(() => {
         isLoading.value = false
         hideTimer = null
       }, remainingTime)
     } else {
-      // 已达到最低时间，立即隐藏
       isLoading.value = false
     }
   }
@@ -87,6 +99,5 @@ export const useLoadingStore = defineStore('loading', () => {
     loadingText,
     showLoading,
     hideLoading,
-    awaitMinDisplay,
   }
 })

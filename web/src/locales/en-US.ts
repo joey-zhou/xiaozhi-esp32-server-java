@@ -109,7 +109,6 @@ export default {
     updatePlatformConfigFailed: 'Failed to update platform configuration',
     addPlatformConfigFailed: 'Failed to add platform configuration',
     // Audio related
-    audioUrlInvalid: 'Audio URL invalid',
     audioPlayFailed: 'Audio playback failed',
     audioPathInvalid: 'Audio path invalid',
     audioTestFailed: 'Audio test failed',
@@ -170,10 +169,6 @@ export default {
   clipboard: {
     copySuccess: 'Copied successfully',
     copyFailed: 'Copy failed',
-    pasteNotSupported: 'Your browser does not support reading clipboard',
-    pasteFailed: 'Failed to read clipboard',
-    jsonError: 'JSON serialization failed',
-    imageNotSupported: 'Your browser does not support copying images',
   },
 
   menu: {
@@ -436,7 +431,6 @@ export default {
     
     // Voice test related
     voiceNotFound: 'Voice information not found',
-    getTestAudioFailed: 'Failed to get test audio',
     playVoiceFailed: 'Voice playback failed',
     loadTemplateFailed: 'Failed to load template list',
     voskLocalRecognition: 'Vosk Local Recognition',
@@ -870,6 +864,8 @@ export default {
     action: 'Action',
     uploadTime: 'Upload Time',
     total: 'Total {total} items',
+    loadFailed: 'Failed to load data',
+    retry: 'Reload',
   },
 
   router: {
@@ -958,9 +954,6 @@ export default {
       sendFailed: 'Failed to send, please check the connection',
       micDenied: 'Cannot start recording, please check microphone permission',
       stopRecordFailed: 'Failed to stop recording',
-      justNow: 'Just now',
-      minutesAgo: '{count} min ago',
-      hoursAgo: '{count} h ago',
       online: 'Online',
       status: {
         idle: 'Not connected',

@@ -2,6 +2,7 @@ package com.xiaozhi.server.web.chat;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
+import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.ChatStreamReq;
 import com.xiaozhi.common.model.resp.ChatSessionClosedResp;
 import com.xiaozhi.common.model.resp.ChatSessionOpenedResp;
@@ -32,6 +33,8 @@ public class WebChatController {
     /**
      * 开启聊天会话。
      * 不传 {@code sessionId} 时创建新会话；传入已有 sessionId 时尝试续接（会校验归属）。
+     * roleId 归属由 {@code @CheckOwner} 拦下：角色的 roleDesc 是用户私有的提示词，
+     * 不校验就能用别人的 roleId 开会话并读到它。
      *
      * @param roleId    角色 ID
      * @param sessionId 可选，续接的会话 ID
@@ -39,6 +42,7 @@ public class WebChatController {
      */
     @PostMapping("/open")
     @SaCheckPermission("system:chat:api:open")
+    @CheckOwner(resource = "role", id = "#roleId")
     @Operation(summary = "开启聊天会话", description = "创建或续接 Web 聊天会话并返回 sessionId")
     public ChatSessionOpenedResp open(@RequestParam Integer roleId,
                                      @RequestParam(required = false) String sessionId) {

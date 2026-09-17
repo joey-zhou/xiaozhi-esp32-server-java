@@ -13,6 +13,7 @@ vi.mock('@/locales', () => ({
 
 import {
   formatBackendDateTime,
+  formatClockTime,
   formatDate,
   formatDateTime,
   formatShortDateTime,
@@ -87,6 +88,25 @@ describe('formatBackendDateTime', () => {
   it('空值与非法值走默认值', () => {
     expect(formatBackendDateTime()).toBe('-')
     expect(formatBackendDateTime('不是日期')).toBe('-')
+  })
+})
+
+describe('formatClockTime', () => {
+  it('输出 HH:mm:ss 且各段补零', () => {
+    expect(formatClockTime('2026-03-12T09:05:07')).toBe('09:05:07')
+    expect(formatClockTime('2026-03-12T23:00:00')).toBe('23:00:00')
+  })
+
+  it('不传参数时取当前时刻', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-12T08:03:04'))
+    expect(formatClockTime()).toBe('08:03:04')
+    vi.useRealTimers()
+  })
+
+  it('非法值走默认值', () => {
+    expect(formatClockTime('不是日期')).toBe('-')
+    expect(formatClockTime('不是日期', 'N/A')).toBe('N/A')
   })
 })
 

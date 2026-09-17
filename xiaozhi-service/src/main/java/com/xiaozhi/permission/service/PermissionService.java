@@ -6,8 +6,6 @@ import java.util.List;
 
 public interface PermissionService {
 
-    String CACHE_NAME = "XiaoZhi:Permission";
-
     List<PermissionBO> listTree();
 
     List<PermissionBO> listByAuthRoleId(Integer authRoleId);

@@ -10,9 +10,6 @@ import java.util.List;
 
 public interface DeviceService extends DeviceWriter {
 
-    /** 设备缓存名称（DeviceServiceImpl 读缓存、DeviceRepositoryImpl 写后失效均使用此常量） */
-    String CACHE_NAME = "XiaoZhi:Device";
-
     // ===================== 查询操作 =====================
 
     PageResult<DeviceProjection> page(int pageNo, int pageSize, String deviceId, String deviceName,
@@ -24,8 +21,6 @@ public interface DeviceService extends DeviceWriter {
     List<DeviceBO> listByDeviceIds(List<String> deviceIds);
 
     List<DeviceBO> listByStateAndType(String state, String type);
-
-    DeviceProjection get(String deviceId);
 
     // ===================== 验证码操作（独立表，非 Device 聚合） =====================
 

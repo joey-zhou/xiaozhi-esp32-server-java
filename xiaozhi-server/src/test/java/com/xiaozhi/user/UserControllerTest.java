@@ -11,6 +11,7 @@ import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.support.ControllerTestSupport;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.user.service.WxLoginService;
+import com.xiaozhi.verifycode.service.VerifyCodeService;
 import com.xiaozhi.utils.CaptchaUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +53,9 @@ class UserControllerTest extends ControllerTestSupport {
     private WxLoginService wxLoginService;
 
     @Mock
+    private VerifyCodeService verifyCodeService;
+
+    @Mock
     private CaptchaUtils captchaUtils;
 
     @Mock
@@ -65,6 +69,7 @@ class UserControllerTest extends ControllerTestSupport {
         ReflectionTestUtils.setField(userController, "userAppService", userAppService);
         ReflectionTestUtils.setField(userController, "userService", userService);
         ReflectionTestUtils.setField(userController, "wxLoginService", wxLoginService);
+        ReflectionTestUtils.setField(userController, "verifyCodeService", verifyCodeService);
         ReflectionTestUtils.setField(userController, "captchaUtils", captchaUtils);
         ReflectionTestUtils.setField(userController, "trustedProxyPolicy", trustedProxyPolicy);
         mockMvc = buildMockMvc(userController);

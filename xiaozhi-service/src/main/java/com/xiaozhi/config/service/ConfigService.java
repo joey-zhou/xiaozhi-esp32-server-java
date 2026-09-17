@@ -9,8 +9,6 @@ import java.util.List;
 
 public interface ConfigService extends ConfigLookup {
 
-    String CACHE_NAME = "XiaoZhi:SysConfig";
-
     PageResult<ConfigBO> page(int pageNo, int pageSize, String configType, String configName,
                               String modelType, String provider, String isDefault, String state,
                               Integer userId);
@@ -30,6 +28,16 @@ public interface ConfigService extends ConfigLookup {
     void evictDefaultCache(String configType);
 
     List<ConfigBO> listBO(Integer userId, String configType, String provider, String modelType, String isDefault, String state);
+
+    /**
+     * 落库第三方智能体平台（coze/dify/xingchen）同步来的模型配置，configType 固定为 llm。
+     * <p>
+     * configId 为空表示平台上新发现的智能体，建一条；带 configId 表示平台侧内容有变化，按 id 更新。
+     * 智能体那侧只需要这一个写入口，配置聚合的仓储不外借。
+     *
+     * @return 落库后的配置
+     */
+    ConfigBO saveAgentModel(ConfigBO agentModel);
 
     @Override
     default ConfigBO getConfig(Integer configId) {

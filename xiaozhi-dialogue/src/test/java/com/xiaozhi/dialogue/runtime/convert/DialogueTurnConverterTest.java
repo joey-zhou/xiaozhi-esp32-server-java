@@ -4,11 +4,13 @@ import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.dialogue.runtime.DialogueTurn;
 import com.xiaozhi.dialogue.runtime.ToolChainPair;
+import com.xiaozhi.dialogue.runtime.UserSpeechAudio;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -29,11 +31,13 @@ class DialogueTurnConverterTest {
     @Test
     void turnWithoutAssistantPersistsUserOnly() {
         Instant now = Instant.now();
+        UserSpeechAudio audio = new UserSpeechAudio(Path.of("audio/user.wav"));
+        audio.complete("audio/user.wav", 1.25);
         DialogueTurn turn = DialogueTurn.builder()
                 .userMessage(new UserMessage("讲个故事"))
                 .conversation(conversation)
                 .userMessageCreatedAt(now)
-                .userSpeechStoredPath("audio/user.wav")
+                .userSpeechAudio(audio)
                 .interrupted(true)
                 .build();
 
@@ -42,6 +46,37 @@ class DialogueTurnConverterTest {
         assertThat(messages).hasSize(1);
         assertThat(messages.get(0).getSender()).isEqualTo(MessageBO.SENDER_USER);
         assertThat(messages.get(0).getAudioPath()).isEqualTo("audio/user.wav");
+    }
+
+    /** 音频落盘晚于 DialogueTurn 构建：路径回填后再转换，落库拿到的就是回填值 */
+    @Test
+    void userAudioPathResolvedAtPersistTime() {
+        UserSpeechAudio audio = new UserSpeechAudio(Path.of("audio/user.wav"));
+        DialogueTurn turn = DialogueTurn.builder()
+                .userMessage(new UserMessage("讲个故事"))
+                .conversation(conversation)
+                .userMessageCreatedAt(Instant.now())
+                .userSpeechAudio(audio)
+                .build();
+
+        audio.complete("https://oss.example.com/audio/user.wav", 2.5);
+        List<MessageBO> messages = converter.toMessages(turn);
+
+        assertThat(messages.get(0).getAudioPath()).isEqualTo("https://oss.example.com/audio/user.wav");
+    }
+
+    /** 纯文本轮次没有音频，不能挂上一轮的录音路径 */
+    @Test
+    void textOnlyTurnHasNoAudioPath() {
+        DialogueTurn turn = DialogueTurn.builder()
+                .userMessage(new UserMessage("讲个故事"))
+                .conversation(conversation)
+                .userMessageCreatedAt(Instant.now())
+                .build();
+
+        List<MessageBO> messages = converter.toMessages(turn);
+
+        assertThat(messages.get(0).getAudioPath()).isNull();
     }
 
     @Test

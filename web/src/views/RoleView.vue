@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, reactive, nextTick, computed, onBeforeUnmount } from 'vue'
-import { message, type FormInstance, type UploadProps } from 'ant-design-vue'
+import { ref, reactive, nextTick, computed } from 'vue'
+import { message, type FormInstance } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import {
   CameraOutlined,
@@ -15,19 +15,20 @@ import { useRouter } from 'vue-router'
 import { useTable } from '@/composables/useTable'
 import { useRoleManager } from '@/composables/useRoleManager'
 import { useMemoryView } from '@/composables/useMemoryView'
+import { useAudioPlayer } from '@/composables/useAudioPlayer'
 import { useMcpToolSelection } from '@/composables/useMcpToolSelection'
 import { useRequest } from '@/composables/useRequest'
 import { useUserStore } from '@/store/user'
 import { ROUTES } from '@/router/routes'
 import { shouldIgnoreRequestError } from '@/services/request'
-import { queryRoles, addRole, updateRole, deleteRole, testVoice, updateToolsStatus } from '@/services/role'
+import { queryRoles, addRole, updateRole, deleteRole, updateToolsStatus } from '@/services/role'
 import { queryTemplates } from '@/services/template'
-import { getResourceUrl } from '@/utils/resource'
 import { useAvatar } from '@/composables/useAvatar'
-import { uploadFile } from '@/services/upload'
+import { useAvatarUpload } from '@/composables/useAvatarUpload'
 import type { ModelOption, PromptTemplate, Role, RoleFormData } from '@/types/role'
-import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
+import type { TableColumnsType } from 'ant-design-vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
+import TableEmptyState from '@/components/TableEmptyState.vue'
 
 const { t } = useI18n()
 const { getAvatarUrl } = useAvatar()
@@ -36,8 +37,20 @@ const userStore = useUserStore()
 const router = useRouter()
 const { navigateToMemory } = useMemoryView()
 
-// 表格和分页
-const { loading, data: roleList, pagination, handleTableChange, loadData, createDebouncedSearch } = useTable<Role>()
+// 表格和分页：分页参数由 useTable 注入，查询条件从 searchForm 现取
+const {
+  loading,
+  data: roleList,
+  pagination,
+  loadError,
+  retryLoad,
+  fetchData,
+  onTableChange,
+  debouncedSearch,
+} = useTable<Role>((params) => queryRoles({
+  ...params,
+  roleName: searchForm.roleName || undefined,
+}))
 
 
 // 角色管理器
@@ -104,27 +117,25 @@ const inactiveTimeoutEnabled = computed({
   }
 })
 
-// 头像上传
+// 头像上传：校验/上传/loading 收敛进 useAvatarUpload，这里只接收上传结果落到表单字段
 const avatarUrl = ref('')
-const avatarLoading = ref(false)
+const { avatarAccept, avatarLoading, beforeAvatarUpload } = useAvatarUpload({
+  onUploaded: (url) => {
+    avatarUrl.value = url
+  }
+})
 
-// 音色播放状态
-const playingVoiceId = ref<string>('')
-const loadingVoiceId = ref<string>('') // loading状态（API请求期间）
-// 试听音频缓存。语速/语调/指令改了就是另一段音频，必须一起进 key，否则会放出旧参数的录音
-const voiceAudioCache = new Map<string, HTMLAudioElement>()
+// 音色试听：播放/加载态与缓存交给 useAudioPlayer 统一管理，卸载时自动停止并释放
+const {
+  playingAudioId: playingVoiceId,
+  loadingAudioId: loadingVoiceId,
+  playAudioFromApi,
+  stopAllAudio: stopAllVoicePreview,
+} = useAudioPlayer()
 
+// 试听音频缓存 key。语速/语调/指令改了就是另一段音频，必须一起进 key，否则会放出旧参数的录音
 const voiceCacheKey = (voiceName: string) =>
   [voiceName, formData.ttsPitch ?? 1.0, formData.ttsSpeed ?? 1.0].join('|')
-
-// 停掉全部试听并释放缓存
-const stopAllVoicePreview = () => {
-  playingVoiceId.value = ''
-  voiceAudioCache.forEach(audio => {
-    audio.pause()
-    audio.currentTime = 0
-  })
-}
 
 // 提示词模板
 const promptEditorMode = ref<'custom' | 'template'>('custom')
@@ -133,6 +144,11 @@ const promptTemplates = ref<PromptTemplate[]>([])
 const { loading: templatesLoading, execute: executeTemplates } = useRequest()
 
 const selectedProvider = ref<string>('')
+
+// 行内操作与表单提交：每个请求一个实例，失败文案互不干扰
+const { executeOk: executeDeleteRole } = useRequest()
+const { executeOk: executeSetDefaultRole } = useRequest()
+const { executeFull: executeSaveRole } = useRequest()
 
 // 折叠面板展开状态
 const modelAdvancedVisible = ref<string[]>([])
@@ -217,23 +233,6 @@ const columns = computed<TableColumnsType>(() => [
 ])
 
 
-// 加载角色列表
-const fetchData = async () => {
-  await loadData((params) => queryRoles({
-    ...params,
-    roleName: searchForm.roleName || undefined
-  }))
-}
-
-// 防抖搜索
-const debouncedSearch = createDebouncedSearch(fetchData, 500)
-
-// 处理表格分页变化
-const onTableChange = (pag: TablePaginationConfig) => {
-  handleTableChange(pag)
-  fetchData()
-}
-
 // 标签页切换
 const handleTabChange = (key: string) => {
   activeTabKey.value = key
@@ -302,42 +301,29 @@ const handleDelete = async (record: Role) => {
     return
   }
 
-  loading.value = true
-  try {
-    const res = await deleteRole(record.roleId)
-    if (res.code === 200) {
-      message.success(t('role.deleteRoleSuccess'))
-      await fetchData()
-    } else {
-      message.error(res.message || t('role.deleteRoleFailed'))
-    }
-  } catch (error) {
-    console.error('删除角色失败:', error)
-    message.error(t('role.deleteRoleFailed'))
-  } finally {
-    loading.value = false
+  const removed = await executeDeleteRole(() => deleteRole(record.roleId), {
+    loadingRef: loading,
+    showSuccess: true,
+    successText: t('role.deleteRoleSuccess'),
+    errorText: t('role.deleteRoleFailed'),
+  })
+
+  if (removed) {
+    await fetchData()
   }
 }
 
 // 设为默认角色
 const handleSetDefault = async (roleId: number) => {
-  loading.value = true
-  try {
-    const res = await updateRole({
-      roleId,
-      isDefault: '1',
-    })
-    if (res.code === 200) {
-      message.success(t('role.setAsDefaultSuccess'))
-      await fetchData()
-    } else {
-      message.error(res.message || t('role.setAsDefaultFailed'))
-    }
-  } catch (error) {
-    console.error('设置默认角色失败:', error)
-    message.error(t('role.setAsDefaultFailed'))
-  } finally {
-    loading.value = false
+  const updated = await executeSetDefaultRole(() => updateRole({ roleId, isDefault: '1' }), {
+    loadingRef: loading,
+    showSuccess: true,
+    successText: t('role.setAsDefaultSuccess'),
+    errorText: t('role.setAsDefaultFailed'),
+  })
+
+  if (updated) {
+    await fetchData()
   }
 }
 
@@ -345,7 +331,6 @@ const handleSetDefault = async (roleId: number) => {
 const handleSubmit = async () => {
   try {
     await formRef.value?.validate()
-    submitLoading.value = true
 
     // 统一处理：从所有可用音色中查找
     const voiceInfo = allVoices.value.find(v => v.value === formData.voiceName)
@@ -364,37 +349,36 @@ const handleSubmit = async () => {
     }
 
     // 1. 保存角色信息
-    const res = editingRoleId.value 
-      ? await updateRole(submitData)
-      : await addRole(submitData)
+    const { ok, data } = await executeSaveRole(
+      () => (editingRoleId.value ? updateRole(submitData) : addRole(submitData)),
+      { loadingRef: submitLoading },
+    )
 
-    if (res.code === 200) {
-      const savedRoleId = editingRoleId.value ?? res.data?.roleId
-
-      // 2. 保存工具选择（使用 exclude 方式）
-      if (savedRoleId && allMcpTools.value.length > 0) {
-        try {
-          await updateToolsStatus(savedRoleId, buildExcludeTools())
-        } catch (error) {
-          console.error('保存工具选择失败:', error)
-          message.warning(t('role.mcpSaveFailed'))
-        }
-      }
-      
-      message.success(editingRoleId.value ? t('role.updateRoleSuccess') : t('role.createRoleSuccess'))
-      resetForm()
-      activeTabKey.value = '1'
-      fetchData()
-    } else {
-      message.error(res.message || t('common.operationFailed'))
+    if (!ok) {
+      return
     }
+
+    const savedRoleId = editingRoleId.value ?? data?.roleId
+
+    // 2. 保存工具选择（使用 exclude 方式）
+    if (savedRoleId && allMcpTools.value.length > 0) {
+      try {
+        await updateToolsStatus(savedRoleId, buildExcludeTools())
+      } catch (error) {
+        console.error('保存工具选择失败:', error)
+        message.warning(t('role.mcpSaveFailed'))
+      }
+    }
+
+    message.success(editingRoleId.value ? t('role.updateRoleSuccess') : t('role.createRoleSuccess'))
+    resetForm()
+    activeTabKey.value = '1'
+    fetchData()
   } catch (error: unknown) {
     console.error('提交表单失败:', error)
     if (error && typeof error === 'object' && 'errorFields' in error) {
       message.error(t('role.checkForm'))
     }
-  } finally {
-    submitLoading.value = false
   }
 }
 
@@ -469,89 +453,29 @@ const handleModelChange = (modelId: number | undefined) => {
 // 播放音色示例
 const handlePlayVoice = async (voiceName?: string) => {
   if (!voiceName) return
-  const cacheKey = voiceCacheKey(voiceName)
+
+  // 统一处理：从所有可用音色中查找
+  const voiceInfo = allVoices.value.find(v => v.value === voiceName)
+  if (!voiceInfo) {
+    message.error(t('role.voiceNotFound'))
+    return
+  }
+
   try {
-    // 再点一次正在播放的音色即停止；点别的音色先把当前这段停掉
-    const wasPlayingSameVoice = playingVoiceId.value === voiceName
-    stopAllVoicePreview()
-    if (wasPlayingSameVoice) return
-
-    // 设置loading状态（API请求期间）
-    loadingVoiceId.value = voiceName
-
-    // 检查缓存
-    let audio = voiceAudioCache.get(cacheKey)
-    
-    if (!audio) {
-      // 统一处理：从所有可用音色中查找
-      const voiceInfo = allVoices.value.find(v => v.value === voiceName)
-      if (!voiceInfo) {
-        message.error(t('role.voiceNotFound'))
-        loadingVoiceId.value = ''
-        return
-      }
-
-      const testParams = {
-        message: t('role.voiceTestMessage'),
-        voiceName: voiceName,
-        ttsId: voiceInfo.ttsId || -1,
-        provider: voiceInfo.provider,
-        ttsPitch: formData.ttsPitch || 1.0,
-        ttsSpeed: formData.ttsSpeed || 1.0
-      }
-
-      // 调用测试接口获取音频URL
-      const result = await testVoice(testParams)
-      
-      // 清除loading状态
-      loadingVoiceId.value = ''
-
-      if (result.code === 200 && result.data?.audioUrl) {
-        // 使用 getResourceUrl 处理音频路径（云存储为完整 URL，直接返回；本地为相对路径，拼接后端地址）
-        const audioUrl = getResourceUrl(result.data.audioUrl)
-        if (audioUrl) {
-          // 创建音频对象
-          audio = new Audio(audioUrl)
-          voiceAudioCache.set(cacheKey, audio)
-        } else {
-          message.error(t('common.audioUrlInvalid'))
-          return
-        }
-        
-        // 监听播放结束
-        audio.onended = () => {
-          if (playingVoiceId.value === voiceName) {
-            playingVoiceId.value = ''
-          }
-        }
-        
-        // 监听错误
-        audio.onerror = () => {
-          message.error(t('common.audioPlayFailed'))
-          playingVoiceId.value = ''
-          voiceAudioCache.delete(cacheKey)
-        }
-      } else {
-        message.error(t('role.getTestAudioFailed'))
-        return
-      }
-    } else {
-      // 清除loading状态
-      loadingVoiceId.value = ''
-    }
-
-    // 播放音频
-    if (audio) {
-      await audio.play()
-      // 播放成功后设置playing状态
-      playingVoiceId.value = voiceName
-    }
+    // 播放态/加载态/缓存都由 useAudioPlayer 处理，同一音色再点一次即停止
+    await playAudioFromApi({
+      voiceName,
+      ttsId: voiceInfo.ttsId || -1,
+      provider: voiceInfo.provider,
+      audioId: voiceName,
+      cacheKey: voiceCacheKey(voiceName),
+      ttsPitch: formData.ttsPitch || 1.0,
+      ttsSpeed: formData.ttsSpeed || 1.0,
+    })
   } catch (error: unknown) {
     console.error('播放音色失败:', error)
     const errorMessage = error instanceof Error ? error.message : t('role.playVoiceFailed')
     message.error(errorMessage)
-    loadingVoiceId.value = ''
-    playingVoiceId.value = ''
   }
 }
 
@@ -588,41 +512,6 @@ const goToTemplateManager = () => {
   router.push(ROUTES.TEMPLATE)
 }
 
-
-// 头像上传前检查
-const beforeAvatarUpload: UploadProps['beforeUpload'] = (file) => {
-  const isImage = file.type.startsWith('image/')
-  const isLt2M = file.size / 1024 / 1024 < 2
-
-  if (!isImage) {
-    message.error(t('common.onlyImageFiles'))
-    return false
-  }
-  if (!isLt2M) {
-    message.error(t('common.imageSizeLimit'))
-    return false
-  }
-
-  avatarLoading.value = true
-  uploadAvatarFile(file)
-    .then(url => {
-      avatarUrl.value = url
-      avatarLoading.value = false
-    })
-    .catch(error => {
-      message.error(`${t('common.avatarUploadFailed')}: ${error}`)
-      avatarLoading.value = false
-    })
-
-  return false
-}
-
-// 上传头像文件
-const uploadAvatarFile = async (file: File): Promise<string> => {
-  const res = await uploadFile(file, 'avatar', { fullResponse: true })
-  // 本地存储用相对路径入库（避免把主机名写死进库）；云存储无 relativePath，用签名 URL，后端剥签名/重签名
-  return res.relativePath || res.url
-}
 
 // 移除头像
 const removeAvatar = () => {
@@ -725,10 +614,6 @@ const handleProviderChange = () => {
   formData.voiceName = undefined
 }
 
-onBeforeUnmount(() => {
-  stopAllVoicePreview()
-})
-
 // 初始化：并行加载所有数据（非阻塞式）
 Promise.all([
   loadAllModels(),
@@ -769,6 +654,7 @@ Promise.all([
         <!-- 角色列表 -->
         <a-tab-pane key="1" :tab="t('role.roleList')">
           <a-table
+            class="ellipsis-table"
             row-key="roleId"
             :columns="columns"
             :data-source="roleList"
@@ -778,6 +664,10 @@ Promise.all([
             size="middle"
             @change="onTableChange"
           >
+            <template #emptyText>
+              <TableEmptyState :error="loadError" @retry="retryLoad" />
+            </template>
+
             <!-- 头像 -->
             <template #bodyCell="{ column, record }">
               <template v-if="column.dataIndex === 'avatar'">
@@ -869,12 +759,15 @@ Promise.all([
                   @delete="() => handleDelete(record)"
                 >
                   <template #actions>
-                    <a
+                    <a-button
                       v-permission="'system:role:memory'"
+                      type="link"
+                      size="small"
+                      class="table-action-link"
                       @click="() => navigateToMemory({ roleId: record.roleId })"
                     >
                       {{ t('role.memory') }}
-                    </a>
+                    </a-button>
                   </template>
                 </TableActionButtons>
               </template>
@@ -905,7 +798,7 @@ Promise.all([
                       name="file"
                       :show-upload-list="false"
                       :before-upload="beforeAvatarUpload"
-                      accept=".jpg,.jpeg,.png,.gif"
+                      :accept="avatarAccept"
                       class="avatar-uploader"
                     >
                       <div class="avatar-content">
@@ -1481,10 +1374,6 @@ Promise.all([
 <style scoped lang="scss">
 .role-view {
   padding: 24px;
-}
-
-.search-card :deep(.ant-form-item) {
-  margin-bottom: 0;
 }
 
 // 头像上传样式

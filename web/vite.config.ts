@@ -3,6 +3,8 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
+import Components from 'unplugin-vue-components/vite'
+import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode, command }) => {
@@ -13,6 +15,13 @@ export default defineConfig(({ mode, command }) => {
     plugins: [
       vue(),
       vueDevTools(),
+      // ant-design-vue 改按需引入：
+      ...(mode === 'test'
+        ? []
+        : [Components({
+            dts: false,
+            resolvers: [AntDesignVueResolver({ importStyle: false, resolveIcons: false })],
+          })]),
     ],
     // 生产构建剥离 console/debugger，避免内部状态和调试信息随产物暴露到浏览器控制台；
     // dev server 保留，不影响本地调试

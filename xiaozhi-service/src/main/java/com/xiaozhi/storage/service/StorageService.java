@@ -92,6 +92,15 @@ public interface StorageService {
     String urlPrefix();
 
     /**
+     * 释放实现自己持有的常驻资源（云端 SDK 客户端等）。
+     * <p>
+     * 由 {@link StorageServiceFactory} 在切换存储实现或进程关闭时调用；
+     * 本地存储没有这类资源，默认不做任何事。
+     */
+    default void shutdown() {
+    }
+
+    /**
      * 检查文件大小
      */
     static void assertAllowed(MultipartFile file) {

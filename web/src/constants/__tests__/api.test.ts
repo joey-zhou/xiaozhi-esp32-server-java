@@ -5,20 +5,15 @@ import {
   ALLOWED_IMAGE_TYPES,
   DEBOUNCE_DELAY,
   DEFAULT_PAGE_SIZE,
-  DESCRIPTION_MAX_LENGTH,
-  DEVICE_NAME_MAX_LENGTH,
   MAX_AUDIO_SIZE,
   MAX_IMAGE_SIZE,
   PAGE_SIZE_OPTIONS,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   REQUEST_TIMEOUT,
-  ROLE_NAME_MAX_LENGTH,
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
   VALIDATION_RULES,
-  WS_MAX_RECONNECT_TIMES,
-  WS_RECONNECT_DELAY,
 } from '../api'
 
 describe('用户名/密码约束对齐后端校验注解', () => {
@@ -56,23 +51,6 @@ describe('用户名/密码约束对齐后端校验注解', () => {
   })
 })
 
-describe('库表列长度约束', () => {
-  // 真源 xiaozhi-server/src/main/resources/db/migration/V1__init.sql sys_device.deviceName varchar(100)
-  it('设备名长度取 sys_device.deviceName 的 varchar 长度', () => {
-    expect(DEVICE_NAME_MAX_LENGTH).toBe(100)
-  })
-
-  // 真源 V1__init.sql sys_role.roleName varchar(100)
-  it('角色名长度取 sys_role.roleName 的 varchar 长度', () => {
-    expect(ROLE_NAME_MAX_LENGTH).toBe(100)
-  })
-
-  // 真源 V1__init.sql sys_template.templateDesc varchar(500)
-  it('描述长度取 varchar(500) 的描述列', () => {
-    expect(DESCRIPTION_MAX_LENGTH).toBe(500)
-  })
-})
-
 describe('分页常量对齐 useTable 现行值', () => {
   it('默认每页条数与 useTable 初值一致', () => {
     expect(DEFAULT_PAGE_SIZE).toBe(10)
@@ -89,10 +67,15 @@ describe('上传大小上限对齐 utils/fileValidators.ts 的四档校验', () 
     expect(MAX_IMAGE_SIZE).toBe(2 * 1024 * 1024)
     expect(MAX_AUDIO_SIZE).toBe(10 * 1024 * 1024)
   })
+})
 
-  it('允许的 MIME 列表保持非空', () => {
-    expect(ALLOWED_IMAGE_TYPES.length).toBeGreaterThan(0)
-    expect(ALLOWED_AUDIO_TYPES.length).toBeGreaterThan(0)
+describe('图片 / 音频 MIME 白名单供 utils/fileValidators.ts 使用', () => {
+  it('图片白名单覆盖 jpeg/png/gif/webp', () => {
+    expect(ALLOWED_IMAGE_TYPES).toEqual(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+  })
+
+  it('音频白名单覆盖 mp3/wav/mpeg', () => {
+    expect(ALLOWED_AUDIO_TYPES).toEqual(['audio/mp3', 'audio/wav', 'audio/mpeg'])
   })
 })
 
@@ -100,12 +83,6 @@ describe('网络相关常量', () => {
   // 真源 web/src/services/request.ts 的 axios timeout
   it('请求超时与 axios 实例一致', () => {
     expect(REQUEST_TIMEOUT).toBe(30000)
-  })
-
-  // 真源 web/src/services/websocket.ts 的 reconnectDelay / maxReconnectAttempts
-  it('重连延迟与次数与 websocket.ts 一致', () => {
-    expect(WS_RECONNECT_DELAY).toBe(2000)
-    expect(WS_MAX_RECONNECT_TIMES).toBe(5)
   })
 
   it('防抖延迟与 useTable.createDebouncedSearch 默认值一致', () => {

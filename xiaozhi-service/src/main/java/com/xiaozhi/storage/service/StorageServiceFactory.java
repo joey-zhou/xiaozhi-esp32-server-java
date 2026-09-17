@@ -164,13 +164,14 @@ public class StorageServiceFactory {
         log.info("存储服务缓存已清除，将按最新配置重建");
     }
 
+    /**
+     * 释放缓存实例持有的 SDK 客户端。
+     * 具体释放什么由实现自己在 {@link StorageService#shutdown()} 里决定，
+     * 本地存储没有常驻资源，默认实现是空的。
+     */
     private void shutdownCached() {
-        if (cachedCloudService instanceof TencentCosStorageService cos) {
-            cos.shutdown();
-        } else if (cachedCloudService instanceof AliyunOssStorageService oss) {
-            oss.shutdown();
-        } else if (cachedCloudService instanceof S3StorageService s3) {
-            s3.shutdown();
+        if (cachedCloudService != null) {
+            cachedCloudService.shutdown();
         }
     }
 

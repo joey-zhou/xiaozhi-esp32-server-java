@@ -140,9 +140,9 @@ function handleThemeChange(theme: string) {
         </template>
       </a-dropdown>
 
-      <!-- 用户信息下拉菜单 -->
-      <a-dropdown class="user-dropdown">
-        <div class="user-info">
+      <!-- 用户信息下拉菜单：trigger 用按钮而不是 div，键盘 Tab 能聚焦、Enter/Space 能触发 -->
+      <a-dropdown class="user-dropdown" :trigger="['hover', 'click']">
+        <a-button type="text" class="header-btn">
           <a-avatar
             :src="avatarUrl"
             size="small"
@@ -153,8 +153,8 @@ function handleThemeChange(theme: string) {
             </template>
           </a-avatar>
           <span class="user-name">{{ user?.name || t('common.user') }}</span>
-        </div>
-        
+        </a-button>
+
         <template #overlay>
           <a-menu>
             <a-menu-item @click="() => goToAccount()">
@@ -221,23 +221,13 @@ function handleThemeChange(theme: string) {
     }
   }
   
+  // a-dropdown 的 class 会合并到触发按钮自身，所以这里直接作用在按钮上，里面的元素才能嵌套写
   .user-dropdown {
-    cursor: pointer;
     padding: 0 12px;
     gap: 10px;
-    display: flex;
-    
-    .user-info {
-      display: flex;
-      align-items: center;
-      
-      .user-avatar {
-        margin-right: 8px;
-      }
-      
-      .user-name {
-        color: var(--ant-color-text);
-      }
+
+    .user-name {
+      color: var(--ant-color-text);
     }
   }
 }

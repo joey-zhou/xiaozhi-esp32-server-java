@@ -2,8 +2,8 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, onBeforeRouteLeave } from 'vue-router'
-import { message as antMessage, type TableColumnsType, type TablePaginationConfig } from 'ant-design-vue'
-import { useTable } from '@/composables/useTable'
+import { message as antMessage, type TableColumnsType } from 'ant-design-vue'
+import { useTable, type TablePageParams } from '@/composables/useTable'
 import { useExport, type ExportColumn } from '@/composables/useExport'
 import { useSelectLoadMore } from '@/composables/useSelectLoadMore'
 import { useRequest } from '@/composables/useRequest'
@@ -19,6 +19,8 @@ import {
 } from '@/services/memory'
 import AudioPlayer from '@/components/AudioPlayer.vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
+import TableEmptyState from '@/components/TableEmptyState.vue'
+import type { PageResponse } from '@/types/api'
 import type { Role } from '@/types/role'
 import type { Device } from '@/types/device'
 import type { SummaryMemory, ChatMemory } from '@/types/memory'
@@ -39,15 +41,17 @@ const memoryType = computed<'chat' | 'summary'>(() => {
 const roleId = computed(() => parseInt(route.query.roleId as string) || 0)
 const routeDeviceId = computed(() => route.query.deviceId as string || '')
 
-// 表格和分页
+// 表格和分页：三种记忆共用一张表，请求按 memoryType 在 fetchMemoryPage 里分流
 const {
   loading,
   data,
   pagination,
-  handleTableChange,
   resetPagination,
-  loadData,
-} = useTable<SummaryMemory | ChatMemory>()
+  loadError,
+  retryLoad,
+  fetchData: fetchMemoryData,
+  onTableChange,
+} = useTable<SummaryMemory | ChatMemory>(fetchMemoryPage)
 
 type MemoryRecord = SummaryMemory | ChatMemory
 
@@ -58,6 +62,9 @@ type ChatMemoryRow = ChatMemory & { toolCalls?: string }
 const { exporting, exportToExcel } = useExport()
 
 const { execute: executeRouteDevice } = useRequest()
+// 行内删除：每个请求一个实例，失败文案互不干扰
+const { executeOk: executeDeleteMemory } = useRequest()
+const { executeOk: executeDeleteMessage } = useRequest()
 
 // 事件总线
 const stopAllAudioBus = useEventBus<void>('stop-all-audio')
@@ -102,7 +109,7 @@ const rangePresets = computed(() => [
   { label: t('message.thisMonth'), value: [dayjs().startOf('month'), dayjs().endOf('month')] },
 ])
 
-// 当前选中的设备名称（long 类型后端不返回 deviceName，前端直接取）
+// 当前选中的设备名称
 const selectedDeviceName = computed(() => {
   if (!selectedDeviceId.value) return ''
   return deviceOptions.value.find((d) => d.deviceId === selectedDeviceId.value)?.deviceName || selectedDeviceId.value
@@ -207,7 +214,7 @@ async function initSelects() {
 
   const needDefault = memoryType.value === 'summary'
 
-  // 优先使用路由传参，否则 summary/long 自动选第一个
+  // 优先使用路由传参，否则 summary 自动选第一个
   if (roleId.value) {
     selectedRoleId.value = roleId.value
   } else if (needDefault && roles.value.length > 0) {
@@ -245,68 +252,60 @@ async function handleRoleChange(roleIdValue: number) {
 }
 
 /**
- * 获取记忆数据
+ * 按当前记忆类型分流请求，分页参数由 useTable 注入
  */
-async function fetchMemoryData() {
-  const pageNo = pagination.current || 1
-  const pageSize = pagination.pageSize || 10
+async function fetchMemoryPage(
+  { pageNo, pageSize }: TablePageParams
+): Promise<PageResponse<MemoryRecord>> {
   // 「全部」用 0 / 空串表示，发给后端必须整个不带该字段：roleId=0 会真的按 0 过滤
   const roleId = selectedRoleId.value || undefined
   const deviceId = selectedDeviceId.value || undefined
 
-  try {
-    if (memoryType.value === 'chat') {
-      await loadData(() => queryChatMemory({
-        pageNo,
-        pageSize,
-        startTime: timeRange.value[0].format('YYYY-MM-DD HH:mm:ss'),
-        endTime: timeRange.value[1].format('YYYY-MM-DD HH:mm:ss'),
-        // queryChatMemory 把 roleId/deviceId 声明成必填，实际「全部」时要留空，
-        // 待 services/memory.ts 把这两项放宽为可选后可去掉这次断言
-        ...({ roleId, deviceId } as { roleId: number; deviceId: string }),
-      }))
-      return
-    }
-
-    // 摘要记忆按「设备+角色」存储，缺任一项会请求到 undefined/undefined，直接拦截并提示
-    if (!roleId || !deviceId) {
-      data.value = []
-      pagination.total = 0
-      antMessage.warning(t('memory.needRoleAndDevice'))
-      return
-    }
-
-    await loadData(() => querySummaryMemory({ pageNo, pageSize, roleId, deviceId }))
-  } catch (error) {
-    console.error('加载记忆数据失败:', error)
-    antMessage.error(t('common.loadFailed'))
+  if (memoryType.value === 'chat') {
+    return queryChatMemory({
+      pageNo,
+      pageSize,
+      startTime: timeRange.value[0].format('YYYY-MM-DD HH:mm:ss'),
+      endTime: timeRange.value[1].format('YYYY-MM-DD HH:mm:ss'),
+      // queryChatMemory 把 roleId/deviceId 声明成必填，实际「全部」时要留空，
+      // 待 services/memory.ts 把这两项放宽为可选后可去掉这次断言
+      ...({ roleId, deviceId } as { roleId: number; deviceId: string }),
+    })
   }
+
+  // 摘要记忆按「设备+角色」存储，缺任一项会请求到 undefined/undefined，直接返回空页并提示
+  if (!roleId || !deviceId) {
+    antMessage.warning(t('memory.needRoleAndDevice'))
+    return { code: 200, message: '', data: { list: [], total: 0, pageNo, pageSize } }
+  }
+
+  return querySummaryMemory({ pageNo, pageSize, roleId, deviceId })
 }
 
 /**
  * 处理删除记忆
  */
-// 摘要的 id 是 createTime 毫秒数；长期记忆的 id 是后端按字符串下发的 Long，原样透传给查询参数保精度
+// 摘要的 id 是 createTime 毫秒数
 async function handleDeleteMemory(record: { id: number }) {
-  loading.value = true
-  try {
-    let res
-    if (memoryType.value === 'summary') {
-      // 对于summary，使用id（createTime的毫秒数）删除指定条
-      res = await deleteSummaryMemory(selectedRoleId.value, selectedDeviceId.value, record.id)
-    }
+  // summary 用 id（createTime 的毫秒数）删指定条；其余类型没有删除接口
+  const requestFn = memoryType.value === 'summary'
+    ? () => deleteSummaryMemory(selectedRoleId.value, selectedDeviceId.value, record.id)
+    : null
 
-    if (res?.code === 200) {
-      antMessage.success(t('common.deleteSuccess'))
-      await fetchMemoryData()
-    } else {
-      antMessage.error(res?.message || t('common.deleteFailed'))
-    }
-  } catch (error) {
-    console.error('删除记忆失败:', error)
+  if (!requestFn) {
     antMessage.error(t('common.deleteFailed'))
-  } finally {
-    loading.value = false
+    return
+  }
+
+  const removed = await executeDeleteMemory(requestFn, {
+    loadingRef: loading,
+    showSuccess: true,
+    successText: t('common.deleteSuccess'),
+    errorText: t('common.deleteFailed'),
+  })
+
+  if (removed) {
+    await fetchMemoryData()
   }
 }
 
@@ -325,14 +324,6 @@ async function handleDeviceChange(deviceId: string) {
 async function handleTimeRangeChange() {
   resetPagination()
   await fetchMemoryData()
-}
-
-/**
- * 处理分页变化
- */
-const onTableChange = (pag: TablePaginationConfig) => {
-  handleTableChange(pag)
-  fetchMemoryData()
 }
 
 /**
@@ -423,18 +414,15 @@ function hasValidAudio(audioPath: string | undefined | null): boolean {
  * 删除聊天消息
  */
 async function handleDeleteMessage(record: { messageId: number }) {
-  loading.value = true
-  try {
-    const res = await deleteMessage(record.messageId)
-    if (res.code === 200) {
-      antMessage.success(t('common.deleteSuccess'))
-      await fetchMemoryData()
-    }
-  } catch (error) {
-    console.error('删除消息失败:', error)
-    antMessage.error(t('common.deleteFailed'))
-  } finally {
-    loading.value = false
+  const removed = await executeDeleteMessage(() => deleteMessage(record.messageId), {
+    loadingRef: loading,
+    showSuccess: true,
+    successText: t('common.deleteSuccess'),
+    errorText: t('common.deleteFailed'),
+  })
+
+  if (removed) {
+    await fetchMemoryData()
   }
 }
 
@@ -574,8 +562,8 @@ onMounted(async () => {
       </a-row>
     </a-card>
 
-    <!-- 记忆数据表格 -->
-    <a-card :bordered="false">
+    <!-- 记忆数据表格：class 挂在卡片上，内部几张 a-table（含展开行里的工具调用表）共用同一份省略号截断规则 -->
+    <a-card :bordered="false" class="ellipsis-table">
       <template #title>
         <a-space>
           <span>{{ t(`router.title.${memoryType === 'chat' ? 'shortTermMemory' : 'summaryMemory'}`) }}</span>
@@ -602,6 +590,10 @@ onMounted(async () => {
         }"
         @change="onTableChange"
       >
+        <template #emptyText>
+          <TableEmptyState :error="loadError" @retry="retryLoad" />
+        </template>
+
         <template #expandedRowRender="{ record }">
           <a-table
             :columns="[
@@ -687,6 +679,10 @@ onMounted(async () => {
         size="middle"
         @change="onTableChange"
       >
+        <template #emptyText>
+          <TableEmptyState :error="loadError" @retry="retryLoad" />
+        </template>
+
         <template #bodyCell="{ column, record }">
 
           <!-- 设备名列（后端不返回，直接用当前选中设备名） -->
@@ -726,31 +722,11 @@ onMounted(async () => {
   padding: 24px;
 }
 
-.search-card :deep(.ant-form-item) {
-  margin-bottom: 0;
-}
-
 .audio-player-container {
   position: relative;
   width: 100%;
   overflow: hidden;
   z-index: 1;
-}
-
-// 表格文字省略样式
-.ellipsis-text {
-  display: inline-block;
-  width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-// 表格单元格样式
-:deep(.ant-table) {
-  .ant-table-tbody > tr > td {
-    max-width: 0;
-  }
 }
 
 // 工具调用 JSON 展示

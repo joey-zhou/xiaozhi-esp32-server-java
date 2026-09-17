@@ -4,7 +4,12 @@
  * 校验器只做判定，不弹提示：合法返回 true，非法返回 i18n key，由调用方翻译后展示。
  * accept 与 validate 共用同一份扩展名清单，避免选择器放行的格式在校验这一步被拦
  */
-import { MAX_AUDIO_SIZE, MAX_IMAGE_SIZE } from '@/constants/api'
+import {
+  ALLOWED_AUDIO_TYPES,
+  ALLOWED_IMAGE_TYPES,
+  MAX_AUDIO_SIZE,
+  MAX_IMAGE_SIZE
+} from '@/constants/api'
 
 /**
  * 文件验证器
@@ -26,8 +31,8 @@ export interface FileValidator {
 /** 音频扩展名白名单，与后端 FileUploadController 的允许列表一致 */
 const AUDIO_EXTENSIONS = ['.wav', '.mp3', '.m4a', '.flac', '.ogg', '.opus', '.aac']
 
-/** 图片扩展名白名单 */
-const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif']
+/** 图片扩展名白名单，与 ALLOWED_IMAGE_TYPES 的 MIME 列表一一对应 */
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
 
 /** 扩展名判定统一走小写比对，浏览器给的文件名大小写不固定 */
 function hasExtension(file: File, extensions: string[]): boolean {
@@ -46,8 +51,8 @@ export const fileValidators = {
     accept: AUDIO_EXTENSIONS.join(','),
 
     validate: (file: File) => {
-      // 浏览器对部分音频（如 .m4a）不给 type，回退按扩展名判定
-      const isAudio = file.type.startsWith('audio/') || hasExtension(file, AUDIO_EXTENSIONS)
+      // 浏览器对部分音频（如 .m4a）不给 type 或给的不是标准 MIME，回退按扩展名判定
+      const isAudio = ALLOWED_AUDIO_TYPES.includes(file.type) || hasExtension(file, AUDIO_EXTENSIONS)
 
       if (!isAudio) {
         return 'common.audioFormatError'
@@ -68,7 +73,8 @@ export const fileValidators = {
     accept: IMAGE_EXTENSIONS.join(','),
 
     validate: (file: File) => {
-      const isImage = file.type.startsWith('image/')
+      // 浏览器对部分来源（如剪贴板粘贴）不给标准 MIME，回退按扩展名判定
+      const isImage = ALLOWED_IMAGE_TYPES.includes(file.type) || hasExtension(file, IMAGE_EXTENSIONS)
 
       if (!isImage) {
         return 'common.onlyImageFiles'

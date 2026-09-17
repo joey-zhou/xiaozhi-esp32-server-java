@@ -29,6 +29,11 @@ export const PAGE_SIZE_OPTIONS = ['10', '30', '50', '100', '1000']
 export const MAX_IMAGE_SIZE = 2 * 1024 * 1024
 export const MAX_AUDIO_SIZE = 10 * 1024 * 1024
 
+/**
+ * 图片 / 音频文件上传的 MIME 白名单
+ * 供 utils/fileValidators.ts 的 image / audio 校验器使用；浏览器给不出这些 MIME 时
+ * 校验器会回退按扩展名判定，两者是「或」的关系，不会互相顶替
+ */
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 export const ALLOWED_AUDIO_TYPES = ['audio/mp3', 'audio/wav', 'audio/mpeg']
 
@@ -36,13 +41,6 @@ export const ALLOWED_AUDIO_TYPES = ['audio/mp3', 'audio/wav', 'audio/mpeg']
  * 防抖延迟（毫秒）
  */
 export const DEBOUNCE_DELAY = 500
-
-/**
- * WebSocket 重连配置
- * 对应 services/websocket.ts 的 reconnectDelay / maxReconnectAttempts
- */
-export const WS_RECONNECT_DELAY = 2000  // 首次重连延迟，实际按 1.5 倍退避
-export const WS_MAX_RECONNECT_TIMES = 5 // 最大重连次数
 
 /**
  * 表单验证规则
@@ -74,21 +72,3 @@ export const PASSWORD_MAX_LENGTH = 20
  */
 export const USERNAME_MIN_LENGTH = 3
 export const USERNAME_MAX_LENGTH = 20
-
-/**
- * 设备名称长度限制
- * 真源 V1__init.sql sys_device.deviceName varchar(100)
- */
-export const DEVICE_NAME_MAX_LENGTH = 100
-
-/**
- * 角色名称长度限制
- * 真源 V1__init.sql sys_role.roleName varchar(100)
- */
-export const ROLE_NAME_MAX_LENGTH = 100
-
-/**
- * 描述长度限制
- * 真源 V1__init.sql sys_template.templateDesc varchar(500)
- */
-export const DESCRIPTION_MAX_LENGTH = 500

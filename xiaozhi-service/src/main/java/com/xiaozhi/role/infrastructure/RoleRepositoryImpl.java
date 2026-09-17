@@ -2,13 +2,13 @@ package com.xiaozhi.role.infrastructure;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.event.RoleUpdatedEvent;
 import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
 import com.xiaozhi.role.dal.mysql.mapper.RoleMapper;
 import com.xiaozhi.role.domain.Role;
 import com.xiaozhi.role.domain.repository.RoleRepository;
 import com.xiaozhi.role.infrastructure.convert.RoleConverter;
-import com.xiaozhi.role.service.RoleService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
@@ -108,7 +108,7 @@ public class RoleRepositoryImpl implements RoleRepository {
     /** 走 evictNow：本方法在事务里跑，单调 evict 会被推迟到提交后，调用方写完回读会命中旧值 */
     private void evictCache(Integer roleId) {
         if (roleId == null) return;
-        CacheHelper.evictNow(cacheManager.getCache(RoleService.CACHE_NAME), String.valueOf(roleId));
+        CacheHelper.evictNow(cacheManager.getCache(CacheNames.ROLE), String.valueOf(roleId));
     }
 
     private Role toRole(RoleDO d) {

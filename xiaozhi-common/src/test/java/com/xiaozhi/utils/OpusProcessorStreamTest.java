@@ -71,11 +71,11 @@ class OpusProcessorStreamTest {
         processor.pcmToOpus(pcm(FRAME_SIZE + 40), true);
         assertThat(stateOf(processor).leftoverCount).isEqualTo(40);
 
-        List<byte[]> tail = processor.flushLeftover();
+        List<OpusProcessor.EncodedFrame> tail = processor.flushLeftover();
 
         assertThat(tail).hasSize(1);
         // 残留样本必须补静音凑满一整帧，解码回来仍是 960 个样本
-        assertThat(new OpusProcessor().opusToPcm(tail.get(0))).hasSize(FRAME_SIZE * 2);
+        assertThat(new OpusProcessor().opusToPcm(tail.get(0).opus())).hasSize(FRAME_SIZE * 2);
         assertThat(stateOf(processor).leftoverCount).isZero();
         assertThat(stateOf(processor).leftoverBuffer).containsOnly((short) 0);
         assertThat(processor.flushLeftover()).isEmpty();
@@ -110,13 +110,13 @@ class OpusProcessorStreamTest {
     void streamingAndBatchEncodingProduceIdenticalFrames() {
         byte[] pcm = pcm(FRAME_SIZE * 2);
 
-        List<byte[]> streamed = new OpusProcessor().pcmToOpus(pcm, true);
-        List<byte[]> batched = new OpusProcessor().pcmToOpus(pcm, false);
+        List<OpusProcessor.EncodedFrame> streamed = new OpusProcessor().pcmToOpus(pcm, true);
+        List<OpusProcessor.EncodedFrame> batched = new OpusProcessor().pcmToOpus(pcm, false);
 
         assertThat(streamed).hasSize(2);
         assertThat(batched).hasSize(2);
-        assertThat(streamed.get(0)).isEqualTo(batched.get(0));
-        assertThat(streamed.get(1)).isEqualTo(batched.get(1));
+        assertThat(streamed.get(0).opus()).isEqualTo(batched.get(0).opus());
+        assertThat(streamed.get(1).opus()).isEqualTo(batched.get(1).opus());
     }
 
     // 同一个编码器连续编两段相同 PCM，第二段不能因为段序不同而与第一段不同
@@ -124,8 +124,8 @@ class OpusProcessorStreamTest {
     void repeatedBatchCallsOnSameProcessorStayConsistent() {
         OpusProcessor processor = new OpusProcessor();
 
-        List<byte[]> first = processor.pcmToOpus(pcm(FRAME_SIZE), false);
-        List<byte[]> second = processor.pcmToOpus(pcm(FRAME_SIZE), false);
+        List<OpusProcessor.EncodedFrame> first = processor.pcmToOpus(pcm(FRAME_SIZE), false);
+        List<OpusProcessor.EncodedFrame> second = processor.pcmToOpus(pcm(FRAME_SIZE), false);
 
         assertThat(first).hasSize(1);
         assertThat(second).hasSize(1);
@@ -158,7 +158,70 @@ class OpusProcessorStreamTest {
 
         assertThat(OpusProcessor.silenceFrame()).isSameAs(first);
         assertThat(first).isNotEmpty();
-        assertThat(first).isEqualTo(new OpusProcessor().pcmToOpus(new byte[FRAME_SIZE * 2], false).get(0));
+        assertThat(first).isEqualTo(new OpusProcessor().pcmToOpus(OpusProcessor.silencePcm(), false).get(0).opus());
         assertThat(new OpusProcessor().opusToPcm(first)).hasSize(FRAME_SIZE * 2);
+    }
+
+    // 静音帧的源 PCM 直接充当 AEC 参考信号，必须是整帧的纯静音
+    @Test
+    void silencePcmIsAFullFrameOfZeros() {
+        assertThat(OpusProcessor.silencePcm()).hasSize(FRAME_SIZE * 2).containsOnly((byte) 0);
+        assertThat(OpusProcessor.silencePcm()).isSameAs(OpusProcessor.silencePcm());
+    }
+
+    // 编码结果随帧带出的 PCM 就是喂给 AEC 的参考信号：必须与实际编进这一帧的样本逐字节相同，
+    // 跨调用拼接的残留样本也要按原顺序出现在帧首，否则参考与设备播放的内容对不上
+    @Test
+    void encodedFrameCarriesExactlyThePcmThatWasEncoded() {
+        OpusProcessor processor = new OpusProcessor();
+        byte[] first = pcm(FRAME_SIZE + 40);
+        byte[] second = pcm(FRAME_SIZE - 40);
+
+        List<OpusProcessor.EncodedFrame> firstFrames = processor.pcmToOpus(first, true);
+        List<OpusProcessor.EncodedFrame> secondFrames = processor.pcmToOpus(second, true);
+
+        assertThat(firstFrames).hasSize(1);
+        assertThat(firstFrames.get(0).pcm()).isEqualTo(slice(first, 0, FRAME_SIZE));
+
+        assertThat(secondFrames).hasSize(1);
+        byte[] expected = new byte[FRAME_SIZE * 2];
+        System.arraycopy(slice(first, FRAME_SIZE, 40), 0, expected, 0, 40 * 2);
+        System.arraycopy(slice(second, 0, FRAME_SIZE - 40), 0, expected, 40 * 2, (FRAME_SIZE - 40) * 2);
+        assertThat(secondFrames.get(0).pcm()).isEqualTo(expected);
+    }
+
+    // 收尾帧补的是静音，带出的参考 PCM 也必须是"残留样本 + 静音"，而不是残留样本本身
+    @Test
+    void flushLeftoverCarriesRemainderPaddedWithSilence() {
+        OpusProcessor processor = new OpusProcessor();
+        byte[] input = pcm(FRAME_SIZE + 40);
+        processor.pcmToOpus(input, true);
+
+        List<OpusProcessor.EncodedFrame> tail = processor.flushLeftover();
+
+        assertThat(tail).hasSize(1);
+        byte[] expected = new byte[FRAME_SIZE * 2];
+        System.arraycopy(slice(input, FRAME_SIZE, 40), 0, expected, 0, 40 * 2);
+        assertThat(tail.get(0).pcm()).isEqualTo(expected);
+    }
+
+    // 只解码的实例（上行 VAD、AEC 兜底）不该白建一个编码器，只编码的实例（播放器）同理
+    @Test
+    void codecsAreBuiltOnlyForTheDirectionActuallyUsed() throws OpusException {
+        OpusProcessor encodeOnly = new OpusProcessor();
+        assertThat(ReflectionTestUtils.getField(encodeOnly, "encoder")).isNull();
+        encodeOnly.pcmToOpus(pcm(FRAME_SIZE), false);
+        assertThat(ReflectionTestUtils.getField(encodeOnly, "encoder")).isNotNull();
+        assertThat(ReflectionTestUtils.getField(encodeOnly, "decoder")).isNull();
+
+        OpusProcessor decodeOnly = new OpusProcessor();
+        decodeOnly.opusToPcm(OpusProcessor.silenceFrame());
+        assertThat(ReflectionTestUtils.getField(decodeOnly, "decoder")).isNotNull();
+        assertThat(ReflectionTestUtils.getField(decodeOnly, "encoder")).isNull();
+    }
+
+    /** 取 PCM 中第 fromSample 个样本起的 count 个样本 */
+    private static byte[] slice(byte[] pcm, int fromSample, int count) {
+        return java.util.Arrays.copyOfRange(pcm, fromSample * 2, (fromSample + count) * 2);
     }
 }

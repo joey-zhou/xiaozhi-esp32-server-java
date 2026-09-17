@@ -49,13 +49,4 @@
         ORDER BY d.createTime DESC
     </select>
 
-    <select id="selectProjectionById" resultType="com.xiaozhi.device.model.DeviceProjection">
-        SELECT
-        <include refid="Device_Select_Columns"/>
-        FROM sys_device d
-        LEFT JOIN sys_role r ON r.roleId = d.roleId
-        WHERE d.deviceId = #{deviceId}
-        LIMIT 1
-    </select>
-
 </mapper>

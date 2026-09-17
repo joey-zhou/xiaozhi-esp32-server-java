@@ -20,13 +20,10 @@ public class RoleConverter {
 
     /** RoleDO → Role 聚合根（从持久层重建） */
     public Role toDomain(RoleDO d) {
-        LlmConfig llm = new LlmConfig(d.getModelId(),
-                d.getTemperature() != null ? d.getTemperature() : 0.7d,
-                d.getTopP() != null ? d.getTopP() : 0.9d);
+        LlmConfig llm = new LlmConfig(d.getModelId(), d.getTemperature(), d.getTopP());
 
         VoiceConfig voice = new VoiceConfig(d.getTtsId(), d.getSttId(), d.getVoiceName(),
-                d.getTtsPitch() != null ? d.getTtsPitch() : 1.0,
-                d.getTtsSpeed() != null ? d.getTtsSpeed() : 1.0);
+                d.getTtsPitch(), d.getTtsSpeed());
 
         AudioConfig audio = new AudioConfig(d.getVadEnergyTh(), d.getVadSpeechTh(),
                 d.getVadSilenceTh(), d.getVadSilenceMs());

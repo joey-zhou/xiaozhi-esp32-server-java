@@ -18,9 +18,11 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public class OpusProcessor {
-    // 缓存
-    private OpusDecoder decoders = initDecoder();
-    private final OpusEncoder encoders = initEncoder();
+    // 编解码器惰性构造：只解码的实例（VAD 上行、AEC 参考兜底）不建编码器，只编码的实例（播放器）不建解码器。
+    // 构造在 initLock 下互斥、经 volatile 字段发布，同一实例先后被不同线程使用也不会重复构造或读到半成品
+    private volatile OpusDecoder decoder;
+    private volatile OpusEncoder encoder;
+    private final Object initLock = new Object();
 
     // 残留数据状态缓存
     private final LeftoverState leftoverStates = new LeftoverState();
@@ -31,6 +33,9 @@ public class OpusProcessor {
     private static final int CHANNELS = AudioUtils.CHANNELS;
     public static final int OPUS_FRAME_DURATION_MS = AudioUtils.OPUS_FRAME_DURATION_MS;
     private static final int MAX_SIZE = 1275;
+
+    /** 一帧静音的 PCM，既用于生成静音帧，也直接充当静音帧的 AEC 参考信号 */
+    private static final byte[] SILENCE_PCM = new byte[FRAME_SIZE * 2];
 
     /**
      * 单个 Opus 包解码后的最大样本数。Opus 一个包最长 120ms，按解码器的采样率算就是上限；
@@ -43,6 +48,13 @@ public class OpusProcessor {
      * 每个 OpusProcessor 实例都归单条链路独占，所以这块缓冲可以跟着实例一起复用。
      */
     private final short[] decodeBuffer = new short[MAX_DECODED_SAMPLES];
+
+    /**
+     * 一帧 Opus 及其编码前的 PCM（16bit 小端）。
+     * 服务端 AEC 需要的参考信号就是这份 PCM，带着它一起交给调用方，
+     * 下行链路才不用把刚编好的帧再解码一遍。
+     */
+    public record EncodedFrame(byte[] opus, byte[] pcm) {}
 
     /**
      * 残留数据状态类
@@ -63,7 +75,7 @@ public class OpusProcessor {
     }
 
     private static final class SilenceFrameHolder {
-        static final byte[] FRAME = new OpusProcessor().pcmToOpus(new byte[FRAME_SIZE * 2], false).get(0);
+        static final byte[] FRAME = new OpusProcessor().pcmToOpus(SILENCE_PCM, false).get(0).opus();
     }
 
     /**
@@ -71,6 +83,13 @@ public class OpusProcessor {
      */
     public static byte[] silenceFrame() {
         return SilenceFrameHolder.FRAME;
+    }
+
+    /**
+     * 一帧（60ms）静音的 PCM，即 {@link #silenceFrame()} 的源信号，调用方不得修改返回的数组
+     */
+    public static byte[] silencePcm() {
+        return SILENCE_PCM;
     }
 
     /**
@@ -84,16 +103,13 @@ public class OpusProcessor {
     /**
      * 刷新残留数据，生成最后一帧
      */
-    public List<byte[]> flushLeftover() {
+    public List<EncodedFrame> flushLeftover() {
         LeftoverState state = leftoverStates;
-        List<byte[]> frames = new ArrayList<>();
+        List<EncodedFrame> frames = new ArrayList<>();
 
         if (state.leftoverCount <= 0) {
             return frames;
         }
-
-        // 获取编码器
-        OpusEncoder encoder = encoders;
 
         // 准备缓冲区
         short[] shortBuf = new short[FRAME_SIZE];
@@ -105,11 +121,9 @@ public class OpusProcessor {
 
         try {
             // 编码最后一帧
-            int opusLen = encoder.encode(shortBuf, 0, FRAME_SIZE, opusBuf, 0, opusBuf.length);
+            int opusLen = encoder().encode(shortBuf, 0, FRAME_SIZE, opusBuf, 0, opusBuf.length);
             if (opusLen > 0) {
-                byte[] frame = new byte[opusLen];
-                System.arraycopy(opusBuf, 0, frame, 0, opusLen);
-                frames.add(frame);
+                frames.add(new EncodedFrame(Arrays.copyOf(opusBuf, opusLen), toPcmBytes(shortBuf, FRAME_SIZE)));
             }
         } catch (OpusException e) {
             log.warn("残留数据编码失败: {}", e.getMessage());
@@ -129,29 +143,35 @@ public class OpusProcessor {
         }
 
         try {
-            OpusDecoder decoder = decoders;
             short[] buf = decodeBuffer;
-            int samples = decoder.decode(data, 0, data.length, buf, 0, buf.length, false);
-
-            byte[] pcm = new byte[samples * 2];
-            for (int i = 0; i < samples; i++) {
-                pcm[i * 2] = (byte) (buf[i] & 0xFF);
-                pcm[i * 2 + 1] = (byte) ((buf[i] >> 8) & 0xFF);
-            }
-
-            return pcm;
+            int samples = decoder().decode(data, 0, data.length, buf, 0, buf.length, false);
+            return toPcmBytes(buf, samples);
         } catch (OpusException e) {
             log.warn("解码失败: {}", e.getMessage());
             // 重置解码器
-            decoders = initDecoder();
+            synchronized (initLock) {
+                decoder = initDecoder();
+            }
             throw e;
         }
     }
 
     /**
+     * short 样本转 16bit 小端 PCM 字节
+     */
+    private static byte[] toPcmBytes(short[] samples, int count) {
+        byte[] pcm = new byte[count * 2];
+        for (int i = 0; i < count; i++) {
+            pcm[i * 2] = (byte) (samples[i] & 0xFF);
+            pcm[i * 2 + 1] = (byte) ((samples[i] >> 8) & 0xFF);
+        }
+        return pcm;
+    }
+
+    /**
      * PCM转Opus
      */
-    public List<byte[]> pcmToOpus(byte[] pcm, boolean isStream) {
+    public List<EncodedFrame> pcmToOpus(byte[] pcm, boolean isStream) {
         if (pcm == null || pcm.length == 0) {
             return new ArrayList<>();
         }
@@ -166,10 +186,10 @@ public class OpusProcessor {
         int frameSize = FRAME_SIZE;
 
         // 获取编码器
-        OpusEncoder encoder = encoders;
+        OpusEncoder enc = encoder();
 
         // 处理PCM
-        List<byte[]> frames = new ArrayList<>();
+        List<EncodedFrame> frames = new ArrayList<>();
 
         // 获取残留数据状态
         LeftoverState state = leftoverStates;
@@ -204,9 +224,9 @@ public class OpusProcessor {
             int start = i * frameSize;
             System.arraycopy(combined, start, shortBuf, 0, frameSize);
             try {
-                int opusLen = encoder.encode(shortBuf, 0, frameSize, opusBuf, 0, opusBuf.length);
+                int opusLen = enc.encode(shortBuf, 0, frameSize, opusBuf, 0, opusBuf.length);
                 if (opusLen > 0) {
-                    frames.add(Arrays.copyOf(opusBuf, opusLen));
+                    frames.add(new EncodedFrame(Arrays.copyOf(opusBuf, opusLen), toPcmBytes(shortBuf, frameSize)));
                 }
             } catch (Exception | AssertionError e) {
                 log.warn("帧 #{} 编码失败: {}", i, e.getMessage());
@@ -229,13 +249,45 @@ public class OpusProcessor {
     }
     
     /**
+     * 取解码器，首次使用时才构造
+     */
+    private OpusDecoder decoder() {
+        OpusDecoder current = decoder;
+        if (current != null) {
+            return current;
+        }
+        synchronized (initLock) {
+            if (decoder == null) {
+                decoder = initDecoder();
+            }
+            return decoder;
+        }
+    }
+
+    /**
+     * 取编码器，首次使用时才构造
+     */
+    private OpusEncoder encoder() {
+        OpusEncoder current = encoder;
+        if (current != null) {
+            return current;
+        }
+        synchronized (initLock) {
+            if (encoder == null) {
+                encoder = initEncoder();
+            }
+            return encoder;
+        }
+    }
+
+    /**
      * 获取解码器
      */
-    public OpusDecoder initDecoder() {
+    private OpusDecoder initDecoder() {
         try {
-            OpusDecoder decoder = new OpusDecoder(SAMPLE_RATE, CHANNELS);
-            decoder.setGain(0);
-            return decoder;
+            OpusDecoder dec = new OpusDecoder(SAMPLE_RATE, CHANNELS);
+            dec.setGain(0);
+            return dec;
         } catch (OpusException e) {
             log.error("创建解码器失败", e);
             throw new RuntimeException("创建解码器失败", e);
@@ -248,24 +300,24 @@ public class OpusProcessor {
     private OpusEncoder initEncoder() {
         try {
             // 使用AUDIO应用以获得更高保真度（TTS更接近有声内容）
-            OpusEncoder encoder = new OpusEncoder(SAMPLE_RATE, CHANNELS, OpusApplication.OPUS_APPLICATION_AUDIO);
+            OpusEncoder enc = new OpusEncoder(SAMPLE_RATE, CHANNELS, OpusApplication.OPUS_APPLICATION_AUDIO);
 
             // 优化设置
-            encoder.setBitrate(AudioUtils.BITRATE);
+            enc.setBitrate(AudioUtils.BITRATE);
             // 信号类型保持语音，以便语音相关优化仍生效
-            encoder.setSignalType(OpusSignal.OPUS_SIGNAL_VOICE);
-            // 提升复杂度以提高编码质量
-            encoder.setComplexity(10);
+            enc.setSignalType(OpusSignal.OPUS_SIGNAL_VOICE);
+            // 复杂度：实时语音取中档，再往上编码耗时明显增加而 48kbps 下听感几乎不变
+            enc.setComplexity(AudioUtils.OPUS_COMPLEXITY);
             // 在网络允许的情况下启用VBR以提升感知质量
-            encoder.setUseVBR(true);
-            // 如有需要可设置期望VBR上限：encoder.setMaxBandwidth(OpusBandwidth.OPUS_BANDWIDTH_NARROWBAND);
+            enc.setUseVBR(true);
+            // 如有需要可设置期望VBR上限：enc.setMaxBandwidth(OpusBandwidth.OPUS_BANDWIDTH_NARROWBAND);
             // 丢包补偿依据场景设置，这里保持0
-            encoder.setPacketLossPercent(0);
-            encoder.setForceChannels(CHANNELS);
+            enc.setPacketLossPercent(0);
+            enc.setForceChannels(CHANNELS);
             // 继续禁用DTX以保持连续输出，避免静音期间突兀
-            encoder.setUseDTX(false);
+            enc.setUseDTX(false);
 
-            return encoder;
+            return enc;
         } catch (OpusException e) {
             log.error("创建编码器失败: 采样率={}, 通道={}", SAMPLE_RATE, CHANNELS, e);
             throw new RuntimeException("创建编码器失败", e);

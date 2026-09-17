@@ -2,12 +2,12 @@ package com.xiaozhi.config.infrastructure;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.config.dal.mysql.dataobject.ConfigDO;
 import com.xiaozhi.config.dal.mysql.mapper.ConfigMapper;
 import com.xiaozhi.config.domain.AiConfig;
 import com.xiaozhi.config.domain.repository.ConfigRepository;
 import com.xiaozhi.config.infrastructure.convert.ConfigConverter;
-import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.event.AiConfigChangedEvent;
 import jakarta.annotation.Resource;
 import org.springframework.cache.Cache;
@@ -64,6 +64,8 @@ public class ConfigRepositoryImpl implements ConfigRepository {
         } else {
             configMapper.updateById(d);
         }
+        // 自动填充把本次写入的时间戳塞回了 DO，回填给聚合根，写接口出参不用再查一遍配置表
+        config.markPersisted(d.getCreateTime(), d.getUpdateTime());
 
         evictCache(config);
 
@@ -119,7 +121,7 @@ public class ConfigRepositoryImpl implements ConfigRepository {
 
     /** 走 evictNow：本方法在事务里跑，单调 evict 会被推迟到提交后，调用方写完回读会命中旧值 */
     private void evictCache(AiConfig config) {
-        Cache cache = cacheManager.getCache(ConfigService.CACHE_NAME);
+        Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
         if (cache == null) return;
         if (config.getConfigId() != null) {
             CacheHelper.evictNow(cache, String.valueOf(config.getConfigId()));

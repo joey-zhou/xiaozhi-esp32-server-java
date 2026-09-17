@@ -2,6 +2,7 @@ package com.xiaozhi.device.infrastructure;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
@@ -10,7 +11,6 @@ import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.domain.vo.VerifyCode;
 import com.xiaozhi.device.infrastructure.convert.DeviceConverter;
-import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.event.DeviceOnlineEvent;
 import com.xiaozhi.event.DeviceRoleChangedEvent;
 import com.xiaozhi.event.DeviceSessionClosedEvent;
@@ -61,7 +61,7 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     public Optional<Device> findById(String deviceId) {
         if (deviceId == null || deviceId.isBlank()) return Optional.empty();
         String cacheKey = deviceId.replace(":", "-");
-        Cache cache = cacheManager.getCache(DeviceService.CACHE_NAME);
+        Cache cache = cacheManager.getCache(CacheNames.DEVICE);
         DeviceBO cached = cacheHelper.getWithLock(
                 "device:" + cacheKey,
                 () -> cache == null ? null : cache.get(cacheKey, DeviceBO.class),
@@ -102,6 +102,8 @@ public class DeviceRepositoryImpl implements DeviceRepository {
         } else {
             deviceMapper.updateById(dataObject);
         }
+        // 自动填充把本次写入的时间戳塞回了 DO，回填给聚合根，写接口出参不用再查一遍设备表
+        device.markPersisted(dataObject.getCreateTime(), dataObject.getUpdateTime());
         evictCache(device.getDeviceId());
 
         DeviceBO bo = deviceConverter.toBO(device);
@@ -144,7 +146,7 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     }
 
     private void evictCache(String deviceId) {
-        Cache cache = cacheManager.getCache(DeviceService.CACHE_NAME);
+        Cache cache = cacheManager.getCache(CacheNames.DEVICE);
         if (cache != null) {
             cache.evict(deviceId.replace(":", "-"));
         }

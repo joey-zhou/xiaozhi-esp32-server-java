@@ -28,6 +28,7 @@ public class AudioUtils {
     public static final int SAMPLE_RATE = 16000; // 采样率
     public static final int CHANNELS = 1; // 单声道
     public static final int BITRATE = 48000; // 48kbps比特率（高质量，接近透明质量）
+    public static final int OPUS_COMPLEXITY = 5; // Opus编码复杂度，实时语音的常用档位，兼顾CPU与音质
     public static final int SAMPLE_FORMAT = 1; // AV_SAMPLE_FMT_S16, 16位PCM
     public static final int BUFFER_SIZE = 512; // 窗口大小
     public static final int OPUS_FRAME_DURATION_MS = 60; // OPUS帧持续时间（毫秒）
@@ -429,7 +430,9 @@ public class AudioUtils {
         } else {
             // 其他格式先转为 PCM，再编码为 Opus
             byte[] pcmData = readAsPcm(filePath);
-            return new OpusProcessor().pcmToOpus(pcmData, false);
+            return new OpusProcessor().pcmToOpus(pcmData, false).stream()
+                    .map(OpusProcessor.EncodedFrame::opus)
+                    .toList();
         }
     }
 

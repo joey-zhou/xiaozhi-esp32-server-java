@@ -1,21 +1,20 @@
 <script setup lang="ts">
 import { ref, computed, reactive } from 'vue'
-import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
-import type { TableColumnsType, FormInstance, TablePaginationConfig } from 'ant-design-vue'
+import type { TableColumnsType, FormInstance } from 'ant-design-vue'
 import type { Rule } from 'ant-design-vue/es/form'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import { useTable } from '@/composables/useTable'
 import { useModal } from '@/composables/useModal'
 import { useRequest } from '@/composables/useRequest'
-import { useLoadingStore } from '@/store/loading'
+import { usePlatformConfigModal } from '@/composables/usePlatformConfigModal'
 import TableActionButtons from '@/components/TableActionButtons.vue'
-import { updateConfig, updatePlatformConfig, queryPlatformConfig, addPlatformConfig } from '@/services/config'
+import TableEmptyState from '@/components/TableEmptyState.vue'
+import { updateConfig, updatePlatformConfig, addPlatformConfig } from '@/services/config'
 import type { Agent, PlatformConfig, ProviderOption, PlatformFormItems } from '@/types/agent'
 import { queryAgents } from '@/services/agent'
 
 const { t } = useI18n()
-const loadingStore = useLoadingStore()
 
 // ==================== 查询表单 ====================
 const searchForm = ref({
@@ -31,7 +30,22 @@ const providerOptions = computed<ProviderOption[]>(() => [
 ])
 
 // ==================== 表格 ====================
-const { loading, data: agentList, pagination, handleTableChange, loadData, createDebouncedSearch } = useTable<Agent>()
+// 分页参数由 useTable 注入，查询条件从 searchForm 现取
+const {
+  loading,
+  data: agentList,
+  pagination,
+  loadError,
+  retryLoad,
+  fetchData,
+  onTableChange,
+  debouncedSearch,
+} = useTable<Agent>((params) => queryAgents({
+  provider: searchForm.value.provider,
+  agentName: searchForm.value.agentName,
+  pageNo: params.pageNo,
+  pageSize: params.pageSize,
+}))
 
 // 两个请求各自一个实例，失败文案互不干扰
 const { executeOk: executeSavePlatformConfig } = useRequest()
@@ -101,25 +115,6 @@ const tableColumns = computed(() => {
   }
   return baseColumns.value
 })
-
-// 加载数据
-const fetchData = async () => {
-  await loadData((params) => queryAgents({
-    provider: searchForm.value.provider,
-    agentName: searchForm.value.agentName,
-    pageNo: params.pageNo,
-    pageSize: params.pageSize
-  }))
-}
-
-// 防抖搜索
-const debouncedSearch = createDebouncedSearch(fetchData, 500)
-
-// 处理表格分页变化
-const onTableChange = (pag: TablePaginationConfig) => {
-  handleTableChange(pag)
-  fetchData()
-}
 
 // ==================== 平台配置 ====================
 const currentConfigId = ref<number | null>(null)
@@ -334,39 +329,13 @@ const platformModalTitle = computed(() => {
   return `${t('common.platformConfig')} - ${platformName}`
 })
 
-// 打开平台配置对话框
-const handleConfigPlatform = async () => {
-  loadingStore.showLoading(t('common.loading'))
-  try {
-    // 先查询是否已有配置
-    const [res] = await Promise.all([
-      queryPlatformConfig('agent', searchForm.value.provider),
-      loadingStore.awaitMinDisplay()
-    ])
+// 打开平台配置对话框：查已有配置 -> 有则编辑、没有则新增
+const { loading: platformConfigLoading, openPlatformModal } = usePlatformConfigModal({
+  onEdit: (existing) => platformModal.openEdit(existing),
+  onCreate: () => platformModal.openCreate()
+})
 
-    if (res.code === 200) {
-      // 后端按 configType+provider 查的就是平台凭据，字段与 PlatformConfig 一致
-      const configs = (res.data?.list ?? []) as PlatformConfig[]
-
-      const existing = configs[0]
-      if (existing) {
-        // 有配置，以编辑模式打开
-        await platformModal.openEdit(existing)
-      } else {
-        // 没有配置，以新增模式打开
-        await platformModal.openCreate()
-      }
-    } else {
-      message.error(res.message || t('common.getPlatformConfigFailed'))
-    }
-  } catch (error) {
-    await loadingStore.awaitMinDisplay()
-    console.error('Error fetching platform config:', error)
-    message.error(t('common.getPlatformConfigFailed'))
-  } finally {
-    loadingStore.hideLoading()
-  }
-}
+const handleConfigPlatform = () => openPlatformModal('agent', searchForm.value.provider)
 
 // 平台配置提交
 const handlePlatformModalOk = async () => {
@@ -435,6 +404,7 @@ fetchData()
         <a-button
           v-permission="['system:config:agent:create', 'system:config:agent:update']"
           type="primary"
+          :loading="platformConfigLoading"
           @click="handleConfigPlatform"
         >
           <template #icon>
@@ -454,6 +424,10 @@ fetchData()
         size="middle"
         :scroll="{ x: 1000 }"
       >
+        <template #emptyText>
+          <TableEmptyState :error="loadError" @retry="retryLoad" />
+        </template>
+
         <!-- 头像 -->
         <template #bodyCell="{ column, record }">
           <template v-if="column.dataIndex === 'iconUrl'">
@@ -506,9 +480,12 @@ fetchData()
       :title="platformModalTitle"
       :open="platformModal.visible.value"
       :confirm-loading="platformModal.submitLoading.value"
+      :mask-closable="false"
+      :ok-text="t('common.confirm')"
+      :cancel-text="t('common.cancel')"
       @ok="handlePlatformModalOk"
       @cancel="platformModal.close"
-      :width="600"
+      width="var(--modal-width-form)"
     >
       <a-form
         ref="platformFormRef"
@@ -548,17 +525,5 @@ fetchData()
 <style scoped>
 .agent-view {
   padding: 24px;
-}
-
-.search-card :deep(.ant-form-item) {
-  margin-bottom: 0;
-}
-
-.ellipsis-text {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>

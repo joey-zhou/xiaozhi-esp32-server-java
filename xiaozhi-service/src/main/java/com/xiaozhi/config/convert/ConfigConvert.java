@@ -6,6 +6,7 @@ import com.xiaozhi.common.model.req.ConfigTestReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
 import com.xiaozhi.common.model.resp.ConfigResp;
 import com.xiaozhi.config.dal.mysql.dataobject.ConfigDO;
+import com.xiaozhi.config.domain.AiConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
@@ -37,6 +38,13 @@ public interface ConfigConvert {
     ConfigBO toBO(ConfigUpdateReq req);
 
     ConfigResp toResp(ConfigBO configBO);
+
+    /**
+     * 写路径出参：字段全部取自刚落库的聚合根，时间戳由 Repository 在写完后回填。
+     * <p>密钥字段不在 ConfigResp 里，不会随出参外泄。
+     */
+    @Mapping(target = "isDefault", expression = "java(config.isDefault() ? \"1\" : \"0\")")
+    ConfigResp toResp(AiConfig config);
 
     @Mapping(target = "userId", ignore = true)
     @Mapping(target = "createTime", ignore = true)

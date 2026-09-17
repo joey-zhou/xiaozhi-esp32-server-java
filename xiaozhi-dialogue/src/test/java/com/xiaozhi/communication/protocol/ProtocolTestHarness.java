@@ -26,6 +26,7 @@ import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.ScheduledPlayer;
 import com.xiaozhi.dialogue.runtime.GoodbyeMessageSupplier;
 import com.xiaozhi.dialogue.runtime.Persona;
+import com.xiaozhi.dialogue.runtime.UserSpeechAudio;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
@@ -422,8 +423,16 @@ class ProtocolTestHarness {
     void shutdown() {
         for (FakeDevice device : connected) {
             ChatSession session = sessionManager.getSession(device.sessionId());
-            if (session != null && session.getPlayer() != null) {
-                session.getPlayer().stop();
+            if (session != null) {
+                // 用户音频落盘异步执行，等它写完再让 @TempDir 删目录，否则删除会与写文件撞车。
+                // 落盘任务在会话队列上按序执行，等最后一轮即等到全部
+                UserSpeechAudio audio = session.getUserSpeechAudio();
+                if (audio != null) {
+                    audio.awaitStoredPath(AwaitHelper.DEFAULT_TIMEOUT);
+                }
+                if (session.getPlayer() != null) {
+                    session.getPlayer().stop();
+                }
             }
             device.transport().close();
             webSocketHandler.afterConnectionClosed(device.transport(), org.springframework.web.socket.CloseStatus.NORMAL);

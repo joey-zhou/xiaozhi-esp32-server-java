@@ -57,7 +57,7 @@ class RecordingAecService extends AecService {
     }
 
     @Override
-    public void feedReference(String sessionId, byte[] opusFrame, long timestamp) {
+    public void feedReference(String sessionId, byte[] opusFrame, byte[] referencePcm, long timestamp) {
         references.add(new Reference(sessionId, opusFrame, timestamp));
     }
 

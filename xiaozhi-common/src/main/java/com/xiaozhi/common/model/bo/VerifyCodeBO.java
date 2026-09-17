@@ -10,13 +10,14 @@ import java.time.LocalDateTime;
  * sys_code 表为多用途验证码表，不同场景使用不同字段：
  * <ul>
  *   <li>设备激活：deviceId、sessionId、type、code、audioPath</li>
- *   <li>用户注册：email、code</li>
+ *   <li>账号验证（注册/登录/找回密码）：account、code</li>
  * </ul>
  */
 @Data
 public class VerifyCodeBO {
 
-    private String email;
+    /** 收码账号：邮箱或手机号，两种渠道共用一列；设备激活场景为 null */
+    private String account;
 
     private String deviceId;
 

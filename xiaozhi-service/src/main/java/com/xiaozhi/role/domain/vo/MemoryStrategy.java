@@ -10,4 +10,12 @@ public record MemoryStrategy(String type) {
     public static MemoryStrategy defaults() {
         return new MemoryStrategy(null);
     }
+
+    /** 按 patch 合并：patch 没给记忆类型就保留当前值，与「局部更新」语义一致 */
+    public MemoryStrategy merge(MemoryStrategy patch) {
+        if (patch == null || patch.type() == null) {
+            return this;
+        }
+        return patch;
+    }
 }

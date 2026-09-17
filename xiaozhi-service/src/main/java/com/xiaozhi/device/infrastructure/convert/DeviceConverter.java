@@ -54,7 +54,7 @@ public class DeviceConverter {
         return d;
     }
 
-    /** Device 聚合根 → DeviceBO（用于事件发布，sessionId / roleName 不可用） */
+    /** Device 聚合根 → DeviceBO（用于事件发布与写路径出参，sessionId / roleName 不可用） */
     public DeviceBO toBO(Device device) {
         DeviceBO bo = new DeviceBO();
         bo.setDeviceId(device.getDeviceId());

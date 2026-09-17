@@ -2,7 +2,7 @@
  * 请求处理 Composable
  * 统一处理业务码判定、全局 Loading、错误提示与防抖
  */
-import { computed, onScopeDispose, ref } from 'vue'
+import { computed, onScopeDispose, ref, type Ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { useLoadingStore } from '@/store/loading'
@@ -14,7 +14,12 @@ export interface RequestOptions<T = unknown> {
   showLoading?: boolean
   /** 全局 loading 遮罩文案，默认 t('common.loading') */
   loadingText?: string
-  /** 失败时是否弹错误提示 */
+  /**
+   * 请求期间置真的外部 loading ref。
+   * 表格、按钮已经把自己的 loading 绑到模板上时用它，避免为了接管错误处理而改模板绑定
+   */
+  loadingRef?: Ref<boolean>
+  /** 业务码失败时是否弹错误提示；传输层错误弹不弹只看 networkErrorText，两者互不影响 */
   showError?: boolean
   /** 成功时是否弹成功提示 */
   showSuccess?: boolean
@@ -22,10 +27,47 @@ export interface RequestOptions<T = unknown> {
   successText?: string
   /** 错误提示文案：业务码失败时作为 res.message 的兜底，传输层错误时覆盖拦截器已弹出的那条 */
   errorText?: string
-  /** 成功回调，入参是解包后的 res.data */
-  onSuccess?: (data: T) => void
+  /**
+   * 传输层错误专用文案，不传时沿用 errorText。
+   * 业务码失败与网络失败要给不同兜底文案时用；传 null 表示不覆盖拦截器已弹出的那条
+   */
+  networkErrorText?: string | null
+  /**
+   * 成功回调，入参是解包后的 res.data 与完整响应体（成功时也要展示后端原文的场景取第二个参数）。
+   * 返回 Promise 时会等它跑完再释放 loading
+   */
+  onSuccess?: (data: T, response: ApiResponse<T>) => void | Promise<void>
+  /**
+   * 业务码失败时的自定义处理，入参是完整响应体。
+   * 返回 true 表示这条失败已被接管，不再弹默认错误提示（按 code 分支、失败也要走确认框的场景用它）
+   */
+  onFailure?: (response: ApiResponse<T>) => boolean | Promise<boolean>
   /** 失败回调，入参是失败的响应体或抛出的错误 */
   onError?: (error: unknown) => void
+}
+
+/**
+ * 外部 loading ref 的在途计数。
+ * 同一个 ref 会被多路请求共用（行内操作与列表刷新都占表格 loading），
+ * 只有最后一路结束才置回 false，否则先结束的那路会提前把转圈关掉
+ */
+const externalLoadingCounts = new Map<Ref<boolean>, number>()
+
+function acquireExternalLoading(target?: Ref<boolean>) {
+  if (!target) return
+  externalLoadingCounts.set(target, (externalLoadingCounts.get(target) ?? 0) + 1)
+  target.value = true
+}
+
+function releaseExternalLoading(target?: Ref<boolean>) {
+  if (!target) return
+  const rest = (externalLoadingCounts.get(target) ?? 1) - 1
+  if (rest > 0) {
+    externalLoadingCounts.set(target, rest)
+    return
+  }
+  externalLoadingCounts.delete(target)
+  target.value = false
 }
 
 /** 返回后端统一信封的请求函数 */
@@ -67,11 +109,14 @@ export function useRequest() {
     const {
       showLoading = false,
       loadingText = t('common.loading'),
+      loadingRef,
       showError = true,
       showSuccess = false,
       successText = t('common.success'),
       errorText,
+      networkErrorText = errorText,
       onSuccess,
+      onFailure,
       onError,
     } = options
 
@@ -79,12 +124,15 @@ export function useRequest() {
     const loadingStore = showLoading ? useLoadingStore() : null
     pending.value += 1
     loadingStore?.showLoading(loadingText)
+    acquireExternalLoading(loadingRef)
 
     try {
       const res = await requestFn()
 
       if (res.code !== 200) {
-        if (showError) {
+        // 先给调用方按 code 分支的机会，它接管了就不再弹默认那条
+        const handled = onFailure ? await onFailure(res) : false
+        if (!handled && showError) {
           message.error(res.message || errorText || t('common.operationFailed'))
         }
         onError?.(res)
@@ -95,7 +143,8 @@ export function useRequest() {
         message.success(successText)
       }
 
-      onSuccess?.(res.data)
+      // 等成功回调跑完再走 finally，回调里刷新列表时 loading 才不会中间断一下
+      await onSuccess?.(res.data, res)
       return { ok: true, data: res.data }
     } catch (error: unknown) {
       if (shouldIgnoreRequestError(error)) {
@@ -105,9 +154,10 @@ export function useRequest() {
 
       console.error('Request error:', error)
 
-      // 传输层错误由 request.ts 的拦截器统一弹提示，这里只在调用方给了文案时用同一个 key 覆盖，不叠第二条
-      if (showError && errorText) {
-        message.error({ content: errorText, key: 'request-error' })
+      // 传输层错误由 request.ts 的拦截器统一弹提示，这里只在调用方给了文案时用同一个 key 覆盖，不叠第二条。
+      // 不看 showError：业务码失败要不要弹、和网络失败要不要换文案是两回事
+      if (networkErrorText) {
+        message.error({ content: networkErrorText, key: 'request-error' })
       }
 
       onError?.(error)
@@ -115,6 +165,7 @@ export function useRequest() {
     } finally {
       pending.value -= 1
       loadingStore?.hideLoading()
+      releaseExternalLoading(loadingRef)
     }
   }
 
@@ -136,6 +187,15 @@ export function useRequest() {
     requestFn: () => Promise<ApiResponse<T>>,
     options: RequestOptions<T> = {}
   ): Promise<boolean> => (await run(requestFn, options)).ok
+
+  /**
+   * 成败与数据都要用：新增接口成功后还要读回 res.data 里的 id 这类场景。
+   * execute 的 undefined 分不清「失败」和「成功但没数据」，executeOk 又拿不到 data
+   */
+  const executeFull = async <T = unknown>(
+    requestFn: () => Promise<ApiResponse<T>>,
+    options: RequestOptions<T> = {}
+  ): Promise<{ ok: boolean; data?: T }> => run(requestFn, options)
 
   /**
    * 并行聚合：多路请求共用一次遮罩，失败合并成一条提示，返回值按入参顺序一一对应。
@@ -220,6 +280,7 @@ export function useRequest() {
     loading,
     execute,
     executeOk,
+    executeFull,
     executeAll,
     createDebouncedRequest,
   }

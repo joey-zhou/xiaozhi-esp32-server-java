@@ -56,7 +56,8 @@ watch(
   <a-modal
     :open="visible"
     :title="t('device.deviceDetails')"
-    width="650px"
+    width="var(--modal-width-wide)"
+    :mask-closable="false"
     @ok="handleOk"
     @cancel="handleClose"
   >

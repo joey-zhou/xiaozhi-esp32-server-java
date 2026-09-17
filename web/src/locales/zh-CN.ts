@@ -109,7 +109,6 @@ export default {
     updatePlatformConfigFailed: '更新平台配置失败',
     addPlatformConfigFailed: '添加平台配置失败',
     // 音频相关
-    audioUrlInvalid: '音频URL无效',
     audioPlayFailed: '音频播放失败',
     audioPathInvalid: '音频路径无效',
     audioTestFailed: '音频测试失败',
@@ -170,10 +169,6 @@ export default {
   clipboard: {
     copySuccess: '复制成功',
     copyFailed: '复制失败',
-    pasteNotSupported: '您的浏览器不支持读取剪贴板',
-    pasteFailed: '读取剪贴板失败',
-    jsonError: 'JSON 序列化失败',
-    imageNotSupported: '您的浏览器不支持复制图片',
   },
 
   menu: {
@@ -436,7 +431,6 @@ export default {
     
     // 音色测试相关
     voiceNotFound: '未找到音色信息',
-    getTestAudioFailed: '获取测试音频失败',
     playVoiceFailed: '播放音色失败',
     loadTemplateFailed: '加载模板列表失败',
     voskLocalRecognition: 'Vosk本地识别',
@@ -869,6 +863,8 @@ export default {
     action: '操作',
     uploadTime: '上传时间',
     total: '共 {total} 条',
+    loadFailed: '数据加载失败',
+    retry: '重新加载',
   },
 
   router: {
@@ -956,9 +952,6 @@ export default {
       sendFailed: '发送失败，请检查连接状态',
       micDenied: '无法启动录音，请检查麦克风权限',
       stopRecordFailed: '停止录音失败',
-      justNow: '刚刚',
-      minutesAgo: '{count}分钟前',
-      hoursAgo: '{count}小时前',
       online: '在线',
       status: {
         idle: '未连接',

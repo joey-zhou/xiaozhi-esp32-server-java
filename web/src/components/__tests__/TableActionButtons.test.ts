@@ -60,7 +60,8 @@ describe('TableActionButtons', () => {
       global: globalOptions(),
     })
 
-    const links = wrapper.findAll('a')
+    // 行内操作必须是真正的 button：没有 href 的 <a> 键盘 tab 不到
+    const links = wrapper.findAll('button.table-action-link:not(.delete-link)')
     expect(links.map((link) => link.text())).toEqual([
       'common.edit',
       'common.view',
@@ -68,6 +69,7 @@ describe('TableActionButtons', () => {
       'common.copy',
       'common.setAsDefault',
     ])
+    expect(wrapper.findAll('a')).toHaveLength(0)
 
     for (const link of links) {
       await link.trigger('click')

@@ -19,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
  * 使不带硬件 AEC 的设备也能正常打断和对话。
  *
  * 核心设计：
+ * - 参考信号取下行帧编码前的 PCM：帧就是服务端编出来的，源 PCM 现成，不必把刚编好的帧再解码一趟。
+ *   源 PCM 比解码结果早一个编解码器时延（约 6.5ms），方向上是提前，对齐是安全的。
  * - render/capture 以采集块为节拍：每处理一块麦克风前先喂参考，常态一块，无真参考用静音块，
  *   保证 AEC3 的延迟估计不因 underrun/overrun 被清空。
  * - 参考侧保留两帧积压吸收上行抖动，播放器预缓冲三帧让设备端队列更深，参考仍领先设备播放点约一帧；
@@ -103,15 +105,21 @@ public class AecService {
     }
 
     /**
-     * 缓存参考信号（下发给设备的 Opus 帧，含静音帧），由 process() 按采集节拍喂给 AEC3。
+     * 缓存参考信号（下发给设备的每一帧，含静音帧），由 process() 按采集节拍喂给 AEC3。
+     *
+     * @param referencePcm 该帧编码前的 PCM。下行帧本来就是服务端编出来的，编码前的 PCM 直接当参考，
+     *                     不必把刚编好的帧再解码一遍；只有缓存命中直读的帧手里没有源 PCM，传 null 走解码兜底
      */
-    public void feedReference(String sessionId, byte[] opusFrame, long timestamp) {
+    public void feedReference(String sessionId, byte[] opusFrame, byte[] referencePcm, long timestamp) {
         AecState state = states.get(sessionId);
         if (state == null) return;
 
         try {
-            // 解码必须按发送顺序进行，解码器有状态
-            byte[] pcm = state.refDecoder.opusToPcm(opusFrame);
+            byte[] pcm = referencePcm;
+            if (pcm == null) {
+                // 解码必须按发送顺序进行，解码器有状态
+                pcm = state.refDecoder.opusToPcm(opusFrame);
+            }
             if (pcm == null || pcm.length == 0) return;
 
             synchronized (state.apmLock) {

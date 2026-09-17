@@ -8,9 +8,6 @@ import java.util.List;
 
 public interface RoleService {
 
-    /** 角色缓存名称（RoleServiceImpl 读缓存、RoleRepositoryImpl 写后失效均使用此常量） */
-    String CACHE_NAME = "XiaoZhi:Role";
-
     // ===================== 查询操作 =====================
 
     PageResult<RoleProjection> page(int pageNo, int pageSize, Integer roleId, String roleName,

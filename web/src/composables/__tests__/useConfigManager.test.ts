@@ -31,6 +31,12 @@ vi.mock('@/services/config', () => ({
   deleteConfig: vi.fn(),
 }))
 
+// llm_factories.json 加载失败时会走这里报错；真实的 @/locales 会调用被上面 mock 掉的 vue-i18n#createI18n，直接崩，故单独 mock
+vi.mock('@/locales', () => ({
+  i18n: { global: { t: (key: string) => key } },
+}))
+
+import { flushPromises } from '@vue/test-utils'
 import { Modal, message } from 'ant-design-vue'
 import { deleteConfig, queryConfigs, updateConfig } from '@/services/config'
 import { useConfigManager } from '../useConfigManager'
@@ -47,25 +53,40 @@ function pageOk() {
 }
 
 describe('useConfigManager llm factory index', () => {
-  it('shares one factory index across instances', () => {
+  it('shares one factory index across instances', async () => {
     const first = useConfigManager('llm')
     const second = useConfigManager('llm')
+    // llm_factories.json 改成了动态 import，模块解析要几个节拍，flushPromises 一次不一定够
+    await vi.waitFor(() => expect(first.typeOptionsLoading.value).toBe(false))
+    // 两个实例共用同一个加载 promise，一起落地
+    expect(second.typeOptionsLoading.value).toBe(false)
 
     const models = first.getModelsByProviderAndType('OpenAI', 'chat')
     expect(models.length).toBeGreaterThan(0)
-    // 同一份模块级索引，重复实例化不再重建
+    // 同一份缓存的索引，重复实例化不再重建
     expect(second.getModelsByProviderAndType('OpenAI', 'chat')).toBe(models)
     expect(second.typeOptions.value).toBe(first.typeOptions.value)
   })
 
-  it('exposes providers only for llm', () => {
-    expect(useConfigManager('llm').typeOptions.value.length).toBeGreaterThan(0)
-    // 非 llm 走 providerConfig 的静态 typeOptions，不碰工厂索引
-    expect(useConfigManager('oss').typeOptions.value.some((item) => item.value === 'local')).toBe(true)
+  it('exposes providers only for llm', async () => {
+    const llmManager = useConfigManager('llm')
+    // 数据到位前下拉框应该是"加载中"而不是"没有选项"
+    expect(llmManager.typeOptionsLoading.value).toBe(true)
+    expect(llmManager.typeOptions.value).toEqual([])
+
+    await flushPromises()
+    expect(llmManager.typeOptionsLoading.value).toBe(false)
+    expect(llmManager.typeOptions.value.length).toBeGreaterThan(0)
+
+    // 非 llm 走 providerConfig 的静态 typeOptions，不碰工厂索引，也不会进入加载态
+    const ossManager = useConfigManager('oss')
+    expect(ossManager.typeOptionsLoading.value).toBe(false)
+    expect(ossManager.typeOptions.value.some((item) => item.value === 'local')).toBe(true)
   })
 
-  it('keeps model type buckets separated', () => {
+  it('keeps model type buckets separated', async () => {
     const manager = useConfigManager('llm')
+    await flushPromises()
 
     const chat = manager.getModelsByProviderAndType('OpenAI', 'chat')
     expect(chat.every((model) => model.model_type === 'chat')).toBe(true)
@@ -207,7 +228,11 @@ describe('useConfigManager write actions', () => {
 
     await manager.setAsDefault({ configId: 3, configName: 'gpt', modelType: 'chat' } as never)
 
-    expect(messageMock.error).toHaveBeenCalledWith('common.serverMaintenance')
+    // 传输层失败与 request.ts 拦截器共用 message key，覆盖它那条而不是叠第二条
+    expect(messageMock.error).toHaveBeenCalledWith({
+      content: 'common.serverMaintenance',
+      key: 'request-error',
+    })
     expect(queryConfigsMock).not.toHaveBeenCalled()
     expect(manager.loading.value).toBe(false)
   })

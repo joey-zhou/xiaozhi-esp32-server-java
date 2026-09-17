@@ -101,17 +101,19 @@ const handleSubmit = async () => {
                   <MailOutlined />
                 </template>
                 <template #suffix>
-                  <span
+                  <button
+                    type="button"
                     class="send-code-btn"
                     :class="{
                       disabled: !canSendCode,
                       loading: sendCodeLoading,
                     }"
+                    :disabled="!canSendCode"
                     @click="handleSendCode"
                   >
                     <LoadingOutlined v-if="sendCodeLoading" />
                     {{ buttonText }}
-                  </span>
+                  </button>
                 </template>
               </a-input>
             </a-form-item>
@@ -186,141 +188,42 @@ const handleSubmit = async () => {
 </template>
 
 <style lang="scss" scoped>
+@use '../styles/auth-shared' as *;
+
 // 主容器
 .forget-container {
-  position: relative;
-  min-height: 100vh;
-  max-width: 1280px;
-  margin: 0 auto;
-  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  @include auth-page;
 }
 
 // 背景图片
 .earth-background {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: url('/static/img/galaxy.jpg') center center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  z-index: 0;
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    z-index: 1;
-  }
+  @include auth-background;
 }
 
 // 忘记密码卡片
 .forget-card {
-  background: rgba(42, 42, 42, 0.35) !important;
-  backdrop-filter: blur(10px);
-  border: none !important;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5) !important;
-  position: relative;
-  z-index: 10;
-
-  :deep(.ant-card-body) {
-    padding: 40px;
-  }
+  @include auth-card;
 }
 
 // 标题样式
 .welcome-title {
-  text-align: center;
-  color: #ffffff;
-  font-size: 28px;
-  font-weight: 600;
-  margin-bottom: 32px;
-  letter-spacing: 1px;
-  width: 100%;
-  display: block;
+  @include auth-title;
 }
 
 // 输入框样式
 .input-field {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border: none !important;
-  box-shadow: none !important;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.13) !important;
-    border: none !important;
-    box-shadow: none !important;
-  }
-
-  &:focus,
-  &.ant-input-focused {
-    background: rgba(255, 255, 255, 0.15) !important;
-    border: none !important;
-    box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2) !important;
-  }
-
-  :deep(input) {
-    background: transparent !important;
-    color: #ffffff !important;
-    border: none !important;
-    box-shadow: none !important;
-
-    &::placeholder {
-      color: rgba(255, 255, 255, 0.7) !important;
-    }
-
-    &:focus {
-      border: none !important;
-      box-shadow: none !important;
-    }
-  }
-
-  :deep(.ant-input-prefix) {
-    color: rgba(255, 255, 255, 0.6) !important;
-  }
-
-  :deep(.ant-input-password-icon) {
-    color: rgba(255, 255, 255, 0.6) !important;
-  }
-
-  :deep(.ant-input-affix-wrapper) {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-
-    &:hover,
-    &:focus,
-    &.ant-input-affix-wrapper-focused {
-      border: none !important;
-      box-shadow: none !important;
-    }
-  }
+  @include auth-input;
 }
 
 // 表单标签
 /* 这三页压在一张固定的深色背景图上，标签色不跟随明暗主题，保持浅灰即可 */
 :deep(.ant-form-item-label > label) {
-  color: #cccccc !important;
-  font-weight: 500;
+  @include auth-form-label;
 }
 
 // 发送验证码按钮
 .send-code-btn {
-  color: #4285f4;
-  font-size: 12px;
-  cursor: pointer;
-  user-select: none;
-  transition: color 0.3s ease;
-  white-space: nowrap;
-
-  &:hover:not(.disabled) {
-    color: #3367d6;
-  }
+  @include auth-send-code-base;
 
   &.disabled {
     color: rgba(255, 255, 255, 0.3);
@@ -356,16 +259,10 @@ const handleSubmit = async () => {
 }
 
 .back-text {
-  color: rgba(255, 255, 255, 0.6);
-  margin-right: 8px;
+  @include auth-hint-text;
 }
 
 .back-link {
-  color: #4285f4;
-  text-decoration: none;
-
-  &:hover {
-    color: #3367d6;
-  }
+  @include auth-link;
 }
 </style>

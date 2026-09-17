@@ -1,6 +1,5 @@
 package com.xiaozhi.role;
 
-import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.req.RoleCreateReq;
 import com.xiaozhi.common.model.req.RolePageReq;
 import com.xiaozhi.common.model.req.RoleUpdateReq;
@@ -61,9 +60,7 @@ public class RoleAppService {
                 req.getInactiveTimeoutSeconds());
         roleRepository.save(role);
 
-        RoleBO created = roleService.getBO(role.getRoleId());
-        if (created == null) throw new IllegalStateException("创建角色失败");
-        return roleConvert.toResp(created);
+        return roleConvert.toResp(role);
     }
 
     @Transactional
@@ -86,10 +83,9 @@ public class RoleAppService {
         }
         roleRepository.save(role);
 
-        RoleBO updated = roleService.getBO(roleId);
-        if (updated == null) throw new IllegalStateException("更新角色失败");
-        return roleConvert.toResp(updated);
+        return roleConvert.toResp(role);
     }
+
 
     /**
      * 删除角色。sys_device.roleId 上没有外键，硬删会留下悬空引用，绑定该角色的设备之后每次接入都会失败，

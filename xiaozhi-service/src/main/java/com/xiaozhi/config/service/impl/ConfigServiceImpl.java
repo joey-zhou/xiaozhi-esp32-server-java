@@ -4,16 +4,22 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.config.CacheNames;
+import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.config.convert.ConfigConvert;
 import com.xiaozhi.config.dal.mysql.dataobject.ConfigDO;
 import com.xiaozhi.config.dal.mysql.mapper.ConfigMapper;
+import com.xiaozhi.config.domain.AiConfig;
+import com.xiaozhi.config.domain.repository.ConfigRepository;
 import com.xiaozhi.config.service.ConfigService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -23,11 +29,17 @@ public class ConfigServiceImpl implements ConfigService {
 
     private static final List<String> EXCLUDED_PROVIDERS = List.of("coze", "dify", "xingchen");
 
+    /** 第三方平台的智能体在本系统里只以 llm 配置的形态存在 */
+    private static final String AGENT_MODEL_CONFIG_TYPE = "llm";
+
     @Resource
     private ConfigMapper configMapper;
 
     @Resource
     private ConfigConvert configConvert;
+
+    @Resource
+    private ConfigRepository configRepository;
 
     @Resource
     private CacheManager cacheManager;
@@ -62,7 +74,7 @@ public class ConfigServiceImpl implements ConfigService {
             return null;
         }
         String cacheKey = String.valueOf(configId);
-        Cache cache = cacheManager.getCache(CACHE_NAME);
+        Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
         return cacheHelper.getWithLock(
             "config:" + cacheKey,
             () -> cache == null ? null : cache.get(cacheKey, ConfigBO.class),
@@ -89,7 +101,7 @@ public class ConfigServiceImpl implements ConfigService {
         String cacheKey = StringUtils.hasText(modelType)
             ? "default:" + configType + ":" + modelType
             : "default:" + configType;
-        Cache cache = cacheManager.getCache(CACHE_NAME);
+        Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
         return cacheHelper.getWithLock(
             "config:default:" + cacheKey,
             () -> cache == null ? null : cache.get(cacheKey, ConfigBO.class),
@@ -116,7 +128,7 @@ public class ConfigServiceImpl implements ConfigService {
         if (!StringUtils.hasText(configType)) {
             return;
         }
-        Cache cache = cacheManager.getCache(CACHE_NAME);
+        Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
         if (cache == null) {
             return;
         }
@@ -129,6 +141,25 @@ public class ConfigServiceImpl implements ConfigService {
         return configMapper.selectList(buildQuery(userId, configType, provider, modelType, isDefault, state)).stream()
             .map(configConvert::toBO)
             .toList();
+    }
+
+    @Override
+    @Transactional
+    public ConfigBO saveAgentModel(ConfigBO agentModel) {
+        Assert.notNull(agentModel, "同步智能体配置不能为空");
+        Assert.notNull(agentModel.getUserId(), "同步智能体配置必须指定用户");
+        // 智能体只会落成 llm 配置，类型不由调用方决定
+        ConfigBO model = agentModel.setConfigType(AGENT_MODEL_CONFIG_TYPE);
+        AiConfig config;
+        if (model.getConfigId() == null) {
+            config = AiConfig.newConfig(model.getUserId(), model);
+        } else {
+            config = configRepository.findById(model.getConfigId())
+                .orElseThrow(() -> new ResourceNotFoundException("配置不存在: " + model.getConfigId()));
+            config.update(model);
+        }
+        configRepository.save(config);
+        return getBO(config.getConfigId());
     }
 
     private LambdaQueryWrapper<ConfigDO> buildQuery(Integer userId, String configType, String provider,

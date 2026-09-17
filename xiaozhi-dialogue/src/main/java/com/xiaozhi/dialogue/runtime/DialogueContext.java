@@ -9,7 +9,6 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.tool.ToolCallback;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -30,23 +29,11 @@ public class DialogueContext {
     private ToolsSessionHolder toolsSessionHolder;
 
     /**
-     * 当前对话轮次的用户音频本地文件路径（WAV），供 Function 在本轮内即时读取。
-     * 上传云存储后本地临时文件可能已被删除。
+     * 当前对话轮次的用户音频落盘结果（路径与时长）。落盘与上传异步执行，结果由该对象回填，
+     * 详见 {@link UserSpeechAudio}。每轮换一个实例，本轮落库读的就是本轮那个。
+     * 文本入口（没有语音）置空，否则那一轮会挂上前一轮的录音。
      */
-    private volatile Path userAudioPath;
-
-    /**
-     * 当前对话轮次用户音频的持久化存储路径：本地为相对路径，云存储为完整 URL。
-     * 与 {@link #userAudioPath} 区分——后者是 java.nio.file.Path（会破坏 URL 的双斜杠），
-     * 此处始终为原始字符串，用于写入 sys_message.audioPath。
-     */
-    private volatile String userAudioStoredPath;
-
-    /**
-     * 当前对话轮次用户音频时长（秒）。必须在上传云存储前用本地文件算好，
-     * 因为上传后本地文件会被删除，且云端 storedPath 无法当作本地文件读取。
-     */
-    private volatile double sttDuration = -1;
+    private volatile UserSpeechAudio userSpeechAudio;
 
     /**
      * 当前对话轮次中的工具调用详情列表（包括内置Function和MCP工具）

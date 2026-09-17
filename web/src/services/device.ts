@@ -10,10 +10,11 @@ export function queryDevices(params: Partial<DeviceQueryParams>) {
 }
 
 /**
- * 添加设备
+ * 添加设备。
+ * 后端回写新建的设备，调用方要用返回的 deviceId 再去绑定智能体，所以这里给出数据类型
  */
 export function addDevice(code: string) {
-  return http.post(api.device, { code })
+  return http.post<Partial<Device>>(api.device, { code })
 }
 
 /**

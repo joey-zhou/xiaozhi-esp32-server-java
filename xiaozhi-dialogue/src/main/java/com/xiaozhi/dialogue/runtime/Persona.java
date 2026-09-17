@@ -47,7 +47,7 @@ import lombok.extern.slf4j.Slf4j;
  * 一是收到消息时，需要从 ChatSession 传导给到 Persona，然后 Persona 将消息传递给 ChatModel。
  * 二是发送消息时，需要从 Persona 将消息传递给 ChatSession。
  *
- * 用户音频的持久化路径与时长通过 ChatSession.getUserAudioStoredPath()/getSttDuration() 关联到 DialogueTurn，
+ * 用户音频的持久化路径与时长通过 ChatSession.getUserSpeechAudio() 关联到 DialogueTurn，
  * DialogueTurn 作为 chatStream() 方法内局部变量构建（已实现）。
  *
  * 生命周期不同时间节点的几个事件：
@@ -147,21 +147,19 @@ public class Persona {
         private final long turnId;
         private final UserMessage userMessage;
         private final Instant startedAt;
-        private final String userSpeechStoredPath;
-        private final double sttDuration;
+        /** 本轮用户音频的落盘结果，异步回填；纯文本轮次为 null */
+        private final UserSpeechAudio userSpeechAudio;
         /** 首 token 时刻，也是助手消息的创建时间 */
         private final AtomicReference<Instant> ttft = new AtomicReference<>(null);
         private final AtomicReference<Phase> phase = new AtomicReference<>(Phase.PREPARING);
         /** 完成回调落库的那一轮，播放途中被打断时据此截断 */
         private volatile DialogueTurn completedTurn;
 
-        private Turn(long turnId, UserMessage userMessage, Instant startedAt,
-                     String userSpeechStoredPath, double sttDuration) {
+        private Turn(long turnId, UserMessage userMessage, Instant startedAt, UserSpeechAudio userSpeechAudio) {
             this.turnId = turnId;
             this.userMessage = userMessage;
             this.startedAt = startedAt;
-            this.userSpeechStoredPath = userSpeechStoredPath;
-            this.sttDuration = sttDuration;
+            this.userSpeechAudio = userSpeechAudio;
         }
     }
 
@@ -301,8 +299,7 @@ public class Persona {
                 .usage(usage)
                 .conversation(conversation)
                 .userMessageCreatedAt(turn.startedAt)
-                .userSpeechStoredPath(turn.userSpeechStoredPath)
-                .sttDuration(turn.sttDuration)
+                .userSpeechAudio(turn.userSpeechAudio)
                 .assistantMessageCreatedAt(assistantCreatedAt)
                 .toolCallDetails(snapshot != null ? snapshot.details() : List.of())
                 .toolChains(allChains)
@@ -476,7 +473,7 @@ public class Persona {
         Instant now = Instant.now();
         // 用户消息时间取 STT 出结果那一刻（构造时已写入）
         Turn turn = new Turn(now.toEpochMilli(), userMessage, MessageTimeMetadata.getTimeMillis(userMessage),
-                session.getUserAudioStoredPath(), session.getSttDuration());
+                session.getUserSpeechAudio());
         session.getDialogueContext().startTurn(turn.turnId);
         player.resetSpokenSentences();
         player.setOnPlaybackStopped(this::onPlaybackStopped);

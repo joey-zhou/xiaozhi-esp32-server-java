@@ -18,7 +18,4 @@ public interface DeviceMapper extends BaseMapper<DeviceDO> {
                                        @Param("state") String state,
                                        @Param("roleId") Integer roleId,
                                        @Param("userId") Integer userId);
-
-    /** 不能叫 selectById：会与 BaseMapper 注入的同名语句撞 statement id，写侧 selectById 会拿到投影。 */
-    DeviceProjection selectProjectionById(@Param("deviceId") String deviceId);
 }

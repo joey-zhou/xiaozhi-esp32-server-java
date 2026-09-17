@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.role.domain.Role;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.role.convert.RoleConvert;
@@ -58,7 +59,7 @@ public class RoleServiceImpl implements RoleService {
             return null;
         }
         String cacheKey = String.valueOf(roleId);
-        Cache cache = cacheManager.getCache(RoleService.CACHE_NAME);
+        Cache cache = cacheManager.getCache(CacheNames.ROLE);
         return cacheHelper.getWithLock(
             "role:" + cacheKey,
             () -> cache == null ? null : cache.get(cacheKey, RoleBO.class),

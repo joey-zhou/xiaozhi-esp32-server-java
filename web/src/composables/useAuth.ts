@@ -8,6 +8,8 @@ import type { LoginResponse } from '@/types/user'
 import { login as loginApi, logout as logoutApi, register as registerApi, resetPassword as resetPasswordApi, telLogin as telLoginApi } from '@/services/user'
 import { STORAGE_REMEMBER_ME, STORAGE_USERNAME } from '@/constants/storage'
 import { ROUTES, defaultRouteFor } from '@/router/routes'
+import { resolveAuthNavigation } from '@/router/authNavigation'
+import { useRequest } from './useRequest'
 
 interface LoginForm {
   username: string
@@ -43,6 +45,12 @@ export function useAuth() {
   const userStore = useUserStore()
   const { t } = useI18n()
   const loading = ref(false)
+  // 四条鉴权请求各自一个实例，失败文案互不干扰；
+  // 传输层错误统一交给 request.ts 拦截器，这里一律 networkErrorText: null 不再覆盖
+  const { executeFull: executeLogin } = useRequest()
+  const { executeFull: executeTelLogin } = useRequest()
+  const { executeOk: executeRegister } = useRequest()
+  const { executeOk: executeResetPassword } = useRequest()
 
   // 只记住用户名，密码一律不落盘
   const rememberedUsername = useStorage(STORAGE_USERNAME, '', localStorage)
@@ -56,7 +64,8 @@ export function useAuth() {
     userStore.setRefreshToken(data.refreshToken)
   }
 
-  // 计算登录后要落地的路径：无权访问 query.redirect 时退回默认页
+  // 计算登录后要落地的路径：把 query.redirect 交给全局唯一的权限判断（resolveAuthNavigation），
+  // 没有 redirect、或 redirect 本就是默认页时直接用默认页，省一次路由解析
   const resolveLandingRoute = (isAdmin: boolean): string => {
     const defaultRoute = defaultRouteFor(isAdmin)
     const redirect = router.currentRoute.value.query.redirect as string | undefined
@@ -66,113 +75,86 @@ export function useAuth() {
     }
 
     const targetRoute = router.resolve(redirect)
-    if (!targetRoute?.meta) {
-      return redirect
-    }
+    const decision = resolveAuthNavigation(
+      { path: targetRoute.path, fullPath: targetRoute.fullPath, meta: targetRoute.meta },
+      {
+        hasToken: true, // 走到这里说明刚登录/手机验证码登录成功，会话已写入
+        isAdmin,
+        hasPermission: userStore.hasPermission,
+        hasAnyPermission: userStore.hasAnyPermission,
+      },
+    )
 
-    if (targetRoute.meta.isAdmin && !isAdmin) {
-      return defaultRoute
-    }
-    if (targetRoute.meta.permission && !userStore.hasPermission(targetRoute.meta.permission)) {
-      return defaultRoute
-    }
-    if (
-      targetRoute.meta.permissions?.length &&
-      !userStore.hasAnyPermission(targetRoute.meta.permissions)
-    ) {
-      return defaultRoute
-    }
-
-    return redirect
+    // 允许则原样跳 redirect（保留其自带的 query），否则用统一判断给出的兜底目标
+    return decision.action === 'allow' ? redirect : decision.to
   }
 
   // 登录
   const login = async (form: LoginForm) => {
-    loading.value = true
-    try {
-      const res = await loginApi({
-        username: form.username,
-        password: form.password,
-      })
+    const { ok, data } = await executeLogin(
+      () => loginApi({ username: form.username, password: form.password }),
+      { loadingRef: loading, errorText: t('auth.loginFailed'), networkErrorText: null },
+    )
 
-      if (res.code === 200) {
-        applyLoginSession(res.data)
-
-        rememberedUsername.value = form.rememberMe ? form.username : ''
-
-        message.success(t('auth.loginSuccess'))
-
-        router.push(resolveLandingRoute(res.data.user?.isAdmin === '1'))
-        return true
-      }
-
-      message.error(res.message || t('auth.loginFailed'))
+    if (!ok || !data) {
       return false
-    } catch {
-      // HTTP 错误已由全局响应拦截器统一提示，避免重复弹窗
-      return false
-    } finally {
-      loading.value = false
     }
+
+    applyLoginSession(data)
+
+    rememberedUsername.value = form.rememberMe ? form.username : ''
+
+    message.success(t('auth.loginSuccess'))
+
+    router.push(resolveLandingRoute(data.user?.isAdmin === '1'))
+    return true
   }
 
   // 注册
   const register = async (form: RegisterForm) => {
-    loading.value = true
-    try {
-      const res = await registerApi({
+    const registered = await executeRegister(
+      () => registerApi({
         name: form.name,
         username: form.username,
         email: form.email,
         tel: form.tel,
         password: form.password,
         verifyCode: form.verifyCode,
-      })
+      }),
+      { loadingRef: loading, errorText: t('common.error'), networkErrorText: null },
+    )
 
-      if (res.code === 200) {
-        message.success(t('auth.registerSuccess'))
-        setTimeout(() => {
-          router.push(ROUTES.LOGIN)
-        }, 500)
-        return true
-      } else {
-        message.error(res.message || t('common.error'))
-        return false
-      }
-    } catch {
-      // HTTP 错误已由全局响应拦截器统一提示，避免重复弹窗
+    if (!registered) {
       return false
-    } finally {
-      loading.value = false
     }
+
+    message.success(t('auth.registerSuccess'))
+    setTimeout(() => {
+      router.push(ROUTES.LOGIN)
+    }, 500)
+    return true
   }
 
   // 重置密码
   const resetPassword = async (form: ForgetPasswordForm) => {
-    loading.value = true
-    try {
-      const res = await resetPasswordApi({
+    const reset = await executeResetPassword(
+      () => resetPasswordApi({
         email: form.email,
         code: form.verificationCode,
         password: form.newPassword,
-      })
+      }),
+      { loadingRef: loading, errorText: t('common.error'), networkErrorText: null },
+    )
 
-      if (res.code === 200) {
-        message.success(t('auth.passwordReset'))
-        setTimeout(() => {
-          router.push(ROUTES.LOGIN)
-        }, 500)
-        return true
-      } else {
-        message.error(res.message || t('common.error'))
-        return false
-      }
-    } catch {
-      // HTTP 错误已由全局响应拦截器统一提示，避免重复弹窗
+    if (!reset) {
       return false
-    } finally {
-      loading.value = false
     }
+
+    message.success(t('auth.passwordReset'))
+    setTimeout(() => {
+      router.push(ROUTES.LOGIN)
+    }, 500)
+    return true
   }
 
   const getRememberedCredentials = () => {
@@ -186,37 +168,34 @@ export function useAuth() {
 
   // 手机号验证码登录
   const telLogin = async (form: MobileLoginForm) => {
-    loading.value = true
-    try {
-      const res = await telLoginApi({
-        tel: form.tel,
-        code: form.code,
-      })
+    const { ok, data } = await executeTelLogin(
+      () => telLoginApi({ tel: form.tel, code: form.code }),
+      {
+        loadingRef: loading,
+        errorText: t('auth.loginFailed'),
+        networkErrorText: null,
+        // 201 是「手机号未注册」，不是错误，引导去注册页而不是弹红字
+        onFailure: (res) => {
+          if (res.code !== 201) {
+            return false
+          }
+          message.warning(res.message)
+          router.push(ROUTES.REGISTER)
+          return true
+        },
+      },
+    )
 
-      if (res.code === 200) {
-        applyLoginSession(res.data)
-
-        message.success(t('auth.loginSuccess'))
-
-        router.push(resolveLandingRoute(res.data.user?.isAdmin === '1'))
-        return true
-      }
-
-      if (res.code === 201) {
-        // 未注册的手机号
-        message.warning(res.message)
-        router.push(ROUTES.REGISTER)
-        return false
-      }
-
-      message.error(res.message || t('auth.loginFailed'))
+    if (!ok || !data) {
       return false
-    } catch {
-      // HTTP 错误已由全局响应拦截器统一提示，避免重复弹窗
-      return false
-    } finally {
-      loading.value = false
     }
+
+    applyLoginSession(data)
+
+    message.success(t('auth.loginSuccess'))
+
+    router.push(resolveLandingRoute(data.user?.isAdmin === '1'))
+    return true
   }
 
   const logout = async () => {

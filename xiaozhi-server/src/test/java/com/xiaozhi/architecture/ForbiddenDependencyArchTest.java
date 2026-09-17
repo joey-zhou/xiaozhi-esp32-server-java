@@ -4,12 +4,14 @@ import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.xiaozhi.config.domain.repository.ConfigRepository;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -17,7 +19,9 @@ import java.util.Set;
 
 import static com.tngtech.archunit.base.DescribedPredicate.not;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -53,21 +57,23 @@ class ForbiddenDependencyArchTest {
     );
 
     /**
-     * §7 禁止项 7 的存量：agent 领域在组装列表时直接注了 config 的 Repository。
-     * 正解是走 ConfigService/ConfigLookup，但那一处同时还在读路径写库、同步外呼三家 Provider，
-     * 一起改才有意义，见 P2-288。
-     */
-    private static final Set<String> FOREIGN_REPOSITORY_KNOWN_VIOLATIONS = Set.of(
-        "com.xiaozhi.agent.service.impl.AgentServiceImpl"
-    );
-
-    /**
      * §7 禁止项 3 的存量：领域事件基类刻意继承 Spring 的 ApplicationEvent，
      * 为的是让所有领域事件直接走 Spring 的事件分发，不再自建一套广播。
      * 这是 common/domain 里唯一一处、且只影响事件基类本身，聚合根不受牵连。
      */
     private static final Set<String> DOMAIN_SPRING_KNOWN_VIOLATIONS = Set.of(
         "com.xiaozhi.common.domain.AbstractDomainEvent"
+    );
+
+    /**
+     * §6「聚合根 → BO 归 infrastructure/convert 的 XxxConverter」的存量：
+     * {@code AiConfig.mergePatch(patch)} 不是自身字段快照，而是「patch 覆盖自身、缺的补自身」的
+     * 合并判定（只认 null 为未提供），{@code ConfigConnectionChecker.resolveConfigUnderTest} 靠它
+     * 决定本次外呼用哪份凭据。合并规则本身是领域语义，搬进 Convert 等于把它变成字段拷贝。
+     * 快照用途的那个调用方已经去掉，这里只剩这一处。
+     */
+    private static final Set<String> DOMAIN_TRANSPORT_KNOWN_VIOLATIONS = Set.of(
+        "com.xiaozhi.config.domain.AiConfig.mergePatch(com.xiaozhi.common.model.bo.ConfigBO)"
     );
 
     /** 路径匹配失效会扫到 0 个类而假绿，用它的规则须先过 {@link #serverModuleIsActuallyScanned}。 */
@@ -128,6 +134,28 @@ class ForbiddenDependencyArchTest {
         rule.check(xiaozhiClasses);
     }
 
+    // ==================== §6 转换层边界 ====================
+
+    /**
+     * 聚合根不得自己产出 BO / Resp。
+     * <p>这类「快照方法」是纯字段搬运，归 {@code infrastructure/convert/XxxConverter}（聚合根 → BO）
+     * 与 {@code convert/XxxConvert}（→ Resp）。放在聚合根上会让领域层反向依赖传输对象，
+     * 且同一份字段清单在两处各存一遍，迟早对不上。
+     * <p>反方向不禁：§2 明写 BO 的用途之一就是写侧入参，{@code newConfig(userId, bo)} /
+     * {@code update(bo)} 这类接收 BO 的构造与变更方法是规约认可的写法。
+     */
+    @Test
+    void domainDoesNotProduceTransportObjects() {
+        ArchRule rule = noMethods()
+            .that().areDeclaredInClassesThat().resideInAPackage("..domain..")
+            .and(not(hasFullNameIn(DOMAIN_TRANSPORT_KNOWN_VIOLATIONS)))
+            .should().haveRawReturnType(
+                resideInAnyPackage("..common.model.bo..", "..common.model.resp.."))
+            .because("聚合根出 BO/Resp 是 Converter 的活，领域层不得反向依赖传输对象");
+
+        rule.check(xiaozhiClasses);
+    }
+
     // ==================== §7 禁止项 6 ====================
 
     @Test
@@ -146,22 +174,30 @@ class ForbiddenDependencyArchTest {
     @Test
     void repositoriesAreOnlyUsedInsideTheirOwnBusinessPackage() {
         ArchRule rule = classes()
-            .that(not(hasNameIn(FOREIGN_REPOSITORY_KNOWN_VIOLATIONS)))
             .should(notDependOnForeignRepository())
             .because("Repository 是某个聚合的写入口，跨业务包使用等于让别的领域直接改这个聚合的库表");
 
         rule.check(xiaozhiClasses);
     }
 
-    /** 规则本身要能真的抓到人：把已登记的存量违规放回判定面，规则必须失败 */
+    /**
+     * 规则本身要能真的抓到人。生产代码已无存量违规（agent 组装列表改走 ConfigService），
+     * 改用一个故意跨包持有 Repository 的样板类来验证：规则对它必须判违规。
+     * 样板类是测试类，不在 {@link #xiaozhiClasses} 的判定面里。
+     */
     @Test
-    void foreignRepositoryRuleActuallyCatchesTheKnownViolation() {
-        ArchRule withoutAllowlist = classes()
-            .should(notDependOnForeignRepository());
+    void foreignRepositoryRuleActuallyCatchesAViolation() {
+        JavaClasses fixture = new ClassFileImporter().importClasses(ForeignRepositoryHolder.class);
 
-        assertThat(withoutAllowlist.evaluate(xiaozhiClasses).hasViolation())
-            .as("去掉豁免名单后规则仍然通过，说明它根本没在判定，等于假绿")
+        assertThat(classes().should(notDependOnForeignRepository()).evaluate(fixture).hasViolation())
+            .as("样板类跨包持有 config 的 Repository 却没被判违规，说明规则根本没在判定，等于假绿")
             .isTrue();
+    }
+
+    /** 上面那条反向断言的样板：住在 architecture 包，却持有 config 领域的 Repository */
+    @SuppressWarnings("unused")
+    private static final class ForeignRepositoryHolder {
+        private ConfigRepository configRepository;
     }
 
     // ==================== §4：common/port 不得出现 Provider SDK 类型 ====================
@@ -236,6 +272,11 @@ class ForbiddenDependencyArchTest {
         String rest = className.substring(prefix.length());
         int dot = rest.indexOf('.');
         return dot < 0 ? rest : rest.substring(0, dot);
+    }
+
+    /** 按方法全名（含参数类型）精确匹配白名单，重载之间不会互相误放行 */
+    private static DescribedPredicate<JavaMethod> hasFullNameIn(Set<String> fullNames) {
+        return DescribedPredicate.describe("全名在白名单里", method -> fullNames.contains(method.getFullName()));
     }
 
     private static DescribedPredicate<JavaClass> hasNameIn(Set<String> names) {

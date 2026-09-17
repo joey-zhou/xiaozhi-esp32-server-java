@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { effectScope } from 'vue'
+import { effectScope, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import type { ApiResponse } from '@/types/api'
 
@@ -46,7 +46,8 @@ describe('useRequest', () => {
       const result = await execute(requestFn, { onSuccess })
 
       expect(result).toEqual({ id: 1, name: 'test' })
-      expect(onSuccess).toHaveBeenCalledWith({ id: 1, name: 'test' })
+      // onSuccess 第二个参数是完整响应体，给「成功时也要展示后端原文」的调用点用
+      expect(onSuccess).toHaveBeenCalledWith({ id: 1, name: 'test' }, ok({ id: 1, name: 'test' }))
     })
 
     it('code!=200 时返回 undefined、弹 res.message、触发 onError', async () => {
@@ -238,7 +239,7 @@ describe('useRequest', () => {
 
       expect(requestFn).toHaveBeenCalledTimes(1)
       expect(requestFn).toHaveBeenCalledWith('abc')
-      expect(onSuccess).toHaveBeenCalledWith(['abc'])
+      expect(onSuccess).toHaveBeenCalledWith(['abc'], ok(['abc']))
     })
 
     it('cancel() 后不再发请求', async () => {
@@ -463,6 +464,274 @@ describe('useRequest.executeAll', () => {
 
     expect(loadingMock.store.showLoading).toHaveBeenCalledTimes(1)
     expect(loadingMock.store.hideLoading).toHaveBeenCalledTimes(1)
+    scope.stop()
+  })
+})
+
+describe('useRequest.executeFull', () => {
+  // 本文件的 mock 清理写在各 describe 内部，新 describe 必须自带一份，否则会继承上面用例的调用计数
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('成功时同时给出 ok 与解包后的 data', async () => {
+    const scope = effectScope()
+
+    await scope.run(async () => {
+      const { executeFull } = useRequest()
+      // 新增接口的典型形态：既要判成败，又要读回后端生成的 id
+      const result = await executeFull(async () => ok({ roleId: 9 }))
+
+      expect(result.ok).toBe(true)
+      expect(result.data).toEqual({ roleId: 9 })
+    })
+
+    scope.stop()
+  })
+
+  it('业务失败时 ok 为 false 且不给 data', async () => {
+    const scope = effectScope()
+
+    await scope.run(async () => {
+      const { executeFull } = useRequest()
+      const result = await executeFull(async () => fail<{ roleId: number }>('角色名已存在'))
+
+      expect(result.ok).toBe(false)
+      expect(result.data).toBeUndefined()
+      expect(message.error).toHaveBeenCalledWith('角色名已存在')
+    })
+
+    scope.stop()
+  })
+})
+
+describe('useRequest.loadingRef', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('请求期间置真外部 loading ref，结束后归 false', async () => {
+    const scope = effectScope()
+    const tableLoading = ref(false)
+
+    await scope.run(async () => {
+      const { execute } = useRequest()
+      const pending = deferred<ApiResponse<string>>()
+
+      const task = execute(() => pending.promise, { loadingRef: tableLoading })
+      expect(tableLoading.value).toBe(true)
+
+      pending.resolve(ok('data'))
+      await task
+      expect(tableLoading.value).toBe(false)
+    })
+
+    scope.stop()
+  })
+
+  it('两个实例共用同一个 ref 时，先结束的那路不提前熄灯', async () => {
+    const scope = effectScope()
+    const tableLoading = ref(false)
+
+    await scope.run(async () => {
+      // 行内操作与列表刷新分属两个 useRequest 实例，但占的是同一个表格 loading
+      const rowAction = useRequest()
+      const listReload = useRequest()
+      const first = deferred<ApiResponse<string>>()
+      const second = deferred<ApiResponse<string>>()
+
+      const firstTask = rowAction.execute(() => first.promise, { loadingRef: tableLoading })
+      const secondTask = listReload.execute(() => second.promise, { loadingRef: tableLoading })
+
+      first.resolve(ok('first'))
+      await firstTask
+      expect(tableLoading.value).toBe(true)
+
+      second.resolve(ok('second'))
+      await secondTask
+      expect(tableLoading.value).toBe(false)
+    })
+
+    scope.stop()
+  })
+
+  it('业务失败与抛异常后都要熄灯', async () => {
+    const scope = effectScope()
+    const buttonLoading = ref(false)
+
+    await scope.run(async () => {
+      const { execute } = useRequest()
+
+      await execute(async () => fail('失败'), { loadingRef: buttonLoading, showError: false })
+      expect(buttonLoading.value).toBe(false)
+
+      await execute(
+        async () => {
+          throw new Error('boom')
+        },
+        { loadingRef: buttonLoading },
+      )
+      expect(buttonLoading.value).toBe(false)
+    })
+
+    scope.stop()
+  })
+
+  it('onSuccess 返回 Promise 时等它跑完才熄灯', async () => {
+    const scope = effectScope()
+    const tableLoading = ref(false)
+    const reload = deferred<void>()
+    let loadingDuringReload: boolean | undefined
+
+    await scope.run(async () => {
+      const { execute } = useRequest()
+      const request = deferred<ApiResponse<string>>()
+      const task = execute(() => request.promise, {
+        loadingRef: tableLoading,
+        onSuccess: () => reload.promise,
+      })
+
+      // 请求已回来但 onSuccess 里的刷新还没结束
+      request.resolve(ok('data'))
+      for (let i = 0; i < 5; i++) {
+        await Promise.resolve()
+      }
+      loadingDuringReload = tableLoading.value
+
+      reload.resolve()
+      await task
+    })
+
+    // 成功后紧接着刷新列表的场景：中间不能断一下，否则表格转圈会闪
+    expect(loadingDuringReload).toBe(true)
+    expect(tableLoading.value).toBe(false)
+    scope.stop()
+  })
+})
+
+describe('useRequest.networkErrorText', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('业务码失败用 errorText 兜底，传输层失败用 networkErrorText', async () => {
+    const scope = effectScope()
+
+    await scope.run(async () => {
+      const { execute } = useRequest()
+      const options = { errorText: '删除失败', networkErrorText: '服务端维护中' }
+
+      await execute(async () => fail(''), options)
+      expect(message.error).toHaveBeenLastCalledWith('删除失败')
+
+      await execute(async () => {
+        throw new Error('boom')
+      }, options)
+      expect(message.error).toHaveBeenLastCalledWith({ content: '服务端维护中', key: 'request-error' })
+    })
+
+    scope.stop()
+  })
+
+  it('networkErrorText 传 null 时不覆盖拦截器已弹出的那条', async () => {
+    const scope = effectScope()
+
+    await scope.run(async () => {
+      const { execute } = useRequest()
+
+      await execute(
+        async () => {
+          throw new Error('boom')
+        },
+        { errorText: '登录失败', networkErrorText: null },
+      )
+    })
+
+    expect(message.error).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
+  it('showError=false 只关掉业务码那条，网络失败照样按 networkErrorText 提示', async () => {
+    const scope = effectScope()
+
+    await scope.run(async () => {
+      const { execute } = useRequest()
+      const options = { showError: false, networkErrorText: '加载失败' }
+
+      await execute(async () => fail('后端说不行'), options)
+      expect(message.error).not.toHaveBeenCalled()
+
+      await execute(async () => {
+        throw new Error('boom')
+      }, options)
+      expect(message.error).toHaveBeenCalledWith({ content: '加载失败', key: 'request-error' })
+    })
+
+    scope.stop()
+  })
+})
+
+describe('useRequest.onFailure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('接管失败（返回 true）时不再弹默认错误提示', async () => {
+    const scope = effectScope()
+    const onFailure = vi.fn(async () => true)
+
+    await scope.run(async () => {
+      const { executeOk } = useRequest()
+      // 后端用 4090 表示「需要二次确认」，这不是错误，由调用方接管成确认框
+      const succeeded = await executeOk(async () => fail('切换后历史文件不可访问', 4090), {
+        errorText: '删除失败',
+        onFailure,
+      })
+
+      expect(succeeded).toBe(false)
+    })
+
+    expect(onFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 4090, message: '切换后历史文件不可访问' }),
+    )
+    expect(message.error).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
+  it('没接管（返回 false）时照常弹后端原文', async () => {
+    const scope = effectScope()
+
+    await scope.run(async () => {
+      const { executeOk } = useRequest()
+      await executeOk(async () => fail('角色不存在'), {
+        errorText: '删除失败',
+        onFailure: () => false,
+      })
+    })
+
+    expect(message.error).toHaveBeenCalledWith('角色不存在')
+    scope.stop()
+  })
+})
+
+describe('useRequest.onSuccess 的完整响应体', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('第二个参数给出完整响应体，成功时也能拿到后端原文', async () => {
+    const scope = effectScope()
+    const onSuccess = vi.fn()
+
+    await scope.run(async () => {
+      const { execute } = useRequest()
+      await execute(async () => ({ code: 200, data: { id: 1 }, message: '连接正常' }), { onSuccess })
+    })
+
+    expect(onSuccess).toHaveBeenCalledWith(
+      { id: 1 },
+      expect.objectContaining({ code: 200, message: '连接正常' }),
+    )
     scope.stop()
   })
 })

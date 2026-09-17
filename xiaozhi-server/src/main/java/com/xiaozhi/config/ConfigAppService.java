@@ -58,8 +58,7 @@ public class ConfigAppService {
         bo.setUserId(userId);
         AiConfig config = AiConfig.newConfig(userId, bo);
         configRepository.save(config);
-        ConfigBO created = configService.getBO(config.getConfigId());
-        return configConvert.toResp(created);
+        return configConvert.toResp(config);
     }
 
     @Transactional
@@ -74,9 +73,9 @@ public class ConfigAppService {
                 .orElseThrow(() -> new ResourceNotFoundException("配置不存在或无权访问"));
         config.update(configConvert.toBO(req));
         configRepository.save(config);
-        ConfigBO updated = configService.getBO(configId);
-        return configConvert.toResp(updated);
+        return configConvert.toResp(config);
     }
+
 
     @Transactional
     public void delete(Integer configId, boolean storageSwitchConfirmed) {

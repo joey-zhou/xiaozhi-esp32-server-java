@@ -4,33 +4,60 @@
     <slot name="actions" :record="record" />
     
     <!-- 编辑按钮 -->
-    <a v-if="showEdit && hasPermission('edit')" @click="handleEdit">
+    <a-button
+      v-if="showEdit && hasPermission('edit')"
+      type="link"
+      size="small"
+      class="table-action-link"
+      @click="handleEdit"
+    >
       {{ editText || t('common.edit') }}
-    </a>
-    
+    </a-button>
+
     <!-- 查看按钮 -->
-    <a v-if="showView && hasPermission('view')" @click="handleView">
+    <a-button
+      v-if="showView && hasPermission('view')"
+      type="link"
+      size="small"
+      class="table-action-link"
+      @click="handleView"
+    >
       {{ viewText || t('common.view') }}
-    </a>
-    
+    </a-button>
+
     <!-- 下载按钮 -->
-    <a v-if="showDownload && hasPermission('download')" @click="handleDownload">
+    <a-button
+      v-if="showDownload && hasPermission('download')"
+      type="link"
+      size="small"
+      class="table-action-link"
+      @click="handleDownload"
+    >
       {{ downloadText || t('common.download') }}
-    </a>
-    
+    </a-button>
+
     <!-- 复制按钮 -->
-    <a v-if="showCopy && hasPermission('copy')" @click="handleCopy">
+    <a-button
+      v-if="showCopy && hasPermission('copy')"
+      type="link"
+      size="small"
+      class="table-action-link"
+      @click="handleCopy"
+    >
       {{ copyText || t('common.copy') }}
-    </a>
-    
+    </a-button>
+
     <!-- 设为默认按钮 -->
-    <a 
-      v-if="showSetDefault && hasPermission('setDefault') && !isDefault" 
+    <a-button
+      v-if="showSetDefault && hasPermission('setDefault') && !isDefault"
+      type="link"
+      size="small"
+      class="table-action-link"
       @click="handleSetDefault"
     >
       {{ setDefaultText || t('common.setAsDefault') }}
-    </a>
-    
+    </a-button>
+
     <!-- 分隔线（如果有删除按钮） -->
     <template v-if="showDelete && hasPermission('delete') && hasAnyVisibleButton">
       <a-divider v-if="showDivider" type="vertical" />
@@ -46,17 +73,17 @@
       :placement="deletePopconfirmPlacement"
       @confirm="handleDelete"
     >
-      <a-button type="link" size="small" danger class="delete-btn" :class="deleteClass">
+      <a-button type="link" size="small" danger class="table-action-link" :class="deleteClass">
         {{ deleteText || t('common.delete') }}
       </a-button>
     </a-popconfirm>
-    
+
     <!-- 更多操作下拉菜单 -->
     <a-dropdown v-if="moreActions && moreActions.length > 0" :trigger="['click']">
-      <a @click.prevent>
+      <a-button type="link" size="small" class="table-action-link">
         {{ moreText || t('common.more') }}
         <DownOutlined />
-      </a>
+      </a-button>
       <template #overlay>
         <a-menu @click="handleMoreAction">
           <a-menu-item
@@ -286,13 +313,7 @@ const handleMoreAction = ({ key }: { key: string }) => emit('more', key, props.r
 </script>
 
 <style scoped lang="scss">
-// 删除按钮用 a-button 承载键盘可达性，去掉 ant 的固定高度与内边距，排版与同列的文字操作保持一致
-.delete-btn.ant-btn {
-  height: auto;
-  padding: 0;
-  border: 0;
-}
-
+// 行内操作统一走 .table-action-link（main.css）压平 a-button 的高度与内边距，这里只补删除按钮的配色
 .delete-link {
   color: var(--ant-color-error);
 

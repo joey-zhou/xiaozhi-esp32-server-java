@@ -26,6 +26,7 @@ import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.user.service.WxLoginService;
+import com.xiaozhi.verifycode.service.VerifyCodeService;
 import com.xiaozhi.utils.CaptchaUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -50,6 +51,9 @@ public class UserController extends BaseController {
 
     @Resource
     private WxLoginService wxLoginService;
+
+    @Resource
+    private VerifyCodeService verifyCodeService;
 
     @Resource
     private CaptchaUtils captchaUtils;
@@ -120,7 +124,7 @@ public class UserController extends BaseController {
     @AuditLog(module = "用户管理", operation = "手机号登录")
     @Operation(summary = "手机号验证码登录", description = "使用手机号和验证码登录，未注册自动注册")
     public ApiResponse<LoginResp> telLogin(@Valid @RequestBody UserTelLoginReq req, HttpServletRequest request) {
-        if (!userService.consumeCaptcha(req.getTel(), req.getCode())) {
+        if (!verifyCodeService.consumeByAccount(req.getTel(), req.getCode())) {
             throw new IllegalArgumentException("验证码错误或已过期");
         }
 
@@ -214,7 +218,7 @@ public class UserController extends BaseController {
             throw new IllegalArgumentException("该邮箱未注册");
         }
 
-        String code = userService.generateCaptcha(req.getEmail());
+        String code = verifyCodeService.generateForAccount(req.getEmail());
         CaptchaUtils.CaptchaResult result = captchaUtils.sendEmailCaptcha(req.getEmail(), code);
         if (!result.isSuccess()) {
             throw new OperationFailedException(result.getMessage());
@@ -230,7 +234,7 @@ public class UserController extends BaseController {
             throw new IllegalArgumentException("该手机号未注册");
         }
 
-        String code = userService.generateCaptcha(req.getTel());
+        String code = verifyCodeService.generateForAccount(req.getTel());
         CaptchaUtils.CaptchaResult result = captchaUtils.sendSmsCaptcha(req.getTel(), code);
         if (!result.isSuccess()) {
             throw new OperationFailedException(result.getMessage());

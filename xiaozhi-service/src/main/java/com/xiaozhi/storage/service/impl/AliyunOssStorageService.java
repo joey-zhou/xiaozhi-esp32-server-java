@@ -161,6 +161,7 @@ public class AliyunOssStorageService implements StorageService {
         return queryIdx >= 0 ? url.substring(0, queryIdx) : url;
     }
 
+    @Override
     public void shutdown() {
         ossClient.shutdown();
     }

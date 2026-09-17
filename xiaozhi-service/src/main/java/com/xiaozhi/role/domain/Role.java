@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 
 /**
@@ -70,8 +71,9 @@ public class Role {
         this.isDefault = isDefault;
         this.inactiveTimeoutSeconds = inactiveTimeoutSeconds != null
                 ? inactiveTimeoutSeconds : DEFAULT_INACTIVE_TIMEOUT_SECONDS;
-        this.llmConfig = llmConfig != null ? llmConfig : LlmConfig.defaults();
-        this.voiceConfig = voiceConfig != null ? voiceConfig : VoiceConfig.defaults();
+        // 采样参数与音调语速没给值就补默认：入参没填与库里该列为 NULL 的历史行走的是同一份默认
+        this.llmConfig = llmConfig != null ? llmConfig.withDefaults() : LlmConfig.defaults();
+        this.voiceConfig = voiceConfig != null ? voiceConfig.withDefaults() : VoiceConfig.defaults();
         this.audioConfig = audioConfig != null ? audioConfig : AudioConfig.defaults();
         this.memoryStrategy = memoryStrategy != null ? memoryStrategy : MemoryStrategy.defaults();
         this.createTime = createTime;
@@ -101,10 +103,12 @@ public class Role {
         if (roleName != null && !roleName.isBlank()) this.roleName = roleName;
         if (roleDesc != null) this.roleDesc = roleDesc;
         if (avatar != null) this.avatar = avatar;
-        if (llmConfig != null) this.llmConfig = llmConfig;
-        if (voiceConfig != null) this.voiceConfig = voiceConfig;
-        if (audioConfig != null) this.audioConfig = audioConfig;
-        if (memoryStrategy != null) this.memoryStrategy = memoryStrategy;
+        // 值对象按字段合并而不是整个换掉：入参里没带的那些字段仍保留角色当前的值，
+        // 否则「只改个名字」这种局部更新会让聚合根上的模型、音色、VAD 阈值全部变成 null
+        if (llmConfig != null) this.llmConfig = this.llmConfig.merge(llmConfig);
+        if (voiceConfig != null) this.voiceConfig = this.voiceConfig.merge(voiceConfig);
+        if (audioConfig != null) this.audioConfig = this.audioConfig.merge(audioConfig);
+        if (memoryStrategy != null) this.memoryStrategy = this.memoryStrategy.merge(memoryStrategy);
         if (isDefault != null) this.isDefault = isDefault;
         if (inactiveTimeoutSeconds != null) this.inactiveTimeoutSeconds = inactiveTimeoutSeconds;
         signals.add(DomainSignal.UPDATED);

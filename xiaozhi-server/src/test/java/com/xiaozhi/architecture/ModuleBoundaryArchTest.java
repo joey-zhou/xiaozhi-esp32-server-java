@@ -1,5 +1,6 @@
 package com.xiaozhi.architecture;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -89,6 +90,18 @@ class ModuleBoundaryArchTest {
     }
 
     @Test
+    void downstreamModulesDoNotReachIntoDal() {
+        ArchRule rule = noClasses()
+            .that().resideInAnyPackage(DOWNSTREAM_PACKAGES)
+            .should().dependOnClassesThat()
+            .resideInAPackage("..dal..")
+            .because("Mapper 与 DO 只归 service 模块用；下游模块直接注入 Mapper 会把表结构泄进会话链路，"
+                + "读写需求一律经 common/port 倒置（向下用 XxxLookup/XxxWriter）");
+
+        rule.check(xiaozhiClasses);
+    }
+
+    @Test
     void downstreamModulesDoNotReachIntoServiceImplementations() {
         ArchRule rule = noClasses()
             .that().resideInAnyPackage(DOWNSTREAM_PACKAGES)
@@ -164,6 +177,21 @@ class ModuleBoundaryArchTest {
             .because("Mapper 与 DO 只归 service 模块用；server 层拿到它们就绕开了 Service 与 Convert，表结构直接泄到 web 层");
 
         rule.check(serverClasses);
+    }
+
+    /**
+     * BaseDO 曾经放在 xiaozhi-common 的 common.model.dataobject 包，包名不含 "dal" 这一段，
+     * 上面 {@link #serverModuleDoesNotDependOnDal} 用 "..dal.." 判定，天然扫不到它——
+     * 经它中转的 DO 依赖对这条护栏完全隐形（P2-282）。BaseDO 挪进 xiaozhi-service 的
+     * common.dal.mysql.dataobject 包后，这里直接复用同一个 resideInAPackage("..dal..") 谓词
+     * 跑一遍 BaseDO 本身：位置一旦挪回 common，这条断言先红，不用等真的有 server 类引用它才发现盲区。
+     */
+    @Test
+    void baseDoIsCoveredByDalPackageGuard() {
+        JavaClass baseDO = xiaozhiClasses.get("com.xiaozhi.common.dal.mysql.dataobject.BaseDO");
+        assertThat(resideInAPackage("..dal..").test(baseDO))
+            .as("BaseDO 不在 ..dal.. 判定面内，serverModuleDoesNotDependOnDal 会扫不到经它中转的依赖")
+            .isTrue();
     }
 
     @Test

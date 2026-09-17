@@ -3,6 +3,7 @@ package com.xiaozhi.permission.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.xiaozhi.authrolepermission.dal.mysql.dataobject.AuthRolePermissionDO;
 import com.xiaozhi.authrolepermission.dal.mysql.mapper.AuthRolePermissionMapper;
+import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.model.bo.PermissionBO;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.permission.convert.PermissionConvert;
@@ -60,7 +61,7 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
-    @Cacheable(value = CACHE_NAME, key = "'authRole:list:' + #authRoleId", condition = "#authRoleId != null")
+    @Cacheable(value = CacheNames.PERMISSION, key = "'authRole:list:' + #authRoleId", condition = "#authRoleId != null")
     public List<PermissionBO> listByAuthRoleId(Integer authRoleId) {
         if (authRoleId == null) {
             return new ArrayList<>();
@@ -81,7 +82,7 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
-    @Cacheable(value = CACHE_NAME, key = "'authRole:ids:' + #authRoleId", condition = "#authRoleId != null")
+    @Cacheable(value = CacheNames.PERMISSION, key = "'authRole:ids:' + #authRoleId", condition = "#authRoleId != null")
     public List<Integer> listIdsByAuthRoleId(Integer authRoleId) {
         if (authRoleId == null) {
             return new ArrayList<>();
@@ -96,7 +97,7 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
-    @Cacheable(value = CACHE_NAME, key = "'authRole:keys:' + #authRoleId", condition = "#authRoleId != null")
+    @Cacheable(value = CacheNames.PERMISSION, key = "'authRole:keys:' + #authRoleId", condition = "#authRoleId != null")
     public List<String> listKeysByAuthRoleId(Integer authRoleId) {
         if (authRoleId == null) {
             return new ArrayList<>();
@@ -123,9 +124,9 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     @Caching(evict = {
-        @CacheEvict(value = CACHE_NAME, key = "'authRole:list:' + #authRoleId"),
-        @CacheEvict(value = CACHE_NAME, key = "'authRole:ids:' + #authRoleId"),
-        @CacheEvict(value = CACHE_NAME, key = "'authRole:keys:' + #authRoleId")
+        @CacheEvict(value = CacheNames.PERMISSION, key = "'authRole:list:' + #authRoleId"),
+        @CacheEvict(value = CacheNames.PERMISSION, key = "'authRole:ids:' + #authRoleId"),
+        @CacheEvict(value = CacheNames.PERMISSION, key = "'authRole:keys:' + #authRoleId")
     })
     public void clearAuthRoleCache(Integer authRoleId) {
     }

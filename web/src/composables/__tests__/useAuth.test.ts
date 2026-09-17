@@ -104,16 +104,16 @@ describe('useAuth', () => {
     expect(routerMock.push).toHaveBeenLastCalledWith('/device')
   })
 
-  it('redirect 指向无权限页面时退回默认落地页', async () => {
+  it('redirect 指向无权限页面时退到 403（与路由守卫的兜底目标保持一致）', async () => {
     routerMock.currentRoute.value.query = { redirect: '/user' }
-    routerMock.resolve.mockReturnValue({ meta: { permission: 'system:user' } })
+    routerMock.resolve.mockReturnValue({ path: '/user', fullPath: '/user', meta: { permission: 'system:user' } })
     userStoreMock.hasPermission.mockReturnValue(false)
     userApiMock.login.mockResolvedValue(loginResponse('0'))
 
     const { login } = useAuth()
     await login({ username: 'user', password: 'pwd' })
 
-    expect(routerMock.push).toHaveBeenCalledWith('/device')
+    expect(routerMock.push).toHaveBeenCalledWith('/403')
   })
 
   it('redirect 有权限时按 redirect 跳转，且带 query 的深链原样保留', async () => {
