@@ -1,9 +1,9 @@
 package com.xiaozhi.communication.message;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.event.TtsPlaybackCompletedEvent;
+import com.xiaozhi.utils.JsonUtil;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -16,8 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class MessageSender {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
     private final ApplicationEventPublisher eventPublisher;
 
     public MessageSender(ApplicationEventPublisher eventPublisher) {
@@ -29,7 +27,8 @@ public class MessageSender {
             log.debug("sendTtsMessage无法发送消息 - 会话已关闭或为null");
             return;
         }
-        ObjectNode messageJson = objectMapper.createObjectNode();
+        ObjectNode messageJson = JsonUtil.OBJECT_MAPPER.createObjectNode();
+        messageJson.put("session_id", session.getSessionId());
         messageJson.put("type", "tts");
         messageJson.put("state", state);
         if (text != null) {
@@ -51,7 +50,8 @@ public class MessageSender {
             log.warn("sendSttMessage无法发送消息 - 会话已关闭或为null");
             return;
         }
-        ObjectNode messageJson = objectMapper.createObjectNode();
+        ObjectNode messageJson = JsonUtil.OBJECT_MAPPER.createObjectNode();
+        messageJson.put("session_id", session.getSessionId());
         messageJson.put("type", "stt");
         messageJson.put("text", text);
 
@@ -66,10 +66,10 @@ public class MessageSender {
             log.warn("sendIotCommandMessage无法发送消息 - 会话已关闭或为null");
             return;
         }
-        ObjectNode messageJson = objectMapper.createObjectNode();
+        ObjectNode messageJson = JsonUtil.OBJECT_MAPPER.createObjectNode();
         messageJson.put("session_id", session.getSessionId());
         messageJson.put("type", "iot");
-        messageJson.set("commands", objectMapper.valueToTree(commands));
+        messageJson.set("commands", JsonUtil.OBJECT_MAPPER.valueToTree(commands));
 
         String jsonMessage = messageJson.toString();
         log.debug("sendIotCommandMessage发送iot消息 - SessionId: {}, Message: {}", session.getSessionId(), messageJson);
@@ -81,7 +81,7 @@ public class MessageSender {
             log.warn("sendEmotion无法发送消息 - 会话已关闭或为null");
             return;
         }
-        ObjectNode messageJson = objectMapper.createObjectNode();
+        ObjectNode messageJson = JsonUtil.OBJECT_MAPPER.createObjectNode();
         messageJson.put("session_id", session.getSessionId());
         messageJson.put("type", "llm");
         messageJson.put("emotion", emotion);

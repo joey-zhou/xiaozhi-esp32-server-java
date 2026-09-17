@@ -1,10 +1,10 @@
 package com.xiaozhi.ai.stt.providers;
 
 import com.xiaozhi.common.annotation.MonitoredOperation;
+import com.xiaozhi.common.monitoring.CountingRejectionHandler;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.utils.AudioUtils;
-import jakarta.annotation.PostConstruct;
 import org.json.JSONObject;
 import org.vosk.LibVosk;
 import org.vosk.LogLevel;
@@ -45,6 +45,9 @@ public class VoskSttService implements SttService {
     // 必须是平台线程，虚拟线程与 Recognizer 的 JNI native 内存绑定冲突。
     // 任务体是阻塞轮询而非 CPU 计算，故上限取核数*4；SynchronousQueue 不排队，扩不出线程即拒绝。
     private static final int CORE_RECOGNIZER_THREADS = Runtime.getRuntime().availableProcessors();
+    // 拒绝即识别失败，需要知道触发过多少次；计数后仍按 AbortPolicy 原样抛异常，行为不变
+    private static final CountingRejectionHandler REJECTION_HANDLER =
+            new CountingRejectionHandler(new ThreadPoolExecutor.AbortPolicy());
     private static final ExecutorService recognizerExecutor = new ThreadPoolExecutor(
             CORE_RECOGNIZER_THREADS, CORE_RECOGNIZER_THREADS * 4,
             60L, TimeUnit.SECONDS,
@@ -54,7 +57,8 @@ public class VoskSttService implements SttService {
                 t.setDaemon(true);
                 return t;
             },
-            new ThreadPoolExecutor.AbortPolicy());
+            REJECTION_HANDLER);
+    // recognizerExecutor 是静态的，可能被多个 VoskSttService 实例共用；指标只需注册一次
 
     static {
         // 注册JVM关闭钩子，确保线程池被正确关闭
@@ -86,8 +90,8 @@ public class VoskSttService implements SttService {
      * 初始化Vosk模型
      *
      * @throws Exception 如果模型加载失败
+     *
      */
-    @PostConstruct
     public void initialize() throws Exception {
         try {
             // 检查是否是 macOS 操作系统

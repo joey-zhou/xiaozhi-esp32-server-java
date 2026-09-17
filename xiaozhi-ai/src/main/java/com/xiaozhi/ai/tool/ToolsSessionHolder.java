@@ -30,30 +30,15 @@ public class ToolsSessionHolder {
     }
 
     /**
-     * Register a global function by name
-     *
-     * @param name the name of the function to register
-     * @return the registered function or null if not found
-     */
-    public ToolCallback registerFunction(String name) {
-        // Look up the function in the globalFunctionRegistry
-        ToolCallback func = globalFunctionRegistry.resolve(name);
-        if (func == null) {
-            log.error("[{}] - SessionId:{} Function:{} not found in globalFunctionRegistry", TAG, sessionId, name);
-            return null;
-        }
-        functionRegistry.put(name, func);
-        log.debug("[{}] - SessionId:{} Function:{} registered from global successfully", TAG, sessionId, name);
-        return func;
-    }
-
-    /**
      * Register a function by name
      *
      * @param name the name of the function to register
      */
     public void registerFunction(String name, ToolCallback functionCallTool) {
-        functionRegistry.put(name, functionCallTool);
+        ToolCallback previous = functionRegistry.put(name, functionCallTool);
+        if (previous != null && previous != functionCallTool) {
+            log.warn("[{}] - SessionId:{} Function:{} 重名注册，旧实例被静默覆盖", TAG, sessionId, name);
+        }
     }
 
     /**

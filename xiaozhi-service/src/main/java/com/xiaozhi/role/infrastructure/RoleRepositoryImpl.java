@@ -1,5 +1,6 @@
 package com.xiaozhi.role.infrastructure;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.config.CacheNames;
@@ -9,6 +10,7 @@ import com.xiaozhi.role.dal.mysql.mapper.RoleMapper;
 import com.xiaozhi.role.domain.Role;
 import com.xiaozhi.role.domain.repository.RoleRepository;
 import com.xiaozhi.role.infrastructure.convert.RoleConverter;
+import com.xiaozhi.role.support.RoleCacheKeys;
 import jakarta.annotation.Resource;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
@@ -92,23 +94,34 @@ public class RoleRepositoryImpl implements RoleRepository {
 
     /** 重置同用户所有角色的默认标记（insert 前调用） */
     private void resetDefault(Integer userId) {
-        roleMapper.update(null, new LambdaUpdateWrapper<RoleDO>()
-                .eq(RoleDO::getUserId, userId)
-                .set(RoleDO::getIsDefault, "0"));
+        resetDefault(userId, null);
     }
 
-    /** 重置同用户其他角色的默认标记（update 前调用，排除自身） */
+    /** 重置同用户其他默认角色的默认标记（update 前调用，排除自身），并让被降级角色的缓存失效 */
     private void resetDefault(Integer userId, Integer excludeRoleId) {
-        roleMapper.update(null, new LambdaUpdateWrapper<RoleDO>()
+        LambdaQueryWrapper<RoleDO> idQuery = new LambdaQueryWrapper<RoleDO>()
+                .select(RoleDO::getRoleId)
                 .eq(RoleDO::getUserId, userId)
-                .ne(RoleDO::getRoleId, excludeRoleId)
+                .eq(RoleDO::getIsDefault, "1");
+        if (excludeRoleId != null) {
+            idQuery.ne(RoleDO::getRoleId, excludeRoleId);
+        }
+        List<Integer> demotedRoleIds = roleMapper.selectList(idQuery).stream()
+                .map(RoleDO::getRoleId)
+                .toList();
+        if (demotedRoleIds.isEmpty()) {
+            return;
+        }
+        roleMapper.update(null, new LambdaUpdateWrapper<RoleDO>()
+                .in(RoleDO::getRoleId, demotedRoleIds)
                 .set(RoleDO::getIsDefault, "0"));
+        demotedRoleIds.forEach(this::evictCache);
     }
 
     /** 走 evictNow：本方法在事务里跑，单调 evict 会被推迟到提交后，调用方写完回读会命中旧值 */
     private void evictCache(Integer roleId) {
         if (roleId == null) return;
-        CacheHelper.evictNow(cacheManager.getCache(CacheNames.ROLE), String.valueOf(roleId));
+        CacheHelper.evictNow(cacheManager.getCache(CacheNames.ROLE), RoleCacheKeys.of(roleId));
     }
 
     private Role toRole(RoleDO d) {

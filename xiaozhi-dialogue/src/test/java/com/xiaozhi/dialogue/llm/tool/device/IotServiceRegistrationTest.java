@@ -48,7 +48,7 @@ class IotServiceRegistrationTest {
         ToolsSessionHolder holder = new ToolsSessionHolder("s1", null, null);
         invokeRegister("registerMethodFunctionTools", holder, descriptor);
 
-        String schema = holder.getFunction("iot_Speaker_Mute").getToolDefinition().inputSchema();
+        String schema = holder.getFunction("iot_speaker_mute").getToolDefinition().inputSchema();
         assertThat(schema).doesNotContain("${");
         assertThat(schema).contains("response_success");
     }
@@ -79,7 +79,7 @@ class IotServiceRegistrationTest {
         ToolsSessionHolder holder = new ToolsSessionHolder("s1", null, null);
         invokeRegister("registerMethodFunctionTools", holder, descriptor);
 
-        String schema = holder.getFunction("iot_Light_SetColor").getToolDefinition().inputSchema();
+        String schema = holder.getFunction("iot_light_setcolor").getToolDefinition().inputSchema();
         assertThat(schema).contains("\"red\"").contains("\"green\"").contains("response_success");
     }
 

@@ -28,7 +28,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
   const { t } = useI18n()
 
   // legacy: true 表示 Clipboard API 不可用（非安全上下文等）时降级用 execCommand
-  const { copy: copyToClipboard, isSupported } = useVueUseClipboard({ legacy: true })
+  const { copy: copyToClipboard } = useVueUseClipboard({ legacy: true })
 
   /**
    * 复制文本到剪贴板
@@ -60,7 +60,6 @@ export function useClipboard(options: UseClipboardOptions = {}) {
   }
 
   return {
-    isSupported,
     copy,
   }
 }

@@ -40,9 +40,9 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
     @Override
     @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "'excluded_tools:' + #roleId")
     public Set<String> getExcludedTools(Integer roleId) {
-        Set<String> excludedTools = new LinkedHashSet<>(getGlobalDisabledTools());
+        Set<String> excludedTools = new LinkedHashSet<>(loadGlobalDisabledTools());
         if (roleId != null) {
-            excludedTools.addAll(getRoleDisabledTools(roleId));
+            excludedTools.addAll(loadRoleDisabledTools(roleId));
         }
         return excludedTools;
     }
@@ -64,6 +64,16 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
     @Override
     @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "'role_disabled:' + #roleId")
     public List<String> getRoleDisabledTools(Integer roleId) {
+        return loadRoleDisabledTools(roleId);
+    }
+
+    @Override
+    @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "'global_disabled'")
+    public List<String> getGlobalDisabledTools() {
+        return loadGlobalDisabledTools();
+    }
+
+    private List<String> loadRoleDisabledTools(Integer roleId) {
         if (roleId == null) {
             return new ArrayList<>();
         }
@@ -78,9 +88,7 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
         return disabledTools;
     }
 
-    @Override
-    @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "'global_disabled'")
-    public List<String> getGlobalDisabledTools() {
+    private List<String> loadGlobalDisabledTools() {
         List<String> disabledTools = new ArrayList<>();
         List<McpToolExcludeDO> configs = mcpToolExcludeMapper.selectList(new LambdaQueryWrapper<McpToolExcludeDO>()
             .eq(McpToolExcludeDO::getExcludeType, EXCLUDE_TYPE_GLOBAL)

@@ -23,7 +23,7 @@
             AND m.source = #{source}
         </if>
         GROUP BY m.sessionId, m.roleId, r.roleName
-        ORDER BY updateTime DESC
+        ORDER BY MAX(m.createTime) DESC
     </select>
 
     <!-- 只统计会话组数，不关联 sys_role、不跑 title 相关子查询，供分页跳过自动 COUNT 时使用 -->

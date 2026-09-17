@@ -100,6 +100,7 @@ const defaultConfig: AudioConfig = {
 let audioContext: AudioContext | null = null
 let opusDecoder: OpusDecoder | null = null
 let audioBufferQueue: Uint8Array[] = []
+const MAX_BUFFER_QUEUE_LEN = 50 // 约束缓冲帧数上限，防止长时间未起播时内存无界增长
 let isAudioBuffering = false
 let isAudioPlaying = false
 let streamingContext: StreamingContext | null = null
@@ -553,6 +554,10 @@ export function markStreamEnd(): boolean {
 
 function addAudioToBuffer(opusData: Uint8Array): boolean {
   audioBufferQueue.push(opusData)
+  if (audioBufferQueue.length > MAX_BUFFER_QUEUE_LEN) {
+    audioBufferQueue.shift()
+    log('音频缓冲队列超限，丢弃最旧帧', 'warning')
+  }
 
   // 如果没有在播放，启动缓冲流程
   if (!isAudioPlaying && !isAudioBuffering) {
@@ -801,6 +806,11 @@ export function stopAudioPlayback(): boolean {
 
     if (streamingContext && streamingContext.source) {
       try {
+        // stop() 也会触发 onended，必须先摘掉回调、清空队列，否则旧 context 会在 10ms 后自己重启播放，
+        // 或者把新一轮 TTS 刚塞进 audioBufferQueue 的帧抢去用旧 context 解码
+        streamingContext.source.onended = null
+        streamingContext.queue = []
+        streamingContext.queuedSamples = 0
         streamingContext.source.stop()
         streamingContext.source.disconnect()
         streamingContext.analyser?.disconnect()

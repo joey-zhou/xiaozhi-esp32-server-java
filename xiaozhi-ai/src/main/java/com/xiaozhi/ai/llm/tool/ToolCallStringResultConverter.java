@@ -15,6 +15,9 @@ public class ToolCallStringResultConverter implements ToolCallResultConverter {
 
     @Override
     public String convert(Object result, Type returnType) {
+        if (result instanceof String s) {
+            return s;
+        }
         return JsonUtil.toJson(result);
     }
 }

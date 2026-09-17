@@ -355,7 +355,7 @@ public class AliyunSttService implements SttService {
 
                 @Override
                 public void onEvent(JsonObject message) {
-                    String type = message.get("type").getAsString();
+                    String type = optString(message, "type");
                     switch(type) {
                         case "session.created":
                             break;
@@ -365,7 +365,7 @@ public class AliyunSttService implements SttService {
                             notifyPartial(onPartialText, joinTranscriptPreview(message));
                             break;
                         case "conversation.item.input_audio_transcription.completed":
-                            String transcript = message.get("transcript").getAsString();
+                            String transcript = optString(message, "transcript");
                             log.info("语音识别结果({}): {}", model, transcript);
                             synchronized (result) {
                                 result.append(transcript);

@@ -156,7 +156,7 @@ class MultiTurnDialogueProtocolTest {
         harness.stt().withFinalText("再见");
         device.transport().clearOutbound();
 
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         speakOneSegment();
 
         assertThat(device.transport().awaitJson("tts:sentence_start").path("text").asText())
@@ -166,8 +166,8 @@ class MultiTurnDialogueProtocolTest {
         assertThat(session.getPlayer().getFunctionAfterChat()).isNotNull();
 
         // 告别语播放期间的 listen 被 functionAfterChat 守卫挡掉：模式与 VAD 断句方式都不该被改
-        device.listenStart(ListenMode.Manual);
-        assertThat(session.getMode()).isEqualTo(ListenMode.Auto);
+        device.listenStart(ListenMode.MANUAL);
+        assertThat(session.getMode()).isEqualTo(ListenMode.AUTO);
         assertThat(harness.vad().autoSegmentOf(session.getSessionId())).isTrue();
         assertThat(device.transport().isOpen()).isTrue();
 
@@ -192,7 +192,7 @@ class MultiTurnDialogueProtocolTest {
         // 只有环境音，STT 终稿为空：本次聆听不成一轮
         harness.stt().withFinalText("");
         device.transport().clearOutbound();
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         speakOneSegment();
         AwaitHelper.until("空识别这轮已结束", () -> harness.stt().completedStreams() == 1);
 
@@ -245,7 +245,7 @@ class MultiTurnDialogueProtocolTest {
         scriptedReplies.add("我来讲个故事。");
         harness.stt().withFinalText("讲个故事");
         device.transport().clearOutbound();
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         speakOneSegment();
         device.transport().awaitJson("tts:sentence_start");
 
@@ -296,7 +296,7 @@ class MultiTurnDialogueProtocolTest {
         scriptedReplies.add(reply);
         harness.stt().withFinalText(userText);
         device.transport().clearOutbound();
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         speakOneSegment();
         device.transport().awaitJson("tts:stop");
         AwaitHelper.until("本轮播放已收尾", () -> !session.getPlayer().hasContent()

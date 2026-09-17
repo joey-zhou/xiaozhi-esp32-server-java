@@ -275,14 +275,14 @@ public class IotService {
         for (var entry : methods.entrySet()) {
             var methodName = entry.getKey();
             var method = entry.getValue();
-            // 创建函数名称，格式：iot_{IoTName}_{MethodName}
-            var funcName = "iot_" + iotName + "_" + methodName;
+            // 创建函数名称，格式：iot_{iotname}_{methodname}
+            var funcName = "iot_" + iotName.toLowerCase() + "_" + methodName.toLowerCase();
 
             String inputSchema = buildMethodInputSchema(method.getParameters());
 
             var toolCallback = FunctionToolCallback
                     .builder(funcName, (Map<String, Object> params, ToolContext toolContext) -> {
-                        String actFuncName = funcName.replace("iot_" + iotName + "_", ""); // 原始方法调用，去掉iot_iotName_前缀
+                        String actFuncName = methodName; // 原始方法名，设备端指令仍用原始大小写
                         String response_success = (String) params.get("response_success");
                         params.remove("response_success"); // 移除response_success参数，避免传递给设备
                         boolean result = sendIotMessage(sessionId, iotName, actFuncName, params);

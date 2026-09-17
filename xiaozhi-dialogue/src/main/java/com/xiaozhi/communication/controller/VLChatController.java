@@ -63,13 +63,13 @@ public class VLChatController {
             return failure("认证信息无效或已过期");
         }
         String sessionId = visionToken.sessionId();
+        String tokenDeviceId = visionToken.deviceId();
+        // 集群部署下识图请求可能落到未持有该会话的实例；token 已用 HMAC 签名+过期时间校验过，
+        // 本实例查不到 session 不代表设备已离线，只在查得到时校验设备与会话是否匹配
         var session = sessionManager.getSession(sessionId);
-        if (session == null) {
-            return failure("session不存在");
-        }
-        if (StringUtils.hasText(visionToken.deviceId()) && session.getDevice() != null
+        if (session != null && StringUtils.hasText(tokenDeviceId) && session.getDevice() != null
                 && session.getDevice().getDeviceId() != null
-                && !visionToken.deviceId().equalsIgnoreCase(session.getDevice().getDeviceId())) {
+                && !tokenDeviceId.equalsIgnoreCase(session.getDevice().getDeviceId())) {
             return failure("设备与会话不匹配");
         }
 

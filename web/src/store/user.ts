@@ -6,7 +6,6 @@ import type { User } from '@/types/user'
 import {
   STORAGE_AUTH_ROLE,
   STORAGE_PERMISSIONS,
-  STORAGE_REFRESH_TOKEN,
   STORAGE_USER_INFO,
   STORAGE_USER_TOKEN,
   STORAGE_WS_CONFIG,
@@ -52,7 +51,6 @@ export const useUserStore = defineStore('user', () => {
 
   // Token 管理
   const token = useStorage<string>(STORAGE_USER_TOKEN, '', localStorage)
-  const refreshToken = useStorage<string>(STORAGE_REFRESH_TOKEN, '', localStorage)
 
   // WebSocket 配置管理
   const defaultWsConfig: WebSocketConfig = {
@@ -96,13 +94,8 @@ export const useUserStore = defineStore('user', () => {
     token.value = newToken
   }
 
-  const setRefreshToken = (newRefreshToken: string) => {
-    refreshToken.value = newRefreshToken
-  }
-
   const clearToken = () => {
     token.value = ''
-    refreshToken.value = ''
   }
 
   // 计算属性 - 是否为管理员
@@ -156,7 +149,6 @@ export const useUserStore = defineStore('user', () => {
     permissions,
     authRole,
     token,
-    refreshToken,
     wsConfig,
     isAdmin,
     setUserInfo,
@@ -165,7 +157,6 @@ export const useUserStore = defineStore('user', () => {
     clearUserInfo,
     updateUserInfo,
     setToken,
-    setRefreshToken,
     clearToken,
     hasPermission,
     hasAnyPermission,

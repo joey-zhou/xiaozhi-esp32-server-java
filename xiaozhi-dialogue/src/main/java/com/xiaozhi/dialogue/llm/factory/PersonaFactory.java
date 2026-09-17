@@ -69,7 +69,8 @@ public class PersonaFactory {
 
     /**
      * 构建完整的 Persona 实例。
-     * ToolCallbacks 当前通过 session.getToolCallbacks() 动态获取，支持MCP/IoT工具运行时注册。
+     * ToolCallbacks 由 Persona.chatStream() 每轮通过 session.getToolsSessionHolder().getAllFunction() 动态获取，
+     * 支持MCP/IoT工具运行时注册；本工厂不再持有快照。
      * Player 不完全属于 Persona，在角色不存在时 Player 就应先于 Persona 构建，以应对错误信息播报。
      *
      * @param session 当前会话
@@ -113,9 +114,6 @@ public class PersonaFactory {
         // 获取ChatModel
         ChatModel chatModel = chatModelFactory.getChatModel(role);
 
-        // MCP/IoT 工具已注册完毕，获取完整的工具列表传给 Persona
-        var toolCallbacks = session.getToolCallbacks();
-
         Persona persona = Persona.builder()
                 .sessionManager(sessionManager)
                 .sessionId(session.getSessionId())
@@ -124,7 +122,6 @@ public class PersonaFactory {
                 .chatModel(chatModel)
                 .synthesizer(synthesizer)
                 .player(session.getPlayer())
-                .toolCallbacks(toolCallbacks)
                 .listener(dialogueListener)
                 .build();
         session.setPersona(persona);

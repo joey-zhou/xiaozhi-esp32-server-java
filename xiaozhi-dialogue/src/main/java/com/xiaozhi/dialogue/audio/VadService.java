@@ -19,8 +19,6 @@ import com.xiaozhi.event.TtsPlaybackCompletedEvent;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -34,10 +32,10 @@ public class VadService {
     // VadState 自身即为该会话的锁对象，避免锁对象与状态分别存放在两张 map 里导致的错锁竞态
     private final ConcurrentHashMap<String, VadState> states = new ConcurrentHashMap<>();
 
-    @Value("${vad.prebuffer.ms:500}")
+    @Value("${xiaozhi.vad.prebuffer.ms:500}")
     private int preBufferMs;
 
-    @Value("${vad.tail.keep.ms:300}")
+    @Value("${xiaozhi.vad.tail.keep.ms:300}")
     private int tailKeepMs;
 
     private static final int SILENCE_FRAME_THRESHOLD = 2;
@@ -96,7 +94,6 @@ public class VadService {
         // 静音期间累计帧数，用于SPEECH_END时按比例移除静音帧
         private int silenceFrameCount = 0;
 
-        private final List<Float> originalProbs = new ArrayList<>();
         private float[][][] sileroState = new float[2][1][128];
         // 跨帧样本拼接缓冲
         private float[] sampleCarryOver = new float[0];
@@ -158,11 +155,6 @@ public class VadService {
         public int getSilenceFrameCount() { return silenceFrameCount; }
         public void resetSilenceFrameCount() { silenceFrameCount = 0; }
 
-        public void addOriginalProb(float prob) {
-            originalProbs.add(prob);
-            if (originalProbs.size() > 10) originalProbs.remove(0);
-        }
-
         public void addToPreBuffer(byte[] data) {
             if (speaking) return;
             preBuffer.add(data.clone());
@@ -214,7 +206,6 @@ public class VadService {
             consecutiveSilenceFrames = 0;
             consecutiveSpeechFrames = 0;
             silenceFrameCount = 0;
-            originalProbs.clear();
             sileroState = new float[2][1][128];
             sampleCarryOver = new float[0];
             vadContext = new float[VAD_CONTEXT_SIZE];
@@ -332,12 +323,11 @@ public class VadService {
                     return new VadResult(VadStatus.SPEECH_CONTINUE, pcmData);
                 }
 
-                float[] samples = bytesToFloats(pcmData);
+                float[] samples = AudioUtils.pcm16ToFloats(pcmData);
                 float energy = calcEnergy(samples);
 
                 float speechProb = Math.min(1.0f, detectSpeech(state, samples));
 
-                state.addOriginalProb(speechProb);
                 state.addToPreBuffer(pcmData);
 
                 boolean hasEnergy = energy > state.thresholds.energy();
@@ -353,7 +343,6 @@ public class VadService {
                     state.sileroState = new float[2][1][128];
                     state.sampleCarryOver = new float[0];
                     state.vadContext = new float[VAD_CONTEXT_SIZE];
-                    state.originalProbs.clear();
                     state.consecutiveSilenceFrames = 0;
                 }
 
@@ -463,16 +452,6 @@ public class VadService {
         }
     }
 
-    private float[] bytesToFloats(byte[] pcmData) {
-        int sampleCount = pcmData.length / 2;
-        float[] samples = new float[sampleCount];
-        ByteBuffer buffer = ByteBuffer.wrap(pcmData).order(ByteOrder.LITTLE_ENDIAN);
-        for (int i = 0; i < sampleCount; i++) {
-            samples[i] = buffer.getShort() / 32768.0f;
-        }
-        return samples;
-    }
-
     private float calcEnergy(float[] samples) {
         float sum = 0;
         for (float sample : samples) sum += Math.abs(sample);
@@ -497,7 +476,6 @@ public class VadService {
                 state.sileroState = new float[2][1][128];
                 state.sampleCarryOver = new float[0];
                 state.vadContext = new float[VAD_CONTEXT_SIZE];
-                state.originalProbs.clear();
             }
         }
     }

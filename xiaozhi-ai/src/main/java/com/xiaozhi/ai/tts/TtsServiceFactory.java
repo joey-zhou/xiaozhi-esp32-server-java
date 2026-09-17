@@ -1,7 +1,7 @@
 package com.xiaozhi.ai.tts;
 
 import com.xiaozhi.common.config.RuntimePathConfig;
-import com.xiaozhi.common.port.TokenResolver;
+import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.ai.tts.providers.*;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -14,8 +14,9 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import java.io.File;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,11 +24,24 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class TtsServiceFactory {
 
-    // 缓存已初始化的服务：键为"provider:configId:voiceName"格式，确保音色变化时创建新实例
-    private final Map<String, TtsService> serviceCache = new ConcurrentHashMap<>();
+    // instruction 是自由文本，键的组合数没有上限，必须给个硬上限兜底
+    private static final int MAX_SERVICE_CACHE_SIZE = 500;
+
+    /**
+     * 缓存已初始化的服务：键为"provider:configId:voiceName:pitch:speed:instruction"格式。
+     * LinkedHashMap 按访问顺序做 LRU，超过上限自动淘汰最久未用的实例；removeCache 按
+     * provider+configId 前缀做的精确失效逻辑不变，两种失效方式互不影响、互为补充。
+     */
+    private final Map<String, TtsService> serviceCache = Collections.synchronizedMap(
+            new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, TtsService> eldest) {
+                    return size() > MAX_SERVICE_CACHE_SIZE;
+                }
+            });
 
     @Resource
-    private TokenResolver tokenResolver;
+    private ProviderTokenClient tokenClient;
 
     @Resource
     private RuntimePathConfig runtimePathConfig;
@@ -86,7 +100,7 @@ public class TtsServiceFactory {
         TtsService ttsService = switch (config.getProvider()) {
             case "aliyun" -> new AliyunTtsService(config, voiceName, pitch, speed, outputPath);
             case "aliyun-nls" -> {
-                yield new AliyunNlsTtsService(config, voiceName, pitch, speed, outputPath, tokenResolver);
+                yield new AliyunNlsTtsService(config, voiceName, pitch, speed, outputPath, tokenClient);
             }
             case "volcengine" -> new VolcengineTtsService(config, voiceName, pitch, speed, outputPath);
             case "xfyun" -> new XfyunTtsService(config, voiceName, pitch, speed, outputPath);

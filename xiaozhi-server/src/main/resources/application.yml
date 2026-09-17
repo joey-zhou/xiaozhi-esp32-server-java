@@ -17,7 +17,7 @@ spring:
 
   datasource:
     hikari:
-      pool-name: DatebookHikariCP
+      pool-name: ServerHikariCP
 
   # Flyway 数据库版本管理
   flyway:
@@ -32,29 +32,15 @@ spring:
   jmx:
     enabled: false
 
-  # Session 配置
-  session:
-    cookie:
-      http-only: true
-      secure: false
-      same-site: lax
-      path: /
-
   # 静态资源配置
   web:
     resources:
       add-mappings: true
 
-  # 激活的配置文件（默认为开发环境）
+  # 默认 dev（mvn spring-boot:run、java -jar、bin/*.sh、docker compose 都一样）；
+  # 走生产要显式指定：SPRING_PROFILES_ACTIVE=prod、--spring.profiles.active=prod 或 bin/all.sh start prod
   profiles:
     active: dev
-
-# ============================================================
-# 日志配置
-# ============================================================
-logging:
-  level:
-    io.github.imfangs.dify.client.impl.StreamEventDispatcher: ERROR
 
 # ============================================================
 # 邮件（注册与找回密码的验证码）
@@ -95,5 +81,5 @@ springdoc:
 # 其余共用字段见 application-common.yml
 # ============================================================
 sa-token:
-  jwt-secret-key: xiaozhi-esp32-server-java-jwt-secret-key
+  jwt-secret-key: ${JWT_SECRET_KEY:xiaozhi-esp32-server-java-jwt-secret-key}
 

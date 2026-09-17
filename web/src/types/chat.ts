@@ -3,10 +3,10 @@
  */
 
 /**
- * LLM 流式输出的 Token 单元，区分思考过程和正式回复
+ * LLM 流式输出的 Token 单元，区分思考过程和正式回复；error 表示模型调用失败，text 是失败原因
  */
 export interface ChatToken {
-  type: 'thinking' | 'content'
+  type: 'thinking' | 'content' | 'error'
   text: string
 }
 

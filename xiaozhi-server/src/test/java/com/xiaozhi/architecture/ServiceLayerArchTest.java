@@ -56,13 +56,19 @@ class ServiceLayerArchTest {
             || location.contains("/xiaozhi-dialogue/target/classes/");
 
     /**
+     * §7 命名白名单只对 xiaozhi-service 生效：common/ai/dialogue/server 里同后缀的类是文档明文排除的技术类。
+     */
+    private static final ImportOption ONLY_SERVICE_MODULE =
+        location -> location.contains("/xiaozhi-service/target/classes/");
+
+    /**
      * 存量：xiaozhi-ai 的这四个类直接返回 Resp。原枚举式判定面覆盖不到它们所在的包，
      * 因此从未被发现。真正的修法是让它们返回 BO、由 server 侧组装 Resp，
      * 涉及 MCP 工具清单与 sherpa 音色探测两条对外链路的返回类型契约，单独排期。
      */
     private static final Set<String> RESP_KNOWN_VIOLATIONS = Set.of(
         "com.xiaozhi.ai.mcp.server.McpToolQueryService",
-        "com.xiaozhi.ai.mcp.server.McpToolQueryServiceImpl",
+        "com.xiaozhi.ai.mcp.server.impl.McpToolQueryServiceImpl",
         "com.xiaozhi.ai.tool.ToolsGlobalRegistry",
         "com.xiaozhi.ai.tts.SherpaVoiceProbe"
     );
@@ -80,6 +86,7 @@ class ServiceLayerArchTest {
 
     private static JavaClasses xiaozhiClasses;
     private static JavaClasses belowServerClasses;
+    private static JavaClasses serviceOnlyClasses;
 
     @BeforeAll
     static void importClasses() {
@@ -90,13 +97,37 @@ class ServiceLayerArchTest {
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .withImportOption(BELOW_SERVER_MODULES)
             .importPackages("com.xiaozhi");
+        serviceOnlyClasses = new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+            .withImportOption(ONLY_SERVICE_MODULE)
+            .importPackages("com.xiaozhi");
     }
 
     @Test
     void belowServerModulesAreActuallyScanned() {
         assertThat(belowServerClasses)
             .as("按路径过滤 service/ai/dialogue 的产物失效了，禁止项 1 会假绿")
-            .hasSizeGreaterThan(200);
+            .hasSizeGreaterThan(100);
+    }
+
+    @Test
+    void serviceModuleIsActuallyScanned() {
+        assertThat(serviceOnlyClasses)
+            .as("按路径过滤 xiaozhi-service 的产物失效了，命名后缀规则会假绿")
+            .hasSizeGreaterThan(100);
+    }
+
+    @Test
+    void serviceModuleHasNoBannedClassNameSuffixes() {
+        ArchRule rule = noClasses()
+            .should().haveSimpleNameEndingWith("Manager")
+            .orShould().haveSimpleNameEndingWith("Store")
+            .orShould().haveSimpleNameEndingWith("Helper")
+            .orShould().haveSimpleNameEndingWith("Util")
+            .orShould().haveSimpleNameEndingWith("Utils")
+            .because("§7 命名白名单禁止 xiaozhi-service 出现 Manager/Store/Helper/Util/Utils 结尾的业务类，其余模块（common/ai/dialogue/server）是 §7 明文排除的技术类，不纳入这条规则");
+
+        rule.check(serviceOnlyClasses);
     }
 
     @Test

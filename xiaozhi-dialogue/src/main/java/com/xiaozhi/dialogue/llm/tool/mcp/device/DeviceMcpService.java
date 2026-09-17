@@ -89,26 +89,23 @@ public class DeviceMcpService {
      * 初始化设备端MCP工具列表，并将能力列表持久化到数据库
      */
     public void initialize(ChatSession chatSession) {
-        DeviceMcpMessage initResult = sendInitialize(chatSession);
-        if (initResult != null) {
-            chatSession.getDeviceMcpHolder().setMcpInitialized(true);
-        }
-        if (chatSession.getDeviceMcpHolder().isMcpInitialized()) {
-            List<String> toolNames = sendToolsList(chatSession, null);
-            persistMcpList(chatSession, toolNames);
-        }
+        doInitialize(chatSession, null);
     }
 
     /**
      * 初始化设备端MCP工具列表（包含用户工具），并将能力列表持久化到数据库
      */
     public void initializeWithUserTools(ChatSession chatSession) {
+        doInitialize(chatSession, true);
+    }
+
+    private void doInitialize(ChatSession chatSession, Boolean withUserTools) {
         DeviceMcpMessage initResult = sendInitialize(chatSession);
         if (initResult != null) {
             chatSession.getDeviceMcpHolder().setMcpInitialized(true);
         }
         if (chatSession.getDeviceMcpHolder().isMcpInitialized()) {
-            List<String> toolNames = sendToolsList(chatSession, true);
+            List<String> toolNames = sendToolsList(chatSession, withUserTools);
             persistMcpList(chatSession, toolNames);
         }
     }

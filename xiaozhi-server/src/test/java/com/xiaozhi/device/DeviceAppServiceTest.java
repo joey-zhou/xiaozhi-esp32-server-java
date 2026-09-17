@@ -4,10 +4,12 @@ import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
+import com.xiaozhi.common.model.req.DeviceBatchUpdateReq;
 import com.xiaozhi.common.model.req.DeviceCreateReq;
 import com.xiaozhi.common.model.req.DeviceScanBindReq;
 import com.xiaozhi.common.model.req.DeviceUpdateReq;
 import com.xiaozhi.common.model.req.OtaReq;
+import com.xiaozhi.common.model.resp.DeviceBatchUpdateResp;
 import com.xiaozhi.common.model.resp.DeviceResp;
 import com.xiaozhi.communication.ServerAddressProvider;
 import com.xiaozhi.communication.auth.DeviceAuthService;
@@ -20,7 +22,7 @@ import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.summary.service.SummaryService;
-import com.xiaozhi.utils.CmsUtils;
+import com.xiaozhi.utils.IpLocationClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -125,12 +127,12 @@ class DeviceAppServiceTest {
         req.setDeviceId("not-a-mac");
         req.setIp("203.0.113.7");
 
-        try (MockedStatic<CmsUtils> cmsUtils = mockStatic(CmsUtils.class)) {
+        try (MockedStatic<IpLocationClient> ipLocationClient = mockStatic(IpLocationClient.class)) {
             assertThatThrownBy(() -> deviceAppService.handleOta(req))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("设备ID不正确");
             // 设备 ID 先过校验再解析 IP 归属，未注册请求带不动 OTA 主链路
-            cmsUtils.verifyNoInteractions();
+            ipLocationClient.verifyNoInteractions();
         }
     }
 
@@ -139,15 +141,15 @@ class DeviceAppServiceTest {
         OtaReq req = otaRequest();
         req.setIp("203.0.113.7");
 
-        try (MockedStatic<CmsUtils> cmsUtils = mockStatic(CmsUtils.class)) {
-            cmsUtils.when(() -> CmsUtils.getIPInfoFromCache("203.0.113.7"))
-                    .thenReturn(new CmsUtils.IPInfo("203.0.113.7", "广东省深圳市", "电信"));
+        try (MockedStatic<IpLocationClient> ipLocationClient = mockStatic(IpLocationClient.class)) {
+            ipLocationClient.when(() -> IpLocationClient.getIPInfoFromCache("203.0.113.7"))
+                    .thenReturn(new IpLocationClient.IPInfo("203.0.113.7", "广东省深圳市", "电信"));
 
             deviceAppService.handleOta(req);
 
             assertThat(req.getLocation()).isEqualTo("广东省深圳市");
             // 主链路只读本地缓存，阻塞版外呼不能出现在 OTA 上
-            cmsUtils.verify(() -> CmsUtils.getIPInfoByAddress(any()), never());
+            ipLocationClient.verify(() -> IpLocationClient.getIPInfoByAddress(any()), never());
         }
     }
 
@@ -375,6 +377,60 @@ class DeviceAppServiceTest {
         verify(messageService, never()).deleteByDeviceId(any());
     }
 
+    @Test
+    void batchUpdateCountsOnlyDevicesThatExist() {
+        when(roleService.getBO(9)).thenReturn(role(9, "管家"));
+        when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.of(storedDevice()));
+        when(deviceRepository.findById("11:22:33:44:55:66")).thenReturn(Optional.empty());
+
+        DeviceBatchUpdateResp result = deviceAppService.batchUpdate(batchUpdateReq(DEVICE_ID + ", ,11:22:33:44:55:66", 9));
+
+        // 库里没有的设备不能算进成功数，空白项也不进总数
+        assertThat(result.getSuccessCount()).isEqualTo(1);
+        assertThat(result.getTotalCount()).isEqualTo(2);
+        verify(deviceRepository).save(any(Device.class));
+    }
+
+    @Test
+    void batchUpdateRejectsWhenNoDeviceMatched() {
+        when(roleService.getBO(9)).thenReturn(role(9, "管家"));
+        when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> deviceAppService.batchUpdate(batchUpdateReq(DEVICE_ID, 9)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("更新失败，请检查设备ID是否正确");
+        verify(deviceRepository, never()).save(any());
+    }
+
+    @Test
+    void handleOtaNormalizesDeviceIdBeforeLookup() {
+        OtaReq req = otaRequest();
+        req.setDeviceId("AA-BB-CC-DD-EE-FF");
+        when(deviceAuthService.generateDeviceToken(DEVICE_ID)).thenReturn("sig.123");
+
+        Map<String, Object> response = deviceAppService.handleOta(req);
+
+        // 上报成大写 '-' 分隔时也要落到扫码绑定/会话用的同一个键上，否则缓存与查询键分叉
+        verify(deviceService).getBO(DEVICE_ID);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> websocket = (Map<String, Object>) response.get("websocket");
+        assertThat(websocket).containsEntry("token", "sig.123");
+    }
+
+    @Test
+    void checkOtaActivationNormalizesDeviceId() {
+        assertThat(deviceAppService.checkOtaActivation("AA-BB-CC-DD-EE-FF")).isTrue();
+
+        verify(deviceService).getBO(DEVICE_ID);
+    }
+
+    private DeviceBatchUpdateReq batchUpdateReq(String deviceIds, Integer roleId) {
+        DeviceBatchUpdateReq req = new DeviceBatchUpdateReq();
+        req.setDeviceIds(deviceIds);
+        req.setRoleId(roleId);
+        return req;
+    }
+
     /** 库里已有的一台设备，字段全带值，用于钉住写接口出参一个字段都不少 */
     private Device storedDevice() {
         return new Device(DEVICE_ID, "客厅音箱", 7, 3, "[\"tool\"]", "10.0.0.8", "北京",
@@ -420,4 +476,5 @@ class DeviceAppServiceTest {
         req.setType("dual-board");
         return req;
     }
+
 }

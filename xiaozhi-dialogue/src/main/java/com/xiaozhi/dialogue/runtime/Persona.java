@@ -6,6 +6,7 @@ import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.memory.ConversationContext;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
+import com.xiaozhi.ai.llm.service.TextChatService;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.ai.stt.SttService;
@@ -20,7 +21,6 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.model.MessageAggregator;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -104,13 +104,6 @@ public class Persona {
      */
     @Getter
     private Conversation conversation;
-
-    /**
-     * 工具回调列表，由 PersonaFactory 构建时从 DialogueContext 传入。
-     * chatStream() 从此字段获取工具列表，使 Persona 不再依赖 session.getToolCallbacks()。
-     */
-    @Builder.Default
-    private List<ToolCallback> toolCallbacks = new ArrayList<>();
 
 
     /** 当前轮次运行态，打断收尾与播完判定都从这里取 */
@@ -488,7 +481,7 @@ public class Persona {
 
         // 工具路由、RAG 召回都在订阅时才执行，准备期间被打断就不再调 LLM
         Flux<ChatResponse> chatResponseFlux = Flux.defer(() -> chatStream(turn, useFunctionCall));
-        Flux<ChatToken> tokenFlux = convert(chatResponseFlux);
+        Flux<ChatToken> tokenFlux = TextChatService.toChatTokens(chatResponseFlux);
         // 设备对话管道：过滤掉思考内容，只将正式回复传给语音合成，括号舞台指示与元数据标签整组去掉
         Flux<String> speechFlux = SpeechTokenFilter.apply(tokenFlux.filter(ChatToken::isContent).map(ChatToken::text));
         synthesizer.synthesize(withErrorFallback(speechFlux));
@@ -557,28 +550,5 @@ public class Persona {
         });
         // 直接合成，不过 LLM
         synthesizer.synthesize(farewell);
-    }
-
-    /**
-     * 将 ChatResponse 流转换为 ChatToken 流，包含思考内容和正式回复。
-     * <p>
-     * Spring AI 1.1.0+ 中，启用 reasoningEffort 后，推理内容通过
-     * {@code AssistantMessage.getProperties().get("reasoningContent")} 返回。
-     */
-    private Flux<ChatToken> convert(Flux<ChatResponse> chatResponseFlux) {
-        return chatResponseFlux.mapNotNull(ChatResponse::getResult)
-                .mapNotNull(Generation::getOutput)
-                .flatMap(message -> {
-                    List<ChatToken> tokens = new ArrayList<>();
-                    Object reasoning = message.getMetadata().get("reasoningContent");
-                    if (reasoning instanceof String r && !r.isEmpty()) {
-                        tokens.add(ChatToken.thinking(r));
-                    }
-                    String text = message.getText();
-                    if (text != null && !text.isEmpty()) {
-                        tokens.add(ChatToken.content(text));
-                    }
-                    return Flux.fromIterable(tokens);
-                });
     }
 }

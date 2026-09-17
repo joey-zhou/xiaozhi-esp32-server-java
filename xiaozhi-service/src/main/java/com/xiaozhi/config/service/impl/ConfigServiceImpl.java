@@ -3,6 +3,7 @@ package com.xiaozhi.config.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xiaozhi.agent.AgentProviders;
 import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
@@ -14,6 +15,7 @@ import com.xiaozhi.config.dal.mysql.mapper.ConfigMapper;
 import com.xiaozhi.config.domain.AiConfig;
 import com.xiaozhi.config.domain.repository.ConfigRepository;
 import com.xiaozhi.config.service.ConfigService;
+import com.xiaozhi.config.support.ConfigCacheKeys;
 import jakarta.annotation.Resource;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -27,7 +29,7 @@ import java.util.List;
 @Service
 public class ConfigServiceImpl implements ConfigService {
 
-    private static final List<String> EXCLUDED_PROVIDERS = List.of("coze", "dify", "xingchen");
+    private static final List<String> EXCLUDED_PROVIDERS = List.copyOf(AgentProviders.ALL);
 
     /** 第三方平台的智能体在本系统里只以 llm 配置的形态存在 */
     private static final String AGENT_MODEL_CONFIG_TYPE = "llm";
@@ -98,10 +100,13 @@ public class ConfigServiceImpl implements ConfigService {
             return null;
         }
 
-        String cacheKey = StringUtils.hasText(modelType)
-            ? "default:" + configType + ":" + modelType
-            : "default:" + configType;
+        String cacheKey = ConfigCacheKeys.defaultKey(configType, modelType);
+        String absentKey = ConfigCacheKeys.absentKey(cacheKey);
         Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
+        // 查过确认没有默认配置时直接返回；配置写入时 ConfigRepositoryImpl 会连同这个标记一起淘汰
+        if (cache != null && cache.get(absentKey) != null) {
+            return null;
+        }
         return cacheHelper.getWithLock(
             "config:default:" + cacheKey,
             () -> cache == null ? null : cache.get(cacheKey, ConfigBO.class),
@@ -115,8 +120,12 @@ public class ConfigServiceImpl implements ConfigService {
                     ConfigBO.STATE_ENABLED
                 ).last("LIMIT 1"));
                 ConfigBO result = configConvert.toBO(configDO);
-                if (result != null && cache != null) {
-                    cache.put(cacheKey, result);
+                if (cache != null) {
+                    if (result == null) {
+                        cache.put(absentKey, Boolean.TRUE);
+                    } else {
+                        cache.put(cacheKey, result);
+                    }
                 }
                 return result;
             }
@@ -128,12 +137,11 @@ public class ConfigServiceImpl implements ConfigService {
         if (!StringUtils.hasText(configType)) {
             return;
         }
-        Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
-        if (cache == null) {
-            return;
-        }
         // 清除无 modelType 的默认缓存；llm 的各 modelType 变体由各自变更时清理
-        CacheHelper.evictNow(cache, "default:" + configType);
+        String cacheKey = ConfigCacheKeys.defaultKey(configType, null);
+        Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
+        CacheHelper.evictNow(cache, cacheKey);
+        CacheHelper.evictNow(cache, ConfigCacheKeys.absentKey(cacheKey));
     }
 
     @Override

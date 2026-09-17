@@ -28,10 +28,10 @@ public class TestVoiceReq {
     @Schema(description = "语音音调(0.5-2.0)")
     @DecimalMin(value = "0.5", message = "语音音调不能小于0.5")
     @DecimalMax(value = "2.0", message = "语音音调不能大于2.0")
-    private Double ttsPitch;
+    private double ttsPitch = 1.0;
 
     @Schema(description = "语音语速(0.5-2.0)")
     @DecimalMin(value = "0.5", message = "语音语速不能小于0.5")
     @DecimalMax(value = "2.0", message = "语音语速不能大于2.0")
-    private Double ttsSpeed;
+    private double ttsSpeed = 1.0;
 }

@@ -19,11 +19,11 @@ public interface MessageService {
 
     PageResult<ConversationProjection> conversationPage(int pageNo, int pageSize, Integer userId, Integer roleId, String source);
 
-    void delete(Integer messageId);
+    void delete(Long messageId);
 
     int deleteByDeviceId(String deviceId);
 
-    MessageBO getBO(Integer messageId);
+    MessageBO getBO(Long messageId);
 
     int saveAll(List<MessageBO> messages);
 

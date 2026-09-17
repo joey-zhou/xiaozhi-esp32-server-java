@@ -8,8 +8,10 @@ import org.springframework.ai.chat.messages.ToolResponseMessage;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * MessageBO#toolCalls 字段的 JSON 编解码器。
@@ -47,10 +49,13 @@ public final class ToolCallMessageCodec {
     /** 序列化 AssistantMessage 的 toolCalls 列表。 */
     public static String encodeToolCalls(List<AssistantMessage.ToolCall> toolCalls) throws JsonProcessingException {
         List<Map<String, String>> raw = toolCalls.stream()
-                .map(tc -> Map.of(
-                        FIELD_ID, tc.id(),
-                        FIELD_NAME, tc.name(),
-                        FIELD_ARGUMENTS, tc.arguments()))
+                .map(tc -> {
+                    Map<String, String> entry = new LinkedHashMap<>();
+                    entry.put(FIELD_ID, Objects.requireNonNullElse(tc.id(), ""));
+                    entry.put(FIELD_NAME, Objects.requireNonNullElse(tc.name(), ""));
+                    entry.put(FIELD_ARGUMENTS, Objects.requireNonNullElse(tc.arguments(), ""));
+                    return entry;
+                })
                 .toList();
         return OBJECT_MAPPER.writeValueAsString(raw);
     }
@@ -73,9 +78,12 @@ public final class ToolCallMessageCodec {
     /** 序列化 ToolResponseMessage 的 responses（只保存 id / name，响应文本由调用方单独持久化）。 */
     public static String encodeToolResponses(List<ToolResponseMessage.ToolResponse> responses) throws JsonProcessingException {
         List<Map<String, String>> raw = responses.stream()
-                .map(r -> Map.of(
-                        FIELD_TOOL_CALL_ID, r.id(),
-                        FIELD_TOOL_NAME, r.name()))
+                .map(r -> {
+                    Map<String, String> entry = new LinkedHashMap<>();
+                    entry.put(FIELD_TOOL_CALL_ID, Objects.requireNonNullElse(r.id(), ""));
+                    entry.put(FIELD_TOOL_NAME, Objects.requireNonNullElse(r.name(), ""));
+                    return entry;
+                })
                 .toList();
         return OBJECT_MAPPER.writeValueAsString(raw);
     }

@@ -220,11 +220,11 @@ class WebSocketHandshakeProtocolTest {
         int aecInitsBeforeListen = harness.aec().initCalls().size();
 
         // 不发 hello，直接开始聆听
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
 
         ChatSession session = device.session();
         assertThat(session.getDeviceState()).isEqualTo(DeviceState.LISTENING);
-        assertThat(session.getMode()).isEqualTo(ListenMode.Auto);
+        assertThat(session.getMode()).isEqualTo(ListenMode.AUTO);
         // auto 模式由服务端自动断句
         assertThat(harness.vad().autoSegmentOf(device.sessionId())).isTrue();
         assertThat(harness.aec().initCalls()).hasSize(aecInitsBeforeListen + 1);

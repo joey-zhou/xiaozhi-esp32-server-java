@@ -31,19 +31,19 @@ class WebChatControllerTest extends ControllerTestSupport {
     private MockMvc mockMvc;
 
     @Mock
-    private WebChatService webChatService;
+    private WebChatAppService webChatAppService;
 
     @BeforeEach
     void setUp() {
         WebChatController controller = new WebChatController();
-        ReflectionTestUtils.setField(controller, "webChatService", webChatService);
+        ReflectionTestUtils.setField(controller, "webChatAppService", webChatAppService);
         ReflectionTestUtils.setField(controller, "webChatConvert", Mappers.getMapper(WebChatConvert.class));
         mockMvc = buildMockMvc(controller);
     }
 
     @Test
     void streamTakesSessionIdAndTextFromBody() throws Exception {
-        when(webChatService.chatStream("s-1", "你好", 9)).thenReturn(Flux.just(ChatToken.content("在的")));
+        when(webChatAppService.chatStream("s-1", "你好", 9)).thenReturn(Flux.just(ChatToken.content("在的")));
 
         try (var ignored = mockLoginUser(9)) {
             mockMvc.perform(post("/api/chat/stream")
@@ -53,7 +53,7 @@ class WebChatControllerTest extends ControllerTestSupport {
                         """));
         }
 
-        verify(webChatService).chatStream("s-1", "你好", 9);
+        verify(webChatAppService).chatStream("s-1", "你好", 9);
     }
 
     @Test
@@ -61,7 +61,7 @@ class WebChatControllerTest extends ControllerTestSupport {
         mockMvc.perform(get("/api/chat/stream").param("sessionId", "s-1").param("text", "你好"))
             .andExpect(status().isMethodNotAllowed());
 
-        verifyNoInteractions(webChatService);
+        verifyNoInteractions(webChatAppService);
     }
 
     @Test
@@ -73,6 +73,6 @@ class WebChatControllerTest extends ControllerTestSupport {
                     """))
             .andExpect(status().isBadRequest());
 
-        verifyNoInteractions(webChatService);
+        verifyNoInteractions(webChatAppService);
     }
 }

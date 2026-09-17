@@ -11,16 +11,22 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 钉住 save() 把本次写库的时间戳回填进聚合根。
+ * 钉住 save() 的写入顺序与时间戳回填。
+ * <p>save() 是 upsert：先更新，匹配不到行才插入。更新是常态（上下线上报、改角色、同步都走它），
+ * 反过来先插入会让每次更新都先撞一次主键冲突。
  * <p>createTime / updateTime 由 MyBatis-Plus 的自动填充在写库时塞进 DO，设备的写接口靠这次回填
  * 直接出参；一旦不回填，创建设备的返回里两个时间就会变成 null，只能再查一遍设备表补回来。
  */
@@ -51,9 +57,35 @@ class DeviceRepositoryTimestampTest {
         ReflectionTestUtils.setField(repository, "eventPublisher", eventPublisher);
     }
 
+    private Device existingDevice() {
+        Device device = new Device(DEVICE_ID, "客厅音箱", 7, 3, null, "10.0.0.8", "北京",
+                "home", "esp32s3", "dual-board", "2.4.0", "1",
+                CREATED_AT, LocalDateTime.of(2026, 2, 1, 8, 0));
+        device.update("书房音箱", null, null);
+        return device;
+    }
+
     @Test
-    void insertWritesBackBothTimestampsToTheAggregate() {
-        when(deviceMapper.selectById(DEVICE_ID)).thenReturn(null);
+    void updateHitsOnFirstWriteAndNeverFallsBackToInsert() {
+        when(deviceMapper.updateById(any(DeviceDO.class))).thenAnswer(invocation -> {
+            DeviceDO updated = invocation.getArgument(0);
+            // 更新语句不能带 createTime，否则会覆盖设备原有的创建时间
+            assertThat(updated.getCreateTime()).isNull();
+            updated.setUpdateTime(UPDATED_AT);
+            return 1;
+        });
+
+        Device device = existingDevice();
+        repository.save(device);
+
+        verify(deviceMapper, never()).insert(any(DeviceDO.class));
+        assertThat(device.getCreateTime()).isEqualTo(CREATED_AT);
+        assertThat(device.getUpdateTime()).isEqualTo(UPDATED_AT);
+    }
+
+    @Test
+    void insertRunsWhenUpdateMatchesNoRowAndWritesBackBothTimestamps() {
+        when(deviceMapper.updateById(any(DeviceDO.class))).thenReturn(0);
         when(deviceMapper.insert(any(DeviceDO.class))).thenAnswer(invocation -> {
             DeviceDO inserted = invocation.getArgument(0);
             inserted.setCreateTime(CREATED_AT);
@@ -69,22 +101,29 @@ class DeviceRepositoryTimestampTest {
     }
 
     @Test
-    void updateWritesBackNewUpdateTimeAndKeepsCreateTime() {
-        when(deviceMapper.selectById(DEVICE_ID)).thenReturn(new DeviceDO());
+    void concurrentFirstRegistrationFallsBackToUpdateWithoutOverwritingCreateTime() {
+        AtomicInteger updateCalls = new AtomicInteger();
         when(deviceMapper.updateById(any(DeviceDO.class))).thenAnswer(invocation -> {
             DeviceDO updated = invocation.getArgument(0);
+            if (updateCalls.getAndIncrement() == 0) {
+                return 0;
+            }
+            // 撞主键后退回更新，自动填充写上的 createTime 必须已被清掉
+            assertThat(updated.getCreateTime()).isNull();
             updated.setUpdateTime(UPDATED_AT);
             return 1;
         });
+        when(deviceMapper.insert(any(DeviceDO.class))).thenAnswer(invocation -> {
+            DeviceDO inserted = invocation.getArgument(0);
+            // 自动填充在语句发出前就写了 createTime，冲突失败后它仍留在 DO 上
+            inserted.setCreateTime(LocalDateTime.of(2026, 9, 12, 20, 0));
+            throw new DuplicateKeyException("duplicate");
+        });
 
-        Device device = new Device(DEVICE_ID, "客厅音箱", 7, 3, null, "10.0.0.8", "北京",
-                "home", "esp32s3", "dual-board", "2.4.0", "1",
-                CREATED_AT, LocalDateTime.of(2026, 2, 1, 8, 0));
-        device.update("书房音箱", null, null);
+        Device device = Device.newDevice(DEVICE_ID, "客厅音箱", "dual-board", 7, 3);
         repository.save(device);
 
-        // 更新语句不带 createTime，回填时不能把聚合根上的创建时间清掉
-        assertThat(device.getCreateTime()).isEqualTo(CREATED_AT);
+        assertThat(updateCalls.get()).isEqualTo(2);
         assertThat(device.getUpdateTime()).isEqualTo(UPDATED_AT);
     }
 }

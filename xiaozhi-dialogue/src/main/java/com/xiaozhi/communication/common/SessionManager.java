@@ -33,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 /**
  * 会话注册表，负责管理所有连接的会话状态。
- * 核心职责：register / get / remove / close，以及设备注册与验证码状态管理。
+ * 核心职责：register / get / remove / close，以及设备注册管理。
  * <p>
  * 不活跃会话检查已拆分至 {@link InactiveSessionChecker}。
  * 音频流管理已迁移至 {@link ChatSession} 实例方法。
@@ -135,14 +135,13 @@ public class SessionManager {
     }
 
     /**
-     * 打开音频通道并发布事件（供Handler调用）
+     * 打开音频通道（供Handler调用）
      */
     public void openAudioChannel(String sessionId, String deviceId) {
         ChatSession session = sessions.get(sessionId);
         if (session != null) {
             session.resetInactiveClosing();
         }
-        applicationContext.publishEvent(new ChatAudioOpenedEvent(this, sessionId, deviceId));
     }
 
     /**
@@ -174,8 +173,6 @@ public class SessionManager {
     public void registerSession(String sessionId, ChatSession chatSession) {
         sessions.put(sessionId, chatSession);
         log.info("会话已注册 - SessionId: {}  SessionType: {}", sessionId, chatSession.getClass().getSimpleName());
-        String deviceId = chatSession.getDevice() != null ? chatSession.getDevice().getDeviceId() : null;
-        applicationContext.publishEvent(new ChatSessionOpenedEvent(this, sessionId, deviceId));
     }
 
     public void removeSession(String sessionId) {
@@ -197,8 +194,8 @@ public class SessionManager {
             if (session != null) {
                 return session;
             }
-            // 映射残留，清理
-            deviceIdToSessionId.remove(deviceId);
+            // 映射残留，清理；只清自己读到的这份，避免误删并发场景下已更新的映射
+            deviceIdToSessionId.remove(deviceId, sessionId);
         }
         return null;
     }
@@ -310,16 +307,6 @@ public class SessionManager {
         if (session != null) {
             session.setLastActivityTime(java.time.Instant.now());
         }
-    }
-
-    // ========== 验证码状态 ==========
-
-    public boolean markCaptchaGeneration(String deviceId) {
-        return captchaState.putIfAbsent(deviceId, Boolean.TRUE) == null;
-    }
-
-    public void unmarkCaptchaGeneration(String deviceId) {
-        captchaState.remove(deviceId);
     }
 
     // ========== 跨会话查询 ==========

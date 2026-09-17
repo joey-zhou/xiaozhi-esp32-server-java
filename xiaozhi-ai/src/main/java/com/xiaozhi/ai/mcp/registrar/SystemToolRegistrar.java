@@ -14,7 +14,8 @@ import java.util.Set;
 
 /**
  * 系统全局工具注册器。
- * 注册 {@link ToolsGlobalRegistry#getAllFunctions(ToolSession)} 中的系统工具（PlayMusic、ChangeRole 等）。
+ * 注册 {@link ToolsGlobalRegistry#getAllFunctions(ToolSession)} 中当前启用（未注释 @Component）的系统全局工具，
+ * 具体清单随 xiaozhi-dialogue.llm.tool.function 下各实现类的启停状态变化。
  *
  */
 @Component

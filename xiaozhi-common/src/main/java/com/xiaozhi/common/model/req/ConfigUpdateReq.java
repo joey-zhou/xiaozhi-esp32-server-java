@@ -14,9 +14,6 @@ public class ConfigUpdateReq {
     @Schema(description = "配置描述")
     private String configDesc;
 
-    @Schema(description = "配置类型")
-    private String configType;
-
     @Schema(description = "模型类型")
     private String modelType;
 
@@ -44,9 +41,6 @@ public class ConfigUpdateReq {
 
     @Schema(description = "服务提供商的API地址")
     private String apiUrl;
-
-    @Schema(description = "状态(1启用 0禁用)")
-    private String state;
 
     @Schema(description = "是否默认配置(1是 0否)")
     private String isDefault;

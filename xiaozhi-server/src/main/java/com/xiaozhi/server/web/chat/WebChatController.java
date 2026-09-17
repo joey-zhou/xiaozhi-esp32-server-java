@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.ChatStreamReq;
+import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.model.resp.ChatSessionClosedResp;
 import com.xiaozhi.common.model.resp.ChatSessionOpenedResp;
 import com.xiaozhi.common.model.resp.ChatTokenResp;
@@ -25,7 +26,7 @@ import reactor.core.publisher.Flux;
 public class WebChatController {
 
     @Resource
-    private WebChatService webChatService;
+    private WebChatAppService webChatAppService;
 
     @Resource
     private WebChatConvert webChatConvert;
@@ -44,10 +45,10 @@ public class WebChatController {
     @SaCheckPermission("system:chat:api:open")
     @CheckOwner(resource = "role", id = "#roleId")
     @Operation(summary = "开启聊天会话", description = "创建或续接 Web 聊天会话并返回 sessionId")
-    public ChatSessionOpenedResp open(@RequestParam Integer roleId,
+    public ApiResponse<ChatSessionOpenedResp> open(@RequestParam Integer roleId,
                                      @RequestParam(required = false) String sessionId) {
         Integer userId = StpUtil.getLoginIdAsInt();
-        return ChatSessionOpenedResp.of(webChatService.openSession(userId, roleId, sessionId));
+        return ApiResponse.success(ChatSessionOpenedResp.of(webChatAppService.openSession(userId, roleId, sessionId)));
     }
 
     /**
@@ -62,7 +63,7 @@ public class WebChatController {
     @Operation(summary = "流式聊天", description = "通过 SSE 返回 AI 回复 Token 流，包含 thinking 和 content 两种类型")
     public Flux<ChatTokenResp> stream(@Valid @RequestBody ChatStreamReq req) {
         Integer userId = StpUtil.getLoginIdAsInt();
-        return webChatService.chatStream(req.getSessionId(), req.getText(), userId).map(webChatConvert::toResp);
+        return webChatAppService.chatStream(req.getSessionId(), req.getText(), userId).map(webChatConvert::toResp);
     }
 
     /**
@@ -71,9 +72,9 @@ public class WebChatController {
     @PostMapping("/close")
     @SaCheckPermission("system:chat:api:close")
     @Operation(summary = "关闭聊天会话", description = "关闭 Web 聊天会话并释放资源")
-    public ChatSessionClosedResp close(@RequestParam String sessionId) {
+    public ApiResponse<ChatSessionClosedResp> close(@RequestParam String sessionId) {
         Integer userId = StpUtil.getLoginIdAsInt();
-        webChatService.closeSession(sessionId, userId);
-        return ChatSessionClosedResp.closed();
+        webChatAppService.closeSession(sessionId, userId);
+        return ApiResponse.success(ChatSessionClosedResp.closed());
     }
 }

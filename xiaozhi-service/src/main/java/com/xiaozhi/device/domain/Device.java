@@ -17,7 +17,7 @@ import java.util.Objects;
 public class Device {
 
     /** 领域信号：由 Repository.save() 转译为 Spring ApplicationEvent 发布 */
-    public enum DomainSignal { UPDATED, ONLINE, ROLE_CHANGED, SESSION_CLOSED }
+    public enum DomainSignal { UPDATED, ROLE_CHANGED, SESSION_CLOSED }
 
     /** 持久化设备状态常量 */
     public static final String STATE_OFFLINE = "0";
@@ -114,15 +114,6 @@ public class Device {
         }
         if (location != null && !location.isBlank()) this.location = location;
         signals.add(DomainSignal.UPDATED);
-    }
-
-    /** 设备上线时同步网络信息 */
-    public void reportOnline(String ip, String version, String wifiName, String location) {
-        if (ip != null && !ip.isBlank()) this.ip = ip;
-        if (version != null && !version.isBlank()) this.version = version;
-        if (wifiName != null && !wifiName.isBlank()) this.wifiName = wifiName;
-        if (location != null && !location.isBlank()) this.location = location;
-        signals.add(DomainSignal.ONLINE);
     }
 
     /** 更新 MCP 工具列表（设备连接时上报） */

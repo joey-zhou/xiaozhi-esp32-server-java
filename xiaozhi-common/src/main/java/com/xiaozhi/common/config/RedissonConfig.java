@@ -13,7 +13,9 @@ import org.springframework.util.StringUtils;
 
 /**
  * Redisson 客户端。只服务分布式锁（CacheHelper、各定时任务）与布隆过滤器，
- * 普通 Redis 操作（缓存、Pub/Sub、设备注册）走 Spring Boot 装配的 Lettuce 连接池。
+ * 普通 Redis 操作（缓存、Pub/Sub、设备注册）走 Spring Boot 装配的 Lettuce 共享连接。
+ * Lettuce 的共享连接默认是线程安全的多路复用，普通命令并不经过下面 lettuce.pool
+ * 配的连接池——那个池只服务需要独占连接的场景（阻塞命令、事务）。
  * <p>
  * 这两件事必须分开，是因为 redisson-spring-boot-starter 的自动配置会顺带提供一个
  * {@code RedissonConnectionFactory} 作为 {@code RedisConnectionFactory}，并且排在

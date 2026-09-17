@@ -68,7 +68,7 @@ public class MessageController extends BaseController {
     @CheckOwner(resource = "message", id = "#messageId")
     @AuditLog(module = "消息管理", operation = "删除消息")
     @Operation(summary = "删除对话消息", description = "删除指定的对话消息，逻辑删除")
-    public ApiResponse<Void> delete(@PathVariable Integer messageId) {
+    public ApiResponse<Void> delete(@PathVariable Long messageId) {
         messageService.delete(messageId);
         return ApiResponse.success("删除成功");
     }

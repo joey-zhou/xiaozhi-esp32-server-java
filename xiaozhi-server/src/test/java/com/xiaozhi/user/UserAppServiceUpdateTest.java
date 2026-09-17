@@ -4,7 +4,7 @@ import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.req.UserUpdateReq;
 import com.xiaozhi.common.model.resp.UserResp;
-import com.xiaozhi.security.AuthenticationService;
+import com.xiaozhi.security.service.AuthenticationService;
 import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;

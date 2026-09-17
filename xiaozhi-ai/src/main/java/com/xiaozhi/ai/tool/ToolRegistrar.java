@@ -7,7 +7,7 @@ import java.util.Set;
 /**
  * 工具注册器接口。
  * 每种工具来源对应一个实现：系统全局工具、设备端MCP工具、远程MCP Server工具、本地MCP Endpoint工具。
- * Spring 自动收集注入。
+ * 实现类位于 xiaozhi-ai 模块 com.xiaozhi.ai.mcp 包下，由 Spring 自动收集注入。
  */
 public interface ToolRegistrar {
 

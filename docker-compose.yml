@@ -18,6 +18,7 @@ services:
       - LANG=C.UTF-8
       - MYSQL_CHARSET=utf8mb4
       - MYSQL_COLLATION=utf8mb4_unicode_ci
+      - TZ=Asia/Shanghai
     networks:
       - app-network
     volumes:
@@ -73,8 +74,9 @@ services:
       # 设备接入鉴权密钥，未导出则不鉴权；.env 被 git 跟踪，不要把真实值写进去
       # 生产部署前 export XIAOZHI_DEVICE_AUTH_SECRET=$(openssl rand -hex 16)
       - XIAOZHI_DEVICE_AUTH_SECRET=${XIAOZHI_DEVICE_AUTH_SECRET:-}
-      # 容器化部署统一走 prod profile：application.yml 里的 dev 只用于本地直接跑 jar/IDE 调试
-      - SPRING_PROFILES_ACTIVE=prod
+      # 默认 dev 方便测试，取 .env 的值；切生产：SPRING_PROFILES_ACTIVE=prod docker compose up -d server dialogue
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
+      - TZ=Asia/Shanghai
     # 与 dialogue 共用同一份本地文件存储：TTS 缓存索引在共享 MySQL/Redis，
     # 文件本身也必须共享，否则缓存命中率会因请求落到另一个容器而失效
     volumes:
@@ -121,8 +123,9 @@ services:
       # 设备接入鉴权密钥，未导出则不鉴权；.env 被 git 跟踪，不要把真实值写进去
       # 生产部署前 export XIAOZHI_DEVICE_AUTH_SECRET=$(openssl rand -hex 16)
       - XIAOZHI_DEVICE_AUTH_SECRET=${XIAOZHI_DEVICE_AUTH_SECRET:-}
-      # 容器化部署统一走 prod profile：application.yml 里的 dev 只用于本地直接跑 jar/IDE 调试
-      - SPRING_PROFILES_ACTIVE=prod
+      # 默认 dev 方便测试，取 .env 的值；切生产：SPRING_PROFILES_ACTIVE=prod docker compose up -d server dialogue
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
+      - TZ=Asia/Shanghai
     # 与 server 共用同一份本地文件存储，见 server 服务同名 volumes 注释
     volumes:
       - audio_data:/app/audio
@@ -134,6 +137,7 @@ services:
       resources:
         limits:
           cpus: '2.0'
+          # VOSK_MODEL_SIZE 切到 standard（~1.3GB）时上面的堆/原生内存预算会不够，需要同步调大这个 memory 限制
           memory: 2G
         reservations:
           cpus: '0.5'

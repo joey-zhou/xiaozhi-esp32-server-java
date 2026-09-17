@@ -2,6 +2,8 @@ package com.xiaozhi.common.model.req;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
@@ -9,9 +11,11 @@ import lombok.Data;
 public class DeviceBatchUpdateReq {
 
     @NotBlank(message = "设备ID不能为空")
+    @Size(max = 2000, message = "设备ID列表过长，请分批提交")
     @Schema(description = "设备ID列表，以逗号分隔", requiredMode = Schema.RequiredMode.REQUIRED)
     private String deviceIds;
 
+    @NotNull(message = "角色ID不能为空")
     @Schema(description = "角色ID")
     private Integer roleId;
 }

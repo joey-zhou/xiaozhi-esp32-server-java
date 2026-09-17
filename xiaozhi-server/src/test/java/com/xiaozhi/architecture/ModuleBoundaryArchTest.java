@@ -1,14 +1,23 @@
 package com.xiaozhi.architecture;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.stereotype.Component;
+
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackages;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -28,19 +37,18 @@ class ModuleBoundaryArchTest {
         "com.xiaozhi.dialogue..", "com.xiaozhi.communication..", "com.xiaozhi.ai.."
     };
 
-    private static final String[] MODULES_BELOW_SERVICE = {
-        "com.xiaozhi.ai..", "com.xiaozhi.dialogue..", "com.xiaozhi.server.."
+    /**
+     * 第三方服务 SDK，不分 AI 与否：AI 能力的归 xiaozhi-ai，对象存储/短信/邮件归 service 业务包，server 一个都不许直接用。
+     * gson、caffeine、hutool、jjwt 这类通用库不算，列进来会误伤。{@link ForbiddenDependencyArchTest} 共用这份名单。
+     */
+    static final String[] THIRD_PARTY_SDK_PACKAGES = {
+        // AI 能力
+        "org.springframework.ai..", "io.modelcontextprotocol..", "com.alibaba.dashscope..", "com.alibaba.nls..",
+        "com.tencent..", "cn.xfyun..", "com.coze..", "com.k2fsa..", "org.vosk..",
+        "io.github.imfangs..", "io.github.whitemagic2014..",
+        // 云厂商 OpenAPI 与非 AI 外部服务
+        "com.aliyun..", "com.aliyuncs..", "com.qcloud..", "software.amazon..", "io.github.biezhi.."
     };
-
-    private static final String[] PROVIDER_SDK_PACKAGES = {
-        "org.springframework.ai..", "com.alibaba.dashscope..", "com.aliyun..",
-        "com.qcloud..", "software.amazon.."
-    };
-
-    private static final String SDK_KNOWN_VIOLATIONS =
-        "com\\.xiaozhi\\.(config\\.ConfigConnectionChecker"
-            + "|server\\.web\\.chat\\.WebChatService"
-            + "|utils\\.SmsUtils)";
 
     /** 路径匹配失效会扫到 0 个类而假绿，用它的规则须先过 {@link #serverModuleIsActuallyScanned}。 */
     private static final ImportOption ONLY_SERVER_MODULE =
@@ -54,14 +62,43 @@ class ModuleBoundaryArchTest {
         "com.xiaozhi.config..", "com.xiaozhi.device..", "com.xiaozhi.role.."
     };
 
-    /** common.domain 是领域事件基类型，communication.domain 是协议报文，都不是业务聚合根 */
+    /**
+     * 只豁免这两个已经存在的领域包，不整包豁免 common.. / communication..——
+     * 整包豁免会让这两个包底下新建的任何 domain 或 infrastructure 子包都对
+     * {@link #onlyWhitelistedPackagesHaveDomainLayer} 隐形。
+     */
     private static final String[] NOT_BUSINESS_PACKAGES = {
-        "com.xiaozhi.common..", "com.xiaozhi.communication.."
+        "com.xiaozhi.common.domain..", "com.xiaozhi.communication.domain.."
     };
+
+    /**
+     * ai/dialogue/server 三个模块按编译产物物理路径识别，不按包名段判定：
+     * communication/utils/monitoring 是横跨 common/service/dialogue/server 的拆分包，
+     * 包名枚举永远补不全。用它的规则须先过 {@link #modulesBelowServiceAreActuallyScanned}。
+     */
+    private static final ImportOption ONLY_MODULES_BELOW_SERVICE = location ->
+        location.contains("/xiaozhi-ai/target/classes/")
+            || location.contains("/xiaozhi-dialogue/target/classes/")
+            || location.contains("/xiaozhi-server/target/classes/");
+
+    /** §7 禁止业务类以 Helper/Util(s)/Manager/Store 结尾，这几个是存量，登记住不许再增 */
+    private static final Set<String> LEGACY_FORBIDDEN_SUFFIX_BEANS = Set.of(
+        "com.xiaozhi.common.CacheHelper",
+        "com.xiaozhi.communication.common.SessionManager"
+    );
+
+    private static final DescribedPredicate<JavaClass> HAS_FORBIDDEN_BEAN_SUFFIX = DescribedPredicate.describe(
+        "类名以 Helper/Util(s)/Manager/Store 结尾",
+        javaClass -> {
+            String simpleName = javaClass.getSimpleName();
+            return simpleName.endsWith("Helper") || simpleName.endsWith("Util") || simpleName.endsWith("Utils")
+                || simpleName.endsWith("Manager") || simpleName.endsWith("Store");
+        });
 
     private static JavaClasses xiaozhiClasses;
     private static JavaClasses serverClasses;
     private static JavaClasses serviceClasses;
+    private static JavaClasses modulesBelowServiceClasses;
 
     @BeforeAll
     static void importClasses() {
@@ -75,6 +112,10 @@ class ModuleBoundaryArchTest {
         serviceClasses = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .withImportOption(ONLY_SERVICE_MODULE)
+            .importPackages("com.xiaozhi");
+        modulesBelowServiceClasses = new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+            .withImportOption(ONLY_MODULES_BELOW_SERVICE)
             .importPackages("com.xiaozhi");
     }
 
@@ -130,24 +171,8 @@ class ModuleBoundaryArchTest {
             .isGreaterThan(50);
     }
 
-    @Test
-    void serviceModuleIsActuallyScanned() {
-        assertThat(serviceClasses)
-            .as("按路径过滤 xiaozhi-service 的产物失效了，依赖它的规则会假绿")
-            .hasSizeGreaterThan(80);
-    }
-
     // 挡的不是写错 import——那种 Maven 先编译不过（service 的 pom 里没有 ai/dialogue/server）。
     // 挡的是有人往 xiaozhi-service/pom.xml 里加反向依赖：加完编译能过，依赖链当场成环。
-    @Test
-    void serviceModuleDoesNotDependOnDownstreamModules() {
-        ArchRule rule = noClasses()
-            .should().dependOnClassesThat().resideInAnyPackage(MODULES_BELOW_SERVICE)
-            .because("service 反向依赖下游模块就是把依赖链掰成环；反向需求一律经 common/port 倒置");
-
-        rule.check(serviceClasses);
-    }
-
     @Test
     void serverModuleIsActuallyScanned() {
         assertThat(serverClasses)
@@ -161,10 +186,9 @@ class ModuleBoundaryArchTest {
     @Test
     void serverModuleDoesNotDependOnProviderSdk() {
         ArchRule rule = noClasses()
-            .that().haveNameNotMatching(SDK_KNOWN_VIOLATIONS)
             .should().dependOnClassesThat()
-            .resideInAnyPackage(PROVIDER_SDK_PACKAGES)
-            .because("Provider SDK 只归 xiaozhi-ai 用；server 层拿到 SDK 说明编排里混进了模型/云服务细节");
+            .resideInAnyPackage(THIRD_PARTY_SDK_PACKAGES)
+            .because("第三方服务 SDK 不得进 server；server 层拿到 SDK 说明编排里混进了模型/云服务细节");
 
         rule.check(serverClasses);
     }
@@ -195,24 +219,93 @@ class ModuleBoundaryArchTest {
     }
 
     @Test
+    void serviceModuleIsActuallyScanned() {
+        assertThat(serviceClasses)
+            .as("按路径过滤 xiaozhi-service 的产物失效了，依赖它的规则会假绿")
+            .hasSizeGreaterThan(100);
+    }
+
+    @Test
+    void modulesBelowServiceAreActuallyScanned() {
+        assertThat(modulesBelowServiceClasses)
+            .as("按路径过滤 ai/dialogue/server 产物失效了，serviceModuleDoesNotDependOnDownstreamModules 会假绿")
+            .hasSizeGreaterThan(100);
+    }
+
+    @Test
+    void serviceModuleDoesNotDependOnDownstreamModules() {
+        ArchRule rule = noClasses()
+            .should().dependOnClassesThat(physicallyResidesIn(modulesBelowServiceClasses))
+            .because("service 反向依赖下游模块就是把依赖链掰成环；反向需求一律经 common/port 倒置，"
+                + "向下暴露用 XxxLookup/XxxWriter，向上暴露用 XxxClient");
+
+        rule.check(serviceClasses);
+    }
+
+    @Test
     void onlyWhitelistedPackagesHaveDomainLayer() {
         ArchRule rule = classes()
             .that().resideInAnyPackage("com.xiaozhi..domain..", "com.xiaozhi..infrastructure..")
             .and().resideOutsideOfPackages(NOT_BUSINESS_PACKAGES)
             .should().resideInAnyPackage(PACKAGES_ALLOWED_DOMAIN)
-            .because("domain/ + infrastructure/ 要同时满足「有跨字段不变量」与「写入口不止一个」，不命中即禁止新建");
+            .because("domain/ + infrastructure/ 要同时满足「有跨字段不变量」与「写入口不止一个」；"
+                + "不命中时规约要求的动作是禁止新建，不是先建了再说");
 
         rule.check(xiaozhiClasses);
     }
 
+    /**
+     * common.domain 是精确豁免，不是扫不到。{@link #NOT_BUSINESS_PACKAGES} 从整包收窄成
+     * domain 子包后，common 下别的位置再新建 domain 或 infrastructure 子包会被上面那条规则抓住；
+     * 这里钉住被豁免的包本身仍落在规则的选择器里，防止哪天判定面被改窄成连它都匹配不到。
+     */
     @Test
-    void knownProviderSdkUsersInServerModule() {
-        ArchRule rule = classes()
-            .that().haveNameMatching(SDK_KNOWN_VIOLATIONS)
-            .should().dependOnClassesThat()
-            .resideInAnyPackage(PROVIDER_SDK_PACKAGES)
-            .because("钉住已知违规，防止豁免范围被悄悄扩大");
+    void commonDomainIsCoveredByDomainLayerGuard() {
+        JavaClass abstractDomainEvent = xiaozhiClasses.get("com.xiaozhi.common.domain.AbstractDomainEvent");
+        assertThat(resideInAnyPackage("com.xiaozhi..domain..", "com.xiaozhi..infrastructure..").test(abstractDomainEvent))
+            .as("common.domain 不在 domain/infrastructure 判定面内，onlyWhitelistedPackagesHaveDomainLayer 会看不到它")
+            .isTrue();
+    }
 
-        rule.check(serverClasses);
+    @Test
+    void businessComponentsDoNotUseForbiddenSuffix() {
+        ArchRule rule = classes()
+            .that(HAS_FORBIDDEN_BEAN_SUFFIX)
+            .and().resideOutsideOfPackage("com.xiaozhi.ai..")
+            .should(beRegisteredLegacyForbiddenSuffixBean())
+            .because("§7 禁止新增 Helper/Util/Manager/Store 结尾的业务类；"
+                + "xiaozhi-ai 内的技术类（如 *Store）按既有约定不受此规则限制");
+
+        rule.check(xiaozhiClasses);
+    }
+
+    /** 存量名单只减不增：里面的类被改名或删掉后要同步摘掉，否则名单会变成没人维护的墓碑 */
+    @Test
+    void legacyForbiddenSuffixBeansStillExist() {
+        Set<String> allNames = xiaozhiClasses.stream().map(JavaClass::getName).collect(Collectors.toSet());
+        assertThat(allNames)
+            .as("LEGACY_FORBIDDEN_SUFFIX_BEANS 里有类已经不存在了，应该从名单里删掉")
+            .containsAll(LEGACY_FORBIDDEN_SUFFIX_BEANS);
+    }
+
+    /** 按物理编译产物判定依赖目标属于哪个模块，与包名解耦 */
+    private static DescribedPredicate<JavaClass> physicallyResidesIn(JavaClasses moduleClasses) {
+        Set<String> names = moduleClasses.stream().map(JavaClass::getName).collect(Collectors.toSet());
+        return DescribedPredicate.describe("物理产物落在 ai/dialogue/server 模块内", javaClass -> names.contains(javaClass.getName()));
+    }
+
+    private static ArchCondition<JavaClass> beRegisteredLegacyForbiddenSuffixBean() {
+        return new ArchCondition<>("已登记为存量豁免（LEGACY_FORBIDDEN_SUFFIX_BEANS）") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                boolean springBean = javaClass.isAnnotatedWith(Component.class)
+                    || javaClass.isMetaAnnotatedWith(Component.class);
+                if (!springBean || LEGACY_FORBIDDEN_SUFFIX_BEANS.contains(javaClass.getName())) {
+                    return;
+                }
+                events.add(SimpleConditionEvent.violated(javaClass,
+                    javaClass.getName() + " 以 Helper/Util/Manager/Store 结尾且不在存量名单里，禁止新增该后缀的业务 Bean"));
+            }
+        };
     }
 }

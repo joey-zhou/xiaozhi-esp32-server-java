@@ -6,7 +6,7 @@ import com.alibaba.nls.client.protocol.SampleRateEnum;
 import com.alibaba.nls.client.protocol.tts.SpeechSynthesizer;
 import com.alibaba.nls.client.protocol.tts.SpeechSynthesizerListener;
 import com.alibaba.nls.client.protocol.tts.SpeechSynthesizerResponse;
-import com.xiaozhi.common.port.TokenResolver;
+import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.XiaozhiTtsOptions;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -90,13 +90,13 @@ public class AliyunNlsTtsService implements TtsService {
     private final String outputPath;
 
     // Token管理器
-    private final TokenResolver tokenResolver;
+    private final ProviderTokenClient tokenClient;
 
-    public AliyunNlsTtsService(ConfigBO config, String voiceName, Double pitch, Double speed, String outputPath, TokenResolver tokenResolver) {
+    public AliyunNlsTtsService(ConfigBO config, String voiceName, Double pitch, Double speed, String outputPath, ProviderTokenClient tokenClient) {
         this.config = config;
         this.options = XiaozhiTtsOptions.builder().voiceName(voiceName).pitch(pitch).speed(speed).build();
         this.outputPath = outputPath;
-        this.tokenResolver = tokenResolver;
+        this.tokenClient = tokenClient;
     }
 
     /**
@@ -104,7 +104,7 @@ public class AliyunNlsTtsService implements TtsService {
      * 使用全局缓存，按configId共享NlsClient；用完必须调用 releaseClient 归还
      */
     private CachedNlsClient acquireClient() throws Exception {
-        String currentToken = tokenResolver.getToken(config);
+        String currentToken = tokenClient.getToken(config);
         if (currentToken == null) {
             throw new RuntimeException("无法获取阿里云Token");
         }

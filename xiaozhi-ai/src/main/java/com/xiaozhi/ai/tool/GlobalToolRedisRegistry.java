@@ -32,10 +32,15 @@ public class GlobalToolRedisRegistry {
      * 将当前进程可见的 GlobalFunction 元数据发布到 Redis，供其他进程读取。
      */
     public void publish(List<ToolSummary> tools) {
-        if (tools == null || tools.isEmpty()) {
+        if (tools == null) {
             return;
         }
         try {
+            if (tools.isEmpty()) {
+                stringRedisTemplate.delete(REDIS_KEY);
+                log.info("系统全局工具列表为空，已清空 Redis 缓存: {}", REDIS_KEY);
+                return;
+            }
             String json = JsonUtil.toJson(tools);
             stringRedisTemplate.opsForValue().set(REDIS_KEY, json);
             log.info("已发布系统全局工具元数据到 Redis，数量: {}", tools.size());

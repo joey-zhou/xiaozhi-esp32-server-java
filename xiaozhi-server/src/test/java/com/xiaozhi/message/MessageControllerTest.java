@@ -71,7 +71,7 @@ class MessageControllerTest extends ControllerTestSupport {
     // 异常文案由 GlobalExceptionHandlerTest 集中覆盖，这里只钉路由与路径变量绑定
     @Test
     void deleteReturnsNotFoundWhenMessageMissing() throws Exception {
-        doThrow(new ResourceNotFoundException("消息不存在或无权访问")).when(messageService).delete(5);
+        doThrow(new ResourceNotFoundException("消息不存在或无权访问")).when(messageService).delete(5L);
 
         mockMvc.perform(delete("/api/message/5"))
             .andExpect(status().isNotFound())

@@ -6,15 +6,15 @@ import type { PlatformConfig } from '@/types/agent'
 /**
  * 查询配置列表
  */
-export function queryConfigs(params: Partial<ConfigQueryParams>) {
-  return http.getPage<Config>(api.config.root, params)
+export function queryConfigs<T = Config>(params: Partial<ConfigQueryParams>) {
+  return http.getPage<T>(api.config.root, params)
 }
 
 /**
  * 添加配置
  * @param confirmStorageSwitch 已确认换掉当前生效的对象存储会让历史文件不可访问
  */
-export function addConfig(data: Partial<Config>, confirmStorageSwitch = false) {
+export function addConfig<T = Config>(data: Partial<T>, confirmStorageSwitch = false) {
   return http.post(api.config.root, data, { params: { confirmStorageSwitch } })
 }
 
@@ -22,7 +22,7 @@ export function addConfig(data: Partial<Config>, confirmStorageSwitch = false) {
  * 更新配置
  * @param confirmStorageSwitch 已确认换掉当前生效的对象存储会让历史文件不可访问
  */
-export function updateConfig(data: Partial<Config>, confirmStorageSwitch = false) {
+export function updateConfig<T extends { configId?: number } = Config>(data: Partial<T>, confirmStorageSwitch = false) {
   return http.put(`${api.config.root}/${data.configId}`, data, { params: { confirmStorageSwitch } })
 }
 
@@ -46,22 +46,19 @@ export function testConfig(data: Partial<Config>) {
  * 查询平台配置（智能体 / 音色克隆平台，返回的是 PlatformConfig 形状）
  */
 export function queryPlatformConfig(configType: string, provider: string) {
-  return http.getPage<PlatformConfig>(api.config.root, {
-    configType,
-    provider
-  })
+  return queryConfigs<PlatformConfig>({ configType, provider } as Partial<ConfigQueryParams>)
 }
 
 /**
  * 添加平台配置
  */
 export function addPlatformConfig(data: Partial<PlatformConfig>) {
-  return http.post(api.config.root, data)
+  return addConfig<PlatformConfig>(data)
 }
 
 /**
  * 更新平台配置
  */
 export function updatePlatformConfig(data: Partial<PlatformConfig>) {
-  return http.put(`${api.config.root}/${data.configId}`, data)
+  return updateConfig<PlatformConfig>(data)
 }

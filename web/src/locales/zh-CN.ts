@@ -93,7 +93,6 @@ export default {
     addFailed: '添加失败',
     // 通用进行中状态
     exporting: '正在导出...',
-    adding: '正在添加...',
     serverMaintenance: '服务器维护/重启中，请稍后再试',
     // 通用占位符
     enterUsername: '请输入用户名',
@@ -231,7 +230,6 @@ export default {
     enterEmailFirst: '请先输入邮箱地址！',
     enterValidEmail: '请输入正确的邮箱格式！',
     verificationCodeSent: '验证码已发送！',
-    sendVerificationCodeFailed: '发送验证码失败！',
     // 手机号登录相关
     mobilePhone: '手机号',
     enterMobilePhone: '请输入手机号',

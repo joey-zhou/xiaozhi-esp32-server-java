@@ -24,6 +24,8 @@ const MAX_H = 180
 const FADE = 16
 
 const SENTENCE_PATTERN = /[^。！？.!?\n]+[。！？.!?]?|[^\n]+/g
+// 长时间没有句末标点/换行（例如整段只用逗号）时的强制切分阈值，避免 pending 无限增长导致每次 watch 都对整段重新跑正则
+const MAX_PENDING_LEN = 1000
 
 function splitSentences(text: string) {
   SENTENCE_PATTERN.lastIndex = 0
@@ -64,6 +66,11 @@ watch(
         if (line) parsed.settled.push(line)
       }
       parsed.pending = parsed.pending.slice(growing.index)
+    } else if (parsed.pending.length > MAX_PENDING_LEN) {
+      // 长时间没有终止符：强制按阈值切一刀当作已完成句子，防止 pending 无限增长退化成全文重扫
+      const cut = parsed.pending.slice(0, MAX_PENDING_LEN).trim()
+      if (cut) parsed.settled.push(cut)
+      parsed.pending = parsed.pending.slice(MAX_PENDING_LEN)
     }
 
     const tail = parsed.pending.trim()

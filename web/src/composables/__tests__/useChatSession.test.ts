@@ -102,6 +102,19 @@ describe('useChatSession', () => {
     expect(session.messages.value[1]?.content).not.toContain('回复中断')
   })
 
+  it('treats an error token as an interruption instead of reply content', async () => {
+    chatMock.chatStream.mockImplementation(
+      streamOf({ type: 'content', text: '半句' }, { type: 'error', text: 'HTTP 401 invalid api key' })
+    )
+
+    const session = mountSession()
+    const result = await session.sendMessage('hi', 1)
+
+    expect(result.success).toBe(false)
+    // 失败原因只经中断提示的 {error} 参数展示，不会作为正文直接拼进回复（测试里的 t 不展开参数）
+    expect(session.messages.value[1]?.content).toBe('半句\n\nchat.replyInterrupted')
+  })
+
   it('does not count a user abort as a failure', async () => {
     chatMock.chatStream.mockImplementation(async function* () {
       yield { type: 'content', text: '半句' }
@@ -175,5 +188,118 @@ describe('useChatSession', () => {
 
     release?.()
     await pending
+  })
+
+  describe('按帧合并 token', () => {
+    /** 接管 rAF：只记录回调，不自动触发，测试里手动决定何时“进入下一帧” */
+    function stubRaf() {
+      const callbacks: FrameRequestCallback[] = []
+      const rafSpy = vi
+        .spyOn(globalThis, 'requestAnimationFrame')
+        .mockImplementation((cb) => {
+          callbacks.push(cb)
+          return callbacks.length
+        })
+      const cafSpy = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {})
+      return {
+        callbacks,
+        /** 触发最早排队的那一帧 */
+        runNextFrame() {
+          const cb = callbacks.shift()
+          cb?.(0)
+        },
+        restore() {
+          rafSpy.mockRestore()
+          cafSpy.mockRestore()
+        },
+      }
+    }
+
+    it('同一帧内到达的多个 token 只落一次盘，刷新前 assistantMsg 保持不变', async () => {
+      const raf = stubRaf()
+      let release: (() => void) | undefined
+      chatMock.chatStream.mockImplementation(async function* () {
+        yield { type: 'content', text: 'A' }
+        yield { type: 'content', text: 'B' }
+        await new Promise<void>((resolve) => {
+          release = resolve
+        })
+        yield { type: 'content', text: 'C' }
+      })
+
+      const session = mountSession()
+      const pending = session.sendMessage('hi', 1)
+      await vi.waitUntil(() => raf.callbacks.length > 0)
+
+      // 两个 token 都到了，但同一帧只调度了一次 rAF，且还没刷进 assistantMsg
+      expect(raf.callbacks).toHaveLength(1)
+      expect(session.messages.value[1]?.content).toBe('')
+
+      raf.runNextFrame()
+      expect(session.messages.value[1]?.content).toBe('AB')
+
+      release?.()
+      await pending
+      // 结束时剩余缓冲（C）已经被同步刷净，不需要再等一帧
+      expect(session.messages.value[1]?.content).toBe('ABC')
+
+      raf.restore()
+    })
+
+    it('中止时把已到达但未刷新的缓冲同步刷净，再追加中断提示', async () => {
+      const raf = stubRaf()
+      let throwError: (() => void) | undefined
+      chatMock.chatStream.mockImplementation(async function* () {
+        yield { type: 'content', text: '半句' }
+        await new Promise<void>((_, reject) => {
+          throwError = () => reject(new Error('网络断了'))
+        })
+        yield { type: 'content', text: '不会到达' }
+      })
+
+      const session = mountSession()
+      const pending = session.sendMessage('hi', 1)
+      await vi.waitUntil(() => raf.callbacks.length > 0)
+
+      // 这一帧还没刷，assistantMsg 里还看不到已到达的 token
+      expect(session.messages.value[1]?.content).toBe('')
+
+      throwError?.()
+      const result = await pending
+
+      expect(result.success).toBe(false)
+      const content = session.messages.value[1]?.content ?? ''
+      // 缓冲先被刷净，中断提示追加在已刷入内容之后
+      expect(content.startsWith('半句')).toBe(true)
+      expect(content).toContain('chat.replyInterrupted')
+
+      raf.restore()
+    })
+
+    it('思考耗时按 token 实际到达时刻计算，不受 rAF 延迟刷新影响', async () => {
+      const raf = stubRaf()
+      let now = 1_000
+      const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+
+      chatMock.chatStream.mockImplementation(async function* () {
+        yield { type: 'thinking', text: '思考中' } // 到达时刻 1000
+        now = 1_300
+        yield { type: 'content', text: '正文' } // 到达时刻 1300 -> 思考耗时应为 300ms
+      })
+
+      const session = mountSession()
+      const pending = session.sendMessage('hi', 1)
+      await vi.waitUntil(() => raf.callbacks.length > 0)
+
+      // 模拟这一帧被推迟很久才真正刷新，flush 时刻不应影响耗时计算
+      now = 5_000
+      raf.runNextFrame()
+
+      expect(session.messages.value[1]?.thinkingDurationMs).toBe(300)
+
+      await pending
+      nowSpy.mockRestore()
+      raf.restore()
+    })
   })
 })

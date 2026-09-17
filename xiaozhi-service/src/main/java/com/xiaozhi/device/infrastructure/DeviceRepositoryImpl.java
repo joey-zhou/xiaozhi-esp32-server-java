@@ -5,13 +5,14 @@ import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
+import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
 import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.domain.vo.VerifyCode;
 import com.xiaozhi.device.infrastructure.convert.DeviceConverter;
-import com.xiaozhi.event.DeviceOnlineEvent;
+import com.xiaozhi.device.support.DeviceCacheKeys;
 import com.xiaozhi.event.DeviceRoleChangedEvent;
 import com.xiaozhi.event.DeviceSessionClosedEvent;
 import com.xiaozhi.event.DeviceUpdatedEvent;
@@ -20,6 +21,7 @@ import jakarta.annotation.Resource;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +48,9 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     private DeviceConverter deviceConverter;
 
     @Resource
+    private DeviceConvert deviceConvert;
+
+    @Resource
     private VerifyCodeService verifyCodeService;
 
     @Resource
@@ -60,17 +65,25 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     @Override
     public Optional<Device> findById(String deviceId) {
         if (deviceId == null || deviceId.isBlank()) return Optional.empty();
-        String cacheKey = deviceId.replace(":", "-");
+        String cacheKey = DeviceCacheKeys.of(deviceId);
         Cache cache = cacheManager.getCache(CacheNames.DEVICE);
         DeviceBO cached = cacheHelper.getWithLock(
                 "device:" + cacheKey,
                 () -> cache == null ? null : cache.get(cacheKey, DeviceBO.class),
-                () -> null
+                () -> {
+                    DeviceDO dataObject = deviceMapper.selectById(deviceId);
+                    if (dataObject == null) {
+                        return null;
+                    }
+                    DeviceBO bo = deviceConvert.toBO(dataObject);
+                    if (cache != null) {
+                        cache.put(cacheKey, bo);
+                    }
+                    return bo;
+                }
         );
-        if (cached != null) {
-            return Optional.of(deviceConverter.toDomain(toDeviceDO(cached)));
-        }
-        return Optional.ofNullable(deviceMapper.selectById(deviceId))
+        return Optional.ofNullable(cached)
+                .map(this::toDeviceDO)
                 .map(deviceConverter::toDomain);
     }
 
@@ -96,11 +109,19 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     @Transactional
     public void save(Device device) {
         DeviceDO dataObject = deviceConverter.toDataObject(device);
-        DeviceDO existing = deviceMapper.selectById(device.getDeviceId());
-        if (existing == null) {
-            deviceMapper.insert(dataObject);
-        } else {
-            deviceMapper.updateById(dataObject);
+        // 设备注册一台只发生一次，之后的上下线上报、改角色、同步都走这里，更新才是常态，
+        // 所以先更新：命中就一次写完，匹配不到行才说明是新设备。
+        // 反过来先插入的话，每次更新都要先撞一次主键冲突，多一次往返，
+        // 且失败的 insert 会先拿到该行共享锁、紧接着的 update 再升级成排他锁，并发同一设备时容易死锁。
+        if (deviceMapper.updateById(dataObject) == 0) {
+            try {
+                deviceMapper.insert(dataObject);
+            } catch (DuplicateKeyException e) {
+                // 并发首次注册，另一条已经插进去了。insert 的自动填充刚把 createTime 写成本次时间，
+                // 清空后 updateById 才会按 NOT_NULL 策略跳过该列，不覆盖设备原有的创建时间
+                dataObject.setCreateTime(null);
+                deviceMapper.updateById(dataObject);
+            }
         }
         // 自动填充把本次写入的时间戳塞回了 DO，回填给聚合根，写接口出参不用再查一遍设备表
         device.markPersisted(dataObject.getCreateTime(), dataObject.getUpdateTime());
@@ -110,7 +131,6 @@ public class DeviceRepositoryImpl implements DeviceRepository {
         device.pullSignals().forEach(signal -> {
             switch (signal) {
                 case UPDATED -> eventPublisher.publishEvent(new DeviceUpdatedEvent(this, bo));
-                case ONLINE -> eventPublisher.publishEvent(new DeviceOnlineEvent(this, device.getDeviceId()));
                 case ROLE_CHANGED -> eventPublisher.publishEvent(new DeviceRoleChangedEvent(this, device.getDeviceId()));
                 case SESSION_CLOSED -> eventPublisher.publishEvent(new DeviceSessionClosedEvent(this, device.getDeviceId()));
             }
@@ -148,11 +168,11 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     private void evictCache(String deviceId) {
         Cache cache = cacheManager.getCache(CacheNames.DEVICE);
         if (cache != null) {
-            cache.evict(deviceId.replace(":", "-"));
+            cache.evict(DeviceCacheKeys.of(deviceId));
         }
     }
 
-    /** BO 快照 → DO（仅用于缓存命中路径的聚合根重建） */
+    /** BO 快照 → DO（重建聚合根用） */
     private DeviceDO toDeviceDO(DeviceBO bo) {
         DeviceDO d = new DeviceDO();
         d.setDeviceId(bo.getDeviceId());

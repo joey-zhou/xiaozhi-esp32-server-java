@@ -14,6 +14,7 @@ import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
 import com.xiaozhi.role.dal.mysql.mapper.RoleMapper;
 import com.xiaozhi.role.model.RoleProjection;
 import com.xiaozhi.role.service.RoleService;
+import com.xiaozhi.role.support.RoleCacheKeys;
 import jakarta.annotation.Resource;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -58,7 +59,7 @@ public class RoleServiceImpl implements RoleService {
         if (roleId == null) {
             return null;
         }
-        String cacheKey = String.valueOf(roleId);
+        String cacheKey = RoleCacheKeys.of(roleId);
         Cache cache = cacheManager.getCache(CacheNames.ROLE);
         return cacheHelper.getWithLock(
             "role:" + cacheKey,
@@ -116,7 +117,7 @@ public class RoleServiceImpl implements RoleService {
         if (roleMapper.insert(copiedRole) <= 0) {
             throw new IllegalStateException("复制默认角色失败");
         }
-        if (copiedRole.getRoleId() == null || getBO(copiedRole.getRoleId()) == null) {
+        if (copiedRole.getRoleId() == null) {
             throw new IllegalStateException("复制默认角色失败");
         }
         return copiedRole.getRoleId();
@@ -142,10 +143,23 @@ public class RoleServiceImpl implements RoleService {
             .last("LIMIT 1"));
     }
 
+    /** 重置同用户其他默认角色的标记，并让被降级角色的缓存失效（与 RoleRepositoryImpl#resetDefault 保持一致） */
     private void resetDefault(Integer userId) {
+        List<Integer> demotedRoleIds = roleMapper.selectList(new LambdaQueryWrapper<RoleDO>()
+                .select(RoleDO::getRoleId)
+                .eq(RoleDO::getUserId, userId)
+                .eq(RoleDO::getIsDefault, "1"))
+            .stream()
+            .map(RoleDO::getRoleId)
+            .toList();
+        if (demotedRoleIds.isEmpty()) {
+            return;
+        }
         roleMapper.update(null, new LambdaUpdateWrapper<RoleDO>()
-            .eq(RoleDO::getUserId, userId)
+            .in(RoleDO::getRoleId, demotedRoleIds)
             .set(RoleDO::getIsDefault, "0"));
+        Cache cache = cacheManager.getCache(CacheNames.ROLE);
+        demotedRoleIds.forEach(id -> CacheHelper.evictNow(cache, RoleCacheKeys.of(id)));
     }
 
 }

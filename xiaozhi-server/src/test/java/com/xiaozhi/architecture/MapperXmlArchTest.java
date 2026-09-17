@@ -28,6 +28,26 @@ class MapperXmlArchTest {
 
     private static final Pattern DTO_PACKAGE = Pattern.compile("\\.model\\.(req|resp)\\.");
 
+    private static final Pattern NAMESPACE =
+        Pattern.compile("<mapper\\s+namespace\\s*=\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern STATEMENT_ID =
+        Pattern.compile("<(?:select|insert|update|delete)\\s+[^>]*\\bid\\s*=\\s*[\"']([^\"']+)[\"']");
+
+    /**
+     * 单表且 MyBatis-Plus 能表达的语句禁止写进 Mapper XML，这份清单冻结的是当前已核实
+     * 「确需 XML」的存量语句（JOIN/子查询/批量等 MP 原生表达不了）。
+     * 新增或删除语句都要显式更新这里，逼着改动者先判断是否该走 MP 而不是顺手加进 XML。
+     */
+    private static final Set<String> STATEMENT_INVENTORY = Set.of(
+        "com.xiaozhi.authrolepermission.dal.mysql.mapper.AuthRolePermissionMapper#insertBatch",
+        "com.xiaozhi.device.dal.mysql.mapper.DeviceMapper#selectPage",
+        "com.xiaozhi.message.dal.mysql.mapper.ConversationMapper#selectConversationCount",
+        "com.xiaozhi.message.dal.mysql.mapper.ConversationMapper#selectConversationPage",
+        "com.xiaozhi.message.dal.mysql.mapper.MessageMapper#selectPage",
+        "com.xiaozhi.role.dal.mysql.mapper.RoleMapper#selectPage",
+        "com.xiaozhi.user.dal.mysql.mapper.UserMapper#selectPage"
+    );
+
     /** key 是资源 URI 全串，value 是文件全文。 */
     private static Map<String, String> mapperXml;
 
@@ -57,6 +77,23 @@ class MapperXmlArchTest {
         assertThat(offending)
             .as("resultType 直指 Req/Resp 会让 Service 返回 web 出参，SQL 直出的附加列应落到包内 XxxProjection")
             .isEmpty();
+    }
+
+    @Test
+    void mapperXmlStatementInventoryIsFrozen() {
+        Set<String> actual = new TreeSet<>();
+        for (String xml : mapperXml.values()) {
+            Matcher nsMatcher = NAMESPACE.matcher(xml);
+            String namespace = nsMatcher.find() ? nsMatcher.group(1) : "";
+            Matcher idMatcher = STATEMENT_ID.matcher(xml);
+            while (idMatcher.find()) {
+                actual.add(namespace + "#" + idMatcher.group(1));
+            }
+        }
+        assertThat(actual)
+            .as("Mapper XML 新增/删除了语句：先确认新语句是否'单表且 MyBatis-Plus 能表达'——能表达就不该写进 XML；"
+                + "确实需要写 XML（JOIN/子查询等）就把变化同步进 STATEMENT_INVENTORY")
+            .isEqualTo(STATEMENT_INVENTORY);
     }
 
     /** 按类全名判断，resultType 落在 ..model.req.. / ..model.resp.. 下即违规。 */

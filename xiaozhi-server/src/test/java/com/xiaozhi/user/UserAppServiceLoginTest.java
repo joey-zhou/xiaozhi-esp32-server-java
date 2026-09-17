@@ -6,7 +6,7 @@ import com.xiaozhi.common.model.bo.UserAuthBO;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.port.DeviceWriter;
 import com.xiaozhi.role.service.RoleService;
-import com.xiaozhi.security.AuthenticationService;
+import com.xiaozhi.security.service.AuthenticationService;
 import com.xiaozhi.template.service.TemplateService;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.userauth.service.UserAuthService;

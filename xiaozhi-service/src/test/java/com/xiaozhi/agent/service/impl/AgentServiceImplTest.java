@@ -4,8 +4,8 @@ import com.xiaozhi.agent.convert.AgentConvert;
 import com.xiaozhi.common.model.bo.AgentBO;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.PageResult;
+import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.config.service.ConfigService;
-import com.xiaozhi.token.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,7 +38,7 @@ class AgentServiceImplTest {
     private ConfigService configService;
 
     @Mock
-    private TokenService tokenService;
+    private ProviderTokenClient tokenClient;
 
     @InjectMocks
     private AgentServiceImpl agentService;
@@ -55,7 +55,7 @@ class AgentServiceImplTest {
 
         assertThat(result.getList()).isEmpty();
         assertThat(result.getTotal()).isZero();
-        verifyNoInteractions(configService, tokenService);
+        verifyNoInteractions(configService, tokenClient);
     }
 
     @Test
@@ -132,7 +132,7 @@ class AgentServiceImplTest {
         // 平台侧快照拿不到时，名称回落到配置名（也就是 botId）
         assertThat(agent.getAgentName()).isEqualTo("bot-1");
         // 没有平台凭据就不会去要 token，也不会写库
-        verifyNoInteractions(tokenService);
+        verifyNoInteractions(tokenClient);
         verify(configService, never()).saveAgentModel(any());
     }
 

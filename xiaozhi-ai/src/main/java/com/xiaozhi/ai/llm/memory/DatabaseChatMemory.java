@@ -62,7 +62,7 @@ public class DatabaseChatMemory implements ChatMemory {
     }
 
     @Override
-    public List<Message> find(String sessionId, int limit) {
+    public List<Message> findBySession(String sessionId, int limit) {
         try {
             return toSpringMessages(messageService.listHistory(sessionId, limit));
         } catch (Exception e) {
@@ -153,16 +153,12 @@ public class DatabaseChatMemory implements ChatMemory {
     }
 
     @Override
-    public List<Message> find(String ownerId, int roleId, Instant timeMillis) {
-        return toSpringMessages(messageService.listHistoryAfter(ownerId, roleId, timeMillis));
+    public List<Message> find(String ownerId, int roleId, Instant since) {
+        return toSpringMessages(messageService.listHistoryAfter(ownerId, roleId, since));
     }
 
     @Override
     public void delete(String ownerId, int roleId) {
-        try {
-            throw new IllegalAccessException("暂不支持删除历史记录");
-        } catch (Exception e) {
-            log.error("清除历史记录时出错: {}", e.getMessage(), e);
-        }
+        throw new UnsupportedOperationException("暂不支持删除历史记录");
     }
 }

@@ -33,11 +33,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 public class AecService {
-    @Value("${aec.noise.suppression.level:MODERATE}")
+    @Value("${xiaozhi.aec.noise.suppression.level:MODERATE}")
     private String noiseSuppressionLevel;
 
     // 参考侧保留的积压帧数，吸收上行抖动；须小于播放器的预缓冲帧数，参考才能领先设备播放点
-    @Value("${aec.reference.backlog.frames:2}")
+    @Value("${xiaozhi.aec.reference.backlog.frames:2}")
     private int referenceBacklogFrames;
 
     // 每会话 AEC 状态
@@ -60,9 +60,8 @@ public class AecService {
     public void initSession(String sessionId) {
         if (nativeUnavailable) return;
         if (!serverAecSessions.contains(sessionId)) return;
-        if (states.containsKey(sessionId)) return;
         try {
-            states.putIfAbsent(sessionId, new AecState());
+            states.computeIfAbsent(sessionId, k -> new AecState());
         } catch (Throwable t) {
             // NoClassDefFoundError 等 native 初始化失败属于 Error，不能只 catch Exception，
             // 否则会击穿到调用方（连接建立流程）导致设备无法连接。
@@ -115,15 +114,14 @@ public class AecService {
         if (state == null) return;
 
         try {
-            byte[] pcm = referencePcm;
-            if (pcm == null) {
-                // 解码必须按发送顺序进行，解码器有状态
-                pcm = state.refDecoder.opusToPcm(opusFrame);
-            }
-            if (pcm == null || pcm.length == 0) return;
-
             synchronized (state.apmLock) {
                 if (state.disposed) return;
+                byte[] pcm = referencePcm;
+                if (pcm == null) {
+                    // 解码必须按发送顺序进行，解码器有状态，挪进锁内避免与其它并发解码调用交叉
+                    pcm = state.refDecoder.opusToPcm(opusFrame);
+                }
+                if (pcm == null || pcm.length == 0) return;
                 state.feed.add(timestamp, pcm);
             }
         } catch (Exception e) {
@@ -158,15 +156,12 @@ public class AecService {
                 // AEC3 的延迟估计既不会因 underrun 被清空，也不会因批量灌入 overrun 复位
                 while (offset + FRAME_BYTES_10MS <= totalBytes) {
                     for (byte[] refBlock : state.feed.blocksForCaptureBlock()) {
-                        byte[] refOutput = new byte[FRAME_BYTES_10MS];
-                        state.apm.processReverseStream(refBlock, state.streamConfig, state.streamConfig, refOutput);
+                        state.apm.processReverseStream(refBlock, state.streamConfig, state.streamConfig, state.refOutputBuf);
                     }
 
-                    byte[] micSubFrame = new byte[FRAME_BYTES_10MS];
-                    System.arraycopy(micPcm, offset, micSubFrame, 0, FRAME_BYTES_10MS);
-                    byte[] outputFrame = new byte[FRAME_BYTES_10MS];
-                    state.apm.processStream(micSubFrame, state.streamConfig, state.streamConfig, outputFrame);
-                    System.arraycopy(outputFrame, 0, aecOutput, outOffset, FRAME_BYTES_10MS);
+                    System.arraycopy(micPcm, offset, state.micSubFrameBuf, 0, FRAME_BYTES_10MS);
+                    state.apm.processStream(state.micSubFrameBuf, state.streamConfig, state.streamConfig, state.outputFrameBuf);
+                    System.arraycopy(state.outputFrameBuf, 0, aecOutput, outOffset, FRAME_BYTES_10MS);
                     offset += FRAME_BYTES_10MS;
                     outOffset += FRAME_BYTES_10MS;
                 }
@@ -249,6 +244,11 @@ public class AecService {
         final ReferenceFeed feed = new ReferenceFeed(referenceBacklogFrames);
         // 统计日志节流
         int framesSinceStatsLog = 0;
+
+        // 10ms 帧临时缓冲，process() 全程在 apmLock 内单线程顺序使用，复用避免每帧分配
+        final byte[] refOutputBuf = new byte[FRAME_BYTES_10MS];
+        final byte[] micSubFrameBuf = new byte[FRAME_BYTES_10MS];
+        final byte[] outputFrameBuf = new byte[FRAME_BYTES_10MS];
 
         // 最近一次统计采样，在 apmLock 内写入，Gauge 无锁读取
         volatile boolean statsSampled = false;

@@ -15,6 +15,5 @@ public final  class DeviceMcpMessage extends Message {
     }
 
     private String sessionId;//会话id
-    private String type = "mcp";
     private DeviceMcpPayload payload;
 }

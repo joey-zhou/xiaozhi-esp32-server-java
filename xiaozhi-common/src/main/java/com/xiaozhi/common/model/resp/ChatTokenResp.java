@@ -7,7 +7,7 @@ import lombok.Data;
 @Schema(description = "流式聊天的一个 Token")
 public class ChatTokenResp {
 
-    @Schema(description = "类型", allowableValues = {"thinking", "content"})
+    @Schema(description = "类型", allowableValues = {"thinking", "content", "error"})
     private String type;
 
     @Schema(description = "文本内容")

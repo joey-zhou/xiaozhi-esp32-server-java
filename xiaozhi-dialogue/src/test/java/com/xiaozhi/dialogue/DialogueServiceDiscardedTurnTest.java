@@ -76,7 +76,7 @@ class DialogueServiceDiscardedTurnTest {
         lenient().when(springSession.getId()).thenReturn(SESSION_ID);
         session = spy(new WebSocketSession(springSession));
         session.setDevice(boundDevice());
-        session.setMode(ListenMode.Auto);
+        session.setMode(ListenMode.AUTO);
         session.setPersona(persona);
         session.setPlayer(player);
         lenient().when(persona.getSttService()).thenReturn(sttService);

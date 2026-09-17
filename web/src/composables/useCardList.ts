@@ -117,78 +117,17 @@ export function useCardList<T extends object>(options: UseCardListOptions<T>) {
     }
   }
   
-  /**
-   * 刷新数据
-   */
-  const refresh = async () => {
-    await loadData()
-  }
-  
-  /**
-   * 重置搜索
-   */
-  const resetSearch = () => {
-    searchQuery.value = ''
-  }
-  
-  /**
-   * 添加项到列表
-   */
-  const addItem = (item: T) => {
-    allItems.value = [...allItems.value, item]
-  }
-  
-  /**
-   * 更新项
-   */
-  const updateItem = (predicate: (item: T) => boolean, newItem: Partial<T>) => {
-    const items = allItems.value
-    const index = items.findIndex(item => predicate(item))
-    if (index !== -1) {
-      const updatedItems = [...items]
-      updatedItems[index] = { ...items[index], ...newItem } as T
-      allItems.value = updatedItems
-    }
-  }
-  
-  /**
-   * 删除项
-   */
-  const removeItem = (predicate: (item: T) => boolean) => {
-    const items = allItems.value
-    allItems.value = items.filter(item => !predicate(item))
-  }
-  
-  /**
-   * 清空数据
-   */
-  const clear = () => {
-    allItems.value = []
-    searchQuery.value = ''
-  }
-  
   // 如果设置了立即加载，则自动加载数据
   if (options.immediate !== false) {
     loadData()
   }
-  
+
   return {
-    // 状态
     loading,
-    searchQuery,
-    allItems,
     filteredItems,
     skeletonCount,
     isEmpty,
     hasData,
-    
-    // 方法
-    loadData,
-    refresh,
-    resetSearch,
-    addItem,
-    updateItem,
-    removeItem,
-    clear
+    loadData
   }
 }

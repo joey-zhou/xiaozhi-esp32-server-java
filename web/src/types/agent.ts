@@ -18,8 +18,6 @@ export interface AgentQueryParams extends PageQueryParams {
  */
 export interface PlatformConfig {
   configId?: number
-  deviceId?: string
-  roleId?: number
   configName?: string
   configDesc?: string
   configType?: string
@@ -33,7 +31,6 @@ export interface PlatformConfig {
   apiUrl?: string
   state?: string
   isDefault?: string
-  agentId?: number
   agentName?: string
   botId?: string
   agentDesc?: string

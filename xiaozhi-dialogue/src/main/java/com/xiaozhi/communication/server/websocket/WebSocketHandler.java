@@ -17,7 +17,6 @@ import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorato
 import org.springframework.web.socket.WebSocketSession;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Objects;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -85,10 +84,15 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
 
         try {
             var msg = JsonUtil.fromJson(payload, Message.class);
-            if (Objects.requireNonNull(msg) instanceof HelloMessage m) {
+            if (msg == null) {
+                // 非 JSON、字段类型不匹配等硬性解析失败：整条丢弃，不进设备绑定、不进业务分发
+                log.warn("无法解析设备消息，已丢弃 - SessionId: {}", sessionId);
+                return;
+            }
+            if (msg instanceof HelloMessage m) {
                 handleHelloMessage(session, m);
-            } else if (msg instanceof PingMessage) {
-                // 保活报文：收到即已重置容器的空闲计时，不进设备绑定、不进业务分发、不回应答
+            } else if (msg instanceof PingMessage || msg instanceof UnknownMessage) {
+                // 保活报文/未识别的 type：不进设备绑定、不进业务分发、不回应答
                 return;
             } else {
                 if (device == null || device.getRoleId() == null) {
@@ -160,19 +164,18 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
      * 判断异常是否由客户端主动关闭连接导致
      */
     private boolean isClientCloseRequest(Throwable exception) {
-        // 检查常见的客户端关闭连接导致的异常类型
-        if (exception instanceof IOException) {
-            String message = exception.getMessage();
-            if (message != null) {
-                return message.contains("Connection reset by peer") ||
-                    message.contains("Broken pipe") ||
-                    message.contains("Connection closed") ||
-                    message.contains("远程主机强迫关闭了一个现有的连接");
-            }
-            // 处理EOFException，这通常是客户端关闭连接导致的
-            return exception instanceof java.io.EOFException;
+        if (exception instanceof java.io.EOFException) {
+            return true;
         }
-        return false;
+        if (!(exception instanceof IOException)) {
+            return false;
+        }
+        String message = exception.getMessage();
+        return message != null && (
+                message.contains("Connection reset") ||
+                message.contains("Broken pipe") ||
+                message.contains("Connection closed") ||
+                message.contains("远程主机强迫关闭了一个现有的连接"));
     }
 
     private void handleHelloMessage(WebSocketSession session, HelloMessage message) {
@@ -194,7 +197,7 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
         messageHandler.applyAudioParams(sessionId, message.getAudioParams());
 
         // 回复hello消息
-        var resp = new HelloMessageResp()
+        var resp = new HelloResponseMessage()
                 .setVersion(protocolVersion)
                 .setTransport("websocket")
                 .setSessionId(sessionId)
@@ -207,7 +210,7 @@ public class WebSocketHandler extends AbstractWebSocketHandler {
                 return;
             }
             current.sendTextMessage(JsonUtil.toJson(resp));
-            if(message.getFeatures() != null && message.getFeatures().getMcp()) {
+            if (message.getFeatures() != null && Boolean.TRUE.equals(message.getFeatures().getMcp())) {
                 //如果客户端开启mcp协议，异步初始化MCP工具
                 Thread.startVirtualThread(() -> {
                     DeviceBO device = current.getDevice();

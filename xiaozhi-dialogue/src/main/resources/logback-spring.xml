@@ -78,6 +78,7 @@
         <logger name="com.xiaozhi.dialogue" level="DEBUG" />
         <logger name="com.alibaba.dashscope.protocol.okhttp" level="WARN" />
         <logger name="io.modelcontextprotocol.client" level="INFO" />
+        <logger name="io.github.imfangs.dify.client.impl.StreamEventDispatcher" level="ERROR" />
     </springProfile>
 
     <!-- 生产环境配置 -->
@@ -91,6 +92,7 @@
         <logger name="org.springframework.web" level="ERROR" />
         <logger name="com.alibaba.dashscope.protocol.okhttp" level="WARN" />
         <logger name="io.modelcontextprotocol.client" level="INFO" />
+        <logger name="io.github.imfangs.dify.client.impl.StreamEventDispatcher" level="ERROR" />
     </springProfile>
 
     <!-- 默认配置（如果没有指定profile） -->

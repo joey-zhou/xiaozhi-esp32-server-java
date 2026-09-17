@@ -126,23 +126,4 @@ public class RoleConverter {
 
         return bo;
     }
-
-    /** RoleBO → value objects（供 AppService 构造 update/create 行为参数） */
-    public LlmConfig toLlmConfig(RoleBO bo) {
-        return new LlmConfig(bo.getModelId(), bo.getTemperature(), bo.getTopP());
-    }
-
-    public VoiceConfig toVoiceConfig(RoleBO bo) {
-        return new VoiceConfig(bo.getTtsId(), bo.getSttId(), bo.getVoiceName(),
-                bo.getTtsPitch(), bo.getTtsSpeed());
-    }
-
-    public AudioConfig toAudioConfig(RoleBO bo) {
-        return new AudioConfig(bo.getVadEnergyTh(), bo.getVadSpeechTh(),
-                bo.getVadSilenceTh(), bo.getVadSilenceMs());
-    }
-
-    public MemoryStrategy toMemoryStrategy(RoleBO bo) {
-        return new MemoryStrategy(bo.getMemoryType());
-    }
 }

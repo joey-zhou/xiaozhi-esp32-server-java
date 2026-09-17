@@ -25,11 +25,10 @@ export interface User {
 }
 
 /**
- * 登录 / 校验 token / 刷新 token 的响应体
+ * 登录 / 校验 token 的响应体
  */
 export interface LoginResponse {
   token: string
-  refreshToken: string
   expiresIn: number // 过期时间（秒）
   userId: number
   isNewUser: boolean

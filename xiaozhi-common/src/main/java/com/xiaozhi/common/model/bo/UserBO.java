@@ -15,8 +15,6 @@ public class UserBO {
     private Integer userId;
     private String username;
     private String password;
-    private String wxOpenId;
-    private String wxUnionId;
     private String name;
     private String avatar;
     private String state;

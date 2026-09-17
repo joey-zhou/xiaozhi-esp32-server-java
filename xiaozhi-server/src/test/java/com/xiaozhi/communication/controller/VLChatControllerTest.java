@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 钉住视觉问答接口的鉴权链路：token 必须是 DeviceAuthService 签发的 vision token，
- * 且 session 存活、设备与 session 匹配、图片可解析，四道关卡各自的拒绝原因都要能区分开。
+ * 且设备与 session（若本实例可见）匹配、图片可解析，三道关卡各自的拒绝原因都要能区分开。
  * <p>
  * ControllerTestSupport 依赖 xiaozhi-server 的 GlobalExceptionHandler，所以本测试留在 server 模块。
  */
@@ -112,7 +112,8 @@ class VLChatControllerTest extends ControllerTestSupport {
     }
 
     @Test
-    void rejectsTokenOfDeadSession() throws Exception {
+    void acceptsTokenWhenSessionIsOnAnotherInstance() throws Exception {
+        when(visionService.recognize(any(), any())).thenReturn("一只猫");
         String token = deviceAuthService.generateVisionToken("gone-session", DEVICE_ID);
 
         mockMvc.perform(multipart("/api/vl/chat")
@@ -120,7 +121,8 @@ class VLChatControllerTest extends ControllerTestSupport {
                         .param("question", "这是什么")
                         .header("authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").value("session不存在"));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.text").value("一只猫"));
     }
 
     @Test

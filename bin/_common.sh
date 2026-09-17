@@ -106,10 +106,20 @@ is_running() {
   [[ -f "$pid_path" ]] && kill -0 "$(cat "$pid_path")" 2>/dev/null
 }
 
+# ---- 运行环境 ----
+# resolve_profile [dev|prod] — 优先级：命令行参数 > 已导出的 SPRING_PROFILES_ACTIVE > dev
+resolve_profile() {
+  local profile="${1:-${SPRING_PROFILES_ACTIVE:-dev}}"
+  case "$profile" in
+    dev|prod) echo "$profile" ;;
+    *) _err "不支持的运行环境: ${profile}（只支持 dev / prod）"; return 1 ;;
+  esac
+}
+
 # ---- 启动单个服务 ----
-# start_service <name> <module> <port> [label_color]
+# start_service <name> <module> <port> <profile>
 start_service() {
-  local name="$1" module="$2" port="$3" color="${4:-$CYAN}"
+  local name="$1" module="$2" port="$3" profile="$4"
 
   if is_running "$name"; then
     _warn "$name 已在运行 (pid=$(cat "$(pid_file "$name")"))"
@@ -136,7 +146,7 @@ start_service() {
     return 1
   fi
 
-  _info "启动 $name (port $port)..."
+  _info "启动 $name (port $port, profile $profile)..."
   _info "  java: $java_bin"
   mkdir -p "$LOGS_DIR"
   rotate_console_log "$LOGS_DIR/$name.out"
@@ -147,6 +157,7 @@ start_service() {
   ( cd "$ROOT_DIR" && exec nohup "$java_bin" \
       -Djava.library.path="$ROOT_DIR/lib" \
       -jar "$jar" \
+      --spring.profiles.active="$profile" \
       >> "$LOGS_DIR/$name.out" 2>&1 ) &
 
   local pid=$!
@@ -199,18 +210,19 @@ status_service() {
 
 # ---- 重启 ----
 restart_service() {
-  local name="$1" module="$2" port="$3"
+  local name="$1" module="$2" port="$3" profile="$4"
   stop_service  "$name"
   sleep 1
-  start_service "$name" "$module" "$port"
+  start_service "$name" "$module" "$port" "$profile"
 }
 
 # ---- 用法提示 ----
 usage() {
   local script="$1"
-  echo -e "用法: ${BOLD}$script${NC} <start|stop|restart|status>"
+  echo -e "用法: ${BOLD}$script${NC} <start|stop|restart|status> [dev|prod]"
   echo "  start    编译并启动"
   echo "  stop     停止"
   echo "  restart  停止后重新编译并启动"
   echo "  status   查看运行状态"
+  echo "  运行环境默认 dev；可在命令后加 prod，或先 export SPRING_PROFILES_ACTIVE=prod"
 }

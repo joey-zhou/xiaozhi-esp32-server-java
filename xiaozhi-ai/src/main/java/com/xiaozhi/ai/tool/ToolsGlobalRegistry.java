@@ -53,32 +53,6 @@ public class ToolsGlobalRegistry implements ToolCallbackResolver {
     }
 
     /**
-     * Register a function by name
-     *
-     * @param name the name of the function to register
-     * @return the registered function or null if not found
-     */
-    public ToolCallback registerFunction(String name, ToolCallback functionCallTool) {
-        ToolCallback result = allFunction.putIfAbsent(name, functionCallTool);
-        return result;
-    }
-
-    /**
-     * Unregister a function by name
-     *
-     * @param name the name of the function to unregister
-     * @return true if successful, false otherwise
-     */
-    public boolean unregisterFunction(String name) {
-        // Check if the function exists before unregistering
-        if (!allFunction.containsKey(name)) {
-            return false;
-        }
-        allFunction.remove(name);
-        return true;
-    }
-
-    /**
      * Get all registered functions
      *
      * @return a map of all registered functions

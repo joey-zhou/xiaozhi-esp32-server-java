@@ -12,6 +12,7 @@ import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.ParameterNameDiscoverer;
+import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.context.expression.MethodBasedEvaluationContext;
@@ -45,6 +46,7 @@ public class OwnershipAspect {
     private final ExpressionParser expressionParser = new SpelExpressionParser();
     /** 已通过表达式变量名校验的方法，校验只做一次。 */
     private final Map<Method, Boolean> validatedMethods = new ConcurrentHashMap<>();
+    private final Map<String, Expression> expressionCache = new ConcurrentHashMap<>();
 
     @Resource
     private UserService userService;
@@ -71,9 +73,15 @@ public class OwnershipAspect {
         MethodBasedEvaluationContext context =
             new MethodBasedEvaluationContext(null, method, joinPoint.getArgs(), parameterNameDiscoverer);
 
+        Boolean isAdminCache = null;
         for (CheckOwner annotation : annotations) {
-            if (annotation.adminBypass() && isAdmin(userId)) {
-                continue;
+            if (annotation.adminBypass()) {
+                if (isAdminCache == null) {
+                    isAdminCache = isAdmin(userId);
+                }
+                if (isAdminCache) {
+                    continue;
+                }
             }
 
             OwnershipChecker checker = checkerMap.get(annotation.resource());
@@ -81,7 +89,9 @@ public class OwnershipAspect {
                 throw new IllegalStateException("未注册资源归属检查器: " + annotation.resource());
             }
 
-            Object resourceId = expressionParser.parseExpression(annotation.id()).getValue(context);
+            Object resourceId = expressionCache
+                .computeIfAbsent(annotation.id(), expressionParser::parseExpression)
+                .getValue(context);
             for (Object candidateId : resolveIds(resourceId)) {
                 if (candidateId == null) {
                     continue;
@@ -149,7 +159,7 @@ public class OwnershipAspect {
 
     private boolean isAdmin(Integer userId) {
         UserBO user = userService.getBO(userId);
-        return user != null && "1".equals(user.getIsAdmin());
+        return user != null && UserBO.ADMIN_YES.equals(user.getIsAdmin());
     }
 
     private List<Object> resolveIds(Object resourceId) {

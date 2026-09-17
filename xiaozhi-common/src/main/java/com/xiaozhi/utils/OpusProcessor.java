@@ -74,15 +74,28 @@ public class OpusProcessor {
         }
     }
 
-    private static final class SilenceFrameHolder {
-        static final byte[] FRAME = new OpusProcessor().pcmToOpus(SILENCE_PCM, false).get(0).opus();
-    }
+    private static volatile byte[] silenceFrame;
 
     /**
-     * 一帧（60ms）静音的 Opus 编码，由独立编码器一次性生成，调用方不得修改返回的数组
+     * 一帧（60ms）静音的 Opus 编码，首次调用时才生成，调用方不得修改返回的数组。
+     * 用 volatile 字段 + synchronized 兜底而不是静态内部类懒加载，是因为静态初始化失败会被 JVM
+     * 永久缓存为 NoClassDefFoundError，这里改成失败后下次调用可以重新尝试编码。
      */
     public static byte[] silenceFrame() {
-        return SilenceFrameHolder.FRAME;
+        byte[] frame = silenceFrame;
+        if (frame != null) {
+            return frame;
+        }
+        synchronized (OpusProcessor.class) {
+            if (silenceFrame == null) {
+                List<EncodedFrame> encoded = new OpusProcessor().pcmToOpus(SILENCE_PCM, false);
+                if (encoded.isEmpty()) {
+                    throw new IllegalStateException("静音帧编码失败");
+                }
+                silenceFrame = encoded.get(0).opus();
+            }
+        }
+        return silenceFrame;
     }
 
     /**
@@ -243,6 +256,18 @@ public class OpusProcessor {
                 System.arraycopy(combined, frameCount * frameSize, state.leftoverBuffer, 0, remainingSamples);
             } else {
                 Arrays.fill(state.leftoverBuffer, (short) 0); // 清空
+            }
+        } else if (remainingSamples > 0) {
+            // 非流式：把不足一帧的尾部补零后编码，避免缓存播放比首播短
+            Arrays.fill(shortBuf, (short) 0);
+            System.arraycopy(combined, frameCount * frameSize, shortBuf, 0, remainingSamples);
+            try {
+                int opusLen = enc.encode(shortBuf, 0, frameSize, opusBuf, 0, opusBuf.length);
+                if (opusLen > 0) {
+                    frames.add(new EncodedFrame(Arrays.copyOf(opusBuf, opusLen), toPcmBytes(shortBuf, frameSize)));
+                }
+            } catch (Exception | AssertionError e) {
+                log.warn("尾帧编码失败: {}", e.getMessage());
             }
         }
         return frames;

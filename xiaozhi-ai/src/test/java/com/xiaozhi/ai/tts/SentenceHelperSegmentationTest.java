@@ -21,7 +21,7 @@ class SentenceHelperSegmentationTest {
         // 句末标点后先挂起，等下一个字符决定收尾符号是否并入本句
         assertThat(helper.take("你好呀今天天气不错。")).isEmpty();
 
-        List<SentenceHelper.SentenceResult> sentences = helper.take("”明天见");
+        List<SentenceResult> sentences = helper.take("”明天见");
 
         assertThat(sentences).hasSize(1);
         assertThat(sentences.get(0).text()).isEqualTo("你好呀今天天气不错。”");
@@ -31,7 +31,7 @@ class SentenceHelperSegmentationTest {
     void endMarkSplitsBeforeNonClosingCharacter() {
         SentenceHelper helper = new SentenceHelper();
 
-        List<SentenceHelper.SentenceResult> sentences = helper.take("你好呀今天天气不错。明天");
+        List<SentenceResult> sentences = helper.take("你好呀今天天气不错。明天");
 
         assertThat(sentences).hasSize(1);
         assertThat(sentences.get(0).text()).isEqualTo("你好呀今天天气不错。");
@@ -44,7 +44,7 @@ class SentenceHelperSegmentationTest {
 
         assertThat(helper.take("短，")).isEmpty();
 
-        List<SentenceHelper.SentenceResult> sentences = helper.take("这是一段较长的话，");
+        List<SentenceResult> sentences = helper.take("这是一段较长的话，");
 
         assertThat(sentences).hasSize(1);
         assertThat(sentences.get(0).text()).isEqualTo("短，这是一段较长的话，");
@@ -54,7 +54,7 @@ class SentenceHelperSegmentationTest {
     void colonSplitsWhenSentenceLongEnough() {
         SentenceHelper helper = new SentenceHelper();
 
-        List<SentenceHelper.SentenceResult> sentences = helper.take("下面是重点内容：");
+        List<SentenceResult> sentences = helper.take("下面是重点内容：");
 
         assertThat(sentences).hasSize(1);
         assertThat(sentences.get(0).text()).isEqualTo("下面是重点内容：");
@@ -64,7 +64,7 @@ class SentenceHelperSegmentationTest {
     void newlineSplitsWhenSentenceLongEnough() {
         SentenceHelper helper = new SentenceHelper();
 
-        List<SentenceHelper.SentenceResult> sentences = helper.take("这是一段够长的文字\n");
+        List<SentenceResult> sentences = helper.take("这是一段够长的文字\n");
 
         assertThat(sentences).hasSize(1);
         assertThat(sentences.get(0).text()).isEqualTo("这是一段够长的文字");
@@ -74,7 +74,7 @@ class SentenceHelperSegmentationTest {
     void emojiSplitsSentenceAndExtractsMood() {
         SentenceHelper helper = new SentenceHelper();
 
-        List<SentenceHelper.SentenceResult> sentences = helper.take("今天天气真是不错啊😊");
+        List<SentenceResult> sentences = helper.take("今天天气真是不错啊😊");
 
         assertThat(sentences).hasSize(1);
         assertThat(sentences.get(0).text()).isEqualTo("今天天气真是不错啊");
@@ -85,7 +85,7 @@ class SentenceHelperSegmentationTest {
     void closedParenthesesSplitSentenceAndAreStripped() {
         SentenceHelper helper = new SentenceHelper();
 
-        List<SentenceHelper.SentenceResult> sentences = helper.take("今天天气真是不错啊（很晴朗）");
+        List<SentenceResult> sentences = helper.take("今天天气真是不错啊（很晴朗）");
 
         assertThat(sentences).hasSize(1);
         assertThat(sentences.get(0).text()).isEqualTo("今天天气真是不错啊");
@@ -98,7 +98,7 @@ class SentenceHelperSegmentationTest {
         // 表情触发切句，但去掉表情后只剩 7 个字，不足以成句，缓冲必须保留
         assertThat(helper.take("今天天气真不错😊")).isEmpty();
 
-        List<SentenceHelper.SentenceResult> sentences = helper.take("，真舒服");
+        List<SentenceResult> sentences = helper.take("，真舒服");
 
         assertThat(sentences).hasSize(1);
         assertThat(sentences.get(0).text()).isEqualTo("今天天气真不错，");
@@ -110,7 +110,7 @@ class SentenceHelperSegmentationTest {
     void englishPeriodFollowedBySpaceSplitsSentence() {
         SentenceHelper helper = new SentenceHelper();
 
-        List<SentenceHelper.SentenceResult> sentences =
+        List<SentenceResult> sentences =
                 helper.take("This is a fairly long sentence. And here comes the next one.");
 
         assertThat(sentences).hasSize(1);

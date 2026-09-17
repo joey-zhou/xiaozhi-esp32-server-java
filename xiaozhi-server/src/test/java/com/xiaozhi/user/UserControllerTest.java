@@ -6,13 +6,14 @@ import com.xiaozhi.common.model.req.UserPageReq;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.LoginResp;
 import com.xiaozhi.common.model.resp.UserResp;
+import com.xiaozhi.common.model.req.UserSendCaptchaReq;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.support.ControllerTestSupport;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.user.service.WxLoginService;
+import com.xiaozhi.verifycode.VerifyCodeAppService;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
-import com.xiaozhi.utils.CaptchaUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -56,7 +58,7 @@ class UserControllerTest extends ControllerTestSupport {
     private VerifyCodeService verifyCodeService;
 
     @Mock
-    private CaptchaUtils captchaUtils;
+    private VerifyCodeAppService verifyCodeAppService;
 
     @Mock
     private TrustedProxyPolicy trustedProxyPolicy;
@@ -70,7 +72,7 @@ class UserControllerTest extends ControllerTestSupport {
         ReflectionTestUtils.setField(userController, "userService", userService);
         ReflectionTestUtils.setField(userController, "wxLoginService", wxLoginService);
         ReflectionTestUtils.setField(userController, "verifyCodeService", verifyCodeService);
-        ReflectionTestUtils.setField(userController, "captchaUtils", captchaUtils);
+        ReflectionTestUtils.setField(userController, "verifyCodeAppService", verifyCodeAppService);
         ReflectionTestUtils.setField(userController, "trustedProxyPolicy", trustedProxyPolicy);
         mockMvc = buildMockMvc(userController);
     }
@@ -79,9 +81,9 @@ class UserControllerTest extends ControllerTestSupport {
     void checkTokenReturnsUnauthorizedWhenNoUserInContext() throws Exception {
         try (var ignored = mockNoLoginUser()) {
             mockMvc.perform(get("/api/user/check-token"))
-                .andExpect(status().isOk())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(ResultStatus.UNAUTHORIZED))
-                .andExpect(jsonPath("$.message").value("Token无效或已过期"));
+                .andExpect(jsonPath("$.message").value("登录已过期，请重新登录"));
         }
     }
 
@@ -104,8 +106,24 @@ class UserControllerTest extends ControllerTestSupport {
     }
 
     @Test
-    void sendEmailCaptchaRejectsUnknownEmailOnForgetFlow() throws Exception {
-        when(userService.getByEmail("nobody@example.com")).thenReturn(null);
+    void sendEmailCaptchaForwardsRequestToAppService() throws Exception {
+        mockMvc.perform(post("/api/user/sendEmailCaptcha")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email":"alice@example.com","type":"register"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(ResultStatus.SUCCESS));
+
+        ArgumentCaptor<UserSendCaptchaReq> captor = ArgumentCaptor.forClass(UserSendCaptchaReq.class);
+        verify(verifyCodeAppService).sendEmailCaptcha(captor.capture());
+        assertThat(captor.getValue().getEmail()).isEqualTo("alice@example.com");
+    }
+
+    @Test
+    void sendEmailCaptchaPropagatesAppServiceRejection() throws Exception {
+        doThrow(new IllegalArgumentException("该邮箱未注册"))
+            .when(verifyCodeAppService).sendEmailCaptcha(any(UserSendCaptchaReq.class));
 
         mockMvc.perform(post("/api/user/sendEmailCaptcha")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -114,6 +132,35 @@ class UserControllerTest extends ControllerTestSupport {
                     """))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value("该邮箱未注册"));
+    }
+
+    @Test
+    void sendSmsCaptchaForwardsRequestToAppService() throws Exception {
+        mockMvc.perform(post("/api/user/sendSmsCaptcha")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"tel":"13800138000","type":"register"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(ResultStatus.SUCCESS));
+
+        ArgumentCaptor<UserSendCaptchaReq> captor = ArgumentCaptor.forClass(UserSendCaptchaReq.class);
+        verify(verifyCodeAppService).sendSmsCaptcha(captor.capture());
+        assertThat(captor.getValue().getTel()).isEqualTo("13800138000");
+    }
+
+    @Test
+    void sendSmsCaptchaPropagatesAppServiceRejection() throws Exception {
+        doThrow(new IllegalArgumentException("该手机号未注册"))
+            .when(verifyCodeAppService).sendSmsCaptcha(any(UserSendCaptchaReq.class));
+
+        mockMvc.perform(post("/api/user/sendSmsCaptcha")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"tel":"13800138000","type":"forget"}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("该手机号未注册"));
     }
 
     /** 提示不区分字段，否则这个匿名端点就是逐字段确认注册状态的预言机 */

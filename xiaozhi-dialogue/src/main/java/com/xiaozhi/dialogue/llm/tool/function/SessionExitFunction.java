@@ -26,6 +26,9 @@ public class SessionExitFunction implements ToolsGlobalRegistry.GlobalFunction {
             .builder(TOOL_NAME, (Map<String, String> params, ToolContext toolContext) -> {
                 String sessionId = (String) toolContext.getContext().get(Persona.TOOL_CONTEXT_SESSION_ID_KEY);
                 ChatSession chatSession = sessionManager.getSession(sessionId);
+                if (chatSession == null || chatSession.getPlayer() == null) {
+                    return "好的，再见！";
+                }
                 chatSession.getPlayer().setFunctionAfterChat(()->sessionManager.closeSession(chatSession));
                 String sayGoodbye = params.get("sayGoodbye");
                 if(sayGoodbye == null || sayGoodbye.trim().isEmpty()){

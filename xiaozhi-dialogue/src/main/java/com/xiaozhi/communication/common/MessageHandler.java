@@ -409,24 +409,24 @@ public class MessageHandler {
 
         // 根据state处理不同的监听状态
         switch (message.getState()) {
-            case ListenState.Start:
+            case ListenState.START:
                 // 设备开始录音，进入聆听状态
                 log.info("开始监听 - Mode: {}", message.getMode());
 
                 chatSession.transitionTo(DeviceState.LISTENING);
 
                 // manual 由客户端松手断句，服务端不做自动收句
-                vadService.initSession(sessionId, chatSession.getMode() != ListenMode.Manual);
+                vadService.initSession(sessionId, chatSession.getMode() != ListenMode.MANUAL);
                 // 初始化AEC会话
                 if (aecService != null) aecService.initSession(sessionId);
                 break;
 
-            case ListenState.Stop:
+            case ListenState.STOP:
                 // 停止监听
                 log.info("停止监听 - Mode: {}", chatSession.getMode());
 
                 // audioSinks 在上一轮结束后仍非空，只有 VAD 本轮状态是准确信号
-                if (chatSession.getMode() == ListenMode.Manual
+                if (chatSession.getMode() == ListenMode.MANUAL
                         && chatSession.getDeviceState() == DeviceState.LISTENING
                         && vadService.finishSegment(sessionId)) {
                     // 松手收句。不能 closeAudioStream/resetSession，STT 虚拟线程之后还要读 pcmData
@@ -440,13 +440,12 @@ public class MessageHandler {
                 }
                 break;
 
-            case ListenState.Text:
+            case ListenState.TEXT:
                 // 检测聊天文本输入 — 确保 AEC 在 TTS 开始前已初始化
                 if (aecService != null) aecService.initSession(sessionId);
                 if (player != null ) {
-                    String modeValue = message.getMode() != null ? message.getMode().getValue() : null;
                     String abortDeviceId = chatSession.getDevice() != null ? chatSession.getDevice().getDeviceId() : null;
-                    applicationContext.publishEvent(new ChatAbortedEvent(this, chatSession.getSessionId(), abortDeviceId, modeValue));
+                    applicationContext.publishEvent(new ChatAbortedEvent(this, chatSession.getSessionId(), abortDeviceId, null));
                 }
                 // 回执按序留在读线程上发出；建 Persona 与启动 LLM 要走工具路由的 embedding、
                 // RAG 的向量检索和一次 LLM 建连，占住读线程会让设备随后发来的 abort、listen stop 一直排队
@@ -463,7 +462,7 @@ public class MessageHandler {
                 });
                 break;
 
-            case ListenState.Detect:
+            case ListenState.DETECT:
                 // 检测到唤醒词 — 确保 AEC 在 TTS 开始前已初始化
                 if (aecService != null) aecService.initSession(sessionId);
                 // 状态切换必须留在读线程：唤醒响应期间要立刻屏蔽 VAD，
@@ -530,6 +529,10 @@ public class MessageHandler {
 
     public void handleMessage(Message msg, String sessionId) {
         var chatSession = sessionManager.getSession(sessionId);
+        if (chatSession == null) {
+            log.warn("收到消息但会话已不存在 - SessionId: {}, MessageType: {}", sessionId, msg.getClass().getSimpleName());
+            return;
+        }
         switch (msg) {
             case ListenMessage m -> handleListenMessage(chatSession, m);
             case IotMessage m -> handleIotMessage(chatSession, m);

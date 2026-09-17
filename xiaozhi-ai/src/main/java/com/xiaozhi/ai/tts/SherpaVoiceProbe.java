@@ -6,12 +6,7 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.*;
-
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * Sherpa-ONNX 本地音色扫描。
@@ -19,17 +14,41 @@ import lombok.extern.slf4j.Slf4j;
  * 扫描配置的本地 TTS 模型目录，自动识别模型类型（Kokoro / Matcha / VITS）和 speaker。
  * 扫描的是与 {@link com.xiaozhi.ai.tts.providers.SherpaOnnxTtsService} 相同的模型目录。
  */
-@Slf4j
 @Component
 public class SherpaVoiceProbe {
 
+    // Kokoro voices.bin 是各说话人 float32 张量顺序拼接：v1.0 起每人 (510, 1, 256)，v0.19 每人 (511, 1, 256)
+    private static final long[] KOKORO_SPEAKER_TENSOR_BYTES = {510L * 256L * 4L, 511L * 256L * 4L};
+
+    private static final long CACHE_TTL_MILLIS = 60_000L;
+
     @Resource
     private RuntimePathConfig runtimePathConfig;
+
+    private volatile List<SherpaVoiceResp> cachedVoices;
+    private volatile long cachedAtMillis;
 
     /**
      * 扫描本地 TTS 模型目录，返回所有可用的 sherpa-onnx 音色列表。
      */
     public List<SherpaVoiceResp> listVoices() {
+        List<SherpaVoiceResp> snapshot = cachedVoices;
+        if (snapshot != null && System.currentTimeMillis() - cachedAtMillis < CACHE_TTL_MILLIS) {
+            return snapshot;
+        }
+        synchronized (this) {
+            snapshot = cachedVoices;
+            if (snapshot != null && System.currentTimeMillis() - cachedAtMillis < CACHE_TTL_MILLIS) {
+                return snapshot;
+            }
+            List<SherpaVoiceResp> scanned = scanVoices();
+            cachedVoices = scanned;
+            cachedAtMillis = System.currentTimeMillis();
+            return scanned;
+        }
+    }
+
+    private List<SherpaVoiceResp> scanVoices() {
         List<SherpaVoiceResp> voices = new ArrayList<>();
         File ttsDir = runtimePathConfig.resolveTtsModelsDir().toFile();
         if (!ttsDir.exists() || !ttsDir.isDirectory()) {
@@ -65,16 +84,9 @@ public class SherpaVoiceProbe {
         }
 
         if (isKokoro) {
-            List<String> speakerNames = readKokoroSpeakers(new File(modelDir, "voices.bin"));
-            if (speakerNames.isEmpty()) {
-                // 读取失败，默认给8个
-                for (int i = 0; i < 8; i++) {
-                    voices.add(buildVoice(dirName, "kokoro", i, "Speaker-" + i));
-                }
-            } else {
-                for (int i = 0; i < speakerNames.size(); i++) {
-                    voices.add(buildVoice(dirName, "kokoro", i, speakerNames.get(i)));
-                }
+            int speakerCount = countKokoroSpeakers(new File(modelDir, "voices.bin"));
+            for (int i = 0; i < speakerCount; i++) {
+                voices.add(buildVoice(dirName, "kokoro", i, "Speaker-" + i));
             }
         } else if (isMatcha) {
             voices.add(buildVoice(dirName, "matcha", 0, dirName));
@@ -98,33 +110,19 @@ public class SherpaVoiceProbe {
     }
 
     /**
-     * 读取 Kokoro voices.bin 中的 speaker 名称列表。
-     * 文件格式：每个名称以 \0 结尾连续存储。
+     * 根据 voices.bin 文件大小推算 Kokoro speaker 数量。
+     * sherpa-onnx 加载时要求文件恰好是「说话人数 × 每人张量」个 float32，按已发布的两种张量长度依次整除；
+     * 都对不上时只列出一定存在的 0 号说话人。
      */
-    private List<String> readKokoroSpeakers(File voicesBin) {
-        List<String> names = new ArrayList<>();
-        try {
-            byte[] data = Files.readAllBytes(voicesBin.toPath());
-            int start = 0;
-            for (int i = 0; i < data.length; i++) {
-                if (data[i] == 0) {
-                    if (i > start) {
-                        String name = new String(data, start, i - start, StandardCharsets.UTF_8).trim();
-                        if (!name.isEmpty()) {
-                            names.add(name);
-                        }
-                    }
-                    start = i + 1;
+    private int countKokoroSpeakers(File voicesBin) {
+        long size = voicesBin.length();
+        if (size > 0) {
+            for (long perSpeaker : KOKORO_SPEAKER_TENSOR_BYTES) {
+                if (size % perSpeaker == 0) {
+                    return (int) (size / perSpeaker);
                 }
             }
-            // 处理末尾没有 \0 的情况
-            if (start < data.length) {
-                String name = new String(data, start, data.length - start, StandardCharsets.UTF_8).trim();
-                if (!name.isEmpty()) names.add(name);
-            }
-        } catch (IOException e) {
-            log.warn("读取 voices.bin 失败: {}", voicesBin.getAbsolutePath());
         }
-        return names;
+        return 1;
     }
 }

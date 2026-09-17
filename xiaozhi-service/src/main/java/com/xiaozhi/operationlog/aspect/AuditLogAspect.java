@@ -17,6 +17,7 @@ import com.xiaozhi.common.model.bo.OperationLogBO;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.operationlog.service.OperationLogService;
 import com.xiaozhi.utils.JsonUtil;
+import lombok.extern.slf4j.Slf4j;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,6 +36,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @Aspect
 @Component
 public class AuditLogAspect {
@@ -74,15 +76,15 @@ public class AuditLogAspect {
 
     private void saveLog(ProceedingJoinPoint pjp, AuditLog auditLog, int costMs, Throwable error) {
         try {
-            OperationLogBO log = new OperationLogBO();
-            log.setModule(auditLog.module());
-            log.setOperation(auditLog.operation());
-            log.setCostMs(costMs);
-            log.setSuccess(error == null);
+            OperationLogBO entry = new OperationLogBO();
+            entry.setModule(auditLog.module());
+            entry.setOperation(auditLog.operation());
+            entry.setCostMs(costMs);
+            entry.setSuccess(error == null);
 
             if (error != null) {
                 String msg = error.getMessage();
-                log.setErrorMsg(msg != null && msg.length() > 500 ? msg.substring(0, 500) : msg);
+                entry.setErrorMsg(msg != null && msg.length() > 500 ? msg.substring(0, 500) : msg);
             }
 
             // 用户ID
@@ -90,34 +92,35 @@ public class AuditLogAspect {
                 if (StpUtil.isLogin()) {
                     Object loginId = StpUtil.getLoginId();
                     if (loginId instanceof Number n) {
-                        log.setUserId(Math.toIntExact(n.longValue()));
+                        entry.setUserId(Math.toIntExact(n.longValue()));
                     } else {
-                        log.setUserId(Integer.valueOf(loginId.toString().trim()));
+                        entry.setUserId(Integer.valueOf(loginId.toString().trim()));
                     }
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                log.debug("审计日志获取当前登录用户ID失败", e);
             }
 
             // 请求信息
             ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             if (attrs != null) {
                 HttpServletRequest request = attrs.getRequest();
-                log.setMethod(request.getMethod());
-                log.setUrl(buildUrl(request));
+                entry.setMethod(request.getMethod());
+                entry.setUrl(buildUrl(request));
                 // 审计的来源 IP 不能由请求头决定，否则审计表可被投毒
-                log.setIp(trustedProxyPolicy.resolveClientIp(request));
+                entry.setIp(trustedProxyPolicy.resolveClientIp(request));
             }
 
             // handler 名称
             MethodSignature sig = (MethodSignature) pjp.getSignature();
-            log.setHandler(pjp.getTarget().getClass().getSimpleName() + "#" + sig.getMethod().getName());
+            entry.setHandler(pjp.getTarget().getClass().getSimpleName() + "#" + sig.getMethod().getName());
 
             // 请求参数（过滤文件、response 等不可序列化的参数）
-            log.setParams(serializeArgs(pjp.getArgs()));
+            entry.setParams(serializeArgs(pjp.getArgs()));
 
-            operationLogService.saveAsync(log);
+            operationLogService.saveAsync(entry);
         } catch (Exception e) {
-            // 日志记录失败不影响主流程
+            log.warn("审计日志保存失败", e);
         }
     }
 

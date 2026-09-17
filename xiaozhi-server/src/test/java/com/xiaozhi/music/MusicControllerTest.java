@@ -14,7 +14,7 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -40,15 +40,15 @@ class MusicControllerTest extends ControllerTestSupport {
     @Test
     void uploadMusicRejectsEmptyFile() throws Exception {
         mockMvc.perform(multipart("/api/file/music").file(mp3("song.mp3", new byte[0])))
-            .andExpect(status().isOk())
-            .andExpect(content().string("上传失败"));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("上传文件不能为空"));
     }
 
     @Test
     void uploadMusicRejectsDisallowedExtension() throws Exception {
         mockMvc.perform(multipart("/api/file/music").file(mp3("song.wav", "abc".getBytes())))
-            .andExpect(status().isOk())
-            .andExpect(content().string("上传失败"));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("仅支持 .mp3 或 playlist.txt"));
 
         assertThat(Files.exists(musicDir.resolve("song.wav"))).isFalse();
     }
@@ -57,7 +57,7 @@ class MusicControllerTest extends ControllerTestSupport {
     void uploadMusicStoresAllowedMp3File() throws Exception {
         mockMvc.perform(multipart("/api/file/music").file(mp3("song-test.mp3", "abc".getBytes())))
             .andExpect(status().isOk())
-            .andExpect(content().string("song-test.mp3，上传成功"));
+            .andExpect(jsonPath("$.data").value("song-test.mp3"));
 
         assertThat(musicDir.resolve("song-test.mp3")).hasBinaryContent("abc".getBytes());
     }
@@ -66,7 +66,7 @@ class MusicControllerTest extends ControllerTestSupport {
     void uploadMusicStoresPlaylistFile() throws Exception {
         mockMvc.perform(multipart("/api/file/music").file(mp3("playlist.txt", "song-test.mp3".getBytes())))
             .andExpect(status().isOk())
-            .andExpect(content().string("playlist.txt，上传成功"));
+            .andExpect(jsonPath("$.data").value("playlist.txt"));
 
         assertThat(musicDir.resolve("playlist.txt")).hasBinaryContent("song-test.mp3".getBytes());
     }

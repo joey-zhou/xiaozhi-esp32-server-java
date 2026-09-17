@@ -2,6 +2,8 @@ package com.xiaozhi.dialogue.llm.tool.mcp.device;
 
 import com.xiaozhi.communication.domain.DeviceMcpMessage;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -16,6 +18,8 @@ public class DeviceMcpHolder {
     /**
      * mcp请求ID
      */
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     private final AtomicLong mcpRequestId = new AtomicLong(10000L);
     /**
      * mcp初始化完成

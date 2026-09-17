@@ -173,10 +173,10 @@ public class RoleController extends BaseController {
 
             return ApiResponse.success("操作成功", new TestVoiceResp(storedPath));
         } catch (IndexOutOfBoundsException e) {
-            log.error(e.getMessage(), e);
+            log.error("请先到语音合成配置页面配置对应Key", e);
             throw new IllegalStateException("请先到语音合成配置页面配置对应Key", e);
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
+            log.error("测试语音合成失败", e);
             throw new OperationFailedException("测试语音合成失败", e);
         }
     }

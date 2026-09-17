@@ -1,7 +1,7 @@
 package com.xiaozhi.ai.stt;
 
 import com.xiaozhi.common.model.bo.ConfigBO;
-import com.xiaozhi.common.port.TokenResolver;
+import com.xiaozhi.common.port.ProviderTokenClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -42,7 +42,7 @@ class SttServiceFactoryTransientServiceTest {
 
     private static SttServiceFactory newFactory() {
         SttServiceFactory factory = new SttServiceFactory();
-        ReflectionTestUtils.setField(factory, "tokenResolver", mock(TokenResolver.class));
+        ReflectionTestUtils.setField(factory, "tokenClient", mock(ProviderTokenClient.class));
         return factory;
     }
 

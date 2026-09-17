@@ -123,7 +123,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
      */
     @Override
     public void configureAsyncSupport(AsyncSupportConfigurer configurer) {
-        // 设置异步请求超时时间为120秒，比SSE的60秒超时更长
-        configurer.setDefaultTimeout(120000L);
+        // 与设备文件边传边下载循环的300秒业务超时对齐，留10秒余量让业务自定义的超时异常先触发；仍比SSE的60秒超时更长
+        configurer.setDefaultTimeout(310_000L);
     }
 }

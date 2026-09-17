@@ -60,7 +60,7 @@ public abstract class Player {
     /**
      * 当前语音发送完毕后，执行的回调（如关闭session）
      */
-    private Runnable functionAfterChat = null;
+    private volatile Runnable functionAfterChat = null;
     /**
      * 每次发出 tts stop 都会触发的回调，Persona 据此判定本轮回复已完整播出
      */
@@ -293,9 +293,11 @@ public abstract class Player {
             if (stopped != null) {
                 stopped.run();
             }
-            // 检查是否需要执行后续操作（如关闭会话）
-            if (functionAfterChat != null) {
-                functionAfterChat.run();
+            // 检查是否需要执行后续操作（如关闭会话）；先取本地再清空再跑，避免重复执行
+            Runnable afterChat = functionAfterChat;
+            if (afterChat != null) {
+                functionAfterChat = null;
+                afterChat.run();
             }
         } catch (Exception e) {
             // sendStop 有可能是由于连接断掉而触发的，所以只打印异常，不再往外抛。

@@ -227,12 +227,8 @@ describe('useUserStore', () => {
       store.setToken('test-token-123')
       expect(store.token).toBe('test-token-123')
 
-      store.setRefreshToken('refresh-token-456')
-      expect(store.refreshToken).toBe('refresh-token-456')
-
       store.clearToken()
       expect(store.token).toBe('')
-      expect(store.refreshToken).toBe('')
     })
   })
 

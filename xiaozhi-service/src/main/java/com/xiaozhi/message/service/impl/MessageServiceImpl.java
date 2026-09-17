@@ -23,6 +23,8 @@ import jakarta.annotation.Resource;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -83,7 +85,7 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     @Transactional
-    public void delete(Integer messageId) {
+    public void delete(Long messageId) {
         if (messageId == null) {
             throw new IllegalArgumentException("消息ID不能为空");
         }
@@ -92,15 +94,15 @@ public class MessageServiceImpl implements MessageService {
             throw new ResourceNotFoundException("消息不存在或已删除");
         }
 
-        if (StringUtils.hasText(existing.getAudioPath())) {
-            AudioUtils.deleteFile(existing.getAudioPath());
-        }
         LambdaUpdateWrapper<MessageDO> updateWrapper = new LambdaUpdateWrapper<MessageDO>()
             .eq(MessageDO::getMessageId, messageId)
             .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
             .set(MessageDO::getState, MessageBO.STATE_DELETED);
         if (messageMapper.update(null, updateWrapper) <= 0) {
             throw new IllegalStateException("删除消息失败");
+        }
+        if (StringUtils.hasText(existing.getAudioPath())) {
+            runAfterCommit(() -> AudioUtils.deleteFile(existing.getAudioPath()));
         }
     }
 
@@ -119,6 +121,15 @@ public class MessageServiceImpl implements MessageService {
             .set(MessageDO::getState, MessageBO.STATE_DELETED);
         int updated = messageMapper.update(null, updateWrapper);
 
+        runAfterCommit(() -> deleteAudioDirectories(deviceId));
+        eventPublisher.publishEvent(new ConversationHistoryClearedEvent(this, deviceId));
+        return updated;
+    }
+
+    /**
+     * 删除该设备在保留期内每一天的音频目录。
+     */
+    private void deleteAudioDirectories(String deviceId) {
         String audioDeviceId = deviceId.replace(":", "-");
         LocalDate today = LocalDate.now();
         for (int i = 0; i <= AudioUtils.AUDIO_RETENTION_DAYS; i++) {
@@ -127,12 +138,26 @@ public class MessageServiceImpl implements MessageService {
                     Path.of(AudioUtils.AUDIO_PATH, date, audioDeviceId).toString());
             AudioUtils.deleteDirectory(deviceDir);
         }
-        eventPublisher.publishEvent(new ConversationHistoryClearedEvent(this, deviceId));
-        return updated;
+    }
+
+    /**
+     * 事务提交后执行不可回滚的副作用；没有事务上下文时直接执行。
+     */
+    private void runAfterCommit(Runnable task) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            task.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                task.run();
+            }
+        });
     }
 
     @Override
-    public MessageBO getBO(Integer messageId) {
+    public MessageBO getBO(Long messageId) {
         if (messageId == null) {
             return null;
         }
@@ -152,7 +177,6 @@ public class MessageServiceImpl implements MessageService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        LocalDate today = LocalDate.now();
         int rows = 0;
         for (MessageBO message : messages) {
             MessageDO messageDO = messageConvert.toDO(message);
@@ -167,9 +191,6 @@ public class MessageServiceImpl implements MessageService {
             }
             if (messageDO.getUpdateTime() == null) {
                 messageDO.setUpdateTime(messageDO.getCreateTime());
-            }
-            if (messageDO.getStatDate() == null) {
-                messageDO.setStatDate(today);
             }
             // message/toolCalls 是 text 列，超长会导致这条 insert 报错、整个事务连同同一轮的其它消息一起回滚
             messageDO.setMessage(truncateToTextColumn(messageDO.getMessage()));
@@ -282,14 +303,7 @@ public class MessageServiceImpl implements MessageService {
         }
 
         // 1. 找到 assistant 消息的 messageId
-        LambdaQueryWrapper<MessageDO> query = new LambdaQueryWrapper<MessageDO>()
-            .eq(MessageDO::getDeviceId, deviceId)
-            .eq(MessageDO::getRoleId, roleId)
-            .eq(MessageDO::getSender, MessageBO.SENDER_ASSISTANT)
-            .eq(MessageDO::getMessageType, MessageBO.MESSAGE_TYPE_NORMAL)
-            .eq(MessageDO::getCreateTime, createTime)
-            .select(MessageDO::getMessageId);
-        MessageDO messageDO = messageMapper.selectOne(query);
+        MessageDO messageDO = findAssistantMessage(deviceId, roleId, createTime);
         if (messageDO == null) {
             return;
         }
@@ -310,14 +324,7 @@ public class MessageServiceImpl implements MessageService {
         if (!StringUtils.hasText(deviceId) || roleId == null || createTime == null) {
             return;
         }
-        LambdaQueryWrapper<MessageDO> query = new LambdaQueryWrapper<MessageDO>()
-            .eq(MessageDO::getDeviceId, deviceId)
-            .eq(MessageDO::getRoleId, roleId)
-            .eq(MessageDO::getSender, MessageBO.SENDER_ASSISTANT)
-            .eq(MessageDO::getMessageType, MessageBO.MESSAGE_TYPE_NORMAL)
-            .eq(MessageDO::getCreateTime, createTime)
-            .select(MessageDO::getMessageId);
-        MessageDO messageDO = messageMapper.selectOne(query);
+        MessageDO messageDO = findAssistantMessage(deviceId, roleId, createTime);
         if (messageDO == null) {
             return;
         }
@@ -332,6 +339,18 @@ public class MessageServiceImpl implements MessageService {
         messageMapper.update(null, update);
     }
 
+    /**
+     * 按设备、角色与创建时间定位一条正常的 assistant 消息，只取 messageId。
+     */
+    private MessageDO findAssistantMessage(String deviceId, Integer roleId, LocalDateTime createTime) {
+        return messageMapper.selectOne(new LambdaQueryWrapper<MessageDO>()
+            .eq(MessageDO::getDeviceId, deviceId)
+            .eq(MessageDO::getRoleId, roleId)
+            .eq(MessageDO::getSender, MessageBO.SENDER_ASSISTANT)
+            .eq(MessageDO::getMessageType, MessageBO.MESSAGE_TYPE_NORMAL)
+            .eq(MessageDO::getCreateTime, createTime)
+            .select(MessageDO::getMessageId));
+    }
 
     @Override
     public int purgeExpiredAudio(int retentionDays, int batchSize) {

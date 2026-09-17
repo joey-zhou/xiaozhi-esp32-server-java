@@ -7,7 +7,6 @@ import com.xiaozhi.message.model.MessageProjection;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,7 +39,7 @@ class MessageConvertTest {
         assertThat(resp).usingRecursiveComparison()
             .ignoringFields("messageId")
             .isEqualTo(projection);
-        assertThat(resp.getMessageId()).isEqualTo(123456);
+        assertThat(resp.getMessageId()).isEqualTo(123456L);
     }
 
     @Test
@@ -50,7 +49,7 @@ class MessageConvertTest {
         projection.setRoleId(3);
         projection.setRoleName("小智");
         projection.setTitle("今天天气怎么样");
-        projection.setUpdateTime(new Date(1_757_000_000_000L));
+        projection.setUpdateTime(LocalDateTime.of(2025, 9, 4, 22, 13, 20));
 
         ConversationResp resp = convert.toResp(projection);
 

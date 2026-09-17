@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PermissionKeyContractArchTest {
 
     private static final Pattern LINE_COMMENT = Pattern.compile("--[^\\n]*");
-    private static final Pattern SCRIPT_VERSION = Pattern.compile("^V(\\d+)__");
+    private static final Pattern SCRIPT_VERSION = Pattern.compile("^V(\\d+)(?:_(\\d+))?__");
     /** 匹配 Flyway 脚本里以 system: 开头的权限键字面量 */
     private static final Pattern SQL_PERMISSION_KEY = Pattern.compile("'(system:[A-Za-z0-9:_.\\-]+)'");
 
@@ -123,7 +123,8 @@ class PermissionKeyContractArchTest {
         if (!matcher.find()) {
             throw new AssertionError("迁移脚本文件名不符合 V{n}__{描述}.sql: " + path.getFileName());
         }
-        return Integer.parseInt(matcher.group(1));
+        int minor = matcher.group(2) == null ? 0 : Integer.parseInt(matcher.group(2));
+        return Integer.parseInt(matcher.group(1)) * 1000 + minor;
     }
 
     /** surefire 的工作目录是模块根；从仓库根跑时退一级找 */

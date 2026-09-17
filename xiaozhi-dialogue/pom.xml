@@ -100,11 +100,11 @@
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
-        <!-- hutool -->
+        <!-- hutool-core (PlayHuiBenFunction 用 MapUtil.getInt / RandomUtil.randomInt) -->
         <dependency>
             <groupId>cn.hutool</groupId>
-            <artifactId>hutool-all</artifactId>
-            <version>5.8.29</version>
+            <artifactId>hutool-core</artifactId>
+            <version>${hutool.version}</version>
         </dependency>
         <!-- Swagger/OpenAPI annotations -->
         <dependency>

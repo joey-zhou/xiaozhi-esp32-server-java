@@ -72,7 +72,6 @@ public class CacheHelper {
             // 4. 查询数据库
             log.debug("从数据库查询: {}", lockKey);
             return dbGetter.get();
-            // 5. 结果会通过@Cacheable自动写入缓存
         } finally {
             try {
                 lock.unlock();
@@ -103,36 +102,4 @@ public class CacheHelper {
         cache.evict(key);
     }
 
-    /**
-     * 简化版 - 带分布式锁的操作
-     *
-     * @param lockKey 锁的key
-     * @param supplier 需要执行的操作
-     * @param <T> 返回类型
-     * @return 操作结果
-     */
-    public <T> T executeWithLock(String lockKey, Supplier<T> supplier) {
-        RLock lock = redissonClient.getLock("lock:" + lockKey);
-
-        try {
-            // 同上：不传租期，交给看门狗续期，避免与查库耗时的固定租期错配
-            if (lock.tryLock(3, TimeUnit.SECONDS)) {
-                try {
-                    return supplier.get();
-                } finally {
-                    lock.unlock();
-                }
-            } else {
-                log.warn("获取锁超时: {}", lockKey);
-                return null;
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("获取锁被中断: {}", lockKey, e);
-            return null;
-        } catch (Exception e) {
-            log.error("执行带锁操作异常: {}", lockKey, e);
-            return null;
-        }
-    }
 }

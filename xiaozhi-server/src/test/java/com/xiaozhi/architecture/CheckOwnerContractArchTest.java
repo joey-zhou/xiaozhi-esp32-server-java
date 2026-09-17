@@ -8,7 +8,6 @@ import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.annotation.CheckOwners;
 import com.xiaozhi.security.ownership.OwnershipChecker;
 import com.xiaozhi.security.ownership.OwnershipConfig;
-import com.xiaozhi.server.config.OwnershipServerConfig;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.DefaultParameterNameDiscoverer;
@@ -119,10 +118,10 @@ class CheckOwnerContractArchTest {
         return methods;
     }
 
-    /** 反射调用两个配置类里所有产出 OwnershipChecker 的工厂方法，取它们声明的资源名 */
+    /** 反射调用配置类里所有产出 OwnershipChecker 的工厂方法，取它们声明的资源名 */
     private static Set<String> registeredResources() {
         Set<String> resources = new LinkedHashSet<>();
-        for (Object config : List.of(new OwnershipConfig(), new OwnershipServerConfig())) {
+        for (Object config : List.of(new OwnershipConfig())) {
             for (Method method : config.getClass().getDeclaredMethods()) {
                 if (!OwnershipChecker.class.isAssignableFrom(method.getReturnType())
                     || !Modifier.isPublic(method.getModifiers())) {

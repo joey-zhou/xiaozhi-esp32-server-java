@@ -1,11 +1,11 @@
 package com.xiaozhi.ai.stt.providers;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.ConfigBO;
+import com.xiaozhi.utils.JsonUtil;
 
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
@@ -41,6 +41,7 @@ public class FunASRSttService implements SttService {
     // 上游未终结音频流时的兜底上限，需远大于设备上行抖动，否则弱网会截断用户没说完的话
     private static final long IDLE_TIMEOUT_MS = 5000;
     private static final long RECOGNITION_TIMEOUT_MS = 90000; // 识别超时时间（90秒）
+    private static final long CONNECT_TIMEOUT_MS = 10000; // WebSocket握手超时，需远小于识别总超时以便及时回收连接线程
 
     private final String apiUrl;
 
@@ -147,10 +148,10 @@ public class FunASRSttService implements SttService {
             @Override
             public void onMessage(String message) {
                 try {
-                    JSONObject jsonObject = JSON.parseObject(message);
-                    boolean isFinal = Boolean.TRUE.equals(jsonObject.getBoolean("is_final"));
-                    String mode = jsonObject.getString("mode");
-                    String text = jsonObject.getString("text");
+                    JsonNode jsonObject = JsonUtil.OBJECT_MAPPER.readTree(message);
+                    boolean isFinal = jsonObject.path("is_final").asBoolean(false);
+                    String mode = jsonObject.path("mode").asText(null);
+                    String text = jsonObject.path("text").asText(null);
                     // 中间结果旁路：2pass-online为实时增量文本，2pass-offline为分段离线修正文本，
                     // 两者都早于连接关闭到达，任意非空文本都说明用户确实开口说话了
                     notifyPartialText(onPartialText, text);
@@ -185,24 +186,26 @@ public class FunASRSttService implements SttService {
         };
 
         try {
-            // 连接WebSocket
-            webSocketClient.connect();
-            
-            // 等待识别完成或超时
-            boolean recognized = recognitionLatch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-            
-            if (!recognized) {
-                log.warn("FunASR识别超时");
-                timedOut = true;
+            // 连接WebSocket，握手超时立即失败，避免读线程永久驻留
+            boolean connected = webSocketClient.connectBlocking(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            if (!connected) {
+                log.warn("FunASR WebSocket握手超时或失败");
+                failureReason.set(SttResult.FAILURE_UPSTREAM_ERROR);
+            } else {
+                // 等待识别完成或超时
+                boolean recognized = recognitionLatch.await(RECOGNITION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+
+                if (!recognized) {
+                    log.warn("FunASR识别超时");
+                    timedOut = true;
+                }
             }
         } catch (Exception e) {
             log.error("FunASR识别过程中发生错误", e);
             failureReason.set(SttResult.FAILURE_UPSTREAM_ERROR);
         } finally {
             // 关闭WebSocket连接
-            if (webSocketClient.isOpen()) {
-                webSocketClient.close();
-            }
+            webSocketClient.close();
         }
         
         // 等到超时且一个字都没识别出来时是失败，不能当成"用户没说话"

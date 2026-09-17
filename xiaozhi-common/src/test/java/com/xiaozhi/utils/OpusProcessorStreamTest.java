@@ -57,10 +57,11 @@ class OpusProcessorStreamTest {
     }
 
     @Test
-    void nonStreamingCallDropsRemainderInsteadOfBuffering() {
+    void nonStreamingCallPadsRemainderInsteadOfDroppingIt() {
         OpusProcessor processor = new OpusProcessor();
 
-        assertThat(processor.pcmToOpus(pcm(FRAME_SIZE + 40), false)).hasSize(1);
+        // 不足一帧的尾部补零编码成额外一帧，不再被静默丢弃
+        assertThat(processor.pcmToOpus(pcm(FRAME_SIZE + 40), false)).hasSize(2);
         assertThat(stateOf(processor).leftoverCount).isZero();
         assertThat(processor.flushLeftover()).isEmpty();
     }

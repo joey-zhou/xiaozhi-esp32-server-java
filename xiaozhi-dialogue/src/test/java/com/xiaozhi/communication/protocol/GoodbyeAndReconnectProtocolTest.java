@@ -47,7 +47,7 @@ class GoodbyeAndReconnectProtocolTest {
     void goodbyeClosesSessionAndSubsequentWakeIsIgnoredOnWebSocket() {
         FakeDevice device = harness.connect(DEVICE_ID);
         device.hello();
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         String sessionId = device.sessionId();
         // 先确认 goodbye 之前 VAD/AEC 确实是活的，否则后面的「已清理」断言等于没测
         assertThat(harness.vad().autoSegmentOf(sessionId)).isTrue();
@@ -122,7 +122,7 @@ class GoodbyeAndReconnectProtocolTest {
     void serverSideCloseReleasesVadAndAec() {
         FakeDevice device = harness.connect(DEVICE_ID);
         device.hello();
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         String sessionId = device.sessionId();
         ChatSession session = device.session();
         assertThat(harness.vad().autoSegmentOf(sessionId)).isTrue();
@@ -166,7 +166,7 @@ class GoodbyeAndReconnectProtocolTest {
         assertThat(fresh.getDeviceState()).isEqualTo(DeviceState.SPEAKING);
 
         // 新会话上的上行音频链路同样是通的
-        second.listenStart(ListenMode.Auto);
+        second.listenStart(ListenMode.AUTO);
         assertThat(harness.vad().autoSegmentOf(second.sessionId())).isTrue();
         second.speak(ScriptedVadService.SPEECH_START,
                 ScriptedVadService.SPEECH_CONTINUE,

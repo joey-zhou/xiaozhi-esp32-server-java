@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.TemplateBO;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.template.convert.TemplateConvert;
@@ -110,6 +111,9 @@ public class TemplateServiceImpl implements TemplateService {
     @Transactional
     public TemplateBO update(Integer templateId, TemplateBO bo) {
         TemplateDO d = getTemplate(templateId);
+        if (d == null) {
+            throw new ResourceNotFoundException("模板不存在或已删除");
+        }
         boolean turningDefault = IS_DEFAULT.equals(bo.getIsDefault()) && !IS_DEFAULT.equals(d.getIsDefault());
         templateConvert.updateDO(bo, d);
         if (turningDefault) {

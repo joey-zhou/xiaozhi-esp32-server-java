@@ -90,7 +90,7 @@ public class LogInterceptor implements HandlerInterceptor {
                 return;
             }
 
-            /* log.debug(
+            log.debug(
                 "HTTP {} {} -> status={} cost={}ms ip={} userId={} handler={}",
                 request.getMethod(),
                 requestPath,
@@ -99,7 +99,7 @@ public class LogInterceptor implements HandlerInterceptor {
                 clientIp,
                 userId,
                 handlerName
-            ); */
+            );
         } finally {
             // 虚拟线程用完可能被复用为下一个任务的载体，MDC 不清会串到下一次调用
             MDC.remove(TRACE_ID_MDC_KEY);

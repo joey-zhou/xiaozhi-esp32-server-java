@@ -2,6 +2,8 @@ package com.xiaozhi.music;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.xiaozhi.common.config.RuntimePathConfig;
+import com.xiaozhi.common.exception.OperationFailedException;
+import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.storage.service.StorageService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,32 +30,32 @@ public class MusicController {
     @PostMapping("/music")
     @ResponseBody
     @SaCheckPermission("system:file:api:upload")
-    public String uploadMusic(@Parameter(description = "上传的音乐文件") @RequestParam("file") MultipartFile file) {
+    public ApiResponse<String> uploadMusic(@Parameter(description = "上传的音乐文件") @RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            return "上传失败";
+            throw new IllegalArgumentException("上传文件不能为空");
         }
         StorageService.assertAllowed(file);
 
         // getOriginalFilename 原样返回客户端给的 Content-Disposition filename，含目录分隔符时会写出音乐目录之外
         String safeName = baseName(file.getOriginalFilename());
         if (!StringUtils.hasText(safeName)) {
-            return "上传失败";
+            throw new IllegalArgumentException("文件名无效");
         }
         if (!safeName.equals("playlist.txt") && !safeName.endsWith(".mp3")) {
-            return "上传失败";
+            throw new IllegalArgumentException("仅支持 .mp3 或 playlist.txt");
         }
         try {
             Path musicPath = Path.of(runtimePathConfig.getMusicDir()).toAbsolutePath().normalize();
             Files.createDirectories(musicPath);
             Path target = musicPath.resolve(safeName).normalize();
             if (!target.startsWith(musicPath)) {
-                return "上传失败";
+                throw new IllegalArgumentException("非法文件名");
             }
             file.transferTo(target);
-            return safeName + "，上传成功";
+            return ApiResponse.success("上传成功", safeName);
         } catch (IOException e) {
             log.error("上传失败", e);
-            return "上传失败";
+            throw new OperationFailedException("上传失败，请稍后重试", e);
         }
     }
 

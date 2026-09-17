@@ -1,6 +1,6 @@
 package com.xiaozhi.communication;
 
-import com.xiaozhi.utils.CmsUtils;
+import com.xiaozhi.utils.ServerIpProbe;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,7 +22,7 @@ public class ServerAddressProvider {
     private String serverAddress;
 
     @Resource
-    private CmsUtils cmsUtils;
+    private ServerIpProbe serverIpProbe;
 
     @Value("${udp.server.port:1884}")
     private int udpPort;
@@ -45,7 +45,7 @@ public class ServerAddressProvider {
             otaAddress = "https://" + domain + "/api/device/ota";
             serverAddress = "https://" + domain;
         } else {
-            String serverIp = cmsUtils.getServerIp();
+            String serverIp = serverIpProbe.getServerIp();
             udpAddress = serverIp;
             websocketAddress = "ws://" + serverIp + ":" + dialoguePort + WS_PATH;
             mcpAddress = "ws://" + serverIp + ":" + dialoguePort + "/ws/mcp/";
@@ -75,7 +75,7 @@ public class ServerAddressProvider {
     }
 
     public String getServerIp() {
-        return cmsUtils.getServerIp();
+        return serverIpProbe.getServerIp();
     }
 
     public int getServerPort() {

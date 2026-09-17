@@ -68,7 +68,7 @@ class ForbiddenDependencyArchTest {
     /**
      * §6「聚合根 → BO 归 infrastructure/convert 的 XxxConverter」的存量：
      * {@code AiConfig.mergePatch(patch)} 不是自身字段快照，而是「patch 覆盖自身、缺的补自身」的
-     * 合并判定（只认 null 为未提供），{@code ConfigConnectionChecker.resolveConfigUnderTest} 靠它
+     * 合并判定（只认 null 为未提供），{@code ConfigTestAppService.resolveConfigUnderTest} 靠它
      * 决定本次外呼用哪份凭据。合并规则本身是领域语义，搬进 Convert 等于把它变成字段拷贝。
      * 快照用途的那个调用方已经去掉，这里只剩这一处。
      */
@@ -200,14 +200,14 @@ class ForbiddenDependencyArchTest {
         private ConfigRepository configRepository;
     }
 
-    // ==================== §4：common/port 不得出现 Provider SDK 类型 ====================
+    // ==================== §4：common/port 不得出现第三方服务 SDK 类型 ====================
 
     @Test
     void portsDoNotExposeProviderSdkTypes() {
         ArchRule rule = noClasses()
             .that().resideInAPackage("com.xiaozhi.common.port")
             .and(not(hasNameIn(PORT_SDK_KNOWN_VIOLATIONS)))
-            .should().dependOnClassesThat().resideInAnyPackage(PROVIDER_SDK_PACKAGES)
+            .should().dependOnClassesThat().resideInAnyPackage(ModuleBoundaryArchTest.THIRD_PARTY_SDK_PACKAGES)
             .because("common/port 是倒置接口，签名带 SDK 类型会把 Provider 依赖传染给每一个消费模块");
 
         rule.check(xiaozhiClasses);

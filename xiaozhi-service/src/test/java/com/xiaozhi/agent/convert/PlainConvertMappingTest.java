@@ -11,7 +11,7 @@ import com.xiaozhi.common.model.resp.AgentResp;
 import com.xiaozhi.common.model.resp.AuthRoleResp;
 import com.xiaozhi.common.model.resp.PermissionTreeResp;
 import com.xiaozhi.operationlog.convert.OperationLogConvert;
-import com.xiaozhi.operationlog.dal.mysql.dataobject.SysOperationLogDO;
+import com.xiaozhi.operationlog.dal.mysql.dataobject.OperationLogDO;
 import com.xiaozhi.permission.convert.PermissionConvert;
 import com.xiaozhi.permission.dal.mysql.dataobject.PermissionDO;
 import com.xiaozhi.userauth.convert.UserAuthConvert;
@@ -36,11 +36,8 @@ class PlainConvertMappingTest {
         AgentBO bo = new AgentBO();
         bo.setConfigId(3);
         bo.setUserId(7);
-        bo.setDeviceId("dev-1");
-        bo.setRoleId(2);
         bo.setConfigName("我的智能体");
         bo.setProvider("coze");
-        bo.setAgentId(88);
         bo.setAgentName("助手");
         bo.setBotId("bot-1");
         bo.setIconUrl("https://example.com/i.png");
@@ -49,11 +46,8 @@ class PlainConvertMappingTest {
 
         assertThat(resp.getConfigId()).isEqualTo(3);
         assertThat(resp.getUserId()).isEqualTo(7);
-        assertThat(resp.getDeviceId()).isEqualTo("dev-1");
-        assertThat(resp.getRoleId()).isEqualTo(2);
         assertThat(resp.getConfigName()).isEqualTo("我的智能体");
         assertThat(resp.getProvider()).isEqualTo("coze");
-        assertThat(resp.getAgentId()).isEqualTo(88);
         assertThat(resp.getAgentName()).isEqualTo("助手");
         assertThat(resp.getBotId()).isEqualTo("bot-1");
         assertThat(resp.getIconUrl()).isEqualTo("https://example.com/i.png");
@@ -132,7 +126,7 @@ class PlainConvertMappingTest {
         bo.setErrorMsg("密码错误");
         bo.setCostMs(12);
 
-        SysOperationLogDO d = Mappers.getMapper(OperationLogConvert.class).toDO(bo);
+        OperationLogDO d = Mappers.getMapper(OperationLogConvert.class).toDO(bo);
 
         assertThat(d.getUserId()).isEqualTo(7);
         assertThat(d.getModule()).isEqualTo("用户管理");

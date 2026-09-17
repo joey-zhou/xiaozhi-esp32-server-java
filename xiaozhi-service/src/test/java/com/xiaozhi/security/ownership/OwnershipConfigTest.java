@@ -5,15 +5,14 @@ import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.MessageBO;
+import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.bo.TemplateBO;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.message.service.MessageService;
-import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
-import com.xiaozhi.role.dal.mysql.mapper.RoleMapper;
-import com.xiaozhi.template.dal.mysql.dataobject.TemplateDO;
-import com.xiaozhi.template.dal.mysql.mapper.TemplateMapper;
+import com.xiaozhi.role.service.RoleService;
+import com.xiaozhi.template.service.TemplateService;
 import com.xiaozhi.user.service.UserService;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -22,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -45,10 +45,10 @@ class OwnershipConfigTest {
     @Test
     void resourceNamesAreUnique() {
         List<String> resources = List.of(
-            config.roleOwnershipChecker(mock(RoleMapper.class)).getResource(),
+            config.roleOwnershipChecker(mock(RoleService.class)).getResource(),
             config.configOwnershipChecker(mock(ConfigService.class)).getResource(),
             config.configWriteOwnershipChecker(mock(ConfigService.class)).getResource(),
-            config.templateOwnershipChecker(mock(TemplateMapper.class)).getResource(),
+            config.templateOwnershipChecker(mock(TemplateService.class)).getResource(),
             config.deviceOwnershipChecker(mock(DeviceService.class)).getResource(),
             config.messageOwnershipChecker(mock(MessageService.class)).getResource(),
             config.userOwnershipChecker(mock(UserService.class)).getResource());
@@ -62,35 +62,35 @@ class OwnershipConfigTest {
     class RoleChecker {
 
         @Mock
-        private RoleMapper roleMapper;
+        private RoleService roleService;
 
         @Test
         void resourceNameIsRole() {
-            assertThat(config.roleOwnershipChecker(roleMapper).getResource()).isEqualTo("role");
+            assertThat(config.roleOwnershipChecker(roleService).getResource()).isEqualTo("role");
         }
 
         @Test
         void passesWhenOwnedByUser() {
-            when(roleMapper.selectById(3)).thenReturn(role(OWNER));
+            when(roleService.getBO(3)).thenReturn(role(OWNER));
 
-            assertThatCode(() -> config.roleOwnershipChecker(roleMapper).check(3, OWNER))
+            assertThatCode(() -> config.roleOwnershipChecker(roleService).check(3, OWNER))
                 .doesNotThrowAnyException();
         }
 
         @Test
         void rejectsMissingRoleAsNotFound() {
-            when(roleMapper.selectById(3)).thenReturn(null);
+            when(roleService.getBO(3)).thenReturn(null);
 
-            assertThatThrownBy(() -> config.roleOwnershipChecker(roleMapper).check("3", OWNER))
+            assertThatThrownBy(() -> config.roleOwnershipChecker(roleService).check("3", OWNER))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("角色不存在");
         }
 
         @Test
         void rejectsOtherUsersRoleAsUnauthorized() {
-            when(roleMapper.selectById(3)).thenReturn(role(OWNER));
+            when(roleService.getBO(3)).thenReturn(role(OWNER));
 
-            assertThatThrownBy(() -> config.roleOwnershipChecker(roleMapper).check(3, OTHER))
+            assertThatThrownBy(() -> config.roleOwnershipChecker(roleService).check(3, OTHER))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("角色不归属当前用户");
         }
@@ -98,14 +98,14 @@ class OwnershipConfigTest {
         /** 归属列为 null 的历史数据不能被当作「谁都能改」。 */
         @Test
         void rejectsRoleWithoutOwnerAsUnauthorized() {
-            when(roleMapper.selectById(3)).thenReturn(role(null));
+            when(roleService.getBO(3)).thenReturn(role(null));
 
-            assertThatThrownBy(() -> config.roleOwnershipChecker(roleMapper).check(3, OWNER))
+            assertThatThrownBy(() -> config.roleOwnershipChecker(roleService).check(3, OWNER))
                 .isInstanceOf(UnauthorizedException.class);
         }
 
-        private RoleDO role(Integer userId) {
-            RoleDO role = new RoleDO();
+        private RoleBO role(Integer userId) {
+            RoleBO role = new RoleBO();
             role.setRoleId(3);
             role.setUserId(userId);
             return role;
@@ -210,54 +210,54 @@ class OwnershipConfigTest {
     class TemplateChecker {
 
         @Mock
-        private TemplateMapper templateMapper;
+        private TemplateService templateService;
 
         @Test
         void resourceNameIsTemplate() {
-            assertThat(config.templateOwnershipChecker(templateMapper).getResource()).isEqualTo("template");
+            assertThat(config.templateOwnershipChecker(templateService).getResource()).isEqualTo("template");
         }
 
         @Test
         void passesWhenOwnedByUser() {
-            when(templateMapper.selectById(3)).thenReturn(template(OWNER, TemplateBO.STATE_ENABLED));
+            when(templateService.getBO(3)).thenReturn(template(OWNER));
 
-            assertThatCode(() -> config.templateOwnershipChecker(templateMapper).check(3, OWNER))
+            assertThatCode(() -> config.templateOwnershipChecker(templateService).check(3, OWNER))
                 .doesNotThrowAnyException();
         }
 
         @Test
         void rejectsMissingTemplateAsNotFound() {
-            when(templateMapper.selectById(3)).thenReturn(null);
+            when(templateService.getBO(3)).thenReturn(null);
 
-            assertThatThrownBy(() -> config.templateOwnershipChecker(templateMapper).check(3, OWNER))
+            assertThatThrownBy(() -> config.templateOwnershipChecker(templateService).check(3, OWNER))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("模板不存在");
         }
 
-        /** 已停用的模板与不存在等价，否则删除后仍可被引用。 */
+        /** 已停用的模板与不存在等价，否则删除后仍可被引用；TemplateService#getBO 内部已按 state 过滤，停用模板会直接返回 null。 */
         @Test
         void rejectsDisabledTemplateAsNotFound() {
-            when(templateMapper.selectById(3)).thenReturn(template(OWNER, "0"));
+            when(templateService.getBO(3)).thenReturn(null);
 
-            assertThatThrownBy(() -> config.templateOwnershipChecker(templateMapper).check(3, OWNER))
+            assertThatThrownBy(() -> config.templateOwnershipChecker(templateService).check(3, OWNER))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("模板不存在");
         }
 
         @Test
         void rejectsOtherUsersTemplateAsUnauthorized() {
-            when(templateMapper.selectById(3)).thenReturn(template(OWNER, TemplateBO.STATE_ENABLED));
+            when(templateService.getBO(3)).thenReturn(template(OWNER));
 
-            assertThatThrownBy(() -> config.templateOwnershipChecker(templateMapper).check(3, OTHER))
+            assertThatThrownBy(() -> config.templateOwnershipChecker(templateService).check(3, OTHER))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("模板不归属当前用户");
         }
 
-        private TemplateDO template(Integer userId, String state) {
-            TemplateDO template = new TemplateDO();
+        private TemplateBO template(Integer userId) {
+            TemplateBO template = new TemplateBO();
             template.setTemplateId(3);
             template.setUserId(userId);
-            template.setState(state);
+            template.setState(TemplateBO.STATE_ENABLED);
             return template;
         }
     }
@@ -331,26 +331,26 @@ class OwnershipConfigTest {
 
         @Test
         void passesWhenOwnedByUser() {
-            when(messageService.getBO(3)).thenReturn(message(OWNER));
+            when(messageService.getBO(3L)).thenReturn(message(OWNER));
 
-            assertThatCode(() -> config.messageOwnershipChecker(messageService).check(3, OWNER))
+            assertThatCode(() -> config.messageOwnershipChecker(messageService).check(3L, OWNER))
                 .doesNotThrowAnyException();
         }
 
         @Test
         void rejectsMissingMessageAsNotFound() {
-            when(messageService.getBO(3)).thenReturn(null);
+            when(messageService.getBO(3L)).thenReturn(null);
 
-            assertThatThrownBy(() -> config.messageOwnershipChecker(messageService).check(3, OWNER))
+            assertThatThrownBy(() -> config.messageOwnershipChecker(messageService).check(3L, OWNER))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("消息不存在");
         }
 
         @Test
         void rejectsOtherUsersMessageAsUnauthorized() {
-            when(messageService.getBO(3)).thenReturn(message(OWNER));
+            when(messageService.getBO(3L)).thenReturn(message(OWNER));
 
-            assertThatThrownBy(() -> config.messageOwnershipChecker(messageService).check(3, OTHER))
+            assertThatThrownBy(() -> config.messageOwnershipChecker(messageService).check(3L, OTHER))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("消息不归属当前用户");
         }
@@ -407,4 +407,5 @@ class OwnershipConfigTest {
             return user;
         }
     }
+
 }

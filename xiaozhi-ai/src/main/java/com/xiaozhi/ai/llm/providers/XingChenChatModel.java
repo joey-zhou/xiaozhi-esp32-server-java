@@ -58,14 +58,14 @@ public class XingChenChatModel implements ChatModel {
         // 创建聊天消息
         XingChenRequest message = XingChenRequest.builder()
                 .flowId(chatClient.getFlowId())
-                .uid("1")
+                .uid(resolveUid(prompt))
                 .parameters(
                         input
                 )
                 .ext(XingChenRequest.Ext.builder().botId("1").caller("workflow").build())
                 .stream(false)
                 .history(new ArrayList<>())
-                .chatId("1")
+                .chatId(resolveChatId(prompt))
                 .build();
         try {
             // 发送消息并获取响应
@@ -98,7 +98,7 @@ public class XingChenChatModel implements ChatModel {
             // 创建聊天消息
             XingChenRequest message = XingChenRequest.builder()
                     .flowId(chatClient.getFlowId())
-                    .uid("1")
+                    .uid(resolveUid(prompt))
                     .parameters(
                             Map.of(
                                     "AGENT_USER_INPUT", prompt.getUserMessage().getText(),
@@ -108,7 +108,7 @@ public class XingChenChatModel implements ChatModel {
                     .ext(XingChenRequest.Ext.builder().botId("1").caller("workflow").build())
                     .stream(true)
                     .history(new ArrayList<>())
-                    .chatId("1")
+                    .chatId(resolveChatId(prompt))
                     .build();
 
             // 使用数组来存储标志(因为在匿名内部类中需要修改)
@@ -318,5 +318,38 @@ public class XingChenChatModel implements ChatModel {
             log.error("Resume过程发生未预期异常", e);
             sink.error(e);
         }
+    }
+
+    /**
+     * 从Prompt的ChatOptions中提取设备ID，生成确定性的用户ID。
+     * 如果无法提取设备ID，则回退到基于UUID的用户ID。
+     */
+    private String resolveUid(Prompt prompt) {
+        if (prompt.getOptions() instanceof ToolCallingChatOptions toolCallingChatOptions) {
+            Map<String, Object> toolContext = toolCallingChatOptions.getToolContext();
+            if (toolContext != null) {
+                Object deviceIdObj = toolContext.get("deviceId");
+                if (deviceIdObj instanceof String deviceId && !deviceId.isBlank()) {
+                    return "user_xz_" + deviceId.replace(":", "");
+                }
+            }
+        }
+        return "user_" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    /**
+     * 从 ToolContext 取出 sessionId 作为星辰的 chat_id；拿不到时返回 null，星辰将其视为开启新会话。
+     */
+    private String resolveChatId(Prompt prompt) {
+        if (prompt.getOptions() instanceof ToolCallingChatOptions toolCallingChatOptions) {
+            Map<String, Object> toolContext = toolCallingChatOptions.getToolContext();
+            if (toolContext != null) {
+                Object sessionIdObj = toolContext.get("sessionId");
+                if (sessionIdObj instanceof String sessionId && !sessionId.isBlank()) {
+                    return sessionId;
+                }
+            }
+        }
+        return null;
     }
 }

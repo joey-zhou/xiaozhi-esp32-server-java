@@ -5,9 +5,9 @@ import lombok.Getter;
 
 @Getter
 public enum ListenMode {
-    Auto("auto"),
-    Manual("manual"),
-    RealTime("realtime");
+    AUTO("auto"),
+    MANUAL("manual"),
+    REAL_TIME("realtime");
 
     @JsonValue
     private final String value;

@@ -82,6 +82,7 @@ public class ScheduledPlayer extends Player {
 
     // 发送线程停顿超过此值视为失步，以当前时刻重锚定时间轴
     private static final long MAX_PLAYBACK_LAG_NS = 500 * 1_000_000L; // 500ms
+    private static final long LAG_LOG_THROTTLE_NS = 5_000_000_000L; // 失步日志节流：5s 内只打一条
 
     // Burst模式状态。只由发送线程在循环内推进，跨轮重置在 fluxDisposable 监视器下做
     private long startTimestamp = 0;  // 播放开始的绝对时间戳（纳秒）
@@ -111,6 +112,9 @@ public class ScheduledPlayer extends Player {
     // 以下两个时刻只在 pauseLock 下读写
     private long pauseDeadlineNs = 0;
     private long pauseStartNs = 0;
+
+    // 失步日志节流：只在发送线程内读写，无需额外同步
+    private volatile long lastLagLogNs = Long.MIN_VALUE;
 
     // 播放代次。每次 stop()（打断/清理）递增，使此前订阅的 Flux 回调失效。
     // Player 是 session 级复用，打断后可能立即起新一轮对话；而上一轮的 TTS
@@ -565,8 +569,11 @@ public class ScheduledPlayer extends Player {
         long delay = startTimestamp + playPosition - currentTime;
 
         if (delay < -MAX_PLAYBACK_LAG_NS) {
-            log.info("发送线程失步，落后{}ms，重锚定时间轴 - SessionId: {}",
-                    -delay / 1_000_000L, session.getSessionId());
+            if (currentTime - lastLagLogNs > LAG_LOG_THROTTLE_NS) {
+                log.info("发送线程失步，落后{}ms，重锚定时间轴 - SessionId: {}",
+                        -delay / 1_000_000L, session.getSessionId());
+                lastLagLogNs = currentTime;
+            }
             startTimestamp = currentTime - playPosition;
             delay = 0;
         }

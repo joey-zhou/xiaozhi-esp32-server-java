@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import api from '../api'
 
 /**
- * 还没收敛的命名空间：services/role 直接引用了 api.mcpTool.* 的子路径，等它收敛后一并改成 root
+ * 还没收敛的命名空间：mcpTool 下的 key 会各自拼接不同的子路径后缀（role/xxx、global/xxx），
+ * 值相同是合理复用而非误标的 CRUD 别名，不纳入去重检查
  */
 const PENDING_NAMESPACES = new Set(['mcpTool'])
 

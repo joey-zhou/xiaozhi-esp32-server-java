@@ -58,7 +58,7 @@ class ProtocolHarnessSmokeTest {
         FakeDevice device = harness.connect(DEVICE_ID);
         device.hello();
 
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         device.speak(ScriptedVadService.SPEECH_START,
                 ScriptedVadService.SPEECH_CONTINUE,
                 ScriptedVadService.SPEECH_CONTINUE,

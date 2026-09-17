@@ -59,7 +59,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class XiaoZhiToolCallingManager implements ToolCallingManager, ApplicationContextAware {
 
-    private static ApplicationContext applicationContext;
+    private ApplicationContext applicationContext;
 
     // @formatter:off
 
@@ -125,7 +125,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
 
     @Override
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
-        XiaoZhiToolCallingManager.applicationContext = applicationContext;
+        this.applicationContext = applicationContext;
         registerConcurrencyGauge(applicationContext);
     }
 
@@ -148,7 +148,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
     /**
      * 获取 ToolSessionProvider
      */
-    private static ToolSessionProvider sessionProvider() {
+    private ToolSessionProvider sessionProvider() {
         if (applicationContext != null) {
             try {
                 return applicationContext.getBean(ToolSessionProvider.class);
@@ -169,7 +169,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
     /**
      * 发布工具调用事件
      */
-    private static void publishToolEvent(String sessionId, String toolName, String arguments,
+    private void publishToolEvent(String sessionId, String toolName, String arguments,
                                           String result, boolean success, long startTimeMs) {
         if (applicationContext == null) {
             return;

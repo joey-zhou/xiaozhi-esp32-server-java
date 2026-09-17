@@ -250,7 +250,7 @@ class ComponentScanCoverageArchTest {
 
     /**
      * 能提供这个类型的 bean：类型本身是 bean 就是它自己，是接口就找该入口看得见的实现类，
-     * 再加上所有把它当返回值的 {@code @Bean} 方法所在的类（如 OwnershipConfig 里那 8 个
+     * 再加上所有把它当返回值的 {@code @Bean} 方法所在的类（如 OwnershipConfig 里那 10 个
      * 直接 new 匿名实现返回的 checker，没有实现类可找，只能从 @Bean 方法反查）。
      */
     private static Set<JavaClass> beanProvidersOf(JavaClass type, JavaClasses runtimeClasses) {

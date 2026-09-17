@@ -19,8 +19,6 @@ public class UserDO extends BaseDO {
 
     private String username;
     private String password;
-    private String wxOpenId;
-    private String wxUnionId;
     private String name;
     private String avatar;
     private String state;

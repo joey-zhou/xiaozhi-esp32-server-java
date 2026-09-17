@@ -9,7 +9,7 @@ import com.alibaba.nls.client.protocol.asr.SpeechTranscriberResponse;
 import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
-import com.xiaozhi.common.port.TokenResolver;
+import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import reactor.core.publisher.Flux;
 
@@ -85,11 +85,11 @@ public class AliyunNlsSttService implements SttService {
     private final ConfigBO config;
 
     // Token管理器
-    private final TokenResolver tokenResolver;
+    private final ProviderTokenClient tokenClient;
 
-    public AliyunNlsSttService(ConfigBO config, TokenResolver tokenResolver) {
+    public AliyunNlsSttService(ConfigBO config, ProviderTokenClient tokenClient) {
         this.config = config;
-        this.tokenResolver = tokenResolver;
+        this.tokenClient = tokenClient;
     }
 
     /**
@@ -97,7 +97,7 @@ public class AliyunNlsSttService implements SttService {
      * 用完必须调用 releaseClient 归还，否则该client永远不会被判定为空闲而关闭。
      */
     private CachedNlsClient acquireClient() throws Exception {
-        String currentToken = tokenResolver.getToken(config);
+        String currentToken = tokenClient.getToken(config);
         if (currentToken == null) {
             throw new RuntimeException("无法获取阿里云Token");
         }

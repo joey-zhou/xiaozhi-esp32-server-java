@@ -3,7 +3,6 @@ package com.xiaozhi.ai.llm.memory;
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.PromptTemplate;
-import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.ai.template.st.StTemplateRenderer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,7 +30,6 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class SummaryConversationFactory implements ConversationFactory{
     private final ChatMemory chatMemory;
-    private final SystemPromptTemplate SUMMARIZER_SYSTEM_PROMPT_TEMPLATE;
     private final PromptTemplate initSummarizerPromptTemplate ;
     private final PromptTemplate againSummarizerPromptTemplate ;
 
@@ -42,13 +40,13 @@ public class SummaryConversationFactory implements ConversationFactory{
     // 独立的 key：避免和窗口/长期两种记忆策略的 max-messages 共用同一个配置项
     @Value("${conversation.summary.max-messages:8}")
     private int maxMessages;
-    @Value("${conversation.batch-size:4}")
+    // 独立的 key：避免和 LongTerm 的 batch-size 共用同一个配置项
+    @Value("${conversation.summary.batch-size:4}")
     private int batchSize;
 
     @Autowired
     public SummaryConversationFactory(ChatMemory chatMemory) {
         this.chatMemory = chatMemory;
-        SUMMARIZER_SYSTEM_PROMPT_TEMPLATE = new SystemPromptTemplate(new ClassPathResource("/prompts/system_prompt_with_summary.md", getClass()));
         this.initSummarizerPromptTemplate = PromptTemplate.builder()
                 .renderer(StTemplateRenderer.builder().startDelimiterToken('$').endDelimiterToken('$').build())
                 .resource(new ClassPathResource("/prompts/init_summarizer.md", getClass()))

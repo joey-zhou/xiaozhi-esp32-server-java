@@ -2,7 +2,7 @@ package com.xiaozhi.ai.llm.factory.providers;
 
 import com.xiaozhi.ai.llm.factory.ChatModelProvider;
 import com.xiaozhi.ai.llm.providers.CozeChatModel;
-import com.xiaozhi.common.port.TokenResolver;
+import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.port.ConfigLookup;
@@ -24,7 +24,7 @@ public class CozeModelProvider implements ChatModelProvider {
     private ConfigLookup configLookup;
     
     @Autowired
-    private TokenResolver tokenResolver;
+    private ProviderTokenClient tokenClient;
 
     @Override
     public String getProviderName() {
@@ -47,7 +47,7 @@ public class CozeModelProvider implements ChatModelProvider {
             throw new IllegalStateException("未找到Coze agent配置, userId=" + config.getUserId());
         }
         ConfigBO queryConfig = configs.get(0);
-        String token = tokenResolver.getToken(queryConfig);
+        String token = tokenClient.getToken(queryConfig);
         
         var chatModel = new CozeChatModel(token, model);
         

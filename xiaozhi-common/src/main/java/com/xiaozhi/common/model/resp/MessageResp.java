@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 public class MessageResp {
 
     @Schema(description = "消息ID")
-    private Integer messageId;
+    private Long messageId;
 
     @Schema(description = "设备ID")
     private String deviceId;

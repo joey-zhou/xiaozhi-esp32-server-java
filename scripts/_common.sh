@@ -102,7 +102,7 @@ download_file() {
     local url="$1"
     local output="$2"
     if command -v curl &>/dev/null; then
-        curl -L -C - --progress-bar -o "$output" "$url"
+        curl -f -L -C - --progress-bar -o "$output" "$url"
     elif command -v wget &>/dev/null; then
         wget -c "$url" -O "$output"
     else

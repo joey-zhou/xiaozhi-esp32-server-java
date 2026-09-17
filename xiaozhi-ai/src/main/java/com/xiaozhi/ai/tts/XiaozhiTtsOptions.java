@@ -50,7 +50,15 @@ public class XiaozhiTtsOptions implements TextToSpeechOptions {
 
     @Override
     public Double getSpeed() {
-        return speed;
+        return speed != null ? speed : 1.0;
+    }
+
+    /**
+     * pitch 的 @Builder.Default 会被显式传 null 击穿，这里做空值兜底，
+     * 避免各 TTS provider 直接对 getPitch() 拆箱 NPE。
+     */
+    public Double getPitch() {
+        return pitch != null ? pitch : 1.0;
     }
 
     @SuppressWarnings("unchecked")

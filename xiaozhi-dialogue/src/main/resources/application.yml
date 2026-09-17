@@ -21,7 +21,8 @@ spring:
     hikari:
       pool-name: DialogueHikariCP
 
-  # 激活开发环境，覆盖此处配置使用 application-dev.yml
+  # 默认 dev（mvn spring-boot:run、java -jar、bin/*.sh、docker compose 都一样）；
+  # 走生产要显式指定：SPRING_PROFILES_ACTIVE=prod、--spring.profiles.active=prod 或 bin/all.sh start prod
   profiles:
     active: dev
 

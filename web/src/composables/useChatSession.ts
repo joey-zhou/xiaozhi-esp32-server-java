@@ -38,6 +38,8 @@ export function useChatSession() {
 
   // 当前流式请求的 AbortController
   let currentAbort: AbortController | null = null
+  // 当前流式请求挂起的按帧合并回调，外部中止时要一并取消，避免中止后还有 rAF 补写数据
+  let cancelPendingFlush: (() => void) | null = null
 
   function toggleThinking(msgId: number) {
     thinkingExpanded.value[msgId] = !thinkingExpanded.value[msgId]
@@ -116,14 +118,9 @@ export function useChatSession() {
       currentAbort.abort()
       currentAbort = null
     }
-  }
-
-  function completeThinking(chatMessage: ChatMessage) {
-    if (!chatMessage.thinking || chatMessage.thinkingDone) return
-    chatMessage.thinkingDone = true
-    if (chatMessage.thinkingStartedAt) {
-      chatMessage.thinkingDurationMs = Date.now() - chatMessage.thinkingStartedAt
-    }
+    // 立即取消挂起的 rAF，不等 generator 抛出 AbortError 后再清，避免中止和帧回调之间有空隙
+    cancelPendingFlush?.()
+    cancelPendingFlush = null
   }
 
   function stopGeneration() {
@@ -196,30 +193,97 @@ export function useChatSession() {
     sending.value = true
     currentAbort = new AbortController()
     let streamFailed = false
+    let lastError: unknown
+
+    // 按帧合并：token 到达时只写本地缓冲，rAF 每帧最多把缓冲刷进 assistantMsg 一次，
+    // 避免每个 token 都触发一次整页 render；thinking 的到达时刻/完成时刻单独记录，
+    // 不受刷新延迟影响，保证思考耗时统计准确
+    let thinkingBuffer = ''
+    let contentBuffer = ''
+    let thinkingStartedAt: number | undefined
+    let thinkingDone = false
+    let thinkingDurationMs: number | undefined
+    let rafHandle = 0
+
+    function markThinkingDone() {
+      if (thinkingStartedAt !== undefined && !thinkingDone) {
+        thinkingDone = true
+        thinkingDurationMs = Date.now() - thinkingStartedAt
+      }
+    }
+
+    // 先落 thinking 再落 content，与到达顺序保持一致
+    function flush() {
+      if (thinkingStartedAt !== undefined && assistantMsg.thinkingStartedAt === undefined) {
+        assistantMsg.thinkingStartedAt = thinkingStartedAt
+      }
+      if (thinkingBuffer) {
+        assistantMsg.thinking = (assistantMsg.thinking || '') + thinkingBuffer
+        thinkingBuffer = ''
+      }
+      if (thinkingDone && !assistantMsg.thinkingDone) {
+        assistantMsg.thinkingDone = true
+        assistantMsg.thinkingDurationMs = thinkingDurationMs
+      }
+      if (contentBuffer) {
+        assistantMsg.content += contentBuffer
+        contentBuffer = ''
+      }
+      onScroll?.()
+    }
+
+    function cancelScheduledFlush() {
+      if (rafHandle) {
+        cancelAnimationFrame(rafHandle)
+        rafHandle = 0
+      }
+    }
+
+    function scheduleFlush() {
+      if (rafHandle) return
+      rafHandle = requestAnimationFrame(() => {
+        rafHandle = 0
+        flush()
+      })
+    }
+
+    cancelPendingFlush = cancelScheduledFlush
 
     try {
       for await (const token of chatStream(sessionId.value, text, currentAbort.signal)) {
-        if (token.type === 'thinking') {
-          if (!assistantMsg.thinkingStartedAt) {
-            assistantMsg.thinkingStartedAt = Date.now()
-          }
-          assistantMsg.thinking = (assistantMsg.thinking || '') + token.text
-        } else {
-          completeThinking(assistantMsg)
-          assistantMsg.content += token.text
+        if (token.type === 'error') {
+          // 后端把模型调用失败的原因推过来后就结束流，按中断处理并展示原因
+          throw new Error(token.text)
         }
-        onScroll?.()
+        if (token.type === 'thinking') {
+          if (thinkingStartedAt === undefined) thinkingStartedAt = Date.now()
+          thinkingBuffer += token.text
+        } else {
+          markThinkingDone()
+          contentBuffer += token.text
+        }
+        scheduleFlush()
       }
-      completeThinking(assistantMsg)
     } catch (e: unknown) {
       if (e instanceof DOMException && e.name === 'AbortError') {
         // 用户主动取消
       } else {
         streamFailed = true
-        assistantMsg.content += '\n\n' + t('chat.replyInterrupted', { error: errorText(e) })
+        lastError = e
       }
     } finally {
-      completeThinking(assistantMsg)
+      // 无论正常结束/异常/中止，读写 assistantMsg 前都要先把剩余缓冲同步刷掉，并取消挂起的 rAF
+      markThinkingDone()
+      cancelScheduledFlush()
+      // 切会话时旧流的 finally 可能晚于新流开始才跑，只清自己登记的那份
+      if (cancelPendingFlush === cancelScheduledFlush) {
+        cancelPendingFlush = null
+      }
+      flush()
+      if (streamFailed) {
+        // 中断提示要接在已刷入的正文之后
+        assistantMsg.content += '\n\n' + t('chat.replyInterrupted', { error: errorText(lastError) })
+      }
       assistantMsg.streaming = false
       sending.value = false
       currentAbort = null

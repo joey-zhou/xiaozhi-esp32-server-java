@@ -2,7 +2,6 @@ package com.xiaozhi.ai.tts.providers;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -130,23 +129,12 @@ public class XfyunTtsService implements TtsService {
                 //返回格式为音频文件的二进制数组bytes
                 @Override
                 public void onSuccess(byte[] bytes) {
-                    FileOutputStream outputStream = null;
                     try {
-                        outputStream = new FileOutputStream(file);
-                        outputStream.write(bytes);
-                        outputStream.flush();
-                        
-                        // 确保文件句柄被释放
-                        if(outputStream != null){
-                            try {
-                                outputStream.close();
-                                outputStream = null;  // 标记已关闭
-                            } catch (IOException e) {
-                                log.error("关闭 xfyun 语音合成文件流失败", e);
-                                throw new RuntimeException("文件关闭失败", e);
-                            }
+                        try (FileOutputStream outputStream = new FileOutputStream(file)) {
+                            outputStream.write(bytes);
+                            outputStream.flush();
                         }
-                        
+
                         // 验证文件已成功写入
                         if (!file.exists() || file.length() == 0) {
                             throw new RuntimeException("音频文件写入失败");

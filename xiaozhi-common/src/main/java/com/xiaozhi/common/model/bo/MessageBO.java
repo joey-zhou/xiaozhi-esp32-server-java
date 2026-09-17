@@ -2,7 +2,6 @@ package com.xiaozhi.common.model.bo;
 
 import lombok.Data;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -33,7 +32,6 @@ public class MessageBO {
      * 读取送 LLM 时由 Conversation 层与 createTime 一起拼成文本前缀。
      */
     private MessageMetadataBO metadata;
-    private LocalDate statDate;
     private String audioPath;
     private String state;
     private String messageType;

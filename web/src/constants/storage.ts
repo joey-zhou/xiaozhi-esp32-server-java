@@ -9,7 +9,6 @@
  */
 export const STORAGE_USER_INFO = 'userInfo'
 export const STORAGE_USER_TOKEN = 'token'
-export const STORAGE_REFRESH_TOKEN = 'refreshToken'
 export const STORAGE_PERMISSIONS = 'permissions'
 export const STORAGE_AUTH_ROLE = 'authRole'
 export const STORAGE_USERNAME = 'username'

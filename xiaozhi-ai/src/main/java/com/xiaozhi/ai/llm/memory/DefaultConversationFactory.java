@@ -32,7 +32,7 @@ public class DefaultConversationFactory implements ConversationFactory {
         return switch (role.getMemoryType()) {
             case "summary" -> summaryConversationFactory.initConversation(ownerId, userId, role, sessionId);
             case "window" -> windowConversation(ownerId, userId, role, sessionId);
-            default -> {
+            case null, default -> {
                 log.warn("系统目前不支持这类未知的记忆类型：{} ，将启用默认的MessageWindowConversation", role.getMemoryType());
                 yield windowConversation(ownerId, userId, role, sessionId);
             }

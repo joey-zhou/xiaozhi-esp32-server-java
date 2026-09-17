@@ -62,7 +62,7 @@ class BinaryFrameProtocolTest {
         assertThat(device.transport().awaitJson("hello").path("version").asInt()).isEqualTo(2);
         assertThat(device.session().getProtocolVersion()).isEqualTo(BinaryProtocolCodec.VERSION_V2);
 
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         byte[] payload = FakeDevice.frame(ScriptedVadService.NO_SPEECH);
         device.sendAudio(payload, HIGH_BIT_TIMESTAMP);
 
@@ -79,7 +79,7 @@ class BinaryFrameProtocolTest {
     void downgradeToV1AlsoDowngradesDownlinkEncoding() {
         FakeDevice device = harness.connect(DEVICE_ID);
         device.hello(2);
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         assertThat(device.session().getProtocolVersion()).isEqualTo(BinaryProtocolCodec.VERSION_V2);
 
         // 设备声明了 v2 却发裸 opus：帧长不足 v2 帧头，解帧失败触发降级
@@ -108,7 +108,7 @@ class BinaryFrameProtocolTest {
         assertThat(device.transport().awaitJson("hello").path("version").asInt()).isEqualTo(3);
         assertThat(device.session().getProtocolVersion()).isEqualTo(BinaryProtocolCodec.VERSION_V3);
 
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         byte[] payload = FakeDevice.frame(ScriptedVadService.NO_SPEECH);
         // v3 帧头没有 timestamp 字段，设备即使想回显也带不上来
         device.sendAudio(payload, HIGH_BIT_TIMESTAMP);
@@ -133,7 +133,7 @@ class BinaryFrameProtocolTest {
     void audioAfterSessionClosedIsDropped() {
         FakeDevice device = harness.connect(DEVICE_ID);
         device.hello();
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
 
         // 基线：VAD 已初始化时，上行帧进 VAD
         device.sendFrames(ScriptedVadService.NO_SPEECH);

@@ -7,7 +7,6 @@ import cn.dev33.satoken.annotation.SaIgnore;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
-import com.xiaozhi.common.exception.OperationFailedException;
 import com.google.gson.Gson;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.req.UserCheckReq;
@@ -26,8 +25,8 @@ import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.user.service.WxLoginService;
+import com.xiaozhi.verifycode.VerifyCodeAppService;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
-import com.xiaozhi.utils.CaptchaUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -56,7 +55,7 @@ public class UserController extends BaseController {
     private VerifyCodeService verifyCodeService;
 
     @Resource
-    private CaptchaUtils captchaUtils;
+    private VerifyCodeAppService verifyCodeAppService;
 
     @Resource
     private TrustedProxyPolicy trustedProxyPolicy;
@@ -64,38 +63,12 @@ public class UserController extends BaseController {
     @GetMapping("/check-token")
     @Operation(summary = "检查Token有效性", description = "验证当前Token是否有效，有效则返回用户信息")
     public ApiResponse<LoginResp> checkToken() {
-        if (!StpUtil.isLogin()) {
-            return ApiResponse.unauthorized("Token无效或已过期");
-        }
         Integer userId = StpUtil.getLoginIdAsInt();
         LoginResp response = userAppService.buildLoginResp(userId, StpUtil.getTokenValue(), false);
         if (response == null) {
             return ApiResponse.unauthorized("用户不存在");
         }
         return ApiResponse.success(response);
-    }
-
-    @PostMapping("/refresh-token")
-    @Operation(summary = "刷新Token", description = "刷新Token有效期，返回新的Token")
-    public ApiResponse<LoginResp> refreshToken() {
-        if (!StpUtil.isLogin()) {
-            return ApiResponse.unauthorized("用户不存在");
-        }
-        Integer userId = StpUtil.getLoginIdAsInt();
-        UserBO user = userService.getBO(userId);
-        if (user == null) {
-            return ApiResponse.unauthorized("用户不存在");
-        }
-        // 换发 Token 等于重新授予一个完整有效期的访问权，与登录同级，禁用账号不能靠刷新续命
-        userService.requireEnabled(user);
-
-        int expireSeconds = userAppService.getTokenExpireSeconds();
-        StpUtil.logout();
-        StpUtil.login(userId, expireSeconds);
-        LoginResp response = userAppService.buildLoginResp(userId, StpUtil.getTokenValue(), false);
-        return response == null
-            ? ApiResponse.unauthorized("Token刷新失败，请重新登录")
-            : ApiResponse.success(response);
     }
 
     @PostMapping("/logout")
@@ -214,15 +187,7 @@ public class UserController extends BaseController {
     @PostMapping("/sendEmailCaptcha")
     @Operation(summary = "发送邮箱验证码", description = "向指定邮箱发送验证码")
     public ApiResponse<Void> sendEmailCaptcha(@Valid @RequestBody UserSendCaptchaReq req) {
-        if ("forget".equals(req.getType()) && userService.getByEmail(req.getEmail()) == null) {
-            throw new IllegalArgumentException("该邮箱未注册");
-        }
-
-        String code = verifyCodeService.generateForAccount(req.getEmail());
-        CaptchaUtils.CaptchaResult result = captchaUtils.sendEmailCaptcha(req.getEmail(), code);
-        if (!result.isSuccess()) {
-            throw new OperationFailedException(result.getMessage());
-        }
+        verifyCodeAppService.sendEmailCaptcha(req);
         return ApiResponse.success();
     }
 
@@ -230,15 +195,7 @@ public class UserController extends BaseController {
     @PostMapping("/sendSmsCaptcha")
     @Operation(summary = "发送短信验证码", description = "向指定手机号发送验证码")
     public ApiResponse<Void> sendSmsCaptcha(@Valid @RequestBody UserSendCaptchaReq req) {
-        if ("forget".equals(req.getType()) && userService.getByTel(req.getTel()) == null) {
-            throw new IllegalArgumentException("该手机号未注册");
-        }
-
-        String code = verifyCodeService.generateForAccount(req.getTel());
-        CaptchaUtils.CaptchaResult result = captchaUtils.sendSmsCaptcha(req.getTel(), code);
-        if (!result.isSuccess()) {
-            throw new OperationFailedException(result.getMessage());
-        }
+        verifyCodeAppService.sendSmsCaptcha(req);
         return ApiResponse.success();
     }
 

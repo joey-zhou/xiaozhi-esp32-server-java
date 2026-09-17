@@ -12,7 +12,6 @@ const userStoreMock = vi.hoisted(() => ({
   setPermissions: vi.fn(),
   setAuthRole: vi.fn(),
   setToken: vi.fn(),
-  setRefreshToken: vi.fn(),
   clearUserInfo: vi.fn(),
   clearToken: vi.fn(),
   hasPermission: vi.fn(() => false),
@@ -47,7 +46,6 @@ function loginResponse(isAdmin: string) {
       permissions: [],
       authRole: null,
       token: 'token-1',
-      refreshToken: 'refresh-1',
     },
   }
 }
@@ -167,7 +165,6 @@ describe('useAuth', () => {
     await telLogin({ tel: '13800000000', code: '123456' })
 
     expect(userStoreMock.setToken).toHaveBeenCalledTimes(2)
-    expect(userStoreMock.setRefreshToken).toHaveBeenCalledTimes(2)
     expect(userStoreMock.setPermissions).toHaveBeenCalledTimes(2)
     expect(userStoreMock.setAuthRole).toHaveBeenCalledTimes(2)
     expect(routerMock.push).toHaveBeenNthCalledWith(1, '/dashboard')

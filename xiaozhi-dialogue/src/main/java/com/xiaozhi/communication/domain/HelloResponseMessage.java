@@ -1,0 +1,17 @@
+package com.xiaozhi.communication.domain;
+
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import lombok.Data;
+import lombok.experimental.Accessors;
+
+@Data
+@Accessors(chain = true)
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+public class HelloResponseMessage {
+    private String type = "hello";
+    private Integer version;
+    private String transport;
+    private String sessionId;
+    private AudioParams audioParams;
+}

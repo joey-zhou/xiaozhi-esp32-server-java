@@ -79,7 +79,7 @@ class ProtocolFuzzToleranceTest {
         device.sendText("{\"type\":\"mcp\",\"payload\":{}}");
 
         // 后置信号：紧接着的合法 listen/start 必须被正常处理
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         AwaitHelper.until("合法 listen/start 已初始化 VAD",
                 () -> Boolean.TRUE.equals(harness.vad().autoSegmentOf(device.sessionId())));
 
@@ -95,11 +95,11 @@ class ProtocolFuzzToleranceTest {
         device.transport().awaitJson("hello");
         device.transport().clearOutbound();
 
-        // type 不在 @JsonSubTypes 列表里，反序列化返回 null，整条报文被吞
+        // type 不在 @JsonSubTypes 列表里，兜底反序列化成 UnknownMessage，按未知类型丢弃
         device.sendText("{\"type\":\"whatever\",\"x\":1}");
 
         // 后置信号：紧接着的合法 listen/start 必须被正常处理
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         AwaitHelper.until("合法 listen/start 已初始化 VAD",
                 () -> Boolean.TRUE.equals(harness.vad().autoSegmentOf(device.sessionId())));
 
@@ -138,7 +138,7 @@ class ProtocolFuzzToleranceTest {
         assertThat(device.transport().isOpen()).isTrue();
 
         // handler 没进坏状态：紧接着的合法 listen/start 仍被正确处理
-        device.listenStart(ListenMode.Manual);
+        device.listenStart(ListenMode.MANUAL);
         AwaitHelper.until("合法 listen/start 已初始化 VAD",
                 () -> harness.vad().autoSegmentOf(device.sessionId()) != null);
         // manual 由客户端断句，autoSegment 必须为 false，证明走的是真实分支而非兜底
@@ -220,7 +220,7 @@ class ProtocolFuzzToleranceTest {
         FakeDevice device = harness.connect(BOUND_DEVICE_ID);
         device.hello();
         device.transport().awaitJson("hello");
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
 
         // 零长二进制帧：解帧后 payload 为空，必须在进 VAD 之前被丢掉
         device.sendRawAudio(new byte[0]);
@@ -251,9 +251,9 @@ class ProtocolFuzzToleranceTest {
         device.transport().clearOutbound();
 
         // 设备端连发三条，验证码流程只能启动一次
-        device.listenStart(ListenMode.Auto);
-        device.listenStart(ListenMode.Auto);
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
+        device.listenStart(ListenMode.AUTO);
+        device.listenStart(ListenMode.AUTO);
 
         JsonNode sentenceStart = device.transport().awaitJson("tts:sentence_start");
         assertThat(sentenceStart.path("text").asText()).isEqualTo("246813");
@@ -344,7 +344,7 @@ class ProtocolFuzzToleranceTest {
         assertThat(device.transport().jsonSignatures()).containsOnly("hello");
 
         // 对照组：同一条连接上发合法消息，验证码流程确实是可达的
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         AwaitHelper.until("验证码已生成",
                 () -> invocationCount(harness.deviceService(), "generateCode") == 1);
     }
@@ -363,7 +363,7 @@ class ProtocolFuzzToleranceTest {
         device.sendText("{\"type\":\"ping\"}");
 
         // 后置信号：紧接着的合法 listen/start 必须被正常处理
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         AwaitHelper.until("ping 之后的合法 listen/start 已初始化 VAD",
                 () -> Boolean.TRUE.equals(harness.vad().autoSegmentOf(device.sessionId())));
 

@@ -93,7 +93,6 @@ export default {
     addFailed: 'Add failed',
     // Common in-progress states
     exporting: 'Exporting...',
-    adding: 'Adding...',
     serverMaintenance: 'Server maintenance/restart in progress, please try again later',
     // Common placeholders
     enterUsername: 'Please enter username',
@@ -231,7 +230,6 @@ export default {
     enterEmailFirst: 'Please enter email address first!',
     enterValidEmail: 'Please enter a valid email format!',
     verificationCodeSent: 'Verification code has been sent!',
-    sendVerificationCodeFailed: 'Failed to send verification code!',
     // Mobile phone login related
     mobilePhone: 'Mobile Phone',
     enterMobilePhone: 'Please enter phone number',

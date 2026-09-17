@@ -2,7 +2,6 @@
 import { ref, nextTick, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  UserOutlined,
   PlusOutlined,
   ClockCircleOutlined,
   DeleteOutlined,
@@ -17,10 +16,7 @@ import { queryRoles } from '@/services/role'
 import { formatShortDateTime } from '@/utils/date'
 import type { Conversation } from '@/types/message'
 import type { Role } from '@/types/role'
-import RobotAvatar from '@/components/RobotAvatar.vue'
-import ThinkingState from '@/components/chat/ThinkingState.vue'
-import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
-import StreamingText from '@/components/chat/StreamingText.vue'
+import ChatMessageItem from '@/components/chat/ChatMessageItem.vue'
 import ChatComposer from '@/components/chat/ChatComposer.vue'
 
 const { t } = useI18n()
@@ -237,36 +233,15 @@ async function sendMessage() {
             <span>{{ t('chat.emptyHint') }}</span>
           </div>
 
-          <div v-for="msg in messages" :key="msg.id" class="message-row" :class="msg.role">
-            <a-avatar v-if="msg.role === 'user'" :size="36" :style="{ background: '#1677ff', flexShrink: 0 }">
-              <template #icon><UserOutlined /></template>
-            </a-avatar>
-            <a-avatar v-else-if="selectedRoleAvatar" :size="36" :src="selectedRoleAvatar" :style="{ flexShrink: 0 }" />
-            <RobotAvatar v-else :size="36" />
-            <div class="message-content" :class="msg.role">
-              <a-typography-text type="secondary" :style="{ fontSize: '13px', padding: '0 4px', marginBottom: '4px' }">
-                {{ msg.role === 'user' ? t('chat.me') : (selectedRoleName || t('chat.defaultAssistant')) }}
-              </a-typography-text>
-              <div class="message-bubble" :class="msg.role">
-                <ThinkingState v-if="msg.streaming && !msg.content && !msg.thinking" />
-                <template v-else>
-                  <ThinkingBlock
-                    v-if="msg.thinking"
-                    :content="msg.thinking"
-                    :done="msg.thinkingDone"
-                    :expanded="thinkingExpanded[msg.id]"
-                    :duration-ms="msg.thinkingDurationMs"
-                    @toggle="toggleThinking(msg.id)"
-                  />
-                  <StreamingText
-                    v-if="msg.content"
-                    :content="msg.content"
-                    :streaming="msg.streaming"
-                  />
-                </template>
-              </div>
-            </div>
-          </div>
+          <ChatMessageItem
+            v-for="msg in messages"
+            :key="msg.id"
+            :msg="msg"
+            :role-name="selectedRoleName || t('chat.defaultAssistant')"
+            :role-avatar="selectedRoleAvatar"
+            :thinking-expanded="thinkingExpanded[msg.id]"
+            @toggle-thinking="toggleThinking(msg.id)"
+          />
         </div>
       </div>
 
@@ -468,48 +443,6 @@ async function sendMessage() {
   min-height: 100%;
 }
 
-/* 消息气泡（无 AntD 等效组件，保留自定义） */
-.message-row {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.message-row.user {
-  flex-direction: row-reverse;
-}
-
-.message-content {
-  display: flex;
-  flex-direction: column;
-  max-width: 80%;
-}
-
-.message-content.user {
-  align-items: flex-end;
-}
-
-.message-bubble {
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 15px;
-  line-height: 1.6;
-  word-break: break-word;
-  white-space: pre-wrap;
-}
-
-.message-bubble.user {
-  background: var(--ant-color-primary-bg);
-  border-top-right-radius: 4px;
-}
-
-.message-bubble.assistant {
-  padding: 4px 0;
-  background: transparent;
-  border-radius: 0;
-  box-shadow: none;
-}
-
 /* 输入区域 */
 .chat-input-wrapper {
   display: flex;
@@ -565,14 +498,6 @@ async function sendMessage() {
 
   .chat-messages {
     padding: 18px 12px;
-  }
-
-  .message-row {
-    gap: 10px;
-  }
-
-  .message-content {
-    max-width: calc(100% - 46px);
   }
 
   .chat-input-wrapper {

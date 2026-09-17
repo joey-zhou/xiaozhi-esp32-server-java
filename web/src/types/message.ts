@@ -3,7 +3,7 @@ import type { PageQueryParams } from './api'
 /**
  * 消息发送方
  */
-export type MessageSender = 'user' | 'assistant' | 'system'
+export type MessageSender = 'user' | 'assistant' | 'tool'
 
 /**
  * 消息信息接口（对齐后端 MessageResp）

@@ -33,14 +33,6 @@ export function logout() {
 }
 
 /**
- * 刷新Token
- * 延长登录有效期
- */
-export function refreshToken() {
-  return http.post<LoginResponse>(api.user.refreshToken)
-}
-
-/**
  * 用户注册
  */
 export function register(data: {
@@ -107,11 +99,4 @@ export function queryUsers(params: Partial<UserQueryParams>) {
 export function updateUser(data: Partial<UpdateUserParams>) {
   const { userId, ...updateData } = data
   return http.put(`${api.user.root}/${userId}`, updateData)
-}
-
-/**
- * 添加用户
- */
-export function addUser(data: Partial<User>) {
-  return http.post(api.user.root, data)
 }

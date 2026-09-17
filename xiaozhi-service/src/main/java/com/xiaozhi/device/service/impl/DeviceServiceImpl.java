@@ -16,6 +16,7 @@ import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.device.service.DeviceService;
+import com.xiaozhi.device.support.DeviceCacheKeys;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.CacheManager;
@@ -69,7 +70,7 @@ public class DeviceServiceImpl implements DeviceService {
         if (!StringUtils.hasText(deviceId)) {
             return null;
         }
-        String cacheKey = deviceId.replace(":", "-");
+        String cacheKey = DeviceCacheKeys.of(deviceId);
         org.springframework.cache.Cache cache = cacheManager.getCache(CacheNames.DEVICE);
         return cacheHelper.getWithLock(
             "device:" + cacheKey,

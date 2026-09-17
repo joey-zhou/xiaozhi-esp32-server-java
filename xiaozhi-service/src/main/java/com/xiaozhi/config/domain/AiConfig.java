@@ -10,7 +10,7 @@ import java.util.List;
 /**
  * AiConfig 聚合根 —— 表示一条 AI 模型配置（LLM / TTS / STT / VAD / Embedding 等）。
  * <p>
- * 不变式：同一 userId + configType + modelType 组合下最多一条默认配置（由 ConfigRepository.save 维护）。
+ * 不变式：同类默认全局只允许一条（按 configType + modelType 维度，不含 userId），由 ConfigRepository.save 维护。
  */
 @Getter
 public class AiConfig {

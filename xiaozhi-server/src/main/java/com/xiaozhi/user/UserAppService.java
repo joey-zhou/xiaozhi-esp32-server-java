@@ -21,7 +21,7 @@ import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.permission.convert.PermissionConvert;
 import com.xiaozhi.permission.service.PermissionService;
 import com.xiaozhi.role.service.RoleService;
-import com.xiaozhi.security.AuthenticationService;
+import com.xiaozhi.security.service.AuthenticationService;
 import com.xiaozhi.template.service.TemplateService;
 import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.service.UserService;
@@ -305,7 +305,6 @@ public class UserAppService {
 
         return LoginResp.builder()
             .token(token)
-            .refreshToken(token)
             .expiresIn(TOKEN_EXPIRE_SECONDS)
             .userId(userId)
             .isNewUser(isNewUser)

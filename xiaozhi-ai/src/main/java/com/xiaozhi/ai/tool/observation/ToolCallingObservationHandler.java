@@ -7,7 +7,6 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.observation.ToolCallingObservationContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
-import org.springframework.stereotype.Component;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
 
@@ -16,7 +15,6 @@ import io.micrometer.observation.ObservationHandler;
  * 包括函数名称、参数、callId、工具名称、参数和执行结果。
  */
 @Slf4j
-@Component
 public class ToolCallingObservationHandler implements ObservationHandler<ToolCallingObservationContext> {
 
     private static final String SESSION_ID_KEY = "sessionId";

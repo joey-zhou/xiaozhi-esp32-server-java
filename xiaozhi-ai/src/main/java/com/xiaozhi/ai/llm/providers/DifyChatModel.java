@@ -15,12 +15,15 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import reactor.core.publisher.Flux;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +42,10 @@ public class DifyChatModel implements ChatModel {
     /**
      * 按 sessionId 缓存 Dify 返回的 conversation_id，使多轮对话能延续 Dify 智能体侧的会话记忆。
      */
-    private final Map<String, String> conversationIds = new ConcurrentHashMap<>();
+    private final Cache<String, String> conversationIds = Caffeine.newBuilder()
+            .expireAfterAccess(Duration.ofHours(24))
+            .maximumSize(5000)
+            .build();
 
     /**
      * 构造函数
@@ -196,7 +202,7 @@ public class DifyChatModel implements ChatModel {
         if (sessionId == null) {
             return null;
         }
-        return conversationIds.get(sessionId);
+        return conversationIds.getIfPresent(sessionId);
     }
 
     /**

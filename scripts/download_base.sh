@@ -18,7 +18,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 # ---- VAD 模型配置 ----
 VAD_MODEL_NAME="silero_vad.onnx"
-VAD_MODEL_URL="https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx"
+VAD_MODEL_URL="https://github.com/snakers4/silero-vad/raw/v6.2.1/src/silero_vad/data/silero_vad.onnx"
 VAD_MODEL_DIR="${MODELS_DIR}"
 
 # ---- 原生库下载地址 ----

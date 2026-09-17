@@ -3,7 +3,7 @@ package com.xiaozhi.ai.stt;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.ai.stt.providers.*;
-import com.xiaozhi.common.port.TokenResolver;
+import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.common.model.bo.ConfigBO;
 
 import jakarta.annotation.Nonnull;
@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 public class SttServiceFactory {
 
     @Resource
-    private TokenResolver tokenResolver;
+    private ProviderTokenClient tokenClient;
 
     @Resource
     private RuntimePathConfig runtimePathConfig;
@@ -123,32 +123,36 @@ public class SttServiceFactory {
         SttService service = switch (config.getProvider()) {
             case "tencent" -> new TencentSttService(config);
             case "aliyun" -> new AliyunSttService(config);
-            case "aliyun-nls" -> new AliyunNlsSttService(config, tokenResolver);
+            case "aliyun-nls" -> new AliyunNlsSttService(config, tokenClient);
             case "funasr" -> new FunASRSttService(config);
             case "xfyun" -> new XfyunSttService(config);
             case "volcengine" -> new VolcengineSttService(config);
-            default -> {
-                var vosk = initializeVosk();
-                if (vosk == null) {
-                    // 不得回退到其它配置创建出的实例，那会把别的租户的第三方凭据借出去
-                    throw new IllegalStateException("默认语音识别服务(Vosk)不可用，请为该角色配置第三方 STT");
-                }
-                yield vosk;
-            }
+            case "vosk", "" -> voskOrThrow();
+            case null -> voskOrThrow();
+            default -> throw new IllegalArgumentException("不支持的 STT provider: " + config.getProvider());
         };
         return service;
     }
 
-    public void removeCache(ConfigBO config) {
-        // 对于API服务，使用"provider:configId"作为缓存键，确保每个配置使用独立的服务实例
-        Integer configId = config.getConfigId();
-        String provider = config.getProvider();
-        String cacheKey = provider + ":" + (configId != null ? configId : "default");
-
-        if ("aliyun-nls".equals(provider)) {
-            AliyunNlsSttService.clearClientCache(configId);
+    private SttService voskOrThrow() {
+        var vosk = initializeVosk();
+        if (vosk == null) {
+            // 不得回退到其它配置创建出的实例，那会把别的租户的第三方凭据借出去
+            throw new IllegalStateException("默认语音识别服务(Vosk)不可用，请为该角色配置第三方 STT");
         }
+        return vosk;
+    }
 
-        serviceCache.remove(cacheKey);
+    public void removeCache(ConfigBO config) {
+        Integer configId = config.getConfigId();
+        // provider 可能已被运维改成别的值，旧 key 的 provider 段对不上；不再比较 provider，
+        // 只按 configId 段清理，否则切走 provider 后旧实例/旧连接永远清不掉
+        serviceCache.keySet().removeIf(k -> {
+            int idx = k.indexOf(':');
+            return idx >= 0 && k.substring(idx + 1).equals(String.valueOf(configId));
+        });
+        // evictClient 对不存在的 configId 是 no-op，不用再判断当前 provider 是不是 aliyun-nls：
+        // 旧 provider 是 aliyun-nls、新 provider 不是时，也要能把旧连接清掉
+        AliyunNlsSttService.clearClientCache(configId);
     }
 }

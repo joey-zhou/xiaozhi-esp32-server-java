@@ -7,6 +7,16 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 设备信息。
+ * <p>
+ * sessionId / code / audioPath / mcpList 四个字段只是 OTA 内部流程
+ * （见 DeviceAppService.generateCode / handleOta）临时借用的载体：DeviceConvert 里
+ * create / scanBind / update 等面向前端的 toResp 重载全部显式 {@code @Mapping(..., ignore = true)}
+ * 这四个字段，它们在所有真正返回给前端的 DeviceResp 响应里恒为 null。
+ * 如果要给这几个字段赋新的业务语义，应该先把这个类拆成独立的 web 出参 DTO 和 OTA 内部载体，
+ * 而不是往这里继续叠加用途。
+ */
 @Data
 @Schema(description = "设备信息")
 public class DeviceResp {

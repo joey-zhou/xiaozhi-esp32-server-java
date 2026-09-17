@@ -11,6 +11,10 @@ import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import lombok.extern.slf4j.Slf4j;
 /**
  * 存储服务工厂。
@@ -35,6 +39,17 @@ public class StorageServiceFactory {
     // 默认 OSS 配置本身极少变化，进程内短暂缓存吸收一轮对话里的多次重复读取；
     // 配置变更广播会调用 refresh() 立即失效，不依赖这个 TTL 过期
     private static final long OSS_CONFIG_CACHE_MILLIS = 30_000L;
+
+    // 旧客户端可能正被其它线程持有引用做 I/O，切换后延迟这么久再真正 shutdown，
+    // 避免正在进行的上传/下载命中已关闭的 SDK 客户端
+    private static final long SHUTDOWN_DELAY_SECONDS = 30L;
+
+    private final ScheduledExecutorService shutdownExecutor =
+        Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "storage-service-shutdown");
+            t.setDaemon(true);
+            return t;
+        });
 
     @Resource
     private ConfigService configService;
@@ -65,16 +80,18 @@ public class StorageServiceFactory {
 
         // 缓存标识包含 configId 与 updateTime：同 provider 下改动 ak/sk/endpoint/bucket 等字段也能触发重建
         String signature = ossConfig.getProvider() + ":" + ossConfig.getConfigId() + ":" + ossConfig.getUpdateTime();
-        if (signature.equals(cachedSignature) && cachedCloudService != null) {
-            return cachedCloudService;
+        StorageService cached = cachedCloudService;
+        if (signature.equals(cachedSignature) && cached != null) {
+            return cached;
         }
 
         synchronized (this) {
-            if (signature.equals(cachedSignature) && cachedCloudService != null) {
-                return cachedCloudService;
+            StorageService cachedInLock = cachedCloudService;
+            if (signature.equals(cachedSignature) && cachedInLock != null) {
+                return cachedInLock;
             }
             try {
-                shutdownCached();
+                scheduleShutdown(cachedCloudService);
                 cachedCloudService = createStorageService(ossConfig);
                 cachedSignature = signature;
                 log.info("存储服务已切换到: {} (configId={})", ossConfig.getProvider(), ossConfig.getConfigId());
@@ -130,8 +147,14 @@ public class StorageServiceFactory {
         return resolveFor(storedPath).download(storedPath);
     }
 
-    /** 删历史文件，实现按值的形态选；删错地方等于删不掉，文件会一直留着 */
+    /**
+     * 删历史文件，实现按值的形态选；删错地方等于删不掉，文件会一直留着。
+     * 路径为空直接返回，调用方不用各自判空（空串落到本地实现会被解析成数据根目录）。
+     */
     public void removeFrom(String storedPath) {
+        if (storedPath == null || storedPath.isBlank()) {
+            return;
+        }
         resolveFor(storedPath).remove(storedPath);
     }
 
@@ -158,25 +181,35 @@ public class StorageServiceFactory {
         configService.evictDefaultCache("oss");
         cachedOssConfig = null;
         cachedOssConfigAt = 0;
-        shutdownCached();
+        scheduleShutdown(cachedCloudService);
         cachedCloudService = null;
         cachedSignature = null;
         log.info("存储服务缓存已清除，将按最新配置重建");
     }
 
     /**
-     * 释放缓存实例持有的 SDK 客户端。
+     * 延迟关闭旧的 SDK 客户端，给正在用它做 I/O 的线程留出完成时间。
      * 具体释放什么由实现自己在 {@link StorageService#shutdown()} 里决定，
      * 本地存储没有常驻资源，默认实现是空的。
      */
-    private void shutdownCached() {
-        if (cachedCloudService != null) {
-            cachedCloudService.shutdown();
+    private void scheduleShutdown(StorageService service) {
+        if (service == null) {
+            return;
         }
+        shutdownExecutor.schedule(() -> {
+            try {
+                service.shutdown();
+            } catch (Exception e) {
+                log.warn("关闭旧存储客户端失败", e);
+            }
+        }, SHUTDOWN_DELAY_SECONDS, TimeUnit.SECONDS);
     }
 
     @PreDestroy
     public void destroy() {
-        shutdownCached();
+        if (cachedCloudService != null) {
+            cachedCloudService.shutdown();
+        }
+        shutdownExecutor.shutdown();
     }
 }

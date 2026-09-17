@@ -5,10 +5,10 @@ import lombok.Getter;
 
 @Getter
 public enum ListenState {
-    Start("start"),
-    Stop("stop"),
-    Text("text"),
-    Detect("detect");
+    START("start"),
+    STOP("stop"),
+    TEXT("text"),
+    DETECT("detect");
 
     @JsonValue
     private final String value;

@@ -2,13 +2,14 @@ package com.xiaozhi.agent.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xiaozhi.agent.AgentProviders;
 import com.xiaozhi.agent.convert.AgentConvert;
 import com.xiaozhi.agent.service.AgentService;
 import com.xiaozhi.common.model.bo.AgentBO;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.config.service.ConfigService;
-import com.xiaozhi.token.TokenService;
+import com.xiaozhi.common.port.ProviderTokenClient;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -50,11 +51,10 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class AgentServiceImpl implements AgentService {
 
-    private static final String PROVIDER_COZE = "coze";
-    private static final String PROVIDER_DIFY = "dify";
-    private static final String PROVIDER_XINGCHEN = "xingchen";
-    private static final Set<String> SUPPORTED_PROVIDERS =
-        Set.of(PROVIDER_COZE, PROVIDER_DIFY, PROVIDER_XINGCHEN);
+    private static final String PROVIDER_COZE = AgentProviders.COZE;
+    private static final String PROVIDER_DIFY = AgentProviders.DIFY;
+    private static final String PROVIDER_XINGCHEN = AgentProviders.XINGCHEN;
+    private static final Set<String> SUPPORTED_PROVIDERS = AgentProviders.ALL;
 
     /** 智能体落库后的配置类型 */
     private static final String MODEL_CONFIG_TYPE = "llm";
@@ -83,7 +83,7 @@ public class AgentServiceImpl implements AgentService {
     private ConfigService configService;
 
     @Resource
-    private TokenService tokenService;
+    private ProviderTokenClient tokenClient;
 
     @Resource
     private AgentConvert agentConvert;
@@ -337,7 +337,7 @@ public class AgentServiceImpl implements AgentService {
         ConfigBO credential = credentials.getFirst();
         String token;
         try {
-            token = tokenService.getToken(credential);
+            token = tokenClient.getToken(credential);
         } catch (RuntimeException e) {
             log.error("获取Coze Token失败", e);
             throw new RuntimeException("无法获取Coze平台授权码，请检查您的平台配置是否正确", e);

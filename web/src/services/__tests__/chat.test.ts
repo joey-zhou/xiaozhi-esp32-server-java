@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const requestMock = vi.hoisted(() => ({
-  post: vi.fn(() => Promise.resolve({ sessionId: 's-1' })),
+const httpMock = vi.hoisted(() => ({
+  post: vi.fn(() => Promise.resolve({ code: 200, message: 'success', data: { sessionId: 's-1' } })),
 }))
 
 const handleAuthExpiredMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../request', () => ({
-  default: requestMock,
+  http: httpMock,
   API_BASE_URL: '/api',
   handleAuthExpired: handleAuthExpiredMock,
 }))
@@ -62,14 +62,14 @@ describe('chat service', () => {
   }
 
   it('开会话与关会话打到 /chat/open 与 /chat/close', async () => {
-    await openChatSession(3, 's-1')
-    expect(requestMock.post).toHaveBeenCalledWith('/chat/open', null, {
+    await expect(openChatSession(3, 's-1')).resolves.toEqual({ sessionId: 's-1' })
+    expect(httpMock.post).toHaveBeenCalledWith('/chat/open', null, {
       params: { roleId: 3, sessionId: 's-1' },
     })
 
-    requestMock.post.mockClear()
+    httpMock.post.mockClear()
     await closeChatSession('s-1')
-    expect(requestMock.post).toHaveBeenCalledWith('/chat/close', null, {
+    expect(httpMock.post).toHaveBeenCalledWith('/chat/close', null, {
       params: { sessionId: 's-1' },
     })
   })

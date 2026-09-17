@@ -33,6 +33,12 @@ public class LocalStorageService implements StorageService {
     @Value("${xiaozhi.upload-path:uploads}")
     private String baseDir;
 
+    // resolveStorageKey 对绝对路径原样放行、不保证落在 dataDir 内，读写前必须再校验一次，否则外部传入的越界路径会被直接读写
+    private boolean withinDataDir(Path resolved) {
+        Path root = runtimePathConfig.resolveDataDir();
+        return resolved.equals(root) || resolved.startsWith(root);
+    }
+
     @Override
 
     public String upload(MultipartFile file, String relativePath, String fileName) throws IOException {
@@ -77,6 +83,10 @@ public class LocalStorageService implements StorageService {
     public byte[] download(String storedPath) {
         try {
             Path path = runtimePathConfig.resolveStorageKey(storedPath);
+            if (!withinDataDir(path)) {
+                log.warn("拒绝越界的存储路径: {}", storedPath);
+                return null;
+            }
             return Files.exists(path) ? Files.readAllBytes(path) : null;
         } catch (Exception e) {
             log.warn("读取本地文件失败: {}", storedPath, e);
@@ -88,7 +98,12 @@ public class LocalStorageService implements StorageService {
     public void remove(String storedPath) {
         if (storedPath == null) return;
         try {
-            Files.deleteIfExists(runtimePathConfig.resolveStorageKey(storedPath));
+            Path path = runtimePathConfig.resolveStorageKey(storedPath);
+            if (!withinDataDir(path)) {
+                log.warn("拒绝越界的存储路径: {}", storedPath);
+                return;
+            }
+            Files.deleteIfExists(path);
         } catch (Exception e) {
             log.warn("删除本地文件失败: {}", storedPath, e);
         }
@@ -96,7 +111,9 @@ public class LocalStorageService implements StorageService {
 
     @Override
     public boolean exists(String storedPath) {
-        return storedPath != null && Files.exists(runtimePathConfig.resolveStorageKey(storedPath));
+        if (storedPath == null) return false;
+        Path path = runtimePathConfig.resolveStorageKey(storedPath);
+        return withinDataDir(path) && Files.exists(path);
     }
 
     @Override

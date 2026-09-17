@@ -17,7 +17,7 @@ public class MessageWindowConversation extends Conversation {
      * 可切换加载维度的构造器。由 Lombok {@link Builder} 生成静态工厂 {@code builder()} 与链式 setter。
      * <ul>
      *   <li>{@code sessionScoped=false}（默认）：按 ownerId + roleId 查 {@link ChatMemory#find(String, int, int)}，设备场景跨 session 聚合</li>
-     *   <li>{@code sessionScoped=true}：按 sessionId 查 {@link ChatMemory#find(String, int)}，Web 场景按会话隔离</li>
+     *   <li>{@code sessionScoped=true}：按 sessionId 查 {@link ChatMemory#findBySession(String, int)}，Web 场景按会话隔离</li>
      * </ul>
      */
     @Builder
@@ -27,7 +27,7 @@ public class MessageWindowConversation extends Conversation {
         this.maxMessages = maxMessages;
 
         List<Message> history = sessionScoped
-                ? chatMemory.find(sessionId, maxMessages)
+                ? chatMemory.findBySession(sessionId, maxMessages)
                 : chatMemory.find(ownerId, roleId, maxMessages);
         log.info("加载对话历史: sessionScoped={}, ownerId={}, sessionId={}, size={}",
                 sessionScoped, ownerId, sessionId, history.size());

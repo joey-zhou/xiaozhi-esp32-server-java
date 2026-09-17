@@ -114,7 +114,7 @@ class ListenStateMachineTest {
         device.hello();
 
         // manual：客户端松手断句，服务端不做自动收句
-        device.listenStart(ListenMode.Manual);
+        device.listenStart(ListenMode.MANUAL);
         assertThat(harness.vad().autoSegmentOf(device.sessionId())).isFalse();
 
         device.speak(ScriptedVadService.SPEECH_START, ScriptedVadService.SPEECH_CONTINUE);
@@ -146,14 +146,14 @@ class ListenStateMachineTest {
 
         // 先跑一轮完整的松手收句，让 audioSinks 留在非空状态：
         // 生产代码正是靠 VAD 本轮状态而不是 audioSinks 判断该走哪个分支
-        device.listenStart(ListenMode.Manual);
+        device.listenStart(ListenMode.MANUAL);
         device.speak(ScriptedVadService.SPEECH_START, ScriptedVadService.SPEECH_CONTINUE);
         device.listenStop();
         AwaitHelper.until("上一轮识别已结束", () -> harness.stt().completedStreams() == 1);
         assertThat(device.session().getAudioSinks()).isNotNull();
 
         // 第二轮：开了监听但一帧语音都没有，listen/stop 应当是取消而不是收句
-        device.listenStart(ListenMode.Manual);
+        device.listenStart(ListenMode.MANUAL);
         device.listenStop();
 
         // Stop 分支整段跑在投递线程上，listenStop() 返回时已经执行完，无需等待
@@ -173,7 +173,7 @@ class ListenStateMachineTest {
         device.hello();
         device.transport().clearOutbound();
 
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         assertThat(harness.vad().autoSegmentOf(device.sessionId())).isTrue();
 
         device.speak(ScriptedVadService.SPEECH_START,
@@ -210,14 +210,14 @@ class ListenStateMachineTest {
     void realtimeModeUsesAutoSegmentationSameAsAuto() {
         harness.stt().withFinalText("再说一遍");
 
-        List<String> autoSignatures = runOneVoiceTurn(harness.connect(DEVICE_ID), ListenMode.Auto);
-        List<String> realtimeSignatures = runOneVoiceTurn(harness.connect(SECOND_DEVICE_ID), ListenMode.RealTime);
+        List<String> autoSignatures = runOneVoiceTurn(harness.connect(DEVICE_ID), ListenMode.AUTO);
+        List<String> realtimeSignatures = runOneVoiceTurn(harness.connect(SECOND_DEVICE_ID), ListenMode.REAL_TIME);
 
         // realtime 不等于 manual，同样由服务端自动断句
         assertThat(harness.vad().autoSegmentOf(harness.sessionManager()
                 .getSessionByDeviceId(SECOND_DEVICE_ID).getSessionId())).isTrue();
         assertThat(harness.sessionManager().getSessionByDeviceId(SECOND_DEVICE_ID).getMode())
-                .isEqualTo(ListenMode.RealTime);
+                .isEqualTo(ListenMode.REAL_TIME);
         assertThat(realtimeSignatures).isEqualTo(autoSignatures);
         assertThat(realtimeSignatures)
                 .containsSubsequence("stt", "tts:start", "llm", "tts:sentence_start", "tts:stop");

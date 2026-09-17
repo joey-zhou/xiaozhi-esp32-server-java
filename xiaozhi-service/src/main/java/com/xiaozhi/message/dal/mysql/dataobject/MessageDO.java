@@ -7,8 +7,6 @@ import com.xiaozhi.common.dal.mysql.dataobject.BaseDO;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.time.LocalDate;
-
 @Data
 @EqualsAndHashCode(callSuper = true)
 @TableName("sys_message")
@@ -26,7 +24,6 @@ public class MessageDO extends BaseDO {
      * 仅 sender=user 的行可能有值，其他为 null。
      */
     private String metadata;
-    private LocalDate statDate;
     private String audioPath;
     private String state;
     private String messageType;

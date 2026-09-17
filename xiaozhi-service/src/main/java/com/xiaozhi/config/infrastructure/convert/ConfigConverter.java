@@ -48,20 +48,6 @@ public class ConfigConverter {
         return d;
     }
 
-    /** BO → 聚合根（供 AppService 在 update 时构建更新参数） */
-    public AiConfig toDomain(ConfigBO bo) {
-        if (bo == null) return null;
-        return AiConfig.reconstitute(
-                bo.getConfigId(), bo.getUserId(),
-                bo.getConfigType(), bo.getProvider(),
-                bo.getConfigName(), bo.getConfigDesc(), bo.getModelType(),
-                bo.getAppId(), bo.getApiKey(), bo.getApiSecret(),
-                bo.getAk(), bo.getSk(), bo.getApiUrl(),
-                bo.getEnableThinking(),
-                bo.getState(), "1".equals(bo.getIsDefault()),
-                null, null);
-    }
-
     /** 聚合根 → BO（供查询路径复用） */
     public ConfigBO toBO(AiConfig c) {
         if (c == null) return null;

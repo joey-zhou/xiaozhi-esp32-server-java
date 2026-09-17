@@ -1,34 +1,31 @@
 package com.xiaozhi.security.ownership;
 
 import com.xiaozhi.common.exception.ResourceNotFoundException;
-import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.MessageBO;
+import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.bo.TemplateBO;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.message.service.MessageService;
-import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
-import com.xiaozhi.role.dal.mysql.mapper.RoleMapper;
-import com.xiaozhi.template.dal.mysql.dataobject.TemplateDO;
-import com.xiaozhi.template.dal.mysql.mapper.TemplateMapper;
+import com.xiaozhi.role.service.RoleService;
+import com.xiaozhi.template.service.TemplateService;
 import com.xiaozhi.user.service.UserService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.StringUtils;
 
 import java.util.Objects;
 @Configuration
 public class OwnershipConfig {
 
     @Bean
-    public OwnershipChecker roleOwnershipChecker(RoleMapper roleMapper) {
-        return new AbstractChecker("role") {
+    public OwnershipChecker roleOwnershipChecker(RoleService roleService) {
+        return new AbstractOwnershipChecker("role") {
             @Override
             public void check(Object resourceId, Integer userId) {
-                RoleDO role = roleMapper.selectById(toIntId(resourceId, "roleId"));
+                RoleBO role = roleService.getBO(toIntId(resourceId, "roleId"));
                 if (role == null) {
                     throw new ResourceNotFoundException("角色不存在");
                 }
@@ -40,7 +37,7 @@ public class OwnershipConfig {
     /** 引用路径（把某个模型/音色绑到自己的角色上）用的检查器。 */
     @Bean
     public OwnershipChecker configOwnershipChecker(ConfigService configService) {
-        return new AbstractChecker("config") {
+        return new AbstractOwnershipChecker("config") {
             @Override
             public void check(Object resourceId, Integer userId) {
                 ConfigBO config = requireConfig(configService, toIntId(resourceId, "configId"));
@@ -52,7 +49,7 @@ public class OwnershipConfig {
     /** 写路径（改配置、删配置）用的检查器。 */
     @Bean
     public OwnershipChecker configWriteOwnershipChecker(ConfigService configService) {
-        return new AbstractChecker("configWrite") {
+        return new AbstractOwnershipChecker("configWrite") {
             @Override
             public void check(Object resourceId, Integer userId) {
                 ConfigBO config = requireConfig(configService, toIntId(resourceId, "configId"));
@@ -71,12 +68,12 @@ public class OwnershipConfig {
     }
 
     @Bean
-    public OwnershipChecker templateOwnershipChecker(TemplateMapper templateMapper) {
-        return new AbstractChecker("template") {
+    public OwnershipChecker templateOwnershipChecker(TemplateService templateService) {
+        return new AbstractOwnershipChecker("template") {
             @Override
             public void check(Object resourceId, Integer userId) {
-                TemplateDO template = templateMapper.selectById(toIntId(resourceId, "templateId"));
-                if (template == null || !TemplateBO.STATE_ENABLED.equals(template.getState())) {
+                TemplateBO template = templateService.getBO(toIntId(resourceId, "templateId"));
+                if (template == null) {
                     throw new ResourceNotFoundException("模板不存在");
                 }
                 requireOwner(template.getUserId(), userId, "模板不归属当前用户");
@@ -86,7 +83,7 @@ public class OwnershipConfig {
 
     @Bean
     public OwnershipChecker deviceOwnershipChecker(DeviceService deviceService) {
-        return new AbstractChecker("device") {
+        return new AbstractOwnershipChecker("device") {
             @Override
             public void check(Object resourceId, Integer userId) {
                 DeviceBO device = deviceService.getBO(toStrId(resourceId, "deviceId"));
@@ -100,10 +97,10 @@ public class OwnershipConfig {
 
     @Bean
     public OwnershipChecker messageOwnershipChecker(MessageService messageService) {
-        return new AbstractChecker("message") {
+        return new AbstractOwnershipChecker("message") {
             @Override
             public void check(Object resourceId, Integer userId) {
-                MessageBO message = messageService.getBO(toIntId(resourceId, "messageId"));
+                MessageBO message = messageService.getBO(toLongId(resourceId, "messageId"));
                 if (message == null) {
                     throw new ResourceNotFoundException("消息不存在");
                 }
@@ -114,7 +111,7 @@ public class OwnershipConfig {
 
     @Bean
     public OwnershipChecker userOwnershipChecker(UserService userService) {
-        return new AbstractChecker("user") {
+        return new AbstractOwnershipChecker("user") {
             @Override
             public void check(Object resourceId, Integer userId) {
                 UserBO user = userService.getBO(toIntId(resourceId, "userId"));
@@ -124,58 +121,5 @@ public class OwnershipConfig {
                 requireOwner(user.getUserId(), userId, "用户不归属当前登录人");
             }
         };
-    }
-
-    public abstract static class AbstractChecker implements OwnershipChecker {
-
-        private final String resource;
-
-        public AbstractChecker(String resource) {
-            this.resource = resource;
-        }
-
-        @Override
-        public String getResource() {
-            return resource;
-        }
-
-        protected final void requireOwner(Integer ownerId, Integer userId, String message) {
-            if (!Objects.equals(ownerId, userId)) {
-                throw new UnauthorizedException(message);
-            }
-        }
-
-        protected final Integer toIntId(Object value, String fieldName) {
-            if (value instanceof Integer integer) {
-                return integer;
-            }
-            if (value instanceof Number number) {
-                return number.intValue();
-            }
-            if (value instanceof String text && StringUtils.hasText(text)) {
-                return Integer.valueOf(text.trim());
-            }
-            throw new IllegalArgumentException(fieldName + " 参数类型不合法");
-        }
-
-        protected final Long toLongId(Object value, String fieldName) {
-            if (value instanceof Long longValue) {
-                return longValue;
-            }
-            if (value instanceof Number number) {
-                return number.longValue();
-            }
-            if (value instanceof String text && StringUtils.hasText(text)) {
-                return Long.valueOf(text.trim());
-            }
-            throw new IllegalArgumentException(fieldName + " 参数类型不合法");
-        }
-
-        protected final String toStrId(Object value, String fieldName) {
-            if (value instanceof String text && StringUtils.hasText(text)) {
-                return text.trim();
-            }
-            throw new IllegalArgumentException(fieldName + " 参数类型不合法");
-        }
     }
 }

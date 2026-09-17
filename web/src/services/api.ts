@@ -12,7 +12,6 @@ export default {
     telLogin: '/user/tel-login',
     checkToken: '/user/check-token',
     logout: '/user/logout',
-    refreshToken: '/user/refresh-token',
     resetPassword: '/user/resetPassword',
     sendEmailCaptcha: '/user/sendEmailCaptcha',
     sendSmsCaptcha: '/user/sendSmsCaptcha',

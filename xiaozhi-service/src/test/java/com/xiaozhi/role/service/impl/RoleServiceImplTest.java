@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
+import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.role.convert.RoleConvert;
@@ -18,16 +19,18 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 
 import java.util.List;
-import java.util.function.Supplier;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -125,14 +128,14 @@ class RoleServiceImplTest {
     void copyDefaultRoleCopiesSourceRoleForTargetUser() {
         RoleDO sourceRole = newRoleDO(1);
         RoleDO copiedRole = newRoleDO(22);
-        RoleBO copiedRoleBO = newRoleBO(22);
+        RoleDO existingDefault = newRoleDO(5);
+        Cache roleCache = mock(Cache.class);
 
         when(roleMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(sourceRole);
+        when(roleMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(existingDefault));
         when(roleConvert.copy(sourceRole)).thenReturn(copiedRole);
         when(roleMapper.insert(copiedRole)).thenReturn(1);
-        when(roleMapper.selectById(22)).thenReturn(copiedRole);
-        when(roleConvert.toBO(copiedRole)).thenReturn(copiedRoleBO);
-        stubCacheHelperLoadingFromDb();
+        when(cacheManager.getCache(CacheNames.ROLE)).thenReturn(roleCache);
 
         Integer result = roleService.copyDefaultRole(10, 20);
 
@@ -144,8 +147,10 @@ class RoleServiceImplTest {
         ArgumentCaptor<LambdaUpdateWrapper<RoleDO>> resetCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
         verify(roleMapper).update(isNull(), resetCaptor.capture());
         assertThat(resetCaptor.getValue().getSqlSet()).contains("isDefault=");
-        assertThat(resetCaptor.getValue().getTargetSql()).contains("userId =");
-        assertThat(resetCaptor.getValue().getParamNameValuePairs().values()).containsExactlyInAnyOrder(20, "0");
+        assertThat(resetCaptor.getValue().getTargetSql()).contains("roleId IN");
+        // 被降级角色的详情缓存要主动失效，不能等自然过期
+        verify(roleCache).evictIfPresent("5");
+        verify(roleCache).evict("5");
     }
 
     @Test
@@ -172,25 +177,17 @@ class RoleServiceImplTest {
     }
 
     @Test
-    void copyDefaultRoleThrowsWhenCopiedRoleCannotBeLoaded() {
+    void copyDefaultRoleThrowsWhenInsertedRoleIdMissing() {
         RoleDO sourceRole = newRoleDO(1);
-        RoleDO copiedRole = newRoleDO(22);
+        RoleDO copiedRole = newRoleDO(null);
 
         when(roleMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(sourceRole);
         when(roleConvert.copy(sourceRole)).thenReturn(copiedRole);
         when(roleMapper.insert(copiedRole)).thenReturn(1);
-        when(roleMapper.selectById(22)).thenReturn(null);
-        stubCacheHelperLoadingFromDb();
 
         assertThatThrownBy(() -> roleService.copyDefaultRole(10, 20))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("复制默认角色失败");
-    }
-
-    /** getBO 走缓存包装，测试里让它直接执行回源逻辑。 */
-    private void stubCacheHelperLoadingFromDb() {
-        when(cacheHelper.getWithLock(any(), any(), any()))
-            .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(2)).get());
     }
 
     private static RoleDO newRoleDO(Integer roleId) {

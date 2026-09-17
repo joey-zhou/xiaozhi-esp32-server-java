@@ -20,7 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AudioUtils {
-    /** 由 {@link com.xiaozhi.common.config.RuntimePathConfig} 在启动时初始化 */
+    /** 由 {@link com.xiaozhi.common.config.RuntimePathConfig} 在启动时通过 {@link #configurePaths} 初始化 */
     public static String AUDIO_PATH;
 
     public static final int AUDIO_RETENTION_DAYS = 30;
@@ -32,6 +32,11 @@ public class AudioUtils {
     public static final int SAMPLE_FORMAT = 1; // AV_SAMPLE_FMT_S16, 16位PCM
     public static final int BUFFER_SIZE = 512; // 窗口大小
     public static final int OPUS_FRAME_DURATION_MS = 60; // OPUS帧持续时间（毫秒）
+
+    /** 给定时长的 16kHz/16bit/单声道 PCM 字节数 */
+    public static int pcmBytes(int durationMs) {
+        return SAMPLE_RATE * 2 * durationMs / 1000;
+    }
 
     /**
      * 删除文件（静默处理异常）
@@ -69,7 +74,7 @@ public class AudioUtils {
         String fileName = uuid + ".wav";
         Path path = Path.of(AUDIO_PATH , fileName);
         saveAsWav(path, audio);
-        return AUDIO_PATH + fileName;
+        return path.toString();
     }
     /**
      * 将原始音频数据保存为WAV文件
@@ -305,7 +310,7 @@ public class AudioUtils {
     /**
      * 判断文件是否为 OGG Opus 格式（.ogg 或 .opus 扩展名）
      */
-    public static boolean isOggOpus(String filePath) {
+    private static boolean isOggOpus(String filePath) {
         String lower = filePath.toLowerCase();
         return lower.endsWith(".ogg") || lower.endsWith(".opus");
     }
@@ -380,7 +385,8 @@ public class AudioUtils {
 
     /**
      * 从文件读取PCM数据并按Opus帧大小（3840字节 = 60ms）分块返回。
-     * 避免将整个音频文件作为单个byte[]持有，减少内存峰值。
+     * 当前实现是先整份读入内存（readAsPcm）再切分（splitPcmChunks），不是流式读取；
+     * 分块只是为了让调用方按帧消费，不降低内存峰值。
      *
      * @param filePath 音频文件路径
      * @return PCM数据分块列表，每块3840字节（最后一块可能更小）
@@ -392,6 +398,7 @@ public class AudioUtils {
     /**
      * 从字节数组读取PCM数据并按Opus帧大小分块返回，格式由文件名/扩展名判断。
      * 音频存在对象存储上时没有本地文件可读，只能先下载成字节再交给这里。
+     * 同样是先整份读入内存再切分，不是流式读取。
      *
      * @param data           音频字节
      * @param fileNameForExt 用于判断格式的文件名或路径（仅取扩展名）
@@ -452,7 +459,7 @@ public class AudioUtils {
 
         // 每个样本 2 字节（16位）
         int inputSamples = pcmData.length / 2;
-        int outputSamples = (int) Math.ceil((long) inputSamples * toRate / fromRate);
+        int outputSamples = (int) Math.ceil((double) inputSamples * toRate / fromRate);
         byte[] output = new byte[outputSamples * 2];
 
         for (int i = 0; i < outputSamples; i++) {
@@ -474,6 +481,19 @@ public class AudioUtils {
         }
 
         return output;
+    }
+
+    /**
+     * 把 16bit PCM 字节数组转换为 [-1, 1] 归一化的 float 数组，小端序。
+     */
+    public static float[] pcm16ToFloats(byte[] pcmData) {
+        int sampleCount = pcmData.length / 2;
+        float[] samples = new float[sampleCount];
+        ByteBuffer buffer = ByteBuffer.wrap(pcmData).order(ByteOrder.LITTLE_ENDIAN);
+        for (int i = 0; i < sampleCount; i++) {
+            samples[i] = buffer.getShort() / 32768.0f;
+        }
+        return samples;
     }
 
     /**
@@ -500,7 +520,7 @@ public class AudioUtils {
      * @param mp3Path MP3文件路径
      * @return PCM数据字节数组（16kHz 16bit mono）
      */
-    public static byte[] mp3ToPcm(String mp3Path) throws IOException {
+    private static byte[] mp3ToPcm(String mp3Path) throws IOException {
         try (FileInputStream fis = new FileInputStream(mp3Path)) {
             Bitstream bitstream = new Bitstream(fis);
             Decoder decoder = new Decoder();
@@ -574,7 +594,7 @@ public class AudioUtils {
      * @return PCM数据
      * @throws IOException 文件读取异常
      */
-    public static byte[] opusToPcm(String opusFilePath) throws IOException {
+    private static byte[] opusToPcm(String opusFilePath) throws IOException {
         // 读取 Opus 帧
         List<byte[]> opusFrames = readOpus(new File(opusFilePath));
 

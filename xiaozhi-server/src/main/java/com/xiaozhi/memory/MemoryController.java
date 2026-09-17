@@ -29,6 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "记忆管理", description = "管理聊天相关的摘要记忆与长期记忆")
 public class MemoryController extends BaseController {
 
+    private static final int MAX_PAGE_SIZE = 1000;
+
     @Resource
     private SummaryService summaryService;
 
@@ -44,6 +46,7 @@ public class MemoryController extends BaseController {
                                       @PathVariable String deviceId,
                                       @RequestParam(defaultValue = "1") Integer pageNo,
                                       @RequestParam(defaultValue = "10") Integer pageSize) {
+        pageSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
         return ApiResponse.success(summaryService.page(deviceId, roleId, pageNo, pageSize).map(summaryConvert::toResp));
     }
 

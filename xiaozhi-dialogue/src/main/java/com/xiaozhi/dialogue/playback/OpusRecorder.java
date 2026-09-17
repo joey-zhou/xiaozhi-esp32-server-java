@@ -151,6 +151,7 @@ public class OpusRecorder {
             opusFile = null;
         } catch (IOException e) {
             log.error("无法关闭Opus音频文件!", e);
+            opusFile = null;
             return;
         }
         if (persona == null || createdAt == null || closedPath == null) {

@@ -39,7 +39,10 @@ spring:
       database: 0
       # Redis 开启 requirepass 后用环境变量 SPRING_DATA_REDIS_PASSWORD 提供口令。
       # 此处不能写 password: 空值——Redisson 会把空串当口令发出 AUTH ""，无口令的 Redis 直接报错拒连。
-      # Lettuce 连接池配置（默认不开池，所有线程共享单连接，高并发下会成为瓶颈）。
+      # 命令超时，避免一次卡住的 Redis 调用拖垮整条请求链路。
+      timeout: 3000ms
+      # Lettuce 连接池配置：普通命令走的是共享连接（线程安全的多路复用），不经过这个池；
+      # 这个池只服务需要独占连接的场景（阻塞命令、事务）。
       # 这份配置要生效，前提是下面把 Redisson 的自动配置排除掉，否则连接工厂会被它抢走。
       lettuce:
         pool:
@@ -112,6 +115,8 @@ xiaozhi:
     native-lib-dir: lib
     vosk-model-dir: models/vosk-model
     tts-models-dir: models/tts
+  operation-log:
+    retention-days: 180    # 操作日志保留天数，超期由定时任务清理
   vad:
     model:
       path: models/silero_vad.onnx

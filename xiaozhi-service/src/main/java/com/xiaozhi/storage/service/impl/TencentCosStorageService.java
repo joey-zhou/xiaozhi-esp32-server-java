@@ -80,13 +80,14 @@ public class TencentCosStorageService implements StorageService {
     @Override
 
     public String upload(Path localFile, String objectKey) throws IOException {
+        String key = pathPrefix + objectKey;
         try (InputStream is = Files.newInputStream(localFile)) {
             ObjectMetadata metadata = new ObjectMetadata();
             metadata.setContentLength(Files.size(localFile));
             // 显式设置 Content-Type：否则 COS 以 octet-stream 存储，OGG/Opus 在浏览器里表现为 0s、无法播放
             metadata.setContentType(StorageContentTypes.resolve(localFile));
-            cosClient.putObject(new PutObjectRequest(bucketName, objectKey, is, metadata));
-            return urlPrefix + objectKey;
+            cosClient.putObject(new PutObjectRequest(bucketName, key, is, metadata));
+            return urlPrefix + key;
         } catch (Exception e) {
             throw new IOException("上传到腾讯云 COS 失败: " + e.getMessage(), e);
         } finally {

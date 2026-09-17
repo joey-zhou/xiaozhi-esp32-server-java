@@ -28,7 +28,7 @@ class SentenceHelperCancelTest {
 
     @Test
     void completedUpstreamStillFlushesTail() {
-        List<SentenceHelper.SentenceResult> sentences = new SentenceHelper()
+        List<SentenceResult> sentences = new SentenceHelper()
                 .convert(Flux.just("你好呀今天", "天气真不错"))
                 .collectList().block();
 

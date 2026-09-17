@@ -19,23 +19,7 @@ import java.util.regex.Pattern;
  * 1. 响应式：convert(Flux<String>) → Flux<String>，供 FileSynthesizer 使用
  * 2. 命令式：take(String token) / take()，供 TTS Provider 内部 WebSocket 订阅使用
  */
-public class SentenceHelper implements ChatConverter {
-
-    /**
-     * 分句结果，包含去除表情符号后的纯文本和提取的情绪词。
-     */
-    public record SentenceResult(String text, String mood) {}
-    // 句子结束标点符号模式（中英文句号、感叹号、问号）
-    private static final Pattern SENTENCE_END_PATTERN = Pattern.compile("[。．.！？!?]");
-
-    // 逗号、分号等停顿标点
-    private static final Pattern PAUSE_PATTERN = Pattern.compile("[，、；,;]");
-
-    // 冒号和引号等特殊标点
-    private static final Pattern SPECIAL_PATTERN = Pattern.compile("[：:\"]");
-
-    // 换行符
-    private static final Pattern NEWLINE_PATTERN = Pattern.compile("[\n\r]");
+public class SentenceHelper {
 
     // 句末收尾符号（右引号、右括号等）。当它们紧跟在句末标点(。！？)后面时，
     // 应当并入当前句一起收尾，而不是被甩到下一句开头，避免字幕引号错位、
@@ -102,16 +86,11 @@ public class SentenceHelper implements ChatConverter {
 
             appendToBuffers(charStr);
 
-            boolean isEndMark = SENTENCE_END_PATTERN.matcher(charStr).find();
-            boolean isPauseMark = PAUSE_PATTERN.matcher(charStr).find();
-            boolean isSpecialMark = SPECIAL_PATTERN.matcher(charStr).find();
-            boolean isNewline = NEWLINE_PATTERN.matcher(charStr).find();
+            boolean isEndMark = isSentenceEndChar(codePoint);
+            boolean isPauseMark = isPauseChar(codePoint);
+            boolean isSpecialMark = isSpecialChar(codePoint);
+            boolean isNewline = isNewlineChar(codePoint);
             boolean isEmoji = EmojiUtils.isEmoji(codePoint);
-
-            boolean containsKaomoji = false;
-            if (currentSentence.length() >= 3) {
-                containsKaomoji = EmojiUtils.containsKaomoji(currentSentence.toString());
-            }
 
             if (isEndMark && charStr.equals(".")) {
                 String context = contextBuffer.toString();
@@ -124,9 +103,9 @@ public class SentenceHelper implements ChatConverter {
             boolean shouldSendSentence = false;
             if (isEndMark || isNewline) {
                 shouldSendSentence = true;
-            } else if ((isPauseMark || isSpecialMark || isEmoji || containsKaomoji)
-                    && currentSentence.length() >= MIN_SENTENCE_LENGTH) {
-                shouldSendSentence = true;
+            } else if (currentSentence.length() >= MIN_SENTENCE_LENGTH) {
+                shouldSendSentence = isPauseMark || isSpecialMark || isEmoji
+                        || EmojiUtils.containsKaomoji(currentSentence.toString());
             }
 
             if (shouldSendSentence && currentSentence.length() >= MIN_SENTENCE_LENGTH) {
@@ -144,6 +123,42 @@ public class SentenceHelper implements ChatConverter {
         }
 
         return sentences;
+    }
+
+    private static boolean isSentenceEndChar(int cp) {
+        switch (cp) {
+            case '。': case '．': case '.': case '！': case '？': case '!': case '?':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isPauseChar(int cp) {
+        switch (cp) {
+            case '，': case '、': case '；': case ',': case ';':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isSpecialChar(int cp) {
+        switch (cp) {
+            case '：': case ':': case '"':
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isNewlineChar(int cp) {
+        switch (cp) {
+            case '\n': case '\r':
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**

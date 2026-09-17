@@ -4,14 +4,15 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.Data;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 @Data
 @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
         include = JsonTypeInfo.As.EXISTING_PROPERTY,
         property = "type",
-        visible = true)
+        visible = true,
+        defaultImpl = UnknownMessage.class)
 @JsonSubTypes({
         @JsonSubTypes.Type(value = HelloMessage.class, name = "hello"),
         @JsonSubTypes.Type(value = DeviceMcpMessage.class, name = "mcp"),

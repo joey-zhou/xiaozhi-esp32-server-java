@@ -61,7 +61,6 @@ export function useAuth() {
     userStore.setPermissions(data.permissions)
     userStore.setAuthRole(data.authRole)
     userStore.setToken(data.token)
-    userStore.setRefreshToken(data.refreshToken)
   }
 
   // 计算登录后要落地的路径：把 query.redirect 交给全局唯一的权限判断（resolveAuthNavigation），

@@ -49,12 +49,6 @@ COPY xiaozhi-server/src  ./xiaozhi-server/src
 # 避免测试不过的提交也能被直接打包成可运行镜像
 RUN mvn -Dmaven.repo.local=/root/.m2/repository package
 
-# 提取项目版本号（从根 pom 的 xiaozhi-parent）
-RUN APP_VERSION=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec 2>/dev/null || \
-        grep '<version>' pom.xml | head -3 | tail -1 | sed -e 's/.*<version>//' -e 's/<\/version>.*//' -e 's/[[:space:]]//g') && \
-    echo "APP_VERSION=${APP_VERSION}" > /build/app_version.env && \
-    cat /build/app_version.env
-
 # ============================================================
 # 下载模型和原生库
 # 脚本会自动跳过已存在的文件，支持 Docker 缓存
@@ -102,14 +96,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxtst6 \
     libxrender1 \
     libpulse0 \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY --from=builder /build/app_version.env /app/
 COPY --from=builder /build/models /app/models
 COPY --from=builder /build/lib /app/lib
 ENV LD_LIBRARY_PATH=/app/lib:$LD_LIBRARY_PATH
+ENV TZ=Asia/Shanghai
 
 # ============================================================
 # xiaozhi-server（管理后台 API，端口 8091）
@@ -117,17 +112,14 @@ ENV LD_LIBRARY_PATH=/app/lib:$LD_LIBRARY_PATH
 # ============================================================
 FROM runtime-base AS server
 
-COPY --from=builder /build/xiaozhi-server/target/xiaozhi-server-*.jar /app/
+COPY --from=builder /build/xiaozhi-server/target/xiaozhi-server-*.jar /app/xiaozhi-server.jar
 
 RUN echo '#!/bin/bash\n\
-if [ -f /app/app_version.env ]; then\n\
-  . /app/app_version.env\n\
-fi\n\
-echo "Starting xiaozhi-server ${APP_VERSION}"\n\
-java -Xms512m -Xmx1024m \\\n\
+echo "Starting xiaozhi-server"\n\
+java -Xms512m -Xmx1024m -XX:MaxDirectMemorySize=256m \\\n\
   -Dsherpa_onnx.native.path=/app/lib \\\n\
   -Djava.library.path=/app/lib \\\n\
-  -jar /app/xiaozhi-server-${APP_VERSION}.jar\n\
+  -jar /app/xiaozhi-server.jar\n\
 ' > /app/start.sh && chmod +x /app/start.sh
 
 CMD ["/bin/bash", "/app/start.sh"]
@@ -138,17 +130,14 @@ CMD ["/bin/bash", "/app/start.sh"]
 # ============================================================
 FROM runtime-base AS dialogue
 
-COPY --from=builder /build/xiaozhi-dialogue/target/xiaozhi-dialogue-*-exec.jar /app/
+COPY --from=builder /build/xiaozhi-dialogue/target/xiaozhi-dialogue-*-exec.jar /app/xiaozhi-dialogue.jar
 
 RUN echo '#!/bin/bash\n\
-if [ -f /app/app_version.env ]; then\n\
-  . /app/app_version.env\n\
-fi\n\
-echo "Starting xiaozhi-dialogue ${APP_VERSION}"\n\
-java -Xms512m -Xmx1024m \\\n\
+echo "Starting xiaozhi-dialogue"\n\
+java -Xms512m -Xmx768m -XX:MaxDirectMemorySize=256m \\\n\
   -Dsherpa_onnx.native.path=/app/lib \\\n\
   -Djava.library.path=/app/lib \\\n\
-  -jar /app/xiaozhi-dialogue-${APP_VERSION}-exec.jar\n\
+  -jar /app/xiaozhi-dialogue.jar\n\
 ' > /app/start.sh && chmod +x /app/start.sh
 
 CMD ["/bin/bash", "/app/start.sh"]

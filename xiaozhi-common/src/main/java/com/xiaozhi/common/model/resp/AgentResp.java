@@ -18,12 +18,6 @@ public class AgentResp {
     @Schema(description = "用户ID")
     private Integer userId;
 
-    @Schema(description = "设备ID")
-    private String deviceId;
-
-    @Schema(description = "角色ID")
-    private Integer roleId;
-
     @Schema(description = "配置名称")
     private String configName;
 
@@ -50,9 +44,6 @@ public class AgentResp {
 
     @Schema(description = "是否默认配置(1是 0否)")
     private String isDefault;
-
-    @Schema(description = "智能体ID")
-    private Integer agentId;
 
     @Schema(description = "智能体名称")
     private String agentName;

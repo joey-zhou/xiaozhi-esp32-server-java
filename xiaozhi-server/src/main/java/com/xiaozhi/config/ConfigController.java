@@ -6,6 +6,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
+import com.xiaozhi.common.model.bo.ConfigProbeResultBO;
 import com.xiaozhi.common.model.req.ConfigCreateReq;
 import com.xiaozhi.common.model.req.ConfigPageReq;
 import com.xiaozhi.common.model.req.ConfigTestReq;
@@ -37,7 +38,7 @@ public class ConfigController extends BaseController {
     private ConfigAppService configAppService;
 
     @Resource
-    private ConfigConnectionChecker configConnectionChecker;
+    private ConfigTestAppService configTestAppService;
 
     /**
      * 配置查询
@@ -103,7 +104,8 @@ public class ConfigController extends BaseController {
     @CheckOwner(resource = "config", id = "#req.configId")
     @Operation(summary = "测试配置", description = "使用当前表单参数测试模型配置是否可用")
     public ApiResponse<Void> test(@Valid @RequestBody ConfigTestReq req) {
-        return configConnectionChecker.test(req, StpUtil.getLoginIdAsInt());
+        ConfigProbeResultBO result = configTestAppService.test(req, StpUtil.getLoginIdAsInt());
+        return result.success() ? ApiResponse.success(result.message()) : ApiResponse.error(result.message());
     }
 
     /**

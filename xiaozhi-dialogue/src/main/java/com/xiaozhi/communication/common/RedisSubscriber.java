@@ -3,13 +3,14 @@ package com.xiaozhi.communication.common;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
+import com.xiaozhi.common.monitoring.CountingRejectionHandler;
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.dialogue.audio.VadService;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpService;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.ai.stt.SttServiceFactory;
-import com.xiaozhi.token.TokenService;
+import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.storage.service.StorageServiceFactory;
@@ -17,6 +18,10 @@ import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.utils.JsonUtil;
+import io.micrometer.core.instrument.FunctionCounter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
 import jakarta.annotation.Resource;
 import jakarta.annotation.PreDestroy;
 import org.springframework.context.annotation.Bean;
@@ -31,6 +36,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -59,7 +65,7 @@ public class RedisSubscriber {
     private StorageServiceFactory storageServiceFactory;
 
     @Resource
-    private TokenService tokenService;
+    private ProviderTokenClient tokenClient;
 
     @Resource
     private ConfigService configService;
@@ -86,12 +92,19 @@ public class RedisSubscriber {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    @Resource
+    private MeterRegistry meterRegistry;
+
     /**
      * 默认不设 taskExecutor 时，容器会退化成每条消息起一条 SimpleAsyncTaskExecutor 线程，
      * 广播量大时线程数没有上限；换成有界线程池做隔离和背压。只在 bean 方法里按需创建，
      * 避免脱离 Spring 容器直接 new RedisSubscriber()（如单测）时也起一堆线程。
      */
     private ThreadPoolTaskExecutor listenerTaskExecutor;
+
+    // 队列满且线程已达上限时才会触发；计数后仍按 AbortPolicy 原样抛异常，行为不变
+    private final CountingRejectionHandler listenerRejectionHandler =
+            new CountingRejectionHandler(new ThreadPoolExecutor.AbortPolicy());
 
     @PreDestroy
     public void shutdownListenerTaskExecutor() {
@@ -110,8 +123,16 @@ public class RedisSubscriber {
         listenerTaskExecutor.setMaxPoolSize(8);
         listenerTaskExecutor.setQueueCapacity(200);
         listenerTaskExecutor.setThreadNamePrefix("redis-sub-");
+        listenerTaskExecutor.setRejectedExecutionHandler(listenerRejectionHandler);
         listenerTaskExecutor.initialize();
         container.setTaskExecutor(listenerTaskExecutor);
+
+        ExecutorServiceMetrics.monitor(meterRegistry, listenerTaskExecutor.getThreadPoolExecutor(),
+                "redis-listener", "xiaozhi.redis.listener", Tags.empty());
+        FunctionCounter.builder("xiaozhi.redis.listener.executor.rejected", listenerRejectionHandler,
+                        CountingRejectionHandler::rejectedCount)
+                .description("Redis 订阅监听线程池拒绝任务次数（8 线程 + 200 队列已满）")
+                .register(meterRegistry);
 
         addListener(container, "onClearConversation", RedisBroadcast.CHANNEL_CLEAR_CONVERSATION);
         addListener(container, "onRoleChanged", RedisBroadcast.CHANNEL_ROLE_CHANGED);
@@ -267,7 +288,7 @@ public class RedisSubscriber {
                     chatModelFactory.removeCache(configId);
                 }
                 // Token 缓存（Coze OAuth、阿里云 Token 等）与 configType 无关，统一清除
-                tokenService.removeCache(config);
+                tokenClient.removeCache(config);
                 log.info("已清除工厂缓存 - configType: {}, configId: {}", configType, configId);
             }
         } catch (Exception e) {

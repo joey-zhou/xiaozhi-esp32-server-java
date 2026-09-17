@@ -2,9 +2,9 @@ package com.xiaozhi.server.web.chat;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.exception.UnauthorizedException;
+import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.bo.UserBO;
-import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
-import com.xiaozhi.role.dal.mysql.mapper.RoleMapper;
+import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.security.ownership.OwnershipAspect;
 import com.xiaozhi.security.ownership.OwnershipConfig;
 import com.xiaozhi.user.service.UserService;
@@ -38,7 +38,7 @@ class WebChatControllerOwnershipTest {
     private static final Integer ROLE_ID = 3;
 
     @Mock
-    private RoleMapper roleMapper;
+    private RoleService roleService;
 
     @Mock
     private UserService userService;
@@ -51,7 +51,7 @@ class WebChatControllerOwnershipTest {
 
     @Test
     void openRejectsAnotherUsersRole() throws Exception {
-        when(roleMapper.selectById(ROLE_ID)).thenReturn(role(OWNER_USER_ID));
+        when(roleService.getBO(ROLE_ID)).thenReturn(role(OWNER_USER_ID));
         when(userService.getBO(OTHER_USER_ID)).thenReturn(normalUser());
         when(joinPoint.getSignature()).thenReturn(methodSignature);
         when(methodSignature.getMethod()).thenReturn(openEndpoint());
@@ -70,7 +70,7 @@ class WebChatControllerOwnershipTest {
 
     @Test
     void openAcceptsOwnRole() throws Exception {
-        when(roleMapper.selectById(ROLE_ID)).thenReturn(role(OWNER_USER_ID));
+        when(roleService.getBO(ROLE_ID)).thenReturn(role(OWNER_USER_ID));
         when(userService.getBO(OWNER_USER_ID)).thenReturn(normalUser());
         when(joinPoint.getSignature()).thenReturn(methodSignature);
         when(methodSignature.getMethod()).thenReturn(openEndpoint());
@@ -86,7 +86,7 @@ class WebChatControllerOwnershipTest {
     }
 
     private OwnershipAspect newAspect() {
-        OwnershipAspect aspect = new OwnershipAspect(List.of(new OwnershipConfig().roleOwnershipChecker(roleMapper)));
+        OwnershipAspect aspect = new OwnershipAspect(List.of(new OwnershipConfig().roleOwnershipChecker(roleService)));
         ReflectionTestUtils.setField(aspect, "userService", userService);
         return aspect;
     }
@@ -95,8 +95,8 @@ class WebChatControllerOwnershipTest {
         return WebChatController.class.getDeclaredMethod("open", Integer.class, String.class);
     }
 
-    private static RoleDO role(Integer userId) {
-        RoleDO role = new RoleDO();
+    private static RoleBO role(Integer userId) {
+        RoleBO role = new RoleBO();
         role.setRoleId(ROLE_ID);
         role.setUserId(userId);
         return role;

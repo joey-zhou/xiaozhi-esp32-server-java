@@ -1,13 +1,13 @@
 package com.xiaozhi.config;
 
 import com.xiaozhi.common.exception.ResourceNotFoundException;
+import com.xiaozhi.common.model.bo.ConfigProbeResultBO;
 import com.xiaozhi.common.model.req.ConfigCreateReq;
 import com.xiaozhi.common.model.req.ConfigPageReq;
 import com.xiaozhi.common.model.req.ConfigTestReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
 import com.xiaozhi.common.model.resp.ConfigResp;
 import com.xiaozhi.common.model.PageResult;
-import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,8 +36,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 钉住配置接口的分页参数绑定与按登录用户过滤，
- * 以及试拨端点交给 ConfigConnectionChecker，并把当前登录用户带过去。
+ * 钉住配置接口的分页参数绑定：登录用户 id 原样传给 ConfigAppService；共享管理员配置的判定
+ * 完全在 ConfigServiceImpl 内部按 userId 是否等于 ADMIN_USER_ID 完成，Controller 不再参与判定。
+ * 同时钉住试拨端点交给 ConfigTestAppService，并把当前登录用户带过去；出参按 success 分流成
+ * ApiResponse.success / ApiResponse.error。
  */
 @ExtendWith(MockitoExtension.class)
 class ConfigControllerTest extends ControllerTestSupport {
@@ -48,7 +50,7 @@ class ConfigControllerTest extends ControllerTestSupport {
     private ConfigAppService configAppService;
 
     @Mock
-    private ConfigConnectionChecker configConnectionChecker;
+    private ConfigTestAppService configTestAppService;
 
     private ConfigController configController;
 
@@ -56,12 +58,12 @@ class ConfigControllerTest extends ControllerTestSupport {
     void setUp() {
         configController = new ConfigController();
         ReflectionTestUtils.setField(configController, "configAppService", configAppService);
-        ReflectionTestUtils.setField(configController, "configConnectionChecker", configConnectionChecker);
+        ReflectionTestUtils.setField(configController, "configTestAppService", configTestAppService);
         mockMvc = buildMockMvc(configController);
     }
 
     @Test
-    void listReturnsPagedConfigsForCurrentUser() throws Exception {
+    void listPassesLoginUserIdToAppService() throws Exception {
         when(configAppService.page(any(ConfigPageReq.class), eq(7))).thenReturn(singlePage());
 
         try (var ignored = mockLoginUser(7)) {
@@ -112,9 +114,9 @@ class ConfigControllerTest extends ControllerTestSupport {
     }
 
     @Test
-    void testEndpointDelegatesToConnectionCheckerWithCurrentUser() throws Exception {
-        when(configConnectionChecker.test(any(ConfigTestReq.class), eq(7)))
-            .thenReturn(ApiResponse.success("连接成功"));
+    void testEndpointDelegatesToTestAppServiceWithCurrentUser() throws Exception {
+        when(configTestAppService.test(any(ConfigTestReq.class), eq(7)))
+            .thenReturn(ConfigProbeResultBO.success("连接成功"));
 
         try (var ignored = mockLoginUser(7)) {
             mockMvc.perform(post("/api/config/test")
@@ -126,8 +128,23 @@ class ConfigControllerTest extends ControllerTestSupport {
         }
 
         ArgumentCaptor<ConfigTestReq> captor = ArgumentCaptor.forClass(ConfigTestReq.class);
-        verify(configConnectionChecker).test(captor.capture(), eq(7));
+        verify(configTestAppService).test(captor.capture(), eq(7));
         assertThat(captor.getValue().getConfigId()).isEqualTo(11);
+    }
+
+    @Test
+    void testEndpointReturnsErrorResponseWhenProbeFails() throws Exception {
+        when(configTestAppService.test(any(ConfigTestReq.class), eq(7)))
+            .thenReturn(ConfigProbeResultBO.failure("接口返回未授权（401），请检查密钥与账号权限"));
+
+        try (var ignored = mockLoginUser(7)) {
+            mockMvc.perform(post("/api/config/test")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(toJson(testReq())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(ResultStatus.ERROR))
+                .andExpect(jsonPath("$.message").value("接口返回未授权（401），请检查密钥与账号权限"));
+        }
     }
 
     // 异常文案由 GlobalExceptionHandlerTest 集中覆盖，这里只钉路由与路径变量绑定

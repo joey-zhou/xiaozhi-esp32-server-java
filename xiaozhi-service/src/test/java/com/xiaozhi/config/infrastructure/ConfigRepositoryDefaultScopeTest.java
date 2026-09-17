@@ -1,6 +1,6 @@
 package com.xiaozhi.config.infrastructure;
 
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.config.dal.mysql.dataobject.ConfigDO;
 import com.xiaozhi.config.dal.mysql.mapper.ConfigMapper;
@@ -18,9 +18,12 @@ import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /** 这些断言须与 {@code sys_config.uk_config_default} 唯一索引的键逐条对齐。 */
 @ExtendWith(MockitoExtension.class)
@@ -51,6 +54,10 @@ class ConfigRepositoryDefaultScopeTest {
         ReflectionTestUtils.setField(repository, "configConverter", new ConfigConverter());
         ReflectionTestUtils.setField(repository, "cacheManager", cacheManager);
         ReflectionTestUtils.setField(repository, "eventPublisher", eventPublisher);
+        // resetDefault 现在先查出被降级的旧默认，再按 id 批量更新；这里给一条待降级记录，让 update 断言仍能触发
+        ConfigDO downgraded = new ConfigDO();
+        downgraded.setConfigId(1);
+        when(configMapper.selectList(any())).thenReturn(List.of(downgraded));
     }
 
     @Test
@@ -86,12 +93,13 @@ class ConfigRepositoryDefaultScopeTest {
     }
 
     private String resetDefaultSql() {
+        // resetDefault 先 select 出待降级的旧默认（过滤条件都在这条查询上），再按 id 批量 update
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<LambdaUpdateWrapper<ConfigDO>> captor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
-        verify(configMapper).update(isNull(), captor.capture());
-        LambdaUpdateWrapper<ConfigDO> wrapper = captor.getValue();
+        ArgumentCaptor<LambdaQueryWrapper<ConfigDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(configMapper).selectList(captor.capture());
+        LambdaQueryWrapper<ConfigDO> wrapper = captor.getValue();
         // MyBatis-Plus 的条件片段惰性求值，先取一次 SQL 才有内容
-        return wrapper.getTargetSql() + " " + wrapper.getSqlSet();
+        return wrapper.getTargetSql();
     }
 
     private static ConfigBO defaultConfig(String configType, String modelType) {

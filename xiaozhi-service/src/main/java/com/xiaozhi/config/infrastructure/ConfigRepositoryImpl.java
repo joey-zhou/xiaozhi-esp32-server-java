@@ -1,13 +1,16 @@
 package com.xiaozhi.config.infrastructure;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.config.CacheNames;
+import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.config.dal.mysql.dataobject.ConfigDO;
 import com.xiaozhi.config.dal.mysql.mapper.ConfigMapper;
 import com.xiaozhi.config.domain.AiConfig;
 import com.xiaozhi.config.domain.repository.ConfigRepository;
 import com.xiaozhi.config.infrastructure.convert.ConfigConverter;
+import com.xiaozhi.config.support.ConfigCacheKeys;
 import com.xiaozhi.event.AiConfigChangedEvent;
 import jakarta.annotation.Resource;
 import org.springframework.cache.Cache;
@@ -17,7 +20,10 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * AiConfig 聚合根仓储实现。
@@ -99,38 +105,67 @@ public class ConfigRepositoryImpl implements ConfigRepository {
      * 为单默认，即使库中存在 modelType 脏值也不应据此细分，否则会因 modelType 不匹配而漏清旧默认。
      */
     private void resetDefault(String configType, String modelType, Integer excludeId) {
-        LambdaUpdateWrapper<ConfigDO> w = new LambdaUpdateWrapper<ConfigDO>()
+        LambdaQueryWrapper<ConfigDO> selectQuery = new LambdaQueryWrapper<ConfigDO>()
+                .select(ConfigDO::getConfigId)
                 .eq(ConfigDO::getConfigType, configType)
                 .eq(ConfigDO::getState, AiConfig.STATE_ENABLED)
-                .eq(ConfigDO::getIsDefault, "1")
-                .set(ConfigDO::getIsDefault, "0");
+                .eq(ConfigDO::getIsDefault, "1");
         if ("llm".equals(configType)) {
             // 唯一约束键是 IFNULL(modelType,'')，null 和空串同属一个默认桶，
             // 必须一起圈进过滤条件，否则未带 modelType 的默认会把其他 modelType 的默认全部清空
             if (StringUtils.hasText(modelType)) {
-                w.eq(ConfigDO::getModelType, modelType);
+                selectQuery.eq(ConfigDO::getModelType, modelType);
             } else {
-                w.and(q -> q.isNull(ConfigDO::getModelType).or().eq(ConfigDO::getModelType, ""));
+                selectQuery.and(q -> q.isNull(ConfigDO::getModelType).or().eq(ConfigDO::getModelType, ""));
             }
         }
         if (excludeId != null) {
-            w.ne(ConfigDO::getConfigId, excludeId);
+            selectQuery.ne(ConfigDO::getConfigId, excludeId);
         }
+        List<Integer> downgradedIds = configMapper.selectList(selectQuery).stream()
+                .map(ConfigDO::getConfigId)
+                .toList();
+        if (downgradedIds.isEmpty()) {
+            return;
+        }
+
+        LambdaUpdateWrapper<ConfigDO> w = new LambdaUpdateWrapper<ConfigDO>()
+                .in(ConfigDO::getConfigId, downgradedIds)
+                .set(ConfigDO::getIsDefault, "0");
         configMapper.update(null, w);
+
+        Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
+        if (cache != null) {
+            downgradedIds.forEach(id -> CacheHelper.evictNow(cache, String.valueOf(id)));
+        }
     }
 
     /** 走 evictNow：本方法在事务里跑，单调 evict 会被推迟到提交后，调用方写完回读会命中旧值 */
     private void evictCache(AiConfig config) {
         Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
-        if (cache == null) return;
         if (config.getConfigId() != null) {
             CacheHelper.evictNow(cache, String.valueOf(config.getConfigId()));
         }
-        if (StringUtils.hasText(config.getConfigType())) {
-            CacheHelper.evictNow(cache, "default:" + config.getConfigType());
-            if (StringUtils.hasText(config.getModelType())) {
-                CacheHelper.evictNow(cache, "default:" + config.getConfigType() + ":" + config.getModelType());
+        if (!StringUtils.hasText(config.getConfigType())) {
+            return;
+        }
+        Set<String> defaultKeys = new LinkedHashSet<>();
+        defaultKeys.add(ConfigCacheKeys.defaultKey(config.getConfigType(), null));
+        if (StringUtils.hasText(config.getModelType())) {
+            defaultKeys.add(ConfigCacheKeys.defaultKey(config.getConfigType(), config.getModelType()));
+        }
+        // llm 配置的 modelType 可以被改掉，改之前那个 modelType 下缓存的默认配置同样失效，按全部 modelType 淘汰
+        if ("llm".equals(config.getConfigType())) {
+            for (ConfigBO.ModelType modelType : ConfigBO.ModelType.values()) {
+                defaultKeys.add(ConfigCacheKeys.defaultKey(config.getConfigType(), modelType.getValue()));
             }
         }
+        defaultKeys.forEach(key -> evictDefault(cache, key));
+    }
+
+    /** 默认配置的缓存值与「没有默认配置」标记一起淘汰 */
+    private static void evictDefault(Cache cache, String cacheKey) {
+        CacheHelper.evictNow(cache, cacheKey);
+        CacheHelper.evictNow(cache, ConfigCacheKeys.absentKey(cacheKey));
     }
 }

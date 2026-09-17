@@ -138,7 +138,7 @@ class AbortAndResumeProtocolTest {
 
         // 用户在播放中插了句"嗯嗯"：ASR 首字先暂停，终稿判定为附和后续播
         harness.stt().withPartials("嗯").withFinalText("嗯嗯");
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         device.speak(ScriptedVadService.SPEECH_START);
 
         Player player = session.getPlayer();
@@ -179,7 +179,7 @@ class AbortAndResumeProtocolTest {
 
         // 用户说了句实义内容，既不是附和也不是回声
         harness.stt().withPartials("换").withFinalText("换一个");
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         device.speak(ScriptedVadService.SPEECH_START);
         AwaitHelper.until("ASR 首字已暂停播放", () -> session.getPlayer().isPaused());
         device.speak(ScriptedVadService.SPEECH_END);
@@ -221,7 +221,7 @@ class AbortAndResumeProtocolTest {
 
         // 设备把自己刚播的那句拾了回来，终稿与下发文本一致
         harness.stt().withPartials("今天天气").withFinalText(sentence);
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
         device.speak(ScriptedVadService.SPEECH_START);
 
         Player player = session.getPlayer();
@@ -253,7 +253,7 @@ class AbortAndResumeProtocolTest {
         installPersona(device);
         // 第一轮识别在音频流结束后一直挂着不返回
         harness.stt().hangUntilReleased().withFinalText("现在几点了");
-        device.listenStart(ListenMode.Auto);
+        device.listenStart(ListenMode.AUTO);
 
         device.speak(ScriptedVadService.SPEECH_START, ScriptedVadService.SPEECH_CONTINUE);
         device.speak(ScriptedVadService.SPEECH_END);

@@ -25,7 +25,7 @@ import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.summary.service.SummaryService;
-import com.xiaozhi.utils.CmsUtils;
+import com.xiaozhi.utils.IpLocationClient;
 import com.xiaozhi.utils.CommonUtils;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
@@ -171,7 +171,7 @@ public class DeviceAppService {
         return deviceConvert.toResp(device, selectedRole.getRoleName());
     }
 
-    /** 归一化二维码中的 MAC：贴纸可能印大写或 '-' 分隔，设备上报为小写冒号格式 */
+    /** 归一化 MAC：二维码贴纸与设备上报都可能是大写或 '-' 分隔，统一成小写冒号格式，避免缓存键与查询键分叉 */
     private String normalizeDeviceId(String raw) {
         return raw == null ? "" : raw.trim().replace('-', ':').toLowerCase();
     }
@@ -216,22 +216,28 @@ public class DeviceAppService {
         }
 
         int successCount = 0;
+        int totalCount = 0;
         for (String rawDeviceId : Arrays.asList(req.getDeviceIds().split(","))) {
             String deviceId = rawDeviceId.trim();
             if (!StringUtils.hasText(deviceId)) {
                 continue;
             }
-            deviceRepository.findById(deviceId).ifPresent(device -> {
+            totalCount++;
+            // 设备不存在时不能算进成功数，否则前端提示的成功条数比实际改动的多
+            boolean updated = deviceRepository.findById(deviceId).map(device -> {
                 device.bindRole(req.getRoleId());
                 deviceRepository.save(device);
-            });
-            successCount++;
+                return true;
+            }).orElse(false);
+            if (updated) {
+                successCount++;
+            }
         }
         if (successCount <= 0) {
             throw new IllegalArgumentException("更新失败，请检查设备ID是否正确");
         }
 
-        return new DeviceBatchUpdateResp(successCount, req.getDeviceIds().split(",").length);
+        return new DeviceBatchUpdateResp(successCount, totalCount);
     }
 
     public DeviceResp generateCode(String deviceId, String sessionId, String type) {
@@ -278,15 +284,15 @@ public class DeviceAppService {
             throw new IllegalArgumentException("设备ID不正确");
         }
 
-        // IP 归属只读本地缓存：未命中时由 CmsUtils 后台补查，本次不落地址，下一次 OTA 再写
+        // IP 归属只读本地缓存：未命中时由 IpLocationClient 后台补查，本次不落地址，下一次 OTA 再写
         if (StringUtils.hasText(req.getIp())) {
-            var ipInfo = CmsUtils.getIPInfoFromCache(req.getIp());
+            var ipInfo = IpLocationClient.getIPInfoFromCache(req.getIp());
             if (ipInfo != null && StringUtils.hasText(ipInfo.getLocation())) {
                 req.setLocation(ipInfo.getLocation());
             }
         }
 
-        String deviceId = req.getDeviceId();
+        String deviceId = normalizeDeviceId(req.getDeviceId());
         DeviceBO boundDevice = deviceService.getBO(deviceId);
         Map<String, Object> otaResponse = new HashMap<>();
 
@@ -358,10 +364,11 @@ public class DeviceAppService {
      *
      * @return true 表示设备已激活，false 表示未激活或设备ID无效
      */
-    public boolean checkOtaActivation(String deviceId) {
-        if (!StringUtils.hasText(deviceId) || !CommonUtils.isMacAddressValid(deviceId)) {
+    public boolean checkOtaActivation(String rawDeviceId) {
+        if (!StringUtils.hasText(rawDeviceId) || !CommonUtils.isMacAddressValid(rawDeviceId)) {
             return false;
         }
+        String deviceId = normalizeDeviceId(rawDeviceId);
         DeviceBO device = deviceService.getBO(deviceId);
         if (device == null) {
             return false;

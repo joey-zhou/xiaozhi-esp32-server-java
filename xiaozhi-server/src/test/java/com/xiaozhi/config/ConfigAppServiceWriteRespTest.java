@@ -8,7 +8,6 @@ import com.xiaozhi.config.convert.ConfigConvert;
 import com.xiaozhi.config.domain.AiConfig;
 import com.xiaozhi.config.domain.repository.ConfigRepository;
 import com.xiaozhi.config.service.ConfigService;
-import com.xiaozhi.storage.service.StorageReferenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,7 +46,7 @@ class ConfigAppServiceWriteRespTest {
     private ConfigRepository configRepository;
 
     @Mock
-    private StorageReferenceService storageReferenceService;
+    private ConfigChangePolicy configChangePolicy;
 
     private final ConfigConvert configConvert = Mappers.getMapper(ConfigConvert.class);
 
@@ -59,7 +58,7 @@ class ConfigAppServiceWriteRespTest {
         ReflectionTestUtils.setField(configAppService, "configService", configService);
         ReflectionTestUtils.setField(configAppService, "configConvert", configConvert);
         ReflectionTestUtils.setField(configAppService, "configRepository", configRepository);
-        ReflectionTestUtils.setField(configAppService, "storageReferenceService", storageReferenceService);
+        ReflectionTestUtils.setField(configAppService, "configChangePolicy", configChangePolicy);
     }
 
     @Test
@@ -89,10 +88,6 @@ class ConfigAppServiceWriteRespTest {
 
     @Test
     void updateReturnsPatchedFieldsAndKeepsUntouchedOnes() {
-        when(configService.getBO(CONFIG_ID)).thenReturn(new ConfigBO()
-            .setConfigId(CONFIG_ID)
-            .setConfigType("llm")
-            .setModelType("chat"));
         when(configRepository.findById(CONFIG_ID)).thenReturn(Optional.of(storedAggregate()));
         stampOnSave(null, UPDATED_AT);
 
@@ -118,8 +113,9 @@ class ConfigAppServiceWriteRespTest {
         assertThat(resp.getCreateTime()).isEqualTo(CREATED_AT);
         // 更新时间取本次写库实际落的值，不是聚合根加载时那份
         assertThat(resp.getUpdateTime()).isEqualTo(UPDATED_AT);
-        // 配置表只在前置校验时读了一次，写完不再回读
-        verify(configService, times(1)).getBO(CONFIG_ID);
+        // 配置只经聚合根读一次（前置校验用它的快照），写完不再回读
+        verify(configRepository, times(1)).findById(CONFIG_ID);
+        verify(configService, never()).getBO(any());
     }
 
     /** 模拟仓储 save()：自增主键与自动填充的时间戳在落库后被回填进聚合根 */

@@ -28,8 +28,6 @@ avatar/
 *.iws
 
 # 忽略 Maven 和 Gradle 缓存
-.mvn/
-.mvn/wrapper/
 .gradle/
 
 .vscode/

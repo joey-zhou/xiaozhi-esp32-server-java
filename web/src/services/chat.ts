@@ -1,4 +1,4 @@
-import request, { API_BASE_URL, handleAuthExpired } from './request'
+import { API_BASE_URL, handleAuthExpired, http } from './request'
 import api from './api'
 import { useUserStore } from '@/store/user'
 import type { ChatToken } from '@/types/chat'
@@ -8,7 +8,6 @@ export type { ChatToken }
 /** 流式响应两次数据之间的最长间隔，超时中断整条流，避免后端挂起时输入框永久禁用 */
 const STREAM_IDLE_TIMEOUT_MS = 60000
 
-/** /chat/open 与 /chat/close 返回裸对象，不走 ApiResponse 信封 */
 export interface ChatSessionOpened {
   sessionId: string
 }
@@ -22,18 +21,22 @@ export interface ChatSessionClosed {
  * 不传 sessionId 时创建新会话；传入已有 sessionId 时尝试续接（后端会校验归属）。
  */
 export function openChatSession(roleId: number, sessionId?: string): Promise<ChatSessionOpened> {
-  return request.post(api.chat.open, null, {
-    params: sessionId ? { roleId, sessionId } : { roleId },
-  })
+  return http
+    .post<ChatSessionOpened>(api.chat.open, null, {
+      params: sessionId ? { roleId, sessionId } : { roleId },
+    })
+    .then((resp) => resp.data)
 }
 
 /**
  * 关闭 Web 聊天会话
  */
 export function closeChatSession(sessionId: string): Promise<ChatSessionClosed> {
-  return request.post(api.chat.close, null, {
-    params: { sessionId },
-  })
+  return http
+    .post<ChatSessionClosed>(api.chat.close, null, {
+      params: { sessionId },
+    })
+    .then((resp) => resp.data)
 }
 
 /**

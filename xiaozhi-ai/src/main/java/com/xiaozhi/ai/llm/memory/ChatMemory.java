@@ -18,7 +18,6 @@ import java.util.List;
  */
 public interface ChatMemory {
     String TIME_MILLIS_KEY = "TIME_MILLIS";
-    String AUDIO_PATH = "AUDIO_PATH";
     String USAGE_KEY = "llm_usage";  // 用于存储LLM使用情况的键
 
 
@@ -49,22 +48,24 @@ public interface ChatMemory {
 
     /**
      * 按 sessionId 获取历史对话消息列表（Web 场景：按会话隔离）。
-     * 与 {@link #find(String, int, int)} 参数数量不同构成方法重载。
+     * <p>
+     * 不与 {@link #find(String, int, int)} 做成重载：两者首参都是 String，调用方漏写 roleId 时
+     * 仍能编译，会悄悄变成按 sessionId 查。
      *
      * @param sessionId 会话 ID
      * @param limit 限制数量
      * @return 消息列表，按 createTime 升序
      */
-    List<Message> find(String sessionId, int limit);
+    List<Message> findBySession(String sessionId, int limit);
 
     /**
      * 获取历史对话消息列表
      * @param ownerId 聊天参与者标识（设备场景: deviceId, Web 场景: userId）
      * @param roleId 角色ID
-     * @param timeMillis 在这个时间戳后的消息
+     * @param since 在这个时间戳后的消息
      * @return
      */
-    List<Message> find(String ownerId, int roleId, Instant timeMillis);
+    List<Message> find(String ownerId, int roleId, Instant since);
     /**
      * 清除历史记录
      * 不是提供给Conversation使用，而是用于强制使其失忆的场景。

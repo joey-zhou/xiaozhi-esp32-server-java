@@ -86,12 +86,12 @@ class MessageHandlerListenTest {
     @Test
     void stopWithoutModeKeepsManualModeAndCompletesSegment() {
         when(vadService.finishSegment(SESSION_ID)).thenReturn(true);
-        messageHandler.handleMessage(listen(ListenState.Start, ListenMode.Manual), SESSION_ID);
+        messageHandler.handleMessage(listen(ListenState.START, ListenMode.MANUAL), SESSION_ID);
 
         // 设备松手时发的 stop 不带 mode，无条件赋值会把本轮模式抹成 null
-        messageHandler.handleMessage(listen(ListenState.Stop, null), SESSION_ID);
+        messageHandler.handleMessage(listen(ListenState.STOP, null), SESSION_ID);
 
-        assertThat(session.getMode()).isEqualTo(ListenMode.Manual);
+        assertThat(session.getMode()).isEqualTo(ListenMode.MANUAL);
         verify(vadService).initSession(SESSION_ID, false);
         verify(dialogueService).completeSpeechSegment(session);
         // 收句不能关流也不能重置 VAD，STT 之后还要读本轮 pcm
@@ -100,11 +100,11 @@ class MessageHandlerListenTest {
 
     @Test
     void stopWhileNotListeningCancelsListening() {
-        session.setMode(ListenMode.Manual);
+        session.setMode(ListenMode.MANUAL);
         session.transitionTo(DeviceState.SPEAKING);
         session.createAudioStream();
 
-        messageHandler.handleMessage(listen(ListenState.Stop, null), SESSION_ID);
+        messageHandler.handleMessage(listen(ListenState.STOP, null), SESSION_ID);
 
         assertThat(session.getAudioSinks()).isNull();
         assertThat(session.getDeviceState()).isEqualTo(DeviceState.IDLE);
@@ -116,11 +116,11 @@ class MessageHandlerListenTest {
 
     @Test
     void autoModeStopCancelsListeningWithoutCompletingSegment() {
-        session.setMode(ListenMode.Auto);
+        session.setMode(ListenMode.AUTO);
         session.transitionTo(DeviceState.LISTENING);
         session.createAudioStream();
 
-        messageHandler.handleMessage(listen(ListenState.Stop, null), SESSION_ID);
+        messageHandler.handleMessage(listen(ListenState.STOP, null), SESSION_ID);
 
         assertThat(session.getDeviceState()).isEqualTo(DeviceState.IDLE);
         verify(vadService).resetSession(SESSION_ID);
@@ -134,7 +134,7 @@ class MessageHandlerListenTest {
         when(player.getFunctionAfterChat()).thenReturn(() -> {
         });
 
-        messageHandler.handleMessage(listen(ListenState.Start, ListenMode.Auto), SESSION_ID);
+        messageHandler.handleMessage(listen(ListenState.START, ListenMode.AUTO), SESSION_ID);
 
         assertThat(session.getMode()).isNull();
         assertThat(session.getDeviceState()).isEqualTo(DeviceState.IDLE);
@@ -147,10 +147,10 @@ class MessageHandlerListenTest {
     void listenBeforePlayerCreatedStillStartsListening() {
         session.setPlayer(null);
 
-        messageHandler.handleMessage(listen(ListenState.Start, ListenMode.Auto), SESSION_ID);
+        messageHandler.handleMessage(listen(ListenState.START, ListenMode.AUTO), SESSION_ID);
 
         assertThat(session.getDeviceState()).isEqualTo(DeviceState.LISTENING);
-        assertThat(session.getMode()).isEqualTo(ListenMode.Auto);
+        assertThat(session.getMode()).isEqualTo(ListenMode.AUTO);
         verify(vadService).initSession(SESSION_ID, true);
     }
 
@@ -158,7 +158,7 @@ class MessageHandlerListenTest {
     @Test
     void wakeWordAfterGoodbyeClearedPlayerIsStillHandled() {
         session.setPlayer(null);
-        ListenMessage message = listen(ListenState.Detect, null);
+        ListenMessage message = listen(ListenState.DETECT, null);
         message.setText("小智小智");
 
         messageHandler.handleMessage(message, SESSION_ID);
@@ -169,7 +169,7 @@ class MessageHandlerListenTest {
     // 唤醒响应期间要屏蔽 VAD，状态切换必须在读线程上同步完成，不能等虚拟线程调度
     @Test
     void detectMarksSpeakingBeforeReturningFromReadThread() {
-        ListenMessage message = listen(ListenState.Detect, null);
+        ListenMessage message = listen(ListenState.DETECT, null);
         message.setText("小智小智");
 
         messageHandler.handleMessage(message, SESSION_ID);
@@ -180,7 +180,7 @@ class MessageHandlerListenTest {
 
     @Test
     void detectInitializesAecBeforeWakeWord() {
-        ListenMessage message = listen(ListenState.Detect, null);
+        ListenMessage message = listen(ListenState.DETECT, null);
         message.setText("小智小智");
 
         messageHandler.handleMessage(message, SESSION_ID);
@@ -194,7 +194,7 @@ class MessageHandlerListenTest {
 
     @Test
     void textInitializesAecBeforeHandlingText() {
-        ListenMessage message = listen(ListenState.Text, null);
+        ListenMessage message = listen(ListenState.TEXT, null);
         message.setText("讲个笑话");
 
         messageHandler.handleMessage(message, SESSION_ID);

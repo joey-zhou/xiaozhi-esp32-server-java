@@ -93,7 +93,7 @@ const routeDeviceOption = ref<Device | null>(null)
 // 补进来的设备一旦随翻页进了 devices，就不再单独占一项，避免出现重复 key
 const deviceOptions = computed<Device[]>(() => {
   const extra = routeDeviceOption.value
-  const loaded = devices.value as Device[]
+  const loaded = devices.value
   if (!extra || loaded.some((d) => d.deviceId === extra.deviceId)) {
     return loaded
   }
@@ -194,7 +194,7 @@ const columns = computed<TableColumnsType>(() => {
  * 下拉按页拉取，路由传来的设备可能不在已加载的页里，不补就会被静默换成第一台
  */
 async function loadRouteDeviceOption(deviceId: string) {
-  if ((devices.value as Device[]).some((d) => d.deviceId === deviceId)) {
+  if (devices.value.some((d) => d.deviceId === deviceId)) {
     return
   }
   // 补不到就保持不补，不打扰用户

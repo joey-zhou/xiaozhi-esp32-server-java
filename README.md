@@ -194,7 +194,7 @@ bin/all.sh status              # 查看状态
 
 我们接受各种项目开发，如果您有特定需求或对商业版本感兴趣，欢迎通过微信联系洽谈。
 
-<img src="./web/public/static/img/wechat.png" alt="微信" width="200" />
+<img src="./docs/images/wechat.png" alt="微信" width="200" />
 
 ## 贡献指南
 
@@ -204,13 +204,13 @@ bin/all.sh status              # 查看状态
 
 微信群超200人无法扫码进群，可以加我微信备注 小智 我拉你进微信群
 
-<img src="./web/public/static/img/wechat.png" alt="微信" width="200" />
+<img src="./docs/images/wechat.png" alt="微信" width="200" />
 
 ### QQ
 
 欢迎加入我们的QQ群一起交流讨论，QQ群号：790820705
 
-<img src="./web/public/static/img/qq.png" alt="QQ群" width="200" />
+<img src="./docs/images/qq.png" alt="QQ群" width="200" />
 
 ---
 

@@ -3,7 +3,7 @@ package com.xiaozhi.ai.llm.factory.providers;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.port.ConfigLookup;
-import com.xiaozhi.common.port.TokenResolver;
+import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.ai.llm.providers.CozeChatModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +28,7 @@ class CozeModelProviderTest {
     private ConfigLookup configLookup;
 
     @Mock
-    private TokenResolver tokenResolver;
+    private ProviderTokenClient tokenClient;
 
     private CozeModelProvider cozeModelProvider;
 
@@ -36,7 +36,7 @@ class CozeModelProviderTest {
     void setUp() {
         cozeModelProvider = new CozeModelProvider();
         ReflectionTestUtils.setField(cozeModelProvider, "configLookup", configLookup);
-        ReflectionTestUtils.setField(cozeModelProvider, "tokenResolver", tokenResolver);
+        ReflectionTestUtils.setField(cozeModelProvider, "tokenClient", tokenClient);
     }
 
 
@@ -49,12 +49,12 @@ class CozeModelProviderTest {
         ConfigBO agentConfig = new ConfigBO().setConfigId(5).setProvider("coze");
         when(configLookup.listConfigs(7, "agent", "coze", null, null, ConfigBO.STATE_ENABLED))
                 .thenReturn(List.of(agentConfig));
-        when(tokenResolver.getToken(agentConfig)).thenReturn("token-1");
+        when(tokenClient.getToken(agentConfig)).thenReturn("token-1");
 
         ChatModel chatModel = cozeModelProvider.createChatModel(modelConfig, new RoleBO());
 
         assertThat(chatModel).isInstanceOf(CozeChatModel.class);
-        verify(tokenResolver).getToken(agentConfig);
+        verify(tokenClient).getToken(agentConfig);
     }
 
     @Test
