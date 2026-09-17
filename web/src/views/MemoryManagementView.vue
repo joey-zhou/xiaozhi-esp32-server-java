@@ -6,6 +6,7 @@ import { message as antMessage, type TableColumnsType, type TablePaginationConfi
 import { useTable } from '@/composables/useTable'
 import { useExport, type ExportColumn } from '@/composables/useExport'
 import { useSelectLoadMore } from '@/composables/useSelectLoadMore'
+import { useRequest } from '@/composables/useRequest'
 import { useLoadingStore } from '@/store/loading'
 import { queryRoles } from '@/services/role'
 import { queryDevices } from '@/services/device'
@@ -55,6 +56,8 @@ type ChatMemoryRow = ChatMemory & { toolCalls?: string }
 
 // 使用导出 composable
 const { exporting, exportToExcel } = useExport()
+
+const { execute: executeRouteDevice } = useRequest()
 
 // 事件总线
 const stopAllAudioBus = useEventBus<void>('stop-all-audio')
@@ -187,15 +190,13 @@ async function loadRouteDeviceOption(deviceId: string) {
   if ((devices.value as Device[]).some((d) => d.deviceId === deviceId)) {
     return
   }
-  try {
-    const res = await queryDevices({ pageNo: 1, pageSize: 1, deviceId })
-    if (res.code === 200) {
-      routeDeviceOption.value = res.data?.list?.[0] ?? null
-    }
-  } catch (error) {
-    if (shouldIgnoreRequestError(error)) return
-    console.error('按 deviceId 补充设备选项失败:', error)
-  }
+  // 补不到就保持不补，不打扰用户
+  await executeRouteDevice(() => queryDevices({ pageNo: 1, pageSize: 1, deviceId }), {
+    showError: false,
+    onSuccess: (data) => {
+      routeDeviceOption.value = data?.list?.[0] ?? null
+    },
+  })
 }
 
 /**

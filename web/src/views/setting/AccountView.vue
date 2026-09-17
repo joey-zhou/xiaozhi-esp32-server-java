@@ -8,6 +8,7 @@ import type { Rule } from 'ant-design-vue/es/form'
 import { useUserStore } from '@/store/user'
 import { useAvatar } from '@/composables/useAvatar'
 import { useFormValidation } from '@/composables/useFormValidation'
+import { useRequest } from '@/composables/useRequest'
 import { PASSWORD_MIN_LENGTH } from '@/constants/api'
 import { updateUser } from '@/services/user'
 import { uploadFile, type UploadResponse } from '@/services/upload'
@@ -19,6 +20,7 @@ const { t } = useI18n()
 const userStore = useUserStore()
 const { getAvatarUrl } = useAvatar()
 const { confirmPasswordRules, passwordRules } = useFormValidation()
+const { executeOk: executeUpdateAvatar } = useRequest()
 
 // 账号页的密码是「留空即不修改」，所以去掉 passwordRules 里的 required，
 // 只保留与后端 UserUpdateReq.password 的 @Size(min=6,max=20) 一致的长度约束
@@ -171,7 +173,7 @@ const beforeAvatarUpload: UploadProps['beforeUpload'] = (file) => {
       updateUserAvatar(data.relativePath || data.url)
     })
     .catch(error => {
-      message.error(t('common.avatarUploadFailed') + error)
+      message.error(`${t('common.avatarUploadFailed')}: ${error}`)
       avatarLoading.value = false
     })
 
@@ -181,29 +183,26 @@ const beforeAvatarUpload: UploadProps['beforeUpload'] = (file) => {
 // 更新用户头像
 // avatarPath 已是待入库值：本地为相对路径，云端为完整 URL（后端负责剥签名/重签名）
 const updateUserAvatar = async (avatarPath: string) => {
-  try {
-    const updateData: UpdateUserParams = {
-      userId: userInfo.value?.userId,
-      username: userInfo.value?.username,
-      avatar: avatarPath
-    } as UpdateUserParams
+  const updateData: UpdateUserParams = {
+    userId: userInfo.value?.userId,
+    username: userInfo.value?.username,
+    avatar: avatarPath
+  } as UpdateUserParams
 
-    const res = await updateUser(updateData)
-
-    if (res.code === 200) {
+  await executeUpdateAvatar(() => updateUser(updateData), {
+    showSuccess: true,
+    successText: t('common.avatarUploadSuccess'),
+    errorText: t('common.avatarUploadFailed'),
+    onSuccess: () => {
       userStore.updateUserInfo({
         ...userInfo.value,
         avatar: avatarPath
       })
-      message.success(t('common.avatarUploadSuccess'))
-    } else {
-      message.error(res.message || t('common.avatarUploadFailed'))
-    }
-  } catch (error) {
-    message.error(t('common.avatarUploadFailed') + error)
-  } finally {
-    avatarLoading.value = false
-  }
+    },
+  })
+
+  // 上传阶段点亮的遮罩，成败都要在这里熄灭
+  avatarLoading.value = false
 }
 </script>
 

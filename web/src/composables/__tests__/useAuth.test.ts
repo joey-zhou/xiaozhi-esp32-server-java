@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { message } from 'ant-design-vue'
 
 const routerMock = vi.hoisted(() => ({
   push: vi.fn(),
@@ -125,6 +126,28 @@ describe('useAuth', () => {
     await login({ username: 'user', password: 'pwd' })
 
     expect(routerMock.push).toHaveBeenCalledWith('/user?id=5')
+  })
+
+  it('登录业务码失败时不写会话、不跳转，只弹后端文案', async () => {
+    userApiMock.login.mockResolvedValue({ code: 400, data: null, message: '用户名或密码错误' })
+
+    const { login } = useAuth()
+
+    expect(await login({ username: 'admin', password: 'wrong' })).toBe(false)
+    expect(userStoreMock.setToken).not.toHaveBeenCalled()
+    expect(routerMock.push).not.toHaveBeenCalled()
+    expect(message.error).toHaveBeenCalledWith('用户名或密码错误')
+  })
+
+  it('HTTP 失败已由拦截器提示，登录不再叠第二条', async () => {
+    userApiMock.login.mockRejectedValue(new Error('Request failed with status code 400'))
+
+    const { login } = useAuth()
+
+    expect(await login({ username: 'admin', password: 'wrong' })).toBe(false)
+    expect(userStoreMock.setToken).not.toHaveBeenCalled()
+    expect(routerMock.push).not.toHaveBeenCalled()
+    expect(message.error).not.toHaveBeenCalled()
   })
 
   it('手机号未注册时跳注册页', async () => {

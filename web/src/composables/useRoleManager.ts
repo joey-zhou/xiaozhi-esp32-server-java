@@ -199,7 +199,8 @@ export function useRoleManager() {
   async function loadAllVoices() {
     voiceLoading.value = true
     try {
-      // 1. 加载TTS配置
+      // 1. 加载TTS配置。不走 useRequest.execute：没配 TTS（非200）要静默退化成空列表继续往下拼音色，
+      // 而请求本身挂了（throw）要中断并保留上一次的清单，execute 会把这两条路都变成返回 undefined
       const ttsRes = await queryConfigs({ configType: 'tts', pageNo: 1, pageSize: 1000 })
       const ttsConfigs: Config[] = ttsRes.code === 200 ? (ttsRes.data?.list ?? []) : []
       const configOf = (provider: string) => ttsConfigs.find(c => c.provider === provider)
@@ -253,6 +254,7 @@ export function useRoleManager() {
   async function loadSttOptions() {
     sttLoading.value = true
     try {
+      // 同 loadAllVoices：没配 STT 时静默只留 Vosk，请求挂了要中断并保留上一次的清单，不能用 useRequest.execute
       const res = await queryConfigs({ configType: 'stt', pageNo: 1, pageSize: 1000 })
       const options: SttOption[] = [
         {

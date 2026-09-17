@@ -66,7 +66,7 @@ export default {
     uploadAvatar: 'Upload Avatar',
     removeAvatar: 'Remove Avatar',
     avatarTip: 'Support JPG, PNG, GIF format, max 2MB',
-    avatarUploadFailed: 'Avatar upload failed: ',
+    avatarUploadFailed: 'Avatar upload failed',
     avatarUploadSuccess: 'Avatar uploaded successfully',
     clickToChangeAvatar: 'Click to change avatar',
     avatarFormatTip: 'Supports JPG, PNG format, size not exceeding 2MB',

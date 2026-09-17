@@ -7,6 +7,7 @@ import type { Rule } from 'ant-design-vue/es/form'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import { useTable } from '@/composables/useTable'
 import { useModal } from '@/composables/useModal'
+import { useRequest } from '@/composables/useRequest'
 import { useLoadingStore } from '@/store/loading'
 import TableActionButtons from '@/components/TableActionButtons.vue'
 import { updateConfig, updatePlatformConfig, queryPlatformConfig, addPlatformConfig } from '@/services/config'
@@ -31,6 +32,10 @@ const providerOptions = computed<ProviderOption[]>(() => [
 
 // ==================== 表格 ====================
 const { loading, data: agentList, pagination, handleTableChange, loadData, createDebouncedSearch } = useTable<Agent>()
+
+// 两个请求各自一个实例，失败文案互不干扰
+const { executeOk: executeSavePlatformConfig } = useRequest()
+const { executeOk: executeSetDefault } = useRequest()
 
 // 基础表格列
 const baseColumns = computed<TableColumnsType>(() => [
@@ -139,46 +144,40 @@ const platformModal = useModal<PlatformConfig>({
   formRef: platformFormRef,
   onSubmit: async (data, isEdit) => {
     // Modal 内已有 submitLoading，不需要全局 loading
-    try {
-      // 如果是Dify平台，确保apiUrl有正确的格式
-      if (data.provider === 'dify' && data.apiUrl) {
-        let baseUrl = data.apiUrl
-        if (baseUrl.endsWith('/')) {
-          baseUrl = baseUrl.slice(0, -1)
-        }
-        data.apiUrl = baseUrl
+    // 如果是Dify平台，确保apiUrl有正确的格式
+    if (data.provider === 'dify' && data.apiUrl) {
+      let baseUrl = data.apiUrl
+      if (baseUrl.endsWith('/')) {
+        baseUrl = baseUrl.slice(0, -1)
       }
-      
-      // 如果是编辑模式，添加configId
-      if (isEdit && currentConfigId.value) {
-        data.configId = currentConfigId.value
-
-        // 编辑模式下，移除空的敏感字段（留空表示保持原值）
-        const sensitiveFields: (keyof PlatformConfig)[] = ['apiKey', 'apiSecret', 'ak', 'sk']
-        sensitiveFields.forEach(field => {
-          if (!data[field]) {
-            delete data[field]
-          }
-        })
-      }
-
-      // 调用API
-      const apiFunc = isEdit ? updatePlatformConfig : addPlatformConfig
-      const res = await apiFunc(data)
-      
-      if (res.code === 200) {
-        message.success(isEdit ? t('common.updatePlatformConfigSuccess') : t('common.addPlatformConfigSuccess'))
-        await fetchData()
-        return true
-      } else {
-        message.error(res.message || (isEdit ? t('common.updatePlatformConfigFailed') : t('common.addPlatformConfigFailed')))
-        return false
-      }
-    } catch (error) {
-      console.error('Error with platform config:', error)
-      message.error(isEdit ? t('common.updatePlatformConfigFailed') : t('common.addPlatformConfigFailed'))
-      return false
+      data.apiUrl = baseUrl
     }
+
+    // 如果是编辑模式，添加configId
+    if (isEdit && currentConfigId.value) {
+      data.configId = currentConfigId.value
+
+      // 编辑模式下，移除空的敏感字段（留空表示保持原值）
+      const sensitiveFields: (keyof PlatformConfig)[] = ['apiKey', 'apiSecret', 'ak', 'sk']
+      sensitiveFields.forEach(field => {
+        if (!data[field]) {
+          delete data[field]
+        }
+      })
+    }
+
+    // 调用API
+    const apiFunc = isEdit ? updatePlatformConfig : addPlatformConfig
+    const ok = await executeSavePlatformConfig(() => apiFunc(data), {
+      showSuccess: true,
+      successText: isEdit ? t('common.updatePlatformConfigSuccess') : t('common.addPlatformConfigSuccess'),
+      errorText: isEdit ? t('common.updatePlatformConfigFailed') : t('common.addPlatformConfigFailed')
+    })
+
+    if (ok) {
+      await fetchData()
+    }
+    return ok
   },
   onOpen: async (item) => {
     if (item) {
@@ -383,22 +382,18 @@ const handlePlatformModalOk = async () => {
 // ==================== 设为默认 ====================
 // 智能体是 agent 类型配置，只提交 configId + isDefault，不带 modelType（那是 llm 才有的维度）
 const handleSetDefault = async (record: Agent) => {
+  // loading 是表格的，设默认期间一并占用，成功后由 fetchData 自己接管
   loading.value = true
-  try {
-    const res = await updateConfig({ configId: record.configId, isDefault: '1' })
+  const ok = await executeSetDefault(() => updateConfig({ configId: record.configId, isDefault: '1' }), {
+    showSuccess: true,
+    successText: t('common.setDefaultSuccess', { name: record.agentName || record.configName || '' }),
+    errorText: t('common.setDefaultFailed')
+  })
 
-    if (res.code === 200) {
-      message.success(t('common.setDefaultSuccess', { name: record.agentName || record.configName || '' }))
-      await fetchData()
-    } else {
-      message.error(res.message || t('common.setDefaultFailed'))
-    }
-  } catch (error) {
-    console.error('设置默认智能体失败:', error)
-    message.error(t('common.setDefaultFailed'))
-  } finally {
-    loading.value = false
+  if (ok) {
+    await fetchData()
   }
+  loading.value = false
 }
 
 // ==================== 初始化（非阻塞式加载）====================

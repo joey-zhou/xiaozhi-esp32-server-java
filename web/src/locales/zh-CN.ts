@@ -66,7 +66,7 @@ export default {
     uploadAvatar: '上传头像',
     removeAvatar: '移除头像',
     avatarTip: '支持JPG、PNG、GIF格式，不超过2MB',
-    avatarUploadFailed: '头像上传失败: ',
+    avatarUploadFailed: '头像上传失败',
     avatarUploadSuccess: '头像上传成功',
     clickToChangeAvatar: '点击头像更换',
     avatarFormatTip: '支持 JPG、PNG 格式，大小不超过 2MB',

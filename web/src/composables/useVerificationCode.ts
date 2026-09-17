@@ -2,10 +2,13 @@ import { ref, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { useIntervalFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
+import { useRequest } from '@/composables/useRequest'
 import { checkUser, sendEmailCaptcha, sendSmsCaptcha } from '@/services/user'
 
 export function useVerificationCode() {
   const { t } = useI18n()
+  const { executeOk } = useRequest()
+  // 按钮文案与倒计时都读它，和 useRequest 自带的 loading 是两个 ref，保持原样
   const sendCodeLoading = ref(false)
   const countdown = ref(0)
 
@@ -59,31 +62,20 @@ export function useVerificationCode() {
     try {
       // 先检查用户名和邮箱是否已存在
       // 注意：后端在已存在时返回 HTTP 409（走 axios 错误分支并抛异常），
-      // 全局响应拦截器已统一弹出后端提示（如“邮箱已注册”），此处无需再判断 code。
+      // 全局响应拦截器已统一弹出后端提示（如“邮箱已注册”），此处不能再弹第二条
       if (username) {
-        await checkUser({
-          username,
-          email,
-        })
+        const available = await executeOk(() => checkUser({ username, email }), { showError: false })
+        if (!available) {
+          return false
+        }
       }
 
-      // 发送验证码
-      const res = await sendEmailCaptcha({
-        email,
-        type: 'register',
+      // 发送验证码。不给 errorText：传输层失败时拦截器弹的是后端原文，覆盖成笼统文案反而更差
+      return await executeOk(() => sendEmailCaptcha({ email, type: 'register' }), {
+        showSuccess: true,
+        successText: t('auth.verificationCodeSent'),
+        onSuccess: () => startCountdown(),
       })
-
-      if (res.code === 200) {
-        message.success(t('auth.verificationCodeSent'))
-        startCountdown()
-        return true
-      }
-
-      message.error(res.message || t('auth.sendVerificationCodeFailed'))
-      return false
-    } catch {
-      // 校验/发送过程中抛出的 HTTP 错误已由全局拦截器统一提示，避免重复弹窗
-      return false
     } finally {
       sendCodeLoading.value = false
     }
@@ -97,22 +89,11 @@ export function useVerificationCode() {
     sendCodeLoading.value = true
 
     try {
-      const res = await sendEmailCaptcha({
-        email,
-        type: 'forget',
+      return await executeOk(() => sendEmailCaptcha({ email, type: 'forget' }), {
+        showSuccess: true,
+        successText: t('auth.verificationCodeSent'),
+        onSuccess: () => startCountdown(),
       })
-
-      if (res.code === 200) {
-        message.success(t('auth.verificationCodeSent'))
-        startCountdown()
-        return true
-      }
-
-      message.error(res.message || t('auth.sendVerificationCodeFailed'))
-      return false
-    } catch {
-      // HTTP 错误已由全局拦截器统一提示，避免重复弹窗
-      return false
     } finally {
       sendCodeLoading.value = false
     }
@@ -129,22 +110,11 @@ export function useVerificationCode() {
     sendCodeLoading.value = true
 
     try {
-      const res = await sendSmsCaptcha({
-        tel,
-        type: 'login',
+      return await executeOk(() => sendSmsCaptcha({ tel, type: 'login' }), {
+        showSuccess: true,
+        successText: t('auth.verificationCodeSent'),
+        onSuccess: () => startCountdown(),
       })
-
-      if (res.code === 200) {
-        message.success(t('auth.verificationCodeSent'))
-        startCountdown()
-        return true
-      }
-
-      message.error(res.message || t('auth.sendVerificationCodeFailed'))
-      return false
-    } catch {
-      // HTTP 错误已由全局拦截器统一提示，避免重复弹窗
-      return false
     } finally {
       sendCodeLoading.value = false
     }

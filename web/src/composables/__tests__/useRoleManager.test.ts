@@ -6,17 +6,8 @@ const serviceMock = vi.hoisted(() => ({
   querySherpaVoices: vi.fn(),
 }))
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (key: string) => key }),
-}))
-
-vi.mock('ant-design-vue', () => ({
-  message: {
-    error: vi.fn(),
-    success: vi.fn(),
-    warning: vi.fn(),
-  },
-}))
+// vue-i18n 与 ant-design-vue 由 src/__tests__/setup.ts 统一 mock：
+// 这里再局部 mock 会盖掉 setup 里的 createI18n，让 @/services/config -> services/request -> locales 整条链炸掉
 
 vi.mock('@/services/config', () => ({ queryConfigs: serviceMock.queryConfigs }))
 vi.mock('@/services/agent', () => ({ queryAgents: serviceMock.queryAgents }))
@@ -116,6 +107,85 @@ describe('useRoleManager 音色清单加载', () => {
     await second.loadAllVoices()
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(second.allVoices.value).toHaveLength(2)
+  })
+})
+
+// 配置查询的两条失败路径处理方式不同，这两组用例就是钉住这个区别：
+// 「没配」（非 200）静默退化成可用的最小清单，「请求挂了」（throw）要报错并保留上一次的清单。
+// 正因为要区分这两条路，这里没有迁到 useRequest 的 execute——它把两者都变成返回 undefined。
+describe('useRoleManager 未配置时静默退化', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    stubVoiceJsonFetch()
+    serviceMock.querySherpaVoices.mockResolvedValue({ code: 200, message: 'ok', data: [] })
+  })
+
+  it('TTS 配置返回非 200 时只剩 edge 音色，且不弹提示', async () => {
+    serviceMock.queryConfigs.mockResolvedValue({ code: 500, message: 'boom', data: null })
+
+    const { allVoices, loadAllVoices } = useRoleManager()
+    await loadAllVoices()
+
+    expect(allVoices.value.map(voice => voice.provider)).toEqual(['edge'])
+    expect(message.error).not.toHaveBeenCalled()
+  })
+
+  it('STT 配置返回非 200 时只留本地 Vosk 一项，且不弹提示', async () => {
+    serviceMock.queryConfigs.mockResolvedValue({ code: 500, message: 'boom', data: null })
+
+    const { sttOptions, loadSttOptions } = useRoleManager()
+    await loadSttOptions()
+
+    expect(sttOptions.value).toEqual([
+      { label: 'role.voskLocalStt', value: -1, desc: 'role.voskLocalSttDesc' },
+    ])
+    expect(message.error).not.toHaveBeenCalled()
+  })
+})
+
+describe('useRoleManager 请求异常时保留上一次的清单', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    stubVoiceJsonFetch()
+    serviceMock.querySherpaVoices.mockResolvedValue({ code: 200, message: 'ok', data: [] })
+  })
+
+  it('TTS 配置请求抛错时报错，且不把音色清单覆写成只有 edge', async () => {
+    serviceMock.queryConfigs.mockResolvedValueOnce({
+      code: 200,
+      message: 'ok',
+      data: { list: [{ configId: 7, provider: 'aliyun', configName: 'ali' }], total: 1 },
+    })
+    const { allVoices, loadAllVoices } = useRoleManager()
+    await loadAllVoices()
+    const loaded = allVoices.value
+
+    expect(loaded.length).toBeGreaterThan(0)
+
+    serviceMock.queryConfigs.mockRejectedValue(new Error('boom'))
+    await loadAllVoices()
+
+    expect(allVoices.value).toBe(loaded)
+    expect(message.error).toHaveBeenCalledWith('role.loadVoiceFailed')
+  })
+
+  it('STT 配置请求抛错时报错，且不把选项覆写成只有 Vosk', async () => {
+    serviceMock.queryConfigs.mockResolvedValueOnce({
+      code: 200,
+      message: 'ok',
+      data: { list: [{ configId: 9, configName: 'whisper', configDesc: 'd' }], total: 1 },
+    })
+    const { sttOptions, loadSttOptions } = useRoleManager()
+    await loadSttOptions()
+    const loaded = sttOptions.value
+
+    expect(loaded).toHaveLength(2)
+
+    serviceMock.queryConfigs.mockRejectedValue(new Error('boom'))
+    await loadSttOptions()
+
+    expect(sttOptions.value).toBe(loaded)
+    expect(message.error).toHaveBeenCalledWith('role.loadSttFailed')
   })
 })
 

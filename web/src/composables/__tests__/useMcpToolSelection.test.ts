@@ -5,19 +5,12 @@ const roleServiceMock = vi.hoisted(() => ({
   getSystemGlobalTools: vi.fn(),
 }))
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (key: string) => key }),
-}))
-
-vi.mock('ant-design-vue', () => ({
-  message: {
-    error: vi.fn(),
-    success: vi.fn(),
-    warning: vi.fn(),
-  },
-}))
-
+// vue-i18n 与 ant-design-vue 用 setup.ts 里的全局 mock：
+// 这里的 composable 经 @/services/role -> services/request 间接引到 '@/locales'，
+// 局部 mock 少一个 createI18n 就会在求值阶段炸
 vi.mock('@/services/role', () => roleServiceMock)
+
+import { message } from 'ant-design-vue'
 
 import { useMcpToolSelection } from '../useMcpToolSelection'
 
@@ -73,4 +66,18 @@ describe('useMcpToolSelection', () => {
     const playMusic = selection.allMcpTools.value.find(tool => tool.name === 'func_playMusic')
     expect(playMusic?.description).toBe('role.systemTool.playMusic')
   })
+
+  // 两路工具是一次 Promise.all，任一路挂了整批就没有结果，只弹一条失败提示
+  it('某一路挂了时工具列表为空，只弹一条提示', async () => {
+    roleServiceMock.getSystemGlobalTools.mockRejectedValue(new Error('boom'))
+    const selection = useMcpToolSelection()
+    await selection.loadTools(7)
+
+    expect(selection.allMcpTools.value).toEqual([])
+    expect(message.error).toHaveBeenCalledTimes(1)
+    expect(message.error).toHaveBeenCalledWith('role.mcpLoadToolsFailed')
+    expect(selection.mcpToolsLoading.value).toBe(false)
+  })
+
+
 })

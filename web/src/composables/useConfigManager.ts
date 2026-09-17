@@ -6,6 +6,7 @@ import { queryConfigs, updateConfig, deleteConfig as deleteConfigRequest } from 
 import { configTypeMap } from '@/config/providerConfig'
 import llmFactoriesData from '@/config/llm_factories.json'
 import { useTable } from './useTable'
+import { useRequest } from './useRequest'
 
 /** 按模型类型分组的工厂模型表 */
 interface LLMFactoryModelInfo {
@@ -116,6 +117,9 @@ export function useConfigManager(configType: ConfigType) {
     handleTableChange,
     createDebouncedSearch,
   } = useTable<Config>()
+
+  // 删除沿用表格 loading，useRequest 自己的 loading 不用
+  const { executeOk: executeDelete } = useRequest()
 
   // 状态
   const currentType = ref('')
@@ -244,17 +248,15 @@ export function useConfigManager(configType: ConfigType) {
   async function deleteConfig(configId: number) {
     loading.value = true
     try {
-      const res = await deleteConfigRequest(configId)
+      const ok = await executeDelete(() => deleteConfigRequest(configId), {
+        showSuccess: true,
+        successText: t('common.deleteSuccess'),
+        errorText: t('common.deleteFailed'),
+      })
 
-      if (res.code === 200) {
-        message.success(t('common.deleteSuccess'))
+      if (ok) {
         await fetchData()
-      } else {
-        message.error(res.message)
       }
-    } catch (error) {
-      console.error('删除配置失败:', error)
-      message.error(t('common.serverMaintenance'))
     } finally {
       loading.value = false
     }

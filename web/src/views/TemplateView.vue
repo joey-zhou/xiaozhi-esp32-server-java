@@ -232,6 +232,7 @@ import {
 } from '@/services/template'
 import { useTable } from '@/composables/useTable'
 import { useModal } from '@/composables/useModal'
+import { useRequest } from '@/composables/useRequest'
 import TableActionButtons from '@/components/TableActionButtons.vue'
 
 const { t } = useI18n()
@@ -339,34 +340,34 @@ const {
   return res
 })
 
+const { executeOk: executeSubmit } = useRequest()
+
 const formRef = ref<FormInstance>()
 const modal = useModal<PromptTemplate>({
   formRef,
   onSubmit: async (data, isEdit) => {
     // Modal 内已有 submitLoading，不需要全局 loading
-    try {
-      const requestData: Partial<PromptTemplate> = { ...data }
+    const requestData: Partial<PromptTemplate> = { ...data }
 
-      if (isEdit && modal.editingItem.value) {
-        requestData.templateId = modal.editingItem.value.templateId
+    if (isEdit && modal.editingItem.value) {
+      requestData.templateId = modal.editingItem.value.templateId
+    }
+
+    const ok = await executeSubmit(
+      () => (isEdit ? updateTemplate(requestData) : addTemplate(requestData)),
+      {
+        showSuccess: true,
+        successText: isEdit ? t('template.updateSuccess') : t('template.createSuccess'),
+        errorText: t('template.operationFailed')
       }
-      
-      const res = isEdit
-        ? await updateTemplate(requestData)
-        : await addTemplate(requestData)
-      
-      if (res.code === 200) {
-        message.success(isEdit ? t('template.updateSuccess') : t('template.createSuccess'))
-        await fetchData()
-        return true
-      } else {
-        message.error(res.message || t('template.operationFailed'))
-        return false
-      }
-    } catch {
-      message.error(t('template.operationFailed'))
+    )
+
+    if (!ok) {
       return false
     }
+
+    await fetchData()
+    return true
   },
   onOpen: (template) => {
     if (template) {

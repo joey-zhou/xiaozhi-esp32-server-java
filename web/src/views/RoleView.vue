@@ -610,7 +610,7 @@ const beforeAvatarUpload: UploadProps['beforeUpload'] = (file) => {
       avatarLoading.value = false
     })
     .catch(error => {
-      message.error(t('common.avatarUploadFailed') + error)
+      message.error(`${t('common.avatarUploadFailed')}: ${error}`)
       avatarLoading.value = false
     })
 

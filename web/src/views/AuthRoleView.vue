@@ -5,6 +5,7 @@ import { message } from 'ant-design-vue'
 import type { TableColumnsType } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { queryAuthRoles, getAuthRolePermissionConfig, updateAuthRolePermissions } from '@/services/authRole'
+import { useRequest } from '@/composables/useRequest'
 import { resolveMenuIcon } from '@/layouts/menuIcons'
 import type { AuthRole, AuthRolePermissionConfig, PermissionTreeNode } from '@/types/authRole'
 
@@ -21,9 +22,12 @@ const selectedAuthRoleId = ref<number>()
 const checkedPermissionIds = ref<number[]>([])
 const expandedKeys = ref<number[]>([])
 
+// roleLoading 要一直盖到嵌套的 selectAuthRole 结束、跨了两个请求，
+// 所以留着手写；另外两个各自只包一个请求，直接用 useRequest 自带的
 const roleLoading = ref(false)
-const configLoading = ref(false)
-const saveLoading = ref(false)
+const { execute: executeAuthRoles } = useRequest()
+const { loading: configLoading, execute: executeConfig } = useRequest()
+const { loading: saveLoading, execute: executeSave } = useRequest()
 
 const roleKeyword = ref('')
 
@@ -146,13 +150,14 @@ onMounted(() => {
 async function loadAuthRoles() {
   roleLoading.value = true
   try {
-    const res = await queryAuthRoles({ pageNo: 1, pageSize: 200 })
-    if (res.code !== 200 || !res.data?.list) {
-      message.error(res.message || t('authRole.loadRolesFailed'))
+    const page = await executeAuthRoles(() => queryAuthRoles({ pageNo: 1, pageSize: 200 }), {
+      errorText: t('authRole.loadRolesFailed'),
+    })
+    if (!page?.list) {
       return
     }
 
-    authRoles.value = res.data.list
+    authRoles.value = page.list
     if (!authRoles.value.length) {
       selectedAuthRoleId.value = undefined
       permissionConfig.value = null
@@ -167,9 +172,6 @@ async function loadAuthRoles() {
     if (nextAuthRoleId) {
       await selectAuthRole(nextAuthRoleId)
     }
-  } catch (error) {
-    console.error('加载权限角色失败:', error)
-    message.error(t('authRole.loadRolesFailed'))
   } finally {
     roleLoading.value = false
   }
@@ -183,22 +185,16 @@ async function selectAuthRole(authRoleId: number) {
   selectedAuthRoleId.value = authRoleId
   permissionConfig.value = null
   checkedPermissionIds.value = []
-  configLoading.value = true
-  try {
-    const res = await getAuthRolePermissionConfig(authRoleId)
-    if (res.code !== 200 || !res.data) {
-      message.error(res.message || t('authRole.loadConfigFailed'))
-      return
-    }
 
-    permissionConfig.value = res.data
-    checkedPermissionIds.value = Array.from(new Set(res.data.checkedPermissionIds ?? [])).sort((a, b) => a - b)
-  } catch (error) {
-    console.error('加载权限配置失败:', error)
-    message.error(t('authRole.loadConfigFailed'))
-  } finally {
-    configLoading.value = false
+  const config = await executeConfig(() => getAuthRolePermissionConfig(authRoleId), {
+    errorText: t('authRole.loadConfigFailed'),
+  })
+  if (!config) {
+    return
   }
+
+  permissionConfig.value = config
+  checkedPermissionIds.value = Array.from(new Set(config.checkedPermissionIds ?? [])).sort((a, b) => a - b)
 }
 
 async function handleSavePermissions() {
@@ -206,24 +202,19 @@ async function handleSavePermissions() {
     return
   }
 
-  saveLoading.value = true
-  try {
-    const permissionIds = withAncestorPermissionIds(checkedPermissionIds.value)
-    const res = await updateAuthRolePermissions(selectedAuthRoleId.value, permissionIds)
-    if (res.code !== 200 || !res.data) {
-      message.error(res.message || t('authRole.saveFailed'))
-      return
-    }
+  const authRoleId = selectedAuthRoleId.value
+  const permissionIds = withAncestorPermissionIds(checkedPermissionIds.value)
 
-    permissionConfig.value = res.data
-    checkedPermissionIds.value = Array.from(new Set(res.data.checkedPermissionIds ?? [])).sort((a, b) => a - b)
-    message.success(t('authRole.saveSuccess'))
-  } catch (error) {
-    console.error('保存权限配置失败:', error)
-    message.error(t('authRole.saveFailed'))
-  } finally {
-    saveLoading.value = false
+  const saved = await executeSave(() => updateAuthRolePermissions(authRoleId, permissionIds), {
+    errorText: t('authRole.saveFailed'),
+  })
+  if (!saved) {
+    return
   }
+
+  permissionConfig.value = saved
+  checkedPermissionIds.value = Array.from(new Set(saved.checkedPermissionIds ?? [])).sort((a, b) => a - b)
+  message.success(t('authRole.saveSuccess'))
 }
 
 function expandAll() {

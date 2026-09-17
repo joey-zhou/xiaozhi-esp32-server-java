@@ -5,7 +5,7 @@ import { message } from 'ant-design-vue'
 import { DeviceState } from '@/constants/enums'
 import { useTable } from '@/composables/useTable'
 import { useInlineEdit } from '@/composables/useInlineEdit'
-import { useLoadingStore } from '@/store/loading'
+import { useRequest } from '@/composables/useRequest'
 import { useMemoryView } from '@/composables/useMemoryView'
 import { queryDevices, addDevice, updateDevice, deleteDevice, clearDeviceMemory } from '@/services/device'
 import { queryRoles } from '@/services/role'
@@ -16,8 +16,12 @@ import type { Role } from '@/types/role'
 import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
 
 const { t } = useI18n()
-const loadingStore = useLoadingStore()
 const { navigateToMemory } = useMemoryView()
+
+// 三个请求各自一个实例：要在模板上显示进度的解构出自己的 loading，其余只取执行函数
+const { loading: addingDevice, executeOk: executeAdd } = useRequest()
+const { executeOk: executeInlineUpdate } = useRequest()
+const { loading: clearingMemory, executeOk: executeClearMemory } = useRequest()
 
 // 表格和分页
 const {
@@ -65,22 +69,20 @@ const {
   updateField
 } = useInlineEdit(data, {
   getKey: (item) => item.deviceId,
+  // 表格 loading 由多处共用，仍在这里自己开合
   onSave: async (item) => {
     loading.value = true
     try {
-      const res = await updateDevice(item)
-      if (res.code === 200) {
-        message.success(t('common.updateSuccess'))
+      const updated = await executeInlineUpdate(() => updateDevice(item), {
+        showSuccess: true,
+        successText: t('common.updateSuccess'),
+        errorText: t('common.updateFailed'),
+      })
+
+      if (updated) {
         await fetchData()
-        return true
-      } else {
-        message.error(res.message || t('common.updateFailed'))
-        return false
       }
-    } catch (error) {
-      console.error('更新设备失败:', error)
-      message.error(t('common.serverMaintenance'))
-      return false
+      return updated
     } finally {
       loading.value = false
     }
@@ -90,11 +92,9 @@ const {
 // 弹窗相关
 const editVisible = ref(false)
 const currentDevice = ref<Device | null>(null)
-const clearMemoryLoading = ref(false)
 
 // 添加设备输入框
 const addDeviceCode = ref('')
-const addDeviceLoading = ref(false)
 
 // 表格列配置
 const columns = computed<TableColumnsType>(() => [
@@ -224,27 +224,21 @@ async function handleAddDevice(code: string) {
   }
 
   // 防抖处理：如果正在添加中，直接返回
-  if (addDeviceLoading.value) {
+  if (addingDevice.value) {
     return
   }
 
-  addDeviceLoading.value = true
-  loadingStore.showLoading(t('common.adding'))
-  try {
-    const res = await addDevice(code)
-    if (res.code === 200) {
-      message.success(t('common.addSuccess'))
-      addDeviceCode.value = ''
-      await fetchData()
-    } else {
-      message.error(res.message || t('common.addFailed'))
-    }
-  } catch (error) {
-    console.error('添加设备失败:', error)
-    message.error(t('common.serverMaintenance'))
-  } finally {
-    addDeviceLoading.value = false
-    loadingStore.hideLoading()
+  const added = await executeAdd(() => addDevice(code), {
+    showLoading: true,
+    loadingText: t('common.adding'),
+    showSuccess: true,
+    successText: t('common.addSuccess'),
+    errorText: t('common.addFailed'),
+  })
+
+  if (added) {
+    addDeviceCode.value = ''
+    await fetchData()
   }
 }
 
@@ -295,23 +289,17 @@ async function handleUpdate(device: Device) {
  * 清除设备记忆（保留全局 loading）
  */
 async function handleClearMemory(device: Device) {
-  clearMemoryLoading.value = true
-  loadingStore.showLoading(t('device.clearingMemory'))
-  try {
-    const res = await clearDeviceMemory(device.deviceId)
-    if (res.code === 200) {
-      message.success(t('common.deleteSuccess'))
-      editVisible.value = false
-      await fetchData()
-    } else {
-      message.error(res.message || t('common.deleteFailed'))
-    }
-  } catch (error) {
-    console.error('清除记忆失败:', error)
-    message.error(t('common.serverMaintenance'))
-  } finally {
-    clearMemoryLoading.value = false
-    loadingStore.hideLoading()
+  const cleared = await executeClearMemory(() => clearDeviceMemory(device.deviceId), {
+    showLoading: true,
+    loadingText: t('device.clearingMemory'),
+    showSuccess: true,
+    successText: t('common.deleteSuccess'),
+    errorText: t('common.deleteFailed'),
+  })
+
+  if (cleared) {
+    editVisible.value = false
+    await fetchData()
   }
 }
 
@@ -431,7 +419,7 @@ fetchData()
         <a-input-search
           v-model:value="addDeviceCode"
           v-permission="'system:device:create'"
-          :loading="addDeviceLoading"
+          :loading="addingDevice"
           :enter-button="t('device.addDevice')"
           :placeholder="t('device.enterDeviceCode')"
           style="width: 300px"
@@ -588,7 +576,7 @@ fetchData()
       :visible="editVisible"
       :current="currentDevice"
       :role-items="roleItems"
-      :clear-memory-loading="clearMemoryLoading"
+      :clear-memory-loading="clearingMemory"
       @close="editVisible = false"
       @submit="handleUpdate"
       @clear-memory="handleClearMemory"

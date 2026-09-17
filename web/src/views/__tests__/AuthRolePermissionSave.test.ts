@@ -14,6 +14,8 @@ import AuthRoleView from '../AuthRoleView.vue'
 // <script setup> 的内部状态不对外暴露，测试里按实际形状声明后取用
 interface AuthRoleViewState {
   checkedPermissionIds: number[]
+  authRoles: { authRoleId: number; authRoleName: string; roleKey: string }[]
+  permissionConfig: { authRoleId: number } | null
   handleSavePermissions: () => Promise<void>
 }
 
@@ -80,5 +82,55 @@ describe('AuthRoleView 权限保存', () => {
     await view.handleSavePermissions()
 
     expect(authRoleApiMock.updateAuthRolePermissions).toHaveBeenCalledWith(1, [1, 11, 12])
+  })
+})
+
+// 这三处走 useRequest 的 execute，失败时它只回 undefined 不抛，
+// 调用方必须自己守住「不要拿空数据覆写已有状态」
+describe('AuthRoleView 加载失败时不覆写已有状态', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    authRoleApiMock.queryAuthRoles.mockResolvedValue({
+      code: 200,
+      data: { list: [{ authRoleId: 1, authRoleName: '普通用户', roleKey: 'user' }] },
+    })
+    authRoleApiMock.getAuthRolePermissionConfig.mockResolvedValue(permissionConfig([1, 11, 12]))
+    authRoleApiMock.updateAuthRolePermissions.mockResolvedValue(permissionConfig([]))
+  })
+
+  it('角色列表请求失败时不去拉权限配置，列表留空', async () => {
+    authRoleApiMock.queryAuthRoles.mockRejectedValue(new Error('boom'))
+
+    const view = await mountView()
+
+    expect(view.authRoles).toEqual([])
+    expect(authRoleApiMock.getAuthRolePermissionConfig).not.toHaveBeenCalled()
+  })
+
+  it('权限配置业务码失败时 permissionConfig 保持为空，不写进半截数据', async () => {
+    authRoleApiMock.getAuthRolePermissionConfig.mockResolvedValue({
+      code: 500,
+      message: '没权限',
+      data: null,
+    })
+
+    const view = await mountView()
+
+    expect(view.permissionConfig).toBeNull()
+    expect(view.checkedPermissionIds).toEqual([])
+  })
+
+  it('保存失败时不把已有的勾选状态清掉', async () => {
+    const view = await mountView()
+    view.checkedPermissionIds = [1, 11]
+
+    authRoleApiMock.updateAuthRolePermissions.mockResolvedValue({
+      code: 500,
+      message: '保存失败',
+      data: null,
+    })
+    await view.handleSavePermissions()
+
+    expect(view.checkedPermissionIds).toEqual([1, 11])
   })
 })
