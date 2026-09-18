@@ -14,14 +14,9 @@ import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.template.service.TemplateService;
 import com.xiaozhi.user.service.UserService;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -57,355 +52,316 @@ class OwnershipConfigTest {
             .containsExactly("role", "config", "configWrite", "template", "device", "message", "user");
     }
 
-    @Nested
-    @ExtendWith(MockitoExtension.class)
-    class RoleChecker {
-
-        @Mock
-        private RoleService roleService;
-
-        @Test
-        void resourceNameIsRole() {
-            assertThat(config.roleOwnershipChecker(roleService).getResource()).isEqualTo("role");
-        }
-
-        @Test
-        void passesWhenOwnedByUser() {
-            when(roleService.getBO(3)).thenReturn(role(OWNER));
-
-            assertThatCode(() -> config.roleOwnershipChecker(roleService).check(3, OWNER))
-                .doesNotThrowAnyException();
-        }
-
-        @Test
-        void rejectsMissingRoleAsNotFound() {
-            when(roleService.getBO(3)).thenReturn(null);
-
-            assertThatThrownBy(() -> config.roleOwnershipChecker(roleService).check("3", OWNER))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("角色不存在");
-        }
-
-        @Test
-        void rejectsOtherUsersRoleAsUnauthorized() {
-            when(roleService.getBO(3)).thenReturn(role(OWNER));
-
-            assertThatThrownBy(() -> config.roleOwnershipChecker(roleService).check(3, OTHER))
-                .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("角色不归属当前用户");
-        }
-
-        /** 归属列为 null 的历史数据不能被当作「谁都能改」。 */
-        @Test
-        void rejectsRoleWithoutOwnerAsUnauthorized() {
-            when(roleService.getBO(3)).thenReturn(role(null));
-
-            assertThatThrownBy(() -> config.roleOwnershipChecker(roleService).check(3, OWNER))
-                .isInstanceOf(UnauthorizedException.class);
-        }
-
-        private RoleBO role(Integer userId) {
-            RoleBO role = new RoleBO();
-            role.setRoleId(3);
-            role.setUserId(userId);
-            return role;
-        }
+    @Test
+    void roleCheckerIsNamedRole() {
+        assertThat(config.roleOwnershipChecker(mock(RoleService.class)).getResource()).isEqualTo("role");
     }
 
-    @Nested
-    @ExtendWith(MockitoExtension.class)
-    class ConfigChecker {
+    @Test
+    void roleCheckPassesWhenOwnedByUser() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.getBO(3)).thenReturn(role(OWNER));
 
-        @Mock
-        private ConfigService configService;
+        assertThatCode(() -> config.roleOwnershipChecker(roleService).check(3, OWNER))
+            .doesNotThrowAnyException();
+    }
 
-        @Test
-        void resourceNameIsConfig() {
-            assertThat(config.configOwnershipChecker(configService).getResource()).isEqualTo("config");
-        }
+    @Test
+    void roleCheckRejectsMissingRoleAsNotFound() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.getBO(3)).thenReturn(null);
 
-        @Test
-        void passesWhenOwnedByUser() {
-            when(configService.getBO(3)).thenReturn(configBO(OWNER));
+        assertThatThrownBy(() -> config.roleOwnershipChecker(roleService).check("3", OWNER))
+            .isInstanceOf(ResourceNotFoundException.class)
+            .hasMessage("角色不存在");
+    }
 
-            assertThatCode(() -> config.configOwnershipChecker(configService).check(3, OWNER))
-                .doesNotThrowAnyException();
-        }
+    @Test
+    void roleCheckRejectsOtherUsersRoleAsUnauthorized() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.getBO(3)).thenReturn(role(OWNER));
 
-        @Test
-        void rejectsMissingConfigAsNotFound() {
-            when(configService.getBO(3)).thenReturn(null);
+        assertThatThrownBy(() -> config.roleOwnershipChecker(roleService).check(3, OTHER))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("角色不归属当前用户");
+    }
 
-            assertThatThrownBy(() -> config.configOwnershipChecker(configService).check(3, OWNER))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("配置不存在");
-        }
+    /** 归属列为 null 的历史数据不能被当作「谁都能改」。 */
+    @Test
+    void roleCheckRejectsRoleWithoutOwnerAsUnauthorized() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.getBO(3)).thenReturn(role(null));
 
-        @Test
-        void rejectsOtherUsersConfigAsUnauthorized() {
-            when(configService.getBO(3)).thenReturn(configBO(OWNER));
+        assertThatThrownBy(() -> config.roleOwnershipChecker(roleService).check(3, OWNER))
+            .isInstanceOf(UnauthorizedException.class);
+    }
 
-            assertThatThrownBy(() -> config.configOwnershipChecker(configService).check(3, OTHER))
-                .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("配置不归属当前用户");
-        }
+    @Test
+    void configCheckerIsNamedConfig() {
+        assertThat(config.configOwnershipChecker(mock(ConfigService.class)).getResource()).isEqualTo("config");
+    }
 
-        private ConfigBO configBO(Integer userId) {
-            ConfigBO configBO = new ConfigBO();
-            configBO.setConfigId(3);
-            configBO.setUserId(userId);
-            return configBO;
-        }
+    @Test
+    void configCheckPassesWhenOwnedByUser() {
+        ConfigService configService = mock(ConfigService.class);
+        when(configService.getBO(3)).thenReturn(configBO(OWNER));
+
+        assertThatCode(() -> config.configOwnershipChecker(configService).check(3, OWNER))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void configCheckRejectsMissingConfigAsNotFound() {
+        ConfigService configService = mock(ConfigService.class);
+        when(configService.getBO(3)).thenReturn(null);
+
+        assertThatThrownBy(() -> config.configOwnershipChecker(configService).check(3, OWNER))
+            .isInstanceOf(ResourceNotFoundException.class)
+            .hasMessage("配置不存在");
+    }
+
+    @Test
+    void configCheckRejectsOtherUsersConfigAsUnauthorized() {
+        ConfigService configService = mock(ConfigService.class);
+        when(configService.getBO(3)).thenReturn(configBO(OWNER));
+
+        assertThatThrownBy(() -> config.configOwnershipChecker(configService).check(3, OTHER))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("配置不归属当前用户");
+    }
+
+    @Test
+    void configWriteCheckerIsNamedConfigWrite() {
+        assertThat(config.configWriteOwnershipChecker(mock(ConfigService.class)).getResource())
+            .isEqualTo("configWrite");
     }
 
     /** 写路径（改配置、删配置）用的检查器。 */
-    @Nested
-    @ExtendWith(MockitoExtension.class)
-    class ConfigWriteChecker {
+    @Test
+    void configWriteCheckPassesWhenOwnedByUser() {
+        ConfigService configService = mock(ConfigService.class);
+        when(configService.getBO(3)).thenReturn(configBO(OWNER));
 
-        @Mock
-        private ConfigService configService;
-
-        @Test
-        void resourceNameIsConfigWrite() {
-            assertThat(config.configWriteOwnershipChecker(configService).getResource()).isEqualTo("configWrite");
-        }
-
-        @Test
-        void passesWhenOwnedByUser() {
-            when(configService.getBO(3)).thenReturn(configBO(OWNER));
-
-            assertThatCode(() -> config.configWriteOwnershipChecker(configService).check(3, OWNER))
-                .doesNotThrowAnyException();
-        }
-
-        @Test
-        void rejectsMissingConfigAsNotFound() {
-            when(configService.getBO(3)).thenReturn(null);
-
-            assertThatThrownBy(() -> config.configWriteOwnershipChecker(configService).check(3, OWNER))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("配置不存在");
-        }
-
-        @Test
-        void rejectsOtherUsersConfigAsUnauthorized() {
-            when(configService.getBO(3)).thenReturn(configBO(OWNER));
-
-            assertThatThrownBy(() -> config.configWriteOwnershipChecker(configService).check(3, OTHER))
-                .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("配置不归属当前用户");
-        }
-
-        private ConfigBO configBO(Integer userId) {
-            ConfigBO configBO = new ConfigBO();
-            configBO.setConfigId(3);
-            configBO.setUserId(userId);
-            return configBO;
-        }
+        assertThatCode(() -> config.configWriteOwnershipChecker(configService).check(3, OWNER))
+            .doesNotThrowAnyException();
     }
 
-    @Nested
-    @ExtendWith(MockitoExtension.class)
-    class TemplateChecker {
+    @Test
+    void configWriteCheckRejectsMissingConfigAsNotFound() {
+        ConfigService configService = mock(ConfigService.class);
+        when(configService.getBO(3)).thenReturn(null);
 
-        @Mock
-        private TemplateService templateService;
-
-        @Test
-        void resourceNameIsTemplate() {
-            assertThat(config.templateOwnershipChecker(templateService).getResource()).isEqualTo("template");
-        }
-
-        @Test
-        void passesWhenOwnedByUser() {
-            when(templateService.getBO(3)).thenReturn(template(OWNER));
-
-            assertThatCode(() -> config.templateOwnershipChecker(templateService).check(3, OWNER))
-                .doesNotThrowAnyException();
-        }
-
-        @Test
-        void rejectsMissingTemplateAsNotFound() {
-            when(templateService.getBO(3)).thenReturn(null);
-
-            assertThatThrownBy(() -> config.templateOwnershipChecker(templateService).check(3, OWNER))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("模板不存在");
-        }
-
-        /** 已停用的模板与不存在等价，否则删除后仍可被引用；TemplateService#getBO 内部已按 state 过滤，停用模板会直接返回 null。 */
-        @Test
-        void rejectsDisabledTemplateAsNotFound() {
-            when(templateService.getBO(3)).thenReturn(null);
-
-            assertThatThrownBy(() -> config.templateOwnershipChecker(templateService).check(3, OWNER))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("模板不存在");
-        }
-
-        @Test
-        void rejectsOtherUsersTemplateAsUnauthorized() {
-            when(templateService.getBO(3)).thenReturn(template(OWNER));
-
-            assertThatThrownBy(() -> config.templateOwnershipChecker(templateService).check(3, OTHER))
-                .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("模板不归属当前用户");
-        }
-
-        private TemplateBO template(Integer userId) {
-            TemplateBO template = new TemplateBO();
-            template.setTemplateId(3);
-            template.setUserId(userId);
-            template.setState(TemplateBO.STATE_ENABLED);
-            return template;
-        }
+        assertThatThrownBy(() -> config.configWriteOwnershipChecker(configService).check(3, OWNER))
+            .isInstanceOf(ResourceNotFoundException.class)
+            .hasMessage("配置不存在");
     }
 
-    @Nested
-    @ExtendWith(MockitoExtension.class)
-    class DeviceChecker {
+    @Test
+    void configWriteCheckRejectsOtherUsersConfigAsUnauthorized() {
+        ConfigService configService = mock(ConfigService.class);
+        when(configService.getBO(3)).thenReturn(configBO(OWNER));
 
-        @Mock
-        private DeviceService deviceService;
-
-        @Test
-        void resourceNameIsDevice() {
-            assertThat(config.deviceOwnershipChecker(deviceService).getResource()).isEqualTo("device");
-        }
-
-        @Test
-        void passesWhenOwnedByUser() {
-            when(deviceService.getBO("dev-1")).thenReturn(device(OWNER));
-
-            assertThatCode(() -> config.deviceOwnershipChecker(deviceService).check(" dev-1 ", OWNER))
-                .doesNotThrowAnyException();
-        }
-
-        @Test
-        void rejectsMissingDeviceAsNotFound() {
-            when(deviceService.getBO("dev-1")).thenReturn(null);
-
-            assertThatThrownBy(() -> config.deviceOwnershipChecker(deviceService).check("dev-1", OWNER))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("设备不存在");
-        }
-
-        @Test
-        void rejectsOtherUsersDeviceAsUnauthorized() {
-            when(deviceService.getBO("dev-1")).thenReturn(device(OWNER));
-
-            assertThatThrownBy(() -> config.deviceOwnershipChecker(deviceService).check("dev-1", OTHER))
-                .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("设备不归属当前用户");
-        }
-
-        /** 未绑定用户的设备不能被任何登录用户操作。 */
-        @Test
-        void rejectsUnboundDeviceAsUnauthorized() {
-            when(deviceService.getBO("dev-1")).thenReturn(device(null));
-
-            assertThatThrownBy(() -> config.deviceOwnershipChecker(deviceService).check("dev-1", OWNER))
-                .isInstanceOf(UnauthorizedException.class);
-        }
-
-        private DeviceBO device(Integer userId) {
-            DeviceBO device = new DeviceBO();
-            device.setDeviceId("dev-1");
-            device.setUserId(userId);
-            return device;
-        }
+        assertThatThrownBy(() -> config.configWriteOwnershipChecker(configService).check(3, OTHER))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("配置不归属当前用户");
     }
 
-    @Nested
-    @ExtendWith(MockitoExtension.class)
-    class MessageChecker {
-
-        @Mock
-        private MessageService messageService;
-
-        @Test
-        void resourceNameIsMessage() {
-            assertThat(config.messageOwnershipChecker(messageService).getResource()).isEqualTo("message");
-        }
-
-        @Test
-        void passesWhenOwnedByUser() {
-            when(messageService.getBO(3L)).thenReturn(message(OWNER));
-
-            assertThatCode(() -> config.messageOwnershipChecker(messageService).check(3L, OWNER))
-                .doesNotThrowAnyException();
-        }
-
-        @Test
-        void rejectsMissingMessageAsNotFound() {
-            when(messageService.getBO(3L)).thenReturn(null);
-
-            assertThatThrownBy(() -> config.messageOwnershipChecker(messageService).check(3L, OWNER))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("消息不存在");
-        }
-
-        @Test
-        void rejectsOtherUsersMessageAsUnauthorized() {
-            when(messageService.getBO(3L)).thenReturn(message(OWNER));
-
-            assertThatThrownBy(() -> config.messageOwnershipChecker(messageService).check(3L, OTHER))
-                .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("消息不归属当前用户");
-        }
-
-        private MessageBO message(Integer userId) {
-            MessageBO message = new MessageBO();
-            message.setMessageId(3L);
-            message.setUserId(userId);
-            return message;
-        }
+    @Test
+    void templateCheckerIsNamedTemplate() {
+        assertThat(config.templateOwnershipChecker(mock(TemplateService.class)).getResource()).isEqualTo("template");
     }
 
-    @Nested
-    @ExtendWith(MockitoExtension.class)
-    class UserChecker {
+    @Test
+    void templateCheckPassesWhenOwnedByUser() {
+        TemplateService templateService = mock(TemplateService.class);
+        when(templateService.getBO(3)).thenReturn(template(OWNER));
 
-        @Mock
-        private UserService userService;
-
-        @Test
-        void resourceNameIsUser() {
-            assertThat(config.userOwnershipChecker(userService).getResource()).isEqualTo("user");
-        }
-
-        @Test
-        void passesWhenTargetIsSelf() {
-            when(userService.getBO(OWNER)).thenReturn(user(OWNER));
-
-            assertThatCode(() -> config.userOwnershipChecker(userService).check(OWNER, OWNER))
-                .doesNotThrowAnyException();
-        }
-
-        @Test
-        void rejectsMissingUserAsNotFound() {
-            when(userService.getBO(9)).thenReturn(null);
-
-            assertThatThrownBy(() -> config.userOwnershipChecker(userService).check(9, OWNER))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("用户不存在");
-        }
-
-        @Test
-        void rejectsAnotherUserAsUnauthorized() {
-            when(userService.getBO(OTHER)).thenReturn(user(OTHER));
-
-            assertThatThrownBy(() -> config.userOwnershipChecker(userService).check(OTHER, OWNER))
-                .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("用户不归属当前登录人");
-        }
-
-        private UserBO user(Integer userId) {
-            UserBO user = new UserBO();
-            user.setUserId(userId);
-            return user;
-        }
+        assertThatCode(() -> config.templateOwnershipChecker(templateService).check(3, OWNER))
+            .doesNotThrowAnyException();
     }
 
+    @Test
+    void templateCheckRejectsMissingTemplateAsNotFound() {
+        TemplateService templateService = mock(TemplateService.class);
+        when(templateService.getBO(3)).thenReturn(null);
+
+        assertThatThrownBy(() -> config.templateOwnershipChecker(templateService).check(3, OWNER))
+            .isInstanceOf(ResourceNotFoundException.class)
+            .hasMessage("模板不存在");
+    }
+
+    /** 已停用的模板与不存在等价，否则删除后仍可被引用；TemplateService#getBO 内部已按 state 过滤，停用模板会直接返回 null。 */
+    @Test
+    void templateCheckRejectsDisabledTemplateAsNotFound() {
+        TemplateService templateService = mock(TemplateService.class);
+        when(templateService.getBO(3)).thenReturn(null);
+
+        assertThatThrownBy(() -> config.templateOwnershipChecker(templateService).check(3, OWNER))
+            .isInstanceOf(ResourceNotFoundException.class)
+            .hasMessage("模板不存在");
+    }
+
+    @Test
+    void templateCheckRejectsOtherUsersTemplateAsUnauthorized() {
+        TemplateService templateService = mock(TemplateService.class);
+        when(templateService.getBO(3)).thenReturn(template(OWNER));
+
+        assertThatThrownBy(() -> config.templateOwnershipChecker(templateService).check(3, OTHER))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("模板不归属当前用户");
+    }
+
+    @Test
+    void deviceCheckerIsNamedDevice() {
+        assertThat(config.deviceOwnershipChecker(mock(DeviceService.class)).getResource()).isEqualTo("device");
+    }
+
+    @Test
+    void deviceCheckPassesWhenOwnedByUser() {
+        DeviceService deviceService = mock(DeviceService.class);
+        when(deviceService.getBO("dev-1")).thenReturn(device(OWNER));
+
+        assertThatCode(() -> config.deviceOwnershipChecker(deviceService).check(" dev-1 ", OWNER))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void deviceCheckRejectsMissingDeviceAsNotFound() {
+        DeviceService deviceService = mock(DeviceService.class);
+        when(deviceService.getBO("dev-1")).thenReturn(null);
+
+        assertThatThrownBy(() -> config.deviceOwnershipChecker(deviceService).check("dev-1", OWNER))
+            .isInstanceOf(ResourceNotFoundException.class)
+            .hasMessage("设备不存在");
+    }
+
+    @Test
+    void deviceCheckRejectsOtherUsersDeviceAsUnauthorized() {
+        DeviceService deviceService = mock(DeviceService.class);
+        when(deviceService.getBO("dev-1")).thenReturn(device(OWNER));
+
+        assertThatThrownBy(() -> config.deviceOwnershipChecker(deviceService).check("dev-1", OTHER))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("设备不归属当前用户");
+    }
+
+    /** 未绑定用户的设备不能被任何登录用户操作。 */
+    @Test
+    void deviceCheckRejectsUnboundDeviceAsUnauthorized() {
+        DeviceService deviceService = mock(DeviceService.class);
+        when(deviceService.getBO("dev-1")).thenReturn(device(null));
+
+        assertThatThrownBy(() -> config.deviceOwnershipChecker(deviceService).check("dev-1", OWNER))
+            .isInstanceOf(UnauthorizedException.class);
+    }
+
+    @Test
+    void messageCheckerIsNamedMessage() {
+        assertThat(config.messageOwnershipChecker(mock(MessageService.class)).getResource()).isEqualTo("message");
+    }
+
+    @Test
+    void messageCheckPassesWhenOwnedByUser() {
+        MessageService messageService = mock(MessageService.class);
+        when(messageService.getBO(3L)).thenReturn(message(OWNER));
+
+        assertThatCode(() -> config.messageOwnershipChecker(messageService).check(3L, OWNER))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void messageCheckRejectsMissingMessageAsNotFound() {
+        MessageService messageService = mock(MessageService.class);
+        when(messageService.getBO(3L)).thenReturn(null);
+
+        assertThatThrownBy(() -> config.messageOwnershipChecker(messageService).check(3L, OWNER))
+            .isInstanceOf(ResourceNotFoundException.class)
+            .hasMessage("消息不存在");
+    }
+
+    @Test
+    void messageCheckRejectsOtherUsersMessageAsUnauthorized() {
+        MessageService messageService = mock(MessageService.class);
+        when(messageService.getBO(3L)).thenReturn(message(OWNER));
+
+        assertThatThrownBy(() -> config.messageOwnershipChecker(messageService).check(3L, OTHER))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("消息不归属当前用户");
+    }
+
+    @Test
+    void userCheckerIsNamedUser() {
+        assertThat(config.userOwnershipChecker(mock(UserService.class)).getResource()).isEqualTo("user");
+    }
+
+    @Test
+    void userCheckPassesWhenTargetIsSelf() {
+        UserService userService = mock(UserService.class);
+        when(userService.getBO(OWNER)).thenReturn(user(OWNER));
+
+        assertThatCode(() -> config.userOwnershipChecker(userService).check(OWNER, OWNER))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void userCheckRejectsMissingUserAsNotFound() {
+        UserService userService = mock(UserService.class);
+        when(userService.getBO(9)).thenReturn(null);
+
+        assertThatThrownBy(() -> config.userOwnershipChecker(userService).check(9, OWNER))
+            .isInstanceOf(ResourceNotFoundException.class)
+            .hasMessage("用户不存在");
+    }
+
+    @Test
+    void userCheckRejectsAnotherUserAsUnauthorized() {
+        UserService userService = mock(UserService.class);
+        when(userService.getBO(OTHER)).thenReturn(user(OTHER));
+
+        assertThatThrownBy(() -> config.userOwnershipChecker(userService).check(OTHER, OWNER))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("用户不归属当前登录人");
+    }
+
+    private static RoleBO role(Integer userId) {
+        RoleBO role = new RoleBO();
+        role.setRoleId(3);
+        role.setUserId(userId);
+        return role;
+    }
+
+    private static ConfigBO configBO(Integer userId) {
+        ConfigBO configBO = new ConfigBO();
+        configBO.setConfigId(3);
+        configBO.setUserId(userId);
+        return configBO;
+    }
+
+    private static TemplateBO template(Integer userId) {
+        TemplateBO template = new TemplateBO();
+        template.setTemplateId(3);
+        template.setUserId(userId);
+        template.setState(TemplateBO.STATE_ENABLED);
+        return template;
+    }
+
+    private static DeviceBO device(Integer userId) {
+        DeviceBO device = new DeviceBO();
+        device.setDeviceId("dev-1");
+        device.setUserId(userId);
+        return device;
+    }
+
+    private static MessageBO message(Integer userId) {
+        MessageBO message = new MessageBO();
+        message.setMessageId(3L);
+        message.setUserId(userId);
+        return message;
+    }
+
+    private static UserBO user(Integer userId) {
+        UserBO user = new UserBO();
+        user.setUserId(userId);
+        return user;
+    }
 }
