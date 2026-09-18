@@ -10,7 +10,7 @@
 **/target/
 **/node_modules/
 
-# 前端（由 Dockerfile-node 单独构建）
+# 前端（由 Dockerfile-web 单独构建）
 web/
 
 # 文档引擎（不需要进入 server 构建）

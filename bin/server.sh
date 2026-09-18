@@ -12,6 +12,7 @@ PORT=8091
 case "${1:-}" in
   start)
     PROFILE="$(resolve_profile "${2:-}")" || exit 1
+    preflight || exit 1
     build "$MODULE"
     start_service "$NAME" "$MODULE" "$PORT" "$PROFILE"
     follow_logs_if_tty "$NAME"
@@ -21,6 +22,7 @@ case "${1:-}" in
     ;;
   restart)
     PROFILE="$(resolve_profile "${2:-}")" || exit 1
+    preflight || exit 1
     stop_service "$NAME"
     sleep 1
     build "$MODULE"

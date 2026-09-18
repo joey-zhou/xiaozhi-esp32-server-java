@@ -109,11 +109,13 @@ download_vosk() {
     echo ""
 }
 
-# 总控脚本与 Dockerfile 的统一入口：sensevoice | small | standard
+# 总控脚本与 Dockerfile 的统一入口：sensevoice | small | standard | none
 download_stt() {
     case "${1:-sensevoice}" in
         sensevoice) download_sense_voice ;;
         small|standard) download_vosk "$1" ;;
+        # 与 TTS 的 none 对齐：SenseVoice 就位时 Vosk 永远轮不到，允许显式不下载
+        none) info "跳过 Vosk 兜底模型下载" ;;
         *) error "未知的 STT 模型: $1"; return 1 ;;
     esac
 }
@@ -161,7 +163,7 @@ show_stt_status() {
 # ============================================================
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     case "${1:-sensevoice}" in
-        sensevoice|small|standard)
+        sensevoice|small|standard|none)
             download_stt "$1"
             ;;
         clean)
@@ -171,11 +173,12 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             echo ""; info "========== STT 模型状态 =========="; show_stt_status; echo ""
             ;;
         *)
-            echo "用法: $0 [sensevoice|small|standard|clean|status]"
+            echo "用法: $0 [sensevoice|small|standard|none|clean|status]"
             echo ""
             echo "  sensevoice - 下载 sherpa-onnx SenseVoice-Small (~230MB，默认，首选本地识别)"
             echo "  small      - 下载 Vosk 中文小模型 (~50MB，兜底)"
             echo "  standard   - 下载 Vosk 中文标准模型 (~1.3GB)"
+            echo "  none       - 不下载 Vosk 兜底模型（SenseVoice 就位时它不会被加载）"
             echo "  clean      - 清理 STT 模型"
             echo "  status     - 查看状态"
             exit 1

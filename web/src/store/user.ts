@@ -18,7 +18,18 @@ export interface WebSocketConfig {
 
 // 设备 WebSocket 由对话进程（xiaozhi-dialogue）提供，端口与 API 进程不同；
 // 路径尾斜杠是后端 AntPathMatcher 的硬要求，services/websocket.ts 连接前会补齐
-const DEFAULT_WS_URL = 'ws://localhost:8092/ws/xiaozhi/v1/'
+const WS_PATH = '/ws/xiaozhi/v1/'
+
+// 未配置 VITE_WS_URL 时按当前页面地址推导，由前置的 nginx/vite 代理转给 dialogue。
+// 同一份构建产物因此能在任意 IP、域名、端口下直接用，换地址不必重新打包；
+// 页面是 https 时自动用 wss，否则浏览器会以 Mixed Content 拦截明文连接
+function resolveDefaultWsUrl(): string {
+  if (typeof window === 'undefined') {
+    return `ws://localhost:8092${WS_PATH}`
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.host}${WS_PATH}`
+}
 
 function createJsonSerializer<T>(fallback: T, label: string) {
   return {
@@ -54,7 +65,7 @@ export const useUserStore = defineStore('user', () => {
 
   // WebSocket 配置管理
   const defaultWsConfig: WebSocketConfig = {
-    url: import.meta.env.VITE_WS_URL || DEFAULT_WS_URL,
+    url: import.meta.env.VITE_WS_URL || resolveDefaultWsUrl(),
   }
 
   const wsConfig = useStorage<WebSocketConfig>(

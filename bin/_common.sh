@@ -56,6 +56,85 @@ resolve_java() {
   return 1
 }
 
+# ---- 启动前自检 ----
+# 检查 JDK 版本、模型与原生库、中间件连通性，SKIP_PREFLIGHT=1 跳过
+preflight() {
+  [[ "${SKIP_PREFLIGHT:-0}" == "1" ]] && return 0
+
+  local failed=0
+
+  # 1) JDK 21+
+  local java_bin java_major
+  if ! java_bin="$(resolve_java)"; then
+    _err "未找到 java。请安装 JDK 21+，或设置 JAVA_HOME / JAVA_BIN"
+    failed=1
+  else
+    java_major="$("$java_bin" -version 2>&1 | head -1 | sed -E 's/.*"([0-9]+).*/\1/')"
+    if [[ ! "$java_major" =~ ^[0-9]+$ ]] || (( java_major < 21 )); then
+      _err "JDK 版本过低（检测到 ${java_major:-未知}），本项目需要 21 及以上：$java_bin"
+      failed=1
+    fi
+  fi
+
+  # 2) 原生库与 VAD 模型
+  if [[ ! -d "$ROOT_DIR/lib" ]] || [[ -z "$(ls -A "$ROOT_DIR/lib" 2>/dev/null)" ]]; then
+    _err "缺少原生库目录 lib/，先执行：./scripts/download_base.sh"
+    failed=1
+  fi
+  if [[ ! -f "$ROOT_DIR/models/silero_vad.onnx" ]]; then
+    _err "缺少 VAD 模型 models/silero_vad.onnx，先执行：./scripts/download_base.sh"
+    failed=1
+  fi
+  if [[ ! -d "$ROOT_DIR/models/sense-voice" ]]; then
+    _warn "未检测到本地语音识别模型 models/sense-voice"
+    _warn "  用云端 STT 可以忽略；想用本地识别执行：./scripts/download_stt.sh"
+  fi
+
+  # 3) 中间件连通性
+  check_tcp "MySQL" "$(datasource_host)" "$(datasource_port)" \
+    "docker compose -f docker-compose-db.yml up -d" || failed=1
+  check_tcp "Redis" "${SPRING_DATA_REDIS_HOST:-localhost}" "${SPRING_DATA_REDIS_PORT:-6379}" \
+    "docker compose -f docker-compose-db.yml up -d" || failed=1
+
+  if (( failed )); then
+    echo ""
+    _err "启动前检查未通过，按上面的提示处理后重试（确认无误可用 SKIP_PREFLIGHT=1 跳过）"
+    return 1
+  fi
+  _log "启动前检查通过"
+}
+
+# check_tcp <名称> <主机> <端口> <修复提示>
+check_tcp() {
+  local name="$1" host="$2" port="$3" hint="$4"
+  # macOS 默认没有 timeout，拿不到就不限时
+  local limit=""
+  if command -v timeout >/dev/null 2>&1; then
+    limit="timeout 3"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    limit="gtimeout 3"
+  fi
+  if $limit bash -c "exec 3<>/dev/tcp/${host}/${port}" 2>/dev/null; then
+    return 0
+  fi
+  _err "$name 连不上（${host}:${port}）"
+  _err "  没起的话执行：$hint"
+  return 1
+}
+
+# 从 SPRING_DATASOURCE_URL 取主机/端口，没设则按 localhost:3306
+datasource_host() {
+  local url="${SPRING_DATASOURCE_URL:-}"
+  [[ -z "$url" ]] && { echo "localhost"; return; }
+  echo "$url" | sed -E 's|^jdbc:mysql://([^:/?]+).*|\1|'
+}
+
+datasource_port() {
+  local url="${SPRING_DATASOURCE_URL:-}"
+  [[ "$url" =~ ^jdbc:mysql://[^:/?]+:([0-9]+) ]] && { echo "${BASH_REMATCH[1]}"; return; }
+  echo "3306"
+}
+
 # ---- 编译 ----
 # build <module>  — 只编译该模块及其依赖
 # build all       — 编译全部

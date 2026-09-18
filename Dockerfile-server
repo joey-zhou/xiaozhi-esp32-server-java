@@ -6,7 +6,7 @@ FROM eclipse-temurin:21-jdk AS builder
 ARG TARGETARCH
 
 # 构建参数
-# Vosk 兜底模型大小: small(~50MB) 或 standard(~1.3GB)；首选的 SenseVoice 模型固定下载
+# Vosk 兜底模型: small(~50MB) / standard(~1.3GB) / none；SenseVoice 固定下载且优先加载
 ARG VOSK_MODEL_SIZE=small
 # TTS本地模型，默认 vits-melo-tts-zh_en（中英文），设为 none 则不下载
 ARG TTS_MODEL=vits-melo-tts-zh_en
@@ -66,7 +66,7 @@ RUN if [ -n "$DOWNLOAD_PROXY" ]; then \
     echo ">>> 下载 SenseVoice STT 模型 ..." && \
     http_proxy="${DOWNLOAD_PROXY}" https_proxy="${DOWNLOAD_PROXY}" \
         bash scripts/download_stt.sh sensevoice && \
-    echo ">>> 下载 Vosk STT 模型 (${VOSK_MODEL_SIZE}) ..." && \
+    echo ">>> Vosk 兜底 STT 模型 (${VOSK_MODEL_SIZE}) ..." && \
     http_proxy="${DOWNLOAD_PROXY}" https_proxy="${DOWNLOAD_PROXY}" \
         bash scripts/download_stt.sh "$VOSK_MODEL_SIZE" && \
     if [ "$TTS_MODEL" != "none" ] && [ -n "$TTS_MODEL" ]; then \
@@ -89,8 +89,7 @@ RUN if [ -n "$DOWNLOAD_PROXY" ]; then \
 # ============================================================
 FROM eclipse-temurin:21-jre AS runtime-base
 
-# document_engine（Python，OCR 靠 tesseract）没有打进这个镜像，这里只是 Java 服务的运行时，
-# 装 tesseract 也用不上；真要在这个镜像里跑 OCR，需要另外把 document_engine 连同 python3/uv 一起打包
+# curl 供健康检查用，其余是 webrtc-java 原生库的依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libxcomposite1 \
     libxdamage1 \
@@ -100,6 +99,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     libpulse0 \
     tzdata \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

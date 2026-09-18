@@ -1,110 +1,67 @@
-# Windows 部署指南
+# Windows 部署
 
-## 系统要求
+只想跑起来：装 [Docker Desktop](https://www.docker.com/products/docker-desktop/) 后按
+[Docker 部署](./DOCKER.md) 走，注意要在 `.env` 里填 `HOST_IP` 设备才能连上。
+本文是在 Windows 上跑源码的做法。
 
-- Windows 10+，管理员权限
-
-## 1. 安装依赖
+## 1. 依赖
 
 | 依赖 | 下载 | 环境变量 | 验证 |
 |------|------|----------|------|
-| JDK 21 | [Oracle JDK 21](https://www.oracle.com/java/technologies/downloads/#java21) | `JAVA_HOME` → 安装路径，Path 添加 `%JAVA_HOME%\bin` | `java -version` |
-| MySQL 8.0 | [MySQL Installer](https://dev.mysql.com/downloads/installer/) | Path 添加 `C:\Program Files\MySQL\MySQL Server 8\bin` | `mysql --version` |
-| Maven | [Maven 下载](https://maven.apache.org/download.cgi) | `MAVEN_HOME` → 解压路径，Path 添加 `%MAVEN_HOME%\bin` | `mvn -v` |
-| Node.js | [Node.js LTS](https://nodejs.org/) | 安装程序自动配置 | `node -v` |
+| JDK 21 | [Temurin 21](https://adoptium.net/temurin/releases/?version=21) | `JAVA_HOME`，Path 加 `%JAVA_HOME%\bin` | `java -version` |
+| Maven | [maven.apache.org](https://maven.apache.org/download.cgi) | `MAVEN_HOME`，Path 加 `%MAVEN_HOME%\bin` | `mvn -v` |
+| Node.js 22 | [nodejs.org](https://nodejs.org/) | 安装程序自动配置 | `node -v` |
+| MySQL 8.0 | [MySQL Installer](https://dev.mysql.com/downloads/installer/) | Path 加 MySQL 的 `bin` | `mysql --version` |
+| Redis | 用 Docker 或 [Memurai](https://www.memurai.com/) | — | `redis-cli ping` |
 
-## 2. 数据库配置
+中间件用容器起最省事：
+
+```powershell
+docker compose -f docker-compose-db.yml up -d   # MySQL + Redis
+```
+
+## 2. 数据库
+
+用了上面的 compose 就已经建好，可跳过。自己装的 MySQL 执行：
 
 ```sql
-mysql -u root -p
 CREATE DATABASE xiaozhi CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'xiaozhi'@'localhost' IDENTIFIED BY '123456';
 GRANT ALL PRIVILEGES ON xiaozhi.* TO 'xiaozhi'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-> 无需手动导入 SQL，项目集成 Flyway，首次启动自动建表。
+无需导入 SQL，Flyway 首次启动自动建表。口令不同时设 `$env:SPRING_DATASOURCE_PASSWORD`。
 
-## 3. 下载模型和原生库
+## 3. 模型与原生库
 
-使用第三方 STT/TTS 服务可只下载基础依赖。在 Git Bash 中执行：
-
-```bash
-./scripts/download_models.sh            # 下载全部（模型 + 原生库）
-./scripts/download_models.sh status     # 查看状态
-```
-
-也可按需单独下载：
+下载脚本是 bash 写的，在 **Git Bash** 里执行：
 
 ```bash
-./scripts/download_base.sh              # 基础依赖（VAD 模型 + 原生库）— 必须
-./scripts/download_stt.sh               # Vosk STT 模型（使用第三方 STT 可跳过）
-./scripts/download_tts.sh               # TTS 模型（使用第三方 TTS 可跳过）
+./scripts/download_models.sh          # 全部
+./scripts/download_base.sh            # 只要基础依赖（VAD + 原生库）
 ```
 
-> 手动下载：从 [Vosk 模型](https://alphacephei.com/vosk/models) 下载 `vosk-model-cn-0.22`，解压重命名为 `models\vosk-model`。
+也可手动下载：[SenseVoice](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models) 的
+`sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2`，解压重命名为 `models\sense-voice`
+（保留 `model.int8.onnx` 与 `tokens.txt`）。
 
-## 4. 部署
-
-项目采用**双进程架构**：
-
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| xiaozhi-server | 8091 | 管理后台 API、用户/设备管理 |
-| xiaozhi-dialogue | 8092 | 设备对话、AI、WebSocket |
-
-```bash
-git clone https://github.com/joey-zhou/xiaozhi-esp32-server-java
-cd xiaozhi-esp32-server-java
-```
-
-### 方式一：PowerShell 脚本（推荐，原生 Windows）
+## 4. 启动
 
 ```powershell
-bin\all.ps1 start       # 编译并启动（server + dialogue）
-bin\all.ps1 status      # 查看状态
-bin\all.ps1 stop        # 停止
-bin\all.ps1 restart     # 重启
-
-# 也可单独管理
-bin\server.ps1 start
-bin\dialogue.ps1 start
+bin\all.ps1 start        # 自检 → 编译 → 启动
+bin\all.ps1 start prod   # 用生产配置
+bin\all.ps1 status / stop / restart
 ```
 
-> 首次运行如提示脚本被禁止执行，可在当前会话临时放开：
-> `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
-> 或直接 `powershell -ExecutionPolicy Bypass -File bin\all.ps1 start`。
-> 脚本会优先使用 `JAVA_BIN` / `JAVA_HOME` 环境变量定位 JDK，未设置时使用 PATH 中的 `java`。
+启动前会自检 JDK 版本、模型与原生库、MySQL/Redis 连通性，`$env:SKIP_PREFLIGHT = '1'` 可跳过。
+提示脚本被禁止执行时：`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`。
 
-### 方式二：bin 脚本（Git Bash）
-
-```bash
-bin/all.sh start       # 编译并启动
-bin/all.sh status      # 查看状态
-bin/all.sh restart     # 重启
-```
-
-
-### 前端
-
-```bash
-cd web && npm install && npm run dev
-```
+Git Bash 里也可以用 `bin/all.sh start`。前端：`cd web && npm install && npm run dev`。
 
 ## 5. 访问
 
-| 服务 | 地址 |
-|------|------|
-| 前端 | http://localhost:8084 |
-| 后台 API | http://localhost:8091 |
-| WebSocket | ws://localhost:8092/ws/xiaozhi/v1/ |
+前端 <http://localhost:8084>，账号 **admin / 123456**。
 
-默认管理员：admin / 123456
-
-## 常见问题
-
-| 问题 | 解决 |
-|------|------|
-| 端口冲突 | 修改 `xiaozhi-server\src\main\resources\application.yml` 中的 `server.port` |
-| MySQL 连接失败 | 确认 MySQL 服务已启动（服务管理器检查） |
-| 构建失败 | `mvn clean install`，确认网络可访问 Maven 中央仓库 |
+还要配大模型密钥才能对话，见[配置说明](./CONFIGURATION.md#第一次使用要配什么)。
+遇到问题看[常见问题](./FAQ.md)。

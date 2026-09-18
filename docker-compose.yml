@@ -1,89 +1,103 @@
-# 所有服务共用的日志驱动上限，避免容器 stdout/stderr 无限增长撑满宿主机磁盘
+# 一键启动：docker compose up -d
+# 默认拉已发布镜像；源码构建见 docker-compose.build.yml，可调项见 .env.example
+name: xiaozhi
+
+# 限制容器日志大小，避免撑满磁盘
 x-logging: &default-logging
   driver: json-file
   options:
     max-size: "10m"
     max-file: "5"
 
+# server 与 dialogue 共用的环境变量
+x-app-environment: &app-environment
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-xiaozhi}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+  SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-xiaozhi}
+  SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-123456}
+  SPRING_DATA_REDIS_HOST: redis
+  # 下发给设备的服务器 IP，留空则自动探测
+  HOST_IP: ${HOST_IP:-}
+  # 设备接入鉴权密钥，留空等于不设防
+  XIAOZHI_DEVICE_AUTH_SECRET: ${XIAOZHI_DEVICE_AUTH_SECRET:-}
+  TZ: ${TZ:-Asia/Shanghai}
+
 services:
   mysql:
     image: mysql:8.0-debian
+    restart: always
     ports:
-      - "127.0.0.1:13306:3306"  # 只监听宿主机回环，容器间用服务名 mysql:3306 互访
+      - "127.0.0.1:${MYSQL_PORT:-13306}:3306"  # 只监听回环
     environment:
-      - MYSQL_ROOT_PASSWORD=abc123456
-      - MYSQL_DATABASE=xiaozhi
-      - MYSQL_USER=xiaozhi
-      - MYSQL_PASSWORD=123456
-      - LANG=C.UTF-8
-      - MYSQL_CHARSET=utf8mb4
-      - MYSQL_COLLATION=utf8mb4_unicode_ci
-      - TZ=Asia/Shanghai
-    networks:
-      - app-network
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-abc123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-xiaozhi}
+      MYSQL_USER: ${MYSQL_USER:-xiaozhi}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-123456}
+      LANG: C.UTF-8
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+      TZ: ${TZ:-Asia/Shanghai}
     volumes:
       - mysql_data:/var/lib/mysql  # 持久化数据
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "xiaozhi", "-p123456"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u $$MYSQL_USER -p$$MYSQL_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - xiaozhi
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
-    logging: *default-logging
-
-  node:
-    build:
-      context: ./web
-      dockerfile: ../Dockerfile-node
-    depends_on:
-      mysql:
-        condition: service_healthy
-    ports:
-      - "8084:8084"
+      start_period: 10s
     networks:
-      - app-network
+      - xiaozhi
     logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
 
   server:
-    build:
-      context: .
-      dockerfile: Dockerfile-server
-      target: server
-      args:
-        - VOSK_MODEL_SIZE=${VOSK_MODEL_SIZE:-small}
-        - TTS_MODEL=${TTS_MODEL:-vits-melo-tts-zh_en}
-        - DOWNLOAD_PROXY=${BUILD_PROXY:-}
-      # 添加构建缓存设置
-      cache_from:
-        - eclipse-temurin:21-jre
+    image: ${XIAOZHI_IMAGE_SERVER:-ghcr.io/joey-zhou/xiaozhi-server}:${XIAOZHI_TAG:-latest}
+    container_name: xiaozhi-server
+    restart: always
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
     ports:
-      - "8091:8091"
-    networks:
-      - app-network
-    environment:
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/xiaozhi?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-      - SPRING_DATASOURCE_USERNAME=xiaozhi
-      - SPRING_DATASOURCE_PASSWORD=123456
-      - HOST_IP=${HOST_IP:-}
-      # 设备接入鉴权密钥，未导出则不鉴权；.env 被 git 跟踪，不要把真实值写进去
-      # 生产部署前 export XIAOZHI_DEVICE_AUTH_SECRET=$(openssl rand -hex 16)
-      - XIAOZHI_DEVICE_AUTH_SECRET=${XIAOZHI_DEVICE_AUTH_SECRET:-}
-      # 默认 dev 方便测试，取 .env 的值；切生产：SPRING_PROFILES_ACTIVE=prod docker compose up -d server dialogue
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
-      - TZ=Asia/Shanghai
-    # 与 dialogue 共用同一份本地文件存储：TTS 缓存索引在共享 MySQL/Redis，
-    # 文件本身也必须共享，否则缓存命中率会因请求落到另一个容器而失效
+      - "${SERVER_PORT:-8091}:8091"
+    environment: *app-environment
+    # audio/uploads 必须与 dialogue 共享，否则 TTS 缓存与上传文件互相读不到
     volumes:
       - audio_data:/app/audio
       - uploads_data:/app/uploads
       - server_logs:/app/logs
-    restart: always  # 自动重启
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8091'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s  # 首次启动要跑完 Flyway 建表
+    networks:
+      - xiaozhi
     logging: *default-logging
     deploy:
       resources:
@@ -95,93 +109,69 @@ services:
           memory: 512M
 
   dialogue:
-    build:
-      context: .
-      dockerfile: Dockerfile-server
-      target: dialogue
-      args:
-        - VOSK_MODEL_SIZE=${VOSK_MODEL_SIZE:-small}
-        - TTS_MODEL=${TTS_MODEL:-vits-melo-tts-zh_en}
-        - DOWNLOAD_PROXY=${BUILD_PROXY:-}
-      cache_from:
-        - eclipse-temurin:21-jre
+    image: ${XIAOZHI_IMAGE_DIALOGUE:-ghcr.io/joey-zhou/xiaozhi-dialogue}:${XIAOZHI_TAG:-latest}
+    container_name: xiaozhi-dialogue
+    restart: always
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # 等 server 建完表
+      server:
+        condition: service_healthy
     ports:
-      - "8092:8092"
-    networks:
-      - app-network
-    environment:
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/xiaozhi?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-      - SPRING_DATASOURCE_USERNAME=xiaozhi
-      - SPRING_DATASOURCE_PASSWORD=123456
-      - HOST_IP=${HOST_IP:-}
-      # 设备接入鉴权密钥，未导出则不鉴权；.env 被 git 跟踪，不要把真实值写进去
-      # 生产部署前 export XIAOZHI_DEVICE_AUTH_SECRET=$(openssl rand -hex 16)
-      - XIAOZHI_DEVICE_AUTH_SECRET=${XIAOZHI_DEVICE_AUTH_SECRET:-}
-      # 默认 dev 方便测试，取 .env 的值；切生产：SPRING_PROFILES_ACTIVE=prod docker compose up -d server dialogue
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
-      - TZ=Asia/Shanghai
-    # 与 server 共用同一份本地文件存储，见 server 服务同名 volumes 注释
+      - "${DIALOGUE_PORT:-8092}:8092"
+    environment: *app-environment
     volumes:
       - audio_data:/app/audio
       - uploads_data:/app/uploads
       - dialogue_logs:/app/logs
-    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8092'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - xiaozhi
     logging: *default-logging
     deploy:
       resources:
         limits:
           cpus: '2.0'
-          # VOSK_MODEL_SIZE 切到 standard（~1.3GB）时上面的堆/原生内存预算会不够，需要同步调大这个 memory 限制
-          memory: 2G
+          memory: 2G  # VOSK_MODEL_SIZE 换成 standard 时要调大
         reservations:
           cpus: '0.5'
           memory: 512M
 
-  redis:
-    image: redis:7-alpine
-    container_name: redis
+  web:
+    image: ${XIAOZHI_IMAGE_WEB:-ghcr.io/joey-zhou/xiaozhi-web}:${XIAOZHI_TAG:-latest}
+    container_name: xiaozhi-web
     restart: always
-    command: ["redis-server", "--appendonly", "yes"]
+    depends_on:
+      - server
+      - dialogue
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+      - "${WEB_PORT:-8084}:8084"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8084/ >/dev/null 2>&1 || exit 1"]
+      interval: 15s
       timeout: 5s
       retries: 5
       start_period: 10s
     networks:
-      - app-network
-      - xiaozhi-network
+      - xiaozhi
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 128M
 
 networks:
-  app-network:
-    driver: bridge
-  xiaozhi-network:
-    driver: bridge
+  xiaozhi:
     name: xiaozhi-network
 
 volumes:
-  mysql_data:  # 持久化数据卷
-  redis_data:  # 持久化Redis数据
-  audio_data:  # server/dialogue 共享的对话录音与TTS缓存文件
-  uploads_data:  # server/dialogue 共享的用户上传文件（音乐、头像等）
-  server_logs:  # xiaozhi-server 日志，容器重建不丢
-  dialogue_logs:  # xiaozhi-dialogue 日志，容器重建不丢
+  mysql_data:
+  redis_data:
+  audio_data:            # 对话录音与 TTS 缓存
+  uploads_data:          # 用户上传文件
+  server_logs:
+  dialogue_logs:

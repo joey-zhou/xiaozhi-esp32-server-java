@@ -1,8 +1,18 @@
 # 变更日志
 
-## [Unreleased]
+## [6.0.0] - 2026-09-18
 
-> 5.0.0（2026-09-07）。
+### 💥 升级注意
+
+- **Docker 数据卷会换名**。compose 现在固定项目名 `xiaozhi`，卷名从 `<所在目录名>_mysql_data`
+  变成 `xiaozhi_mysql_data`。老部署直接 `docker compose up -d` 会挂到新的空卷上，数据看着像丢了
+  （实际仍在旧卷里）。要继续用旧卷，升级前在 `.env` 里写 `COMPOSE_PROJECT_NAME=<原来的目录名>`。
+- **compose 服务与文件改名**：服务 `node` → `web`，`Dockerfile-node` → `Dockerfile-web`。
+  主 compose 默认拉 GHCR 镜像，从源码构建改为 `-f docker-compose.yml -f docker-compose.build.yml`。
+- **`.env` 不再随仓库分发**，改为 `.env.example`；本地已有的 `.env` 不受影响。
+- **前端不再写死后端地址**：WebSocket 与静态资源按页面地址推导，容器部署由 web 容器的 nginx 反代
+  `/api`、`/ws`、`/audio`、`/uploads`。自建反向代理的部署要把 `/ws/` 也代理到 dialogue，
+  或继续用 `VITE_WS_URL` 指定绝对地址。
 
 ### 架构与规约
 - refactor: 读写两条路径分开——读侧 Service 直接出 BO/投影，Resp 组装收回 xiaozhi-server；写侧走 AppService → 聚合根 → Repository
@@ -35,6 +45,17 @@
 - fix: 审计日志凭证字段打码，明文口令与密钥不再落库
 - fix: AI 运行时配置查询必须带用户，避免退化成全库查询
 - fix: 用户邮箱与手机号补唯一索引
+
+### 部署与文档
+- feat: `docker compose up -d` 一键启动，默认拉 GHCR 预构建镜像；源码构建移到 `docker-compose.build.yml`
+- feat: 镜像发布流水线 `.github/workflows/docker.yml`，打 tag 即发布 server/dialogue/web 三个镜像
+- feat: `bin/*.sh` 与 `bin/*.ps1` 启动前自检 JDK 版本、模型与原生库、MySQL/Redis 连通性；ps1 补齐 profile 参数
+- feat: 前端产物不再写死后端地址，WebSocket 与静态资源按页面地址推导，web 容器 nginx 反代 `/api`、`/ws`、`/audio`、`/uploads`
+- fix: compose 补健康检查与固定项目名，dialogue 等 server 建完表再启动
+- fix: 前端镜像构建改为串行产出产物，不再在 vue-tsc 与 vite 并行时 OOM
+- fix: `download_stt.sh` 支持 `none`，`VOSK_MODEL_SIZE=none` 不再让镜像构建中断
+- docs: 新增 `docs/CONFIGURATION.md`（首次配置、环境变量、安全默认值）与 `docs/FAQ.md`（常见问题统一收口）
+- docs: README 与三份部署文档按一键部署重写，Docker 部署不再需要 clone 仓库
 
 ---
 

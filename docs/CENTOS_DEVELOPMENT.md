@@ -1,102 +1,70 @@
-# CentOS 部署指南
+# Linux 源码部署
 
-## 系统要求
+以 CentOS / Rocky / Alma 为例，Ubuntu 把 `yum` 换成 `apt`。
+只想跑起来用 [Docker 部署](./DOCKER.md) 更省事，本文适合要改代码或要接管进程的场景。
 
-| 项目 | 要求 |
-|------|------|
-| 系统 | CentOS 7/8 |
-| 内存 | ≥ 2GB（推荐 4GB） |
-| 磁盘 | ≥ 10GB |
-| 端口 | 8084、8091、8092、3306 |
+要求：内存 ≥ 4GB（用本地语音模型建议 8GB），磁盘 ≥ 20GB。
 
-## 1. 安装依赖
+## 1. 依赖
 
 ```bash
-sudo yum install -y epel-release wget curl git vim unzip
+sudo yum install -y epel-release wget curl git unzip
 sudo yum install -y java-21-openjdk java-21-openjdk-devel maven
-curl -sL https://rpm.nodesource.com/setup_22.x | sudo bash -
-sudo yum install -y nodejs
-```
+curl -sL https://rpm.nodesource.com/setup_22.x | sudo bash - && sudo yum install -y nodejs
 
-## 2. 配置防火墙
-
-```bash
-sudo firewall-cmd --permanent --add-port={8084,8091,8092,3306}/tcp
+sudo firewall-cmd --permanent --add-port={8084,8091,8092,1883}/tcp
+sudo firewall-cmd --permanent --add-port=1884/udp
 sudo firewall-cmd --reload
 ```
 
-## 3. 安装 MySQL 8.0
+## 2. MySQL 与 Redis
+
+用容器起最省事：
 
 ```bash
-sudo yum localinstall -y https://dev.mysql.com/get/mysql80-community-release-el7-7.noarch.rpm
-sudo yum install -y mysql-community-server
-sudo systemctl start mysqld && sudo systemctl enable mysqld
-sudo grep 'temporary password' /var/log/mysqld.log   # 获取临时密码
-sudo mysql_secure_installation
+docker compose -f docker-compose-db.yml up -d
 ```
 
-创建数据库：
+已有 MySQL 8.0 就建库建号（**不用导入 SQL，Flyway 首次启动自动建表**）：
 
 ```sql
-mysql -u root -p
 CREATE DATABASE xiaozhi CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'xiaozhi'@'localhost' IDENTIFIED BY '123456';
 GRANT ALL PRIVILEGES ON xiaozhi.* TO 'xiaozhi'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-> 无需手动导入 SQL，项目集成 Flyway，首次启动自动建表。
+口令或地址不同时用环境变量覆盖：`SPRING_DATASOURCE_PASSWORD`、`SPRING_DATA_REDIS_HOST`。
 
-## 4. 下载模型和原生库
-
-使用第三方 STT/TTS 服务可只下载基础依赖。
-
-```bash
-./scripts/download_models.sh            # 下载全部（模型 + 原生库）
-./scripts/download_models.sh status     # 查看状态
-```
-
-也可按需单独下载：
-
-```bash
-./scripts/download_base.sh              # 基础依赖（VAD 模型 + 原生库）— 必须
-./scripts/download_stt.sh               # Vosk STT 模型（使用第三方 STT 可跳过）
-./scripts/download_tts.sh               # TTS 模型（使用第三方 TTS 可跳过）
-```
-
-## 5. 部署
-
-项目采用**双进程架构**：
-
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| xiaozhi-server | 8091 | 管理后台 API、用户/设备管理 |
-| xiaozhi-dialogue | 8092 | 设备对话、AI、WebSocket |
+## 3. 模型与原生库
 
 ```bash
 git clone https://github.com/joey-zhou/xiaozhi-esp32-server-java
 cd xiaozhi-esp32-server-java
 
-# 一键编译并启动
-bin/all.sh start
-
-# 查看状态
-bin/all.sh status
-
-# 停止 / 重启
-bin/all.sh stop
-bin/all.sh restart
+./scripts/download_models.sh          # 全部
+./scripts/download_base.sh            # 只要基础依赖（VAD + 原生库），语音全用云端时够用
+./scripts/download_models.sh status   # 查看状态
 ```
 
-也可单独管理：`bin/server.sh start`、`bin/dialogue.sh start`
+## 4. 启动
 
-前端：
+双进程：`xiaozhi-server`(8091) 管后台与 OTA，`xiaozhi-dialogue`(8092) 管设备对话。
 
 ```bash
-cd web && npm install && npm run build
+bin/all.sh start           # 自检 → 编译 → 启动，随后跟随日志（Ctrl+C 只退出跟随）
+bin/all.sh start prod      # 用生产配置
+bin/all.sh status / stop / restart / logs
 ```
 
-## 6. Nginx 反向代理（可选）
+启动前会自检 JDK 版本、模型与原生库、MySQL/Redis 连通性，缺什么直接给出补法，
+`SKIP_PREFLIGHT=1` 可跳过。也可单独管理：`bin/server.sh`、`bin/dialogue.sh`。
+
+前端：`cd web && npm install && npm run build`，产物在 `web/dist`。
+
+## 5. Nginx
+
+把前端、API、WebSocket 收敛到一个端口：
 
 ```nginx
 server {
@@ -107,45 +75,69 @@ server {
         root /path/to/xiaozhi-esp32-server-java/web/dist;
         try_files $uri $uri/ /index.html;
     }
-    location /api {
-        proxy_pass http://localhost:8091;
+    location /api/ {
+        proxy_pass http://127.0.0.1:8091;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        client_max_body_size 100M;
+        proxy_read_timeout 300s;
     }
-    location /ws {
-        proxy_pass http://localhost:8092;
+    location ~ ^/(audio|uploads)/ {
+        proxy_pass http://127.0.0.1:8091;
+        proxy_set_header Host $host;
+    }
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8092;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+        proxy_read_timeout 3600s;
     }
 }
 ```
 
-## 7. 访问
+挂了 Nginx 要配 `XIAOZHI_SECURITY_TRUSTED_PROXIES`，否则限流与封禁会把所有请求算成同一个 IP。
 
-| 服务 | 地址 |
-|------|------|
-| 前端 | http://your_server_ip:8084 |
-| 后台 API | http://your_server_ip:8091 |
-| WebSocket | ws://your_server_ip:8092/ws/xiaozhi/v1/ |
+配 HTTPS 就把上面这段挪到 `listen 443 ssl` 里：前端不写死协议，页面是 https 时
+WebSocket 自动用 wss，不需要重新构建。设备侧的下发地址要走 https/wss 则需配
+`XIAOZHI_SERVER_DOMAIN`，并把 `ws.<域名>` 也解析过来。
 
-默认管理员：admin / 123456
+## 6. systemd（可选）
 
-## 维护
+```ini
+# /etc/systemd/system/xiaozhi-server.service
+[Unit]
+Description=xiaozhi-server
+After=network.target
 
-```bash
-bin/all.sh status                          # 查看状态
-tail -f logs/xiaozhi-server.log            # 查看日志
-tail -f logs/xiaozhi-dialogue.log
-git pull origin main && bin/all.sh restart # 更新并重启
-mysqldump -u root -p xiaozhi > backup.sql  # 数据库备份
+[Service]
+WorkingDirectory=/opt/xiaozhi-esp32-server-java
+Environment=SPRING_PROFILES_ACTIVE=prod
+Environment=XIAOZHI_DEVICE_AUTH_SECRET=换成自己的随机值
+ExecStart=/usr/bin/java -Djava.library.path=/opt/xiaozhi-esp32-server-java/lib \
+  -jar /opt/xiaozhi-esp32-server-java/xiaozhi-server/target/xiaozhi-server-6.0.0.jar
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-## 常见问题
+`xiaozhi-dialogue` 照抄一份换成 `xiaozhi-dialogue/target/xiaozhi-dialogue-*-exec.jar`，
+**两个服务的 `XIAOZHI_DEVICE_AUTH_SECRET` 必须一致**。
 
-| 问题 | 解决 |
-|------|------|
-| MySQL 初始化失败 | `sudo systemctl restart mysqld` |
-| 端口冲突 | `netstat -tulnp \| grep <端口>` 找到并 kill 占用进程 |
-| 内存不足 | 添加 swap：`sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 && sudo mkswap /swapfile && sudo swapon /swapfile` |
-| 模型加载失败 | `chmod -R 755 models` |
+## 7. 访问
+
+前端 `http://<IP>:8084`，账号 **admin / 123456**，登录后先改密码。
+
+还要配大模型密钥才能对话，见[配置说明](./CONFIGURATION.md#第一次使用要配什么)；
+对外部署前要换掉的默认密钥见[安全相关的默认值](./CONFIGURATION.md#安全相关的默认值)。
+
+日常维护：
+
+```bash
+bin/all.sh status
+git pull origin main && bin/all.sh restart
+mysqldump -u root -p xiaozhi > backup.sql
+```
+
+遇到问题看[常见问题](./FAQ.md)。

@@ -1,0 +1,38 @@
+# =============================================================================
+# 源码构建覆盖层：不拉取已发布镜像，改为在本机从源码构建
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# 首次构建要编译全部 Java 模块并下载约 1.5GB 模型，视网络情况耗时 20~40 分钟；
+# 只想跑起来用 docker-compose.yml 直接拉镜像即可。
+# =============================================================================
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile-server
+      target: server
+      args:
+        VOSK_MODEL_SIZE: ${VOSK_MODEL_SIZE:-small}
+        TTS_MODEL: ${TTS_MODEL:-vits-melo-tts-zh_en}
+        DOWNLOAD_PROXY: ${BUILD_PROXY:-}
+      cache_from:
+        - eclipse-temurin:21-jre
+
+  dialogue:
+    build:
+      context: .
+      dockerfile: Dockerfile-server
+      target: dialogue
+      args:
+        VOSK_MODEL_SIZE: ${VOSK_MODEL_SIZE:-small}
+        TTS_MODEL: ${TTS_MODEL:-vits-melo-tts-zh_en}
+        DOWNLOAD_PROXY: ${BUILD_PROXY:-}
+      cache_from:
+        - eclipse-temurin:21-jre
+
+  web:
+    build:
+      context: ./web
+      dockerfile: ../Dockerfile-web

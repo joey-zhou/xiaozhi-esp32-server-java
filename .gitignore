@@ -36,3 +36,6 @@ datasets/
 .cursor/
 .DS_Store
 CLAUDE.md
+
+# Docker 本地配置，按 .env.example 复制生成
+.env

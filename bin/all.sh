@@ -8,6 +8,7 @@ source "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 case "${1:-}" in
   start)
     PROFILE="$(resolve_profile "${2:-}")" || exit 1
+    preflight || exit 1
     build all
     start_service "xiaozhi-server"   "xiaozhi-server"   8091 "$PROFILE"
     start_service "xiaozhi-dialogue" "xiaozhi-dialogue" 8092 "$PROFILE"
@@ -22,6 +23,7 @@ case "${1:-}" in
     ;;
   restart)
     PROFILE="$(resolve_profile "${2:-}")" || exit 1
+    preflight || exit 1
     stop_service "xiaozhi-server"
     stop_service "xiaozhi-dialogue"
     sleep 1

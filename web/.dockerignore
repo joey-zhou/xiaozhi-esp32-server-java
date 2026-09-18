@@ -1,4 +1,4 @@
-# node 服务的构建上下文是 ./web（见 docker-compose.yml），根目录的 .dockerignore 对这里不生效，
+# web 服务的构建上下文是 ./web（见 docker-compose.yml），根目录的 .dockerignore 对这里不生效，
 # 需要单独一份，否则宿主机装的 node_modules（含 macOS 原生二进制）会被 COPY 进 Linux 镜像
 **/node_modules/
 **/dist/

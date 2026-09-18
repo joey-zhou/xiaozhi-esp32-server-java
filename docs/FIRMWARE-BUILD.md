@@ -5,8 +5,11 @@
 
 # 1.6.2以下版本固件
 
+> 端口不要写错：**WebSocket 由 dialogue 进程监听 8092**，OTA 由 server 进程监听 8091，两个是不同的进程、不同的端口。
+> 本节写进固件的是 WebSocket 地址，用 8092；下一节 1.6.2 以后固件写的是 OTA 地址，用 8091。
+
 2. 打开`xiaozhi-esp32/main/Kconfig.projbuild`文件，找到`WEBSOCKET_URL`的`default`的内容，把`wss://api.tenclass.net`
-   改成你自己的地址，例如，我的接口地址是`ws://192.168.1.25:8091`，就把内容改成这个。
+   改成你自己的地址，例如，我的接口地址是`ws://192.168.1.25:8092`，就把内容改成这个。
 
 修改前：
 
@@ -25,14 +28,10 @@ config WEBSOCKET_URL
 config WEBSOCKET_URL
     depends on CONNECTION_TYPE_WEBSOCKET
     string "Websocket URL"
-    default "ws://192.168.5.167:8091/ws/xiaozhi/v1/"
+    default "ws://192.168.5.167:8092/ws/xiaozhi/v1/"
     help
         Communication with the server through websocket after wake up.
 ```
-
-注意：你的地址是`ws://`开头，不是`wss://`开头，一定不要写错了。
-
-注意：你的地址是`ws://`开头，不是`wss://`开头，一定不要写错了。
 
 注意：你的地址是`ws://`开头，不是`wss://`开头，一定不要写错了。
 
@@ -58,10 +57,6 @@ config OTA_VERSION_URL
     help
         The application will access this URL to check for updates.
 ```
-
-注意：你的地址是`http://`开头，不是`https://`开头，一定不要写错了。
-
-注意：你的地址是`http://`开头，不是`https://`开头，一定不要写错了。
 
 注意：你的地址是`http://`开头，不是`https://`开头，一定不要写错了。
 

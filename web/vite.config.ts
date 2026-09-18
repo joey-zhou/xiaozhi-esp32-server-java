@@ -45,10 +45,23 @@ export default defineConfig(({ mode, command }) => {
       host: '0.0.0.0',
       proxy: {
         '/api': {
-          // 只在 vite dev server 生效；容器里跑的是 nginx，转发地址在 Dockerfile-node 的 proxy_pass
+          // 只在 vite dev server 生效；容器里跑的是 nginx，转发规则见 web/nginx.conf
           target: env.VITE_BACKEND_URL || 'http://localhost:8091',
           changeOrigin: true,
           // 后端地址是 https 且用自签名证书时改成 false，否则代理会因证书校验失败
+          secure: true
+        },
+        // 后端提供的录音与上传文件，dev 下同样代理过去，避免页面里出现跨域的绝对地址
+        '^/(audio|uploads)/': {
+          target: env.VITE_BACKEND_URL || 'http://localhost:8091',
+          changeOrigin: true,
+          secure: true
+        },
+        // WebSocket 挂在 dialogue 进程上，代理后 dev 与容器部署的连接地址形式一致（同源 /ws/...）
+        '/ws': {
+          target: env.VITE_WS_TARGET || 'http://localhost:8092',
+          changeOrigin: true,
+          ws: true,
           secure: true
         },
       }

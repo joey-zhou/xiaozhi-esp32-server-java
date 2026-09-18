@@ -39,6 +39,99 @@ function Resolve-Java {
     return $null
 }
 
+# ---- 运行环境 ----
+# Resolve-Profile [dev|prod] — 优先级：命令行参数 > 已设置的 SPRING_PROFILES_ACTIVE > dev
+function Resolve-Profile {
+    param([string]$Name)
+    if (-not $Name) { $Name = $env:SPRING_PROFILES_ACTIVE }
+    if (-not $Name) { $Name = 'dev' }
+    if ($Name -notin @('dev', 'prod')) {
+        throw "不支持的运行环境: $Name（只支持 dev / prod）"
+    }
+    return $Name
+}
+
+# ---- 端口连通性 ----
+function Test-TcpPort {
+    param([string]$TargetHost, [int]$Port, [int]$TimeoutMs = 3000)
+    $client = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $task = $client.ConnectAsync($TargetHost, $Port)
+        if (-not $task.Wait($TimeoutMs)) { return $false }
+        return $client.Connected
+    } catch {
+        return $false
+    } finally {
+        $client.Dispose()
+    }
+}
+
+# ---- 启动前自检 ----
+# 检查 JDK 版本、模型与原生库、中间件连通性，$env:SKIP_PREFLIGHT = '1' 跳过
+function Invoke-Preflight {
+    if ($env:SKIP_PREFLIGHT -eq '1') { return $true }
+
+    $ok = $true
+
+    # 1) JDK 21+
+    $javaBin = Resolve-Java
+    if (-not $javaBin) {
+        Write-XzErr '未找到 java。请安装 JDK 21+，或设置 JAVA_HOME / JAVA_BIN'
+        $ok = $false
+    } else {
+        $versionLine = (& $javaBin -version 2>&1 | Select-Object -First 1)
+        $major = 0
+        if ("$versionLine" -match '"(\d+)') { $major = [int]$Matches[1] }
+        if ($major -lt 21) {
+            Write-XzErr "JDK 版本过低（检测到 $major），本项目需要 21 及以上: $javaBin"
+            $ok = $false
+        }
+    }
+
+    # 2) 原生库与 VAD 模型
+    $libDir = Join-Path $RootDir 'lib'
+    if (-not (Test-Path $libDir) -or -not (Get-ChildItem $libDir -ErrorAction SilentlyContinue)) {
+        Write-XzErr '缺少原生库目录 lib\，先在 Git Bash 里执行: ./scripts/download_base.sh'
+        $ok = $false
+    }
+    if (-not (Test-Path (Join-Path $RootDir 'models\silero_vad.onnx'))) {
+        Write-XzErr '缺少 VAD 模型 models\silero_vad.onnx，先在 Git Bash 里执行: ./scripts/download_base.sh'
+        $ok = $false
+    }
+    if (-not (Test-Path (Join-Path $RootDir 'models\sense-voice'))) {
+        Write-XzWarn '未检测到本地语音识别模型 models\sense-voice'
+        Write-XzWarn '  用云端 STT 可以忽略；想用本地识别执行: ./scripts/download_stt.sh'
+    }
+
+    # 3) 中间件连通性
+    $dbHost = 'localhost'
+    $dbPort = 3306
+    if ($env:SPRING_DATASOURCE_URL -match '^jdbc:mysql://([^:/?]+)(?::(\d+))?') {
+        $dbHost = $Matches[1]
+        if ($Matches[2]) { $dbPort = [int]$Matches[2] }
+    }
+    if (-not (Test-TcpPort $dbHost $dbPort)) {
+        Write-XzErr "MySQL 连不上（${dbHost}:${dbPort}）"
+        Write-XzErr '  没起的话执行: docker compose -f docker-compose-db.yml up -d'
+        $ok = $false
+    }
+    $redisHost = if ($env:SPRING_DATA_REDIS_HOST) { $env:SPRING_DATA_REDIS_HOST } else { 'localhost' }
+    $redisPort = if ($env:SPRING_DATA_REDIS_PORT) { [int]$env:SPRING_DATA_REDIS_PORT } else { 6379 }
+    if (-not (Test-TcpPort $redisHost $redisPort)) {
+        Write-XzErr "Redis 连不上（${redisHost}:${redisPort}）"
+        Write-XzErr '  没起的话执行: docker compose -f docker-compose-db.yml up -d'
+        $ok = $false
+    }
+
+    if (-not $ok) {
+        Write-Host ''
+        Write-XzErr "启动前检查未通过，按上面的提示处理后重试（确认无误可设 `$env:SKIP_PREFLIGHT = '1' 跳过）"
+        return $false
+    }
+    Write-XzLog '启动前检查通过'
+    return $true
+}
+
 # ---- 编译 ----
 # Invoke-Build <module>  — 只编译该模块及其依赖
 # Invoke-Build all       — 编译全部
@@ -107,9 +200,9 @@ function Test-ServiceRunning {
 }
 
 # ---- 启动单个服务 ----
-# Start-XzService <name> <module> <port>
+# Start-XzService <name> <module> <port> [profile]
 function Start-XzService {
-    param([string]$Name, [string]$Module, [int]$Port)
+    param([string]$Name, [string]$Module, [int]$Port, [string]$SpringProfile = 'dev')
 
     if (Test-ServiceRunning $Name) {
         $procId = Get-Content (Get-PidFile $Name) | Select-Object -First 1
@@ -137,7 +230,7 @@ function Start-XzService {
         return
     }
 
-    Write-XzInfo "启动 $Name (port $Port)..."
+    Write-XzInfo "启动 $Name (port $Port, profile $SpringProfile)..."
     Write-XzInfo "  java: $javaBin"
     if (-not (Test-Path $LogsDir)) { New-Item -ItemType Directory -Path $LogsDir | Out-Null }
 
@@ -148,7 +241,7 @@ function Start-XzService {
     #   1. Logback 配置中的 .\logs 写到 $RootDir\logs\
     #   2. application.yml 中 lib\, models\silero_vad.onnx 等相对路径解析正确
     $proc = Start-Process -FilePath $javaBin `
-        -ArgumentList @("-Djava.library.path=$libPath", '-jar', $jar) `
+        -ArgumentList @("-Djava.library.path=$libPath", '-jar', $jar, "--spring.profiles.active=$SpringProfile") `
         -WorkingDirectory $RootDir `
         -RedirectStandardOutput $outFile `
         -RedirectStandardError "$outFile.err" `
@@ -207,18 +300,19 @@ function Get-XzServiceStatus {
 
 # ---- 重启 ----
 function Restart-XzService {
-    param([string]$Name, [string]$Module, [int]$Port)
+    param([string]$Name, [string]$Module, [int]$Port, [string]$SpringProfile = 'dev')
     Stop-XzService $Name
     Start-Sleep -Seconds 1
-    Start-XzService $Name $Module $Port
+    Start-XzService $Name $Module $Port $SpringProfile
 }
 
 # ---- 用法提示 ----
 function Show-Usage {
     param([string]$Script)
-    Write-Host "用法: $Script <start|stop|restart|status>"
+    Write-Host "用法: $Script <start|stop|restart|status> [dev|prod]"
     Write-Host "  start    编译并启动"
     Write-Host "  stop     停止"
     Write-Host "  restart  停止后重新编译并启动"
     Write-Host "  status   查看运行状态"
+    Write-Host '  运行环境默认 dev；可在命令后加 prod，或先设 $env:SPRING_PROFILES_ACTIVE = "prod"'
 }

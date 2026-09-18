@@ -9,7 +9,7 @@
     </parent>
     <groupId>com.xiaozhi</groupId>
     <artifactId>xiaozhi-parent</artifactId>
-    <version>5.0.0</version>
+    <version>6.0.0</version>
     <packaging>pom</packaging>
     <name>xiaozhi-parent</name>
 
@@ -23,7 +23,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <xiaozhi.version>5.0.0</xiaozhi.version>
+        <xiaozhi.version>6.0.0</xiaozhi.version>
         <!--
           锁定 3.4.x：Redisson 3.25.0 只带 redisson-spring-data-32 适配器，
           没有实现 Spring Data Redis 3.5.x 新增的抽象方法，调用 pExpire 会落回

@@ -107,38 +107,64 @@ Xiaozhi ESP32 Server Java 是基于 [Xiaozhi ESP32](https://github.com/78/xiaozh
 ---
 
 <a id="deployment"></a>
-## 部署文档
+## 部署
 
-### 快速开始
+| 方式 | 适合 | 前置条件 |
+|------|------|----------|
+| **Docker**（推荐） | 直接用起来 | 只要 Docker |
+| **源码** | 要改代码 | JDK 21、Maven、Node 22、MySQL 8、Redis 7 |
 
-前置条件：JDK 21、Maven、Node 22，外加两个中间件——
-**MySQL 8.0**（建库 `xiaozhi`、建号 `xiaozhi/123456`）与 **Redis 7**（`localhost:6379`）。
-默认 profile 是 `dev`，这两个连不上时 Flyway 与 Hikari 会在启动阶段直接抛异常。
-建库建号的完整 SQL 见 [CentOS 部署文档](./docs/CENTOS_DEVELOPMENT.md)；
-也可以用 `docker compose -f docker-compose-db.yml up -d` 一次起好 MySQL + Redis。
+### Docker
+
+```bash
+mkdir xiaozhi && cd xiaozhi
+curl -O https://raw.githubusercontent.com/joey-zhou/xiaozhi-esp32-server-java/main/docker-compose.yml
+docker compose up -d
+```
+
+等容器都 healthy 后打开 <http://localhost:8084>，账号 **admin / 123456**。
+详见 [Docker 部署](./docs/DOCKER.md)。
+
+### 源码
 
 ```bash
 git clone https://github.com/joey-zhou/xiaozhi-esp32-server-java
 cd xiaozhi-esp32-server-java
-./scripts/download_models.sh   # 下载模型和原生库（首次必须）
-bin/all.sh start               # 一键编译并启动（server + dialogue）
-bin/all.sh status              # 查看状态
+docker compose -f docker-compose-db.yml up -d   # 起 MySQL + Redis，已有可跳过
+./scripts/download_models.sh                    # 下载模型和原生库，首次必须
+bin/all.sh start                                # 自检、编译并启动
+cd web && npm install && npm run dev            # 前端
 ```
 
-> `models/` 和 `lib/` 不在 Git 仓库中，首次部署需通过脚本下载。使用第三方 STT/TTS 可只运行 `./scripts/download_base.sh`（仅下载 VAD 模型和原生库）。
+Windows 用 `bin\all.ps1 start`。详见 [CentOS 部署](./docs/CENTOS_DEVELOPMENT.md) / [Windows 部署](./docs/WINDOWS_DEVELOPMENT.md)。
 
-### 部署方式
+> `models/` 和 `lib/` 不在 Git 仓库中，首次部署需通过脚本下载。
+> 语音识别与合成全用第三方 API 的话，只跑 `./scripts/download_base.sh` 即可（仅 VAD 模型和原生库）。
 
-| 方式 | 文档 | 说明 |
-|------|------|------|
-| 源码部署（Linux） | [CentOS 部署文档](./docs/CENTOS_DEVELOPMENT.md) | 推荐生产环境 |
-| 源码部署（Windows） | [Windows 部署文档](./docs/WINDOWS_DEVELOPMENT.md) | 开发和测试 |
-| Docker | [Docker 部署文档](./docs/DOCKER.md) | 快速容器化部署 |
-| 固件编译 | [固件编译文档](./docs/FIRMWARE-BUILD.md) | ESP32 固件编译和烧录 |
+### 登录之后
 
-成功运行后按[固件编译文档](./docs/FIRMWARE-BUILD.md)让设备接入。两个地址分属两个进程，不要写混：
-**WebSocket** 是 dialogue 进程的 `ws://<内网IP>:8092/ws/xiaozhi/v1/`，
-**OTA** 是 server 进程的 `http://<内网IP>:8091/api/device/ota`（若把 server 的端口改成非 8091，需要同步改 dialogue 的 `xiaozhi.server.ota-port`，否则 dialogue 启动横幅和服务注册上报的 OTA 地址会跟着错）。
+**要自己配一个大模型的 API Key 才能对话**，系统不预置任何密钥。
+语音识别用内置本地模型、语音合成用免费 Edge TTS，都可以先不管。
+见[配置说明](./docs/CONFIGURATION.md#第一次使用要配什么)。
+
+设备侧填这两个地址（分属两个进程，别写混）：
+
+- OTA：`http://<内网IP>:8091/api/device/ota`
+- WebSocket：`ws://<内网IP>:8092/ws/xiaozhi/v1/`
+
+改了服务端口时，要同步改 `xiaozhi.server.port` 与 `xiaozhi.dialogue.port`，
+否则下发给设备的地址还是旧端口。
+
+### 文档
+
+| 文档 | 内容 |
+|------|------|
+| [Docker 部署](./docs/DOCKER.md) | 一键启动、升级、源码构建 |
+| [配置说明](./docs/CONFIGURATION.md) | 首次配置、环境变量、安全默认值 |
+| [常见问题](./docs/FAQ.md) | 部署与使用中的高频问题 |
+| [CentOS 部署](./docs/CENTOS_DEVELOPMENT.md) | Linux 源码部署，推荐生产环境 |
+| [Windows 部署](./docs/WINDOWS_DEVELOPMENT.md) | Windows 开发与测试 |
+| [固件编译](./docs/FIRMWARE-BUILD.md) | ESP32 固件编译和烧录 |
 
 ---
 
