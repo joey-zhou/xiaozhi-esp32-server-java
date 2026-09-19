@@ -2,6 +2,11 @@ package com.xiaozhi.dialogue.runtime;
 
 import com.xiaozhi.ai.llm.memory.Conversation;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.MessageType;
+import org.springframework.ai.chat.messages.UserMessage;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -28,5 +33,34 @@ class PersonaConversationContractTest {
         Persona persona = Persona.builder().sessionId("session-1").conversation(conversation()).build();
 
         assertThat(persona.getConversation()).isNotNull();
+    }
+
+    /** conversationMessages 取的是裸消息快照：没有角色系统提示词也没有摘要，文本未拼元数据前缀 */
+    @Test
+    void conversationMessagesAreRawTurnsWithoutThePrompt() {
+        Conversation conversation = conversation();
+        Persona persona = Persona.builder().sessionId("session-1").conversation(conversation).build();
+        assertThat(persona.conversationMessages()).isEmpty();
+
+        conversation.add(new UserMessage("讲个故事"));
+
+        List<Message> messages = persona.conversationMessages();
+        assertThat(messages).hasSize(1);
+        assertThat(messages.getFirst().getMessageType()).isEqualTo(MessageType.USER);
+        assertThat(messages.getFirst().getText()).isEqualTo("讲个故事");
+    }
+
+    /** 快照是副本：调用方遍历期间会话继续追加，不会撞 ConcurrentModificationException */
+    @Test
+    void snapshotDoesNotSeeLaterAppends() {
+        Conversation conversation = conversation();
+        Persona persona = Persona.builder().sessionId("session-1").conversation(conversation).build();
+        conversation.add(new UserMessage("第一句"));
+
+        List<Message> snapshot = persona.conversationMessages();
+        conversation.add(new UserMessage("第二句"));
+
+        assertThat(snapshot).hasSize(1);
+        assertThat(persona.conversationMessages()).hasSize(2);
     }
 }

@@ -97,6 +97,7 @@ public class Persona {
     /**
      * 与LLM Provider通信的具体实现类
      */
+    @Getter
     private ChatModel chatModel;
 
     @Getter
@@ -532,6 +533,13 @@ public class Persona {
             return true;
         }
         return player != null && player.hasContent();
+    }
+
+    /**
+     * 送给判定用的会话消息：裸文本快照，元数据前缀由渲染方按需装配。
+     */
+    public List<Message> conversationMessages() {
+        return conversation.rawMessages();
     }
 
     /**

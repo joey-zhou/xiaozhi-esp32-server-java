@@ -9,6 +9,7 @@ import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.dialogue.audio.VadService;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
+import com.xiaozhi.ai.llm.service.AddresseeClassifier;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
@@ -86,6 +87,9 @@ public class DialogueService{
 
     @Resource
     private IntentService intentService;
+
+    @Resource
+    private AddresseeClassifier addresseeClassifier;
 
     @Resource
     private GoodbyeMessageSupplier goodbyeMessages;
@@ -226,7 +230,8 @@ public class DialogueService{
     }
 
     /**
-     * 首字暂停后拿到终稿：附和或空则续播并丢弃本次识别，否则确认打断。
+     * 首字暂停后拿到终稿：回声、空、附和词、以及模型判定不是在对设备说的整句都续播并丢弃本次识别，
+     * 其余确认打断。前三条是 <1ms 的快路径，只有落到它们之外的整句才会去问模型。
      *
      * @return 是否继续把本句当作新一轮对话处理
      */
@@ -243,6 +248,14 @@ public class DialogueService{
         boolean answeringQuestion = player != null && endsWithQuestion(player.spokenSentences());
         if (!StringUtils.hasText(text) || (!answeringQuestion && intentService.isBackchannel(text))) {
             log.info("误打断，续播 - SessionId: {}, text: {}", session.getSessionId(), text);
+            if (player != null) {
+                player.resume();
+            }
+            return false;
+        }
+        if (!addresseeClassifier.directedAtDevice(persona.getChatModel(), persona.conversationMessages(),
+                player != null ? player.spokenSentences() : List.of(), text)) {
+            log.info("插话不是在对设备说，续播 - SessionId: {}, text: {}", session.getSessionId(), text);
             if (player != null) {
                 player.resume();
             }

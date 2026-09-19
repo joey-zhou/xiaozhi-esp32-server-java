@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue;
 
+import com.xiaozhi.ai.llm.service.AddresseeClassifier;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.communication.server.websocket.WebSocketSession;
@@ -25,13 +26,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 首字暂停后由终稿决定：附和或空则续播丢弃，否则确认打断并收尾。
+ * 首字暂停后由终稿决定：回声、空、附和词走 <1ms 快路径直接续播丢弃，
+ * 落到快路径之外的整句再交给模型判定是不是在对设备说，不是则续播，是才确认打断并收尾。
  */
 @ExtendWith(MockitoExtension.class)
 class DialogueServiceBargeInTest {
 
     @Mock
     private IntentService intentService;
+    @Mock
+    private AddresseeClassifier addresseeClassifier;
     @Mock
     private MessageSender messageService;
     @Mock
@@ -64,6 +68,7 @@ class DialogueServiceBargeInTest {
 
         assertThat(proceed).isFalse();
         verify(player).resume();
+        verify(addresseeClassifier, never()).directedAtDevice(any(), any(), any(), any());
         verify(persona, never()).markInterrupted();
         verify(persona, never()).onInterrupted();
         verify(messageService, never()).sendTtsMessage(any(), isNull(), eq("stop"));
@@ -72,6 +77,7 @@ class DialogueServiceBargeInTest {
     @Test
     void affirmativeAnsweringQuestionIsRealSpeech() {
         when(player.spokenSentences()).thenReturn(List.of("要我现在设闹钟吗？"));
+        when(addresseeClassifier.directedAtDevice(any(), any(), any(), eq("好的"))).thenReturn(true);
 
         boolean proceed = dialogueService.resolveBargeIn(session, persona, "好的");
 
@@ -90,6 +96,7 @@ class DialogueServiceBargeInTest {
         assertThat(proceed).isFalse();
         verify(player).resume();
         verify(intentService, never()).isBackchannel(any());
+        verify(addresseeClassifier, never()).directedAtDevice(any(), any(), any(), any());
         verify(persona, never()).markInterrupted();
     }
 
@@ -99,12 +106,14 @@ class DialogueServiceBargeInTest {
 
         assertThat(proceed).isFalse();
         verify(player).resume();
+        verify(addresseeClassifier, never()).directedAtDevice(any(), any(), any(), any());
         verify(persona, never()).markInterrupted();
     }
 
     @Test
     void realSpeechConfirmsInterrupt() {
         when(intentService.isBackchannel("换一个")).thenReturn(false);
+        when(addresseeClassifier.directedAtDevice(any(), any(), any(), eq("换一个"))).thenReturn(true);
 
         boolean proceed = dialogueService.resolveBargeIn(session, persona, "换一个");
 
@@ -114,5 +123,21 @@ class DialogueServiceBargeInTest {
         verify(player).stop();
         verify(player, never()).resume();
         verify(messageService).sendTtsMessage(session, null, "stop");
+    }
+
+    @Test
+    void utteranceAimedAtSomeoneElseResumesInsteadOfInterrupting() {
+        when(intentService.isBackchannel("对，他这个逻辑有问题")).thenReturn(false);
+        when(addresseeClassifier.directedAtDevice(any(), any(), any(), eq("对，他这个逻辑有问题")))
+                .thenReturn(false);
+
+        boolean proceed = dialogueService.resolveBargeIn(session, persona, "对，他这个逻辑有问题");
+
+        assertThat(proceed).isFalse();
+        verify(player).resume();
+        verify(persona, never()).markInterrupted();
+        verify(persona, never()).onInterrupted();
+        verify(player, never()).stop();
+        verify(messageService, never()).sendTtsMessage(any(), isNull(), eq("stop"));
     }
 }

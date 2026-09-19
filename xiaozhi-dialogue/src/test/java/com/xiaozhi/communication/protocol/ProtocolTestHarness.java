@@ -2,6 +2,7 @@ package com.xiaozhi.communication.protocol;
 
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.ai.llm.memory.Conversation;
+import com.xiaozhi.ai.llm.service.AddresseeClassifier;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
@@ -32,6 +33,8 @@ import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import jakarta.annotation.Resource;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -98,6 +101,15 @@ class ProtocolTestHarness {
     private final DialogueService dialogueService = new DialogueService();
     private final WebSocketHandler webSocketHandler = new WebSocketHandler();
     private final IntentService intentService = new IntentService();
+
+    /** 协议测试不出网问模型，插话一律按「在对设备说」处理，打断语义与接入判定前保持一致 */
+    private final AddresseeClassifier addresseeClassifier = new AddresseeClassifier() {
+        @Override
+        public boolean directedAtDevice(ChatModel chatModel, List<Message> history,
+                                        List<String> spokenSentences, String utterance) {
+            return true;
+        }
+    };
     private final InstanceIdHolder instanceIdHolder = new InstanceIdHolder(INSTANCE_ID);
     private final GoodbyeMessageSupplier goodbyeMessages = new GoodbyeMessageSupplier() {
         @Override
@@ -163,6 +175,7 @@ class ProtocolTestHarness {
                 "aecService", aecService,
                 "sessionManager", sessionManager,
                 "intentService", intentService,
+                "addresseeClassifier", addresseeClassifier,
                 "goodbyeMessages", goodbyeMessages,
                 "eventPublisher", eventBus.publisher(),
                 "storageServiceFactory", storageServiceFactory);
