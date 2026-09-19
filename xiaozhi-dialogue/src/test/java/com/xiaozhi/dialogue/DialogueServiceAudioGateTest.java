@@ -6,6 +6,7 @@ import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.communication.server.websocket.WebSocketSession;
 import com.xiaozhi.dialogue.audio.VadService;
+import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.dialogue.audio.VadService.VadResult;
 import com.xiaozhi.dialogue.audio.VadService.VadStatus;
 import com.xiaozhi.dialogue.playback.Player;
@@ -53,6 +54,8 @@ class DialogueServiceAudioGateTest {
     private Player player;
     @Mock
     private Persona persona;
+    @Mock
+    private PersonaFactory personaFactory;
     @Mock
     private SttService sttService;
     @Mock
@@ -208,5 +211,19 @@ class DialogueServiceAudioGateTest {
 
     private static byte[] opusFrame() {
         return new byte[] {1, 2, 3, 4};
+    }
+
+    // 唤醒词前置缓冲每次唤醒都要清空，落盘关着也不能省掉这一步：
+    // 不清的话攒满上限后新帧进不来，日后打开落盘拿到的永远是第一次唤醒的音频
+    @Test
+    void wakeWordBufferIsDrainedOnEveryWakeEvenWithPersistenceOff() {
+        when(personaFactory.buildPersona(session)).thenReturn(persona);
+        session.addWakeWordAudio(new byte[]{1, 2, 3});
+        session.addWakeWordAudio(new byte[]{4, 5, 6});
+
+        dialogueService.handleWakeWord(session, "你好小智");
+
+        assertThat(session.drainWakeWordAudio()).isEmpty();
+        verify(persona).chat("你好小智", false);
     }
 }

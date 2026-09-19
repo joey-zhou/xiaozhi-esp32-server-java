@@ -674,13 +674,25 @@ public class DialogueService{
     }
 
     /**
-     * 落盘唤醒词前置音频。解码与上传都不能拖慢问候语，整段放虚拟线程。
+     * 收走唤醒词前置音频。缓冲每次唤醒都必须清空：不清的话攒满上限后新帧进不来，
+     * 日后打开落盘拿到的永远是第一次唤醒的音频。
+     * <p>
+     * 落盘默认关闭，排查误唤醒（设备自己醒了，当时听到了什么）时放开下面那行调用。
+     * 这些文件不在消息表里，录音保留期的定时清理管不到，排查完要关回去并手工清掉。
      */
     private void saveWakeWordAudio(ChatSession session) {
         List<byte[]> opusFrames = session.drainWakeWordAudio();
         if (opusFrames.isEmpty()) {
             return;
         }
+        // persistWakeWordAudio(session, opusFrames);
+    }
+
+    /**
+     * 落盘唤醒词前置音频。解码与上传都不能拖慢问候语，整段放虚拟线程。
+     */
+    @SuppressWarnings("unused")
+    private void persistWakeWordAudio(ChatSession session, List<byte[]> opusFrames) {
         Thread.startVirtualThread(() -> {
             try {
                 OpusProcessor decoder = new OpusProcessor();
