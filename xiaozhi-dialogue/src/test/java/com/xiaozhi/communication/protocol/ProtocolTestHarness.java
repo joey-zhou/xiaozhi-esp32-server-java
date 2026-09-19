@@ -46,6 +46,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -129,9 +131,10 @@ class ProtocolTestHarness {
     /** deviceId → 设备档案，connect 时按此决定设备是否已绑定角色 */
     private final Map<String, DeviceBO> deviceProfiles = new ConcurrentHashMap<>();
     private final Map<Integer, RoleBO> roleProfiles = new ConcurrentHashMap<>();
-    private final List<FakeDevice> connected = new ArrayList<>();
+    // 并发用例会从多条线程同时 connect，登记表与传输序号都必须线程安全
+    private final List<FakeDevice> connected = new CopyOnWriteArrayList<>();
 
-    private int transportSequence;
+    private final AtomicInteger transportSequence = new AtomicInteger();
 
     static ProtocolTestHarness create() {
         ProtocolTestHarness harness = new ProtocolTestHarness();
@@ -331,7 +334,7 @@ class ProtocolTestHarness {
 
     /** 新建一个未连接的传输，id 自增保证同一 harness 内不重复 */
     FakeWebSocketTransport newTransport() {
-        return new FakeWebSocketTransport("protocol-session-" + (++transportSequence));
+        return new FakeWebSocketTransport("protocol-session-" + transportSequence.incrementAndGet());
     }
 
     // ========== 组件访问 ==========
@@ -418,6 +421,12 @@ class ProtocolTestHarness {
 
     StorageServiceFactory storageServiceFactory() {
         return storageServiceFactory;
+    }
+
+    /** SessionManager 内部的 deviceId → sessionId 索引，并发用例用它断言没有残留条目 */
+    @SuppressWarnings("unchecked")
+    Map<String, String> deviceSessionIndex() {
+        return (Map<String, String>) ReflectionTestUtils.getField(sessionManager, "deviceIdToSessionId");
     }
 
     /** 关闭全部连接，@AfterEach 调用，避免播放线程跨用例残留 */
