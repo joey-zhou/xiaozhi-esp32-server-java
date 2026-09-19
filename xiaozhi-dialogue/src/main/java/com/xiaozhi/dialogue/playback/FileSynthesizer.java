@@ -4,6 +4,7 @@ import com.xiaozhi.common.Speech;
 
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.ai.tts.SentenceHelper;
+import com.xiaozhi.ai.tts.TtsOverloadException;
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.utils.AudioUtils;
 import reactor.core.Disposable;
@@ -74,6 +75,9 @@ public class FileSynthesizer extends Synthesizer {
                         } else {
                             log.error("TTS服务返回空音频文件 - SessionId: {}", chatSession.getSessionId());
                         }
+                    } catch (TtsOverloadException e) {
+                        // 本地合成已达并发上限，跳过本句，后续句子照常合成
+                        log.warn("本地TTS过载丢句: {} - SessionId: {}", e.getMessage(), chatSession.getSessionId());
                     } catch (Exception e) {
                         log.error("TTS合成出错: {} - SessionId: {}", e.getMessage(), chatSession.getSessionId());
                     }

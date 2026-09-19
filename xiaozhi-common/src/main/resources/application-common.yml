@@ -116,6 +116,18 @@ xiaozhi:
     vosk-model-dir: models/vosk-model
     sense-voice-model-dir: models/sense-voice
     tts-models-dir: models/tts
+  tts:
+    sherpa:
+      # 同时进行的本地合成数上限，0 表示按 CPU 核数自动推导（核数/4，最少 1）。
+      # 与 num-threads 的乘积即合成占用的核数，超过可用核数会让 RTF 线性恶化；
+      # RTF 越过 1 就合成慢于播放，句间必然出现停顿。
+      # 注意容器部署时这里的核数是容器 CPU 限额换算来的，不是宿主机核数
+      max-concurrent: 0
+      # 单次合成的 onnxruntime 线程数。合成只要 RTF 稳定小于 1 就不影响播放，
+      # 调高它只让单句更快、并发路数更少，默认把核让给并发
+      num-threads: 1
+      # 排队等待上限（毫秒），超时即放弃该句。慢机器上 RTF 高、排队更久，可上调；再长用户也等不住
+      wait-timeout-ms: 8000
   operation-log:
     retention-days: 180    # 操作日志保留天数，超期由定时任务清理
   vad:

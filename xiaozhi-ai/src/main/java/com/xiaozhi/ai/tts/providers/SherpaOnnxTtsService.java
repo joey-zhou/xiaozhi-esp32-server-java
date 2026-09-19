@@ -2,16 +2,19 @@ package com.xiaozhi.ai.tts.providers;
 
 import com.k2fsa.sherpa.onnx.*;
 import com.xiaozhi.common.annotation.MonitoredOperation;
+import com.xiaozhi.ai.tts.TtsOverloadException;
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.XiaozhiTtsOptions;
 import com.xiaozhi.common.model.bo.ConfigBO;
+import com.xiaozhi.common.monitoring.CountingRejectionHandler;
 import com.xiaozhi.utils.AudioUtils;
 
 import java.io.*;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -22,6 +25,10 @@ import lombok.extern.slf4j.Slf4j;
  *   示例：vits-melo-tts-zh_en:vits:0
  *         kokoro-multi-lang:kokoro:3
  *         matcha-zh-baker:matcha:0
+ * <p>
+ * 合成是纯 CPU 计算，全部经共享的合成线程池，并发数即同时占用的核数：单次合成的 onnxruntime
+ * 线程数默认 1，于是「并发数 × 线程数」不超发就等于并发数。超发会让 RTF 线性恶化，一旦越过 1
+ * 就合成慢于播放，句间必然出现停顿。排队超时或队列满即放弃本句，抛 {@link TtsOverloadException}。
  */
 @Slf4j
 public class SherpaOnnxTtsService implements TtsService {
@@ -33,6 +40,22 @@ public class SherpaOnnxTtsService implements TtsService {
     // 实例只能经由本 Map 发布，由 ConcurrentHashMap 保证 native 指针对其他线程可见
     // 模型文件被替换后需重启进程才生效
     private static final Map<String, OfflineTts> ttsCache = new ConcurrentHashMap<>();
+
+    // 并发数缺省值：本地 STT 解码占核数的一半、声纹提取占四分之一，合成只能拿剩下的
+    private static final int DEFAULT_MAX_CONCURRENT = Math.max(1, Runtime.getRuntime().availableProcessors() / 4);
+    // 单条许可对应的排队位数，乘出来的队列深度与 WAIT_TIMEOUT_MS 的等待上限量级一致
+    private static final int QUEUE_PER_PERMIT = 8;
+    // 排队等待上限缺省值，超过则本句已不可能在用户容忍时间内播出
+    private static final long DEFAULT_WAIT_TIMEOUT_MS = 8000;
+
+    private static final CountingRejectionHandler REJECTION_HANDLER =
+            new CountingRejectionHandler(new ThreadPoolExecutor.AbortPolicy());
+    // 累计放弃的句子数，本版没有指标导出，只在测试里可见
+    private static final AtomicLong droppedCount = new AtomicLong();
+    private static volatile ThreadPoolExecutor synthExecutor;
+    private static volatile long waitTimeoutMs = DEFAULT_WAIT_TIMEOUT_MS;
+    // 单次合成的 onnxruntime 线程数，进程级配置，由 SherpaTtsConfig 启动时设定
+    private static volatile int synthNumThreads = 1;
 
     private final XiaozhiTtsOptions options;
     private final String outputPath;
@@ -90,19 +113,13 @@ public class SherpaOnnxTtsService implements TtsService {
             OfflineTts tts = getOrCreateTts();
             float ttsSpeed = (getSpeed() != null) ? getSpeed().floatValue() : 1.0f;
 
-            long start = System.currentTimeMillis();
-            GeneratedAudio audio = tts.generate(text, speakerId, ttsSpeed);
-            long elapsed = System.currentTimeMillis() - start;
+            // 推理在池内，后面的转码与落盘在池外，工作线程只占住真正抢 CPU 的那一段
+            GeneratedAudio audio = generateWithAdmission(tts, text, ttsSpeed);
 
             if (audio == null || audio.getSamples() == null || audio.getSamples().length == 0) {
                 log.error("sherpa-onnx 语音合成返回空音频，模型路径: {}", modelPath);
                 return null;
             }
-
-            float audioDuration = audio.getSamples().length / (float) audio.getSampleRate();
-            float rtf = (elapsed / 1000.0f) / audioDuration;
-            log.info("sherpa-onnx 语音合成完成 - 耗时: {}ms, 音频时长: {}s, RTF: {}",
-                    elapsed, String.format("%.2f", audioDuration), String.format("%.3f", rtf));
 
             // 将 float[] samples 转为 16-bit PCM byte[]
             byte[] pcmData = AudioUtils.floatToPcm16(audio.getSamples());
@@ -118,10 +135,106 @@ public class SherpaOnnxTtsService implements TtsService {
             AudioUtils.saveAsWav(outPath, pcmData);
 
             return outPath;
+        } catch (TtsOverloadException e) {
+            throw e;
         } catch (Exception e) {
             log.error("sherpa-onnx 语音合成失败 - 模型路径: {}, 错误: {}", modelPath, e.getMessage(), e);
             throw new Exception("本地语音合成失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 不得绕开本方法直接调 generate：不限并发时 N 句同时合成会开出 N×numThreads 条 native 线程抢核。
+     */
+    private GeneratedAudio generateWithAdmission(OfflineTts tts, String text, float speed) throws Exception {
+        return submitWithAdmission(() -> {
+            long start = System.nanoTime();
+            GeneratedAudio generated = tts.generate(text, speakerId, speed);
+            recordGenerate(start, generated);
+            return generated;
+        });
+    }
+
+    /**
+     * 送进合成线程池并等结果。队列已满或排队超过等待上限即放弃本次，抛 {@link TtsOverloadException}。
+     */
+    static <T> T submitWithAdmission(Callable<T> task) throws Exception {
+        Future<T> future;
+        try {
+            future = executor().submit(task);
+        } catch (RejectedExecutionException e) {
+            droppedCount.incrementAndGet();
+            throw new TtsOverloadException("本地合成排队已满，跳过本次合成");
+        }
+        long timeout = waitTimeoutMs;
+        try {
+            return future.get(timeout, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            // 已进 JNI 的任务打断不了，cancel(false) 只撤掉还在排队的，避免白跑
+            future.cancel(false);
+            droppedCount.incrementAndGet();
+            throw new TtsOverloadException("本地合成排队超过 " + timeout + "ms，跳过本次合成");
+        } catch (InterruptedException e) {
+            future.cancel(false);
+            Thread.currentThread().interrupt();
+            throw e;
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            throw cause instanceof Exception ex ? ex : new Exception(cause);
+        }
+    }
+
+    private static void recordGenerate(long startNanos, GeneratedAudio audio) {
+        long elapsedNanos = System.nanoTime() - startNanos;
+        if (audio == null || audio.getSamples() == null || audio.getSamples().length == 0) {
+            return;
+        }
+        long elapsedMs = TimeUnit.NANOSECONDS.toMillis(elapsedNanos);
+        float audioDuration = audio.getSamples().length / (float) audio.getSampleRate();
+        log.info("sherpa-onnx 语音合成完成 - 耗时: {}ms, 音频时长: {}s, RTF: {}",
+                elapsedMs, String.format("%.2f", audioDuration),
+                String.format("%.3f", (elapsedMs / 1000.0f) / audioDuration));
+    }
+
+    /**
+     * 建合成线程池，由 {@code SherpaTtsConfig} 启动时调一次。
+     * maxConcurrent 非正数时按核数的四分之一推导，waitTimeout 非正数时用缺省 8 秒。
+     */
+    public static synchronized void configure(int maxConcurrent, int numThreads, long waitTimeout) {
+        synthNumThreads = Math.max(1, numThreads);
+        waitTimeoutMs = waitTimeout > 0 ? waitTimeout : DEFAULT_WAIT_TIMEOUT_MS;
+        if (synthExecutor == null) {
+            synthExecutor = createExecutor(maxConcurrent > 0 ? maxConcurrent : DEFAULT_MAX_CONCURRENT);
+        }
+    }
+
+    private static ThreadPoolExecutor executor() {
+        ThreadPoolExecutor executor = synthExecutor;
+        if (executor != null) {
+            return executor;
+        }
+        synchronized (SherpaOnnxTtsService.class) {
+            if (synthExecutor == null) {
+                synthExecutor = createExecutor(DEFAULT_MAX_CONCURRENT);
+            }
+            return synthExecutor;
+        }
+    }
+
+    private static ThreadPoolExecutor createExecutor(int maxConcurrent) {
+        int queueCapacity = maxConcurrent * QUEUE_PER_PERMIT;
+        log.info("sherpa-onnx TTS 合成线程池就绪 - 并发上限: {}, 排队上限: {}", maxConcurrent, queueCapacity);
+        // 平台线程：推理在 JNI 里长时间占着 CPU，放虚拟线程会把载体线程钉死
+        return new ThreadPoolExecutor(
+                maxConcurrent, maxConcurrent,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(queueCapacity),
+                r -> {
+                    Thread t = new Thread(r, "sherpa-tts-worker");
+                    t.setDaemon(true);
+                    return t;
+                },
+                REJECTION_HANDLER);
     }
 
     /**
@@ -136,10 +249,10 @@ public class SherpaOnnxTtsService implements TtsService {
      * 根据模型类型创建 OfflineTts 实例
      */
     private OfflineTts createTts() {
-        log.info("初始化 sherpa-onnx TTS 模型 - 类型: {}, 路径: {}", modelType, modelPath);
+        log.info("初始化 sherpa-onnx TTS 模型 - 类型: {}, 路径: {}, 线程数: {}", modelType, modelPath, synthNumThreads);
 
         OfflineTtsModelConfig.Builder modelConfigBuilder = OfflineTtsModelConfig.builder()
-                .setNumThreads(2)
+                .setNumThreads(synthNumThreads)
                 .setDebug(false)
                 .setProvider("cpu");
 
