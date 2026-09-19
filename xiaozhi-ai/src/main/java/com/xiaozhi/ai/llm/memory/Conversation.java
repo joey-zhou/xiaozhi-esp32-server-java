@@ -402,7 +402,7 @@ public class Conversation extends ConversationIdentifier {
         int removed;
         boolean flushAll;
         try {
-            removed = summarizeAndDrop(batch);
+            removed = summarize(batch);
         } finally {
             synchronized (this) {
                 compacting = false;
@@ -419,9 +419,11 @@ public class Conversation extends ConversationIdentifier {
     }
 
     /**
+     * 把这批消息合进摘要；摘要成功后这批消息移出上下文。
+     *
      * @return 本批实际移出上下文的消息数，摘要失败为 0
      */
-    private int summarizeAndDrop(List<Message> batch) {
+    private int summarize(List<Message> batch) {
         if (discarded) {
             return 0;
         }

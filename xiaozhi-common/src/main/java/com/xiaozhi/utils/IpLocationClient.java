@@ -230,7 +230,7 @@ public class IpLocationClient {
         if (cached != null && cached.isValid()) {
             return cached.info();
         }
-        return queryAndCacheIPInfo(ipAddress);
+        return queryIPInfo(ipAddress);
     }
 
     /**
@@ -303,7 +303,7 @@ public class IpLocationClient {
         try {
             IP_INFO_EXECUTOR.execute(() -> {
                 try {
-                    queryAndCacheIPInfo(ipAddress);
+                    queryIPInfo(ipAddress);
                 } finally {
                     IP_INFO_INFLIGHT.remove(ipAddress);
                 }
@@ -316,7 +316,7 @@ public class IpLocationClient {
     /**
      * 外呼查询 IP 归属并写入缓存，查询失败按较短有效期缓存兜底结果
      */
-    private static IPInfo queryAndCacheIPInfo(String ipAddress) {
+    private static IPInfo queryIPInfo(String ipAddress) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
 

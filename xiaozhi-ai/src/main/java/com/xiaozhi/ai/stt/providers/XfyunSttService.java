@@ -234,7 +234,7 @@ public class XfyunSttService implements SttService {
                     log.warn("code:{}, error:{}, sid:{}",
                             response.getCode(), response.getMessage(), response.getSid());
                     // 服务端返回非 0 码即本次会话终止，必须就地收尾，否则只能等识别超时兜底
-                    failAndRelease(failureReason, SttResult.FAILURE_UPSTREAM_ERROR, latchReleased, recognitionLatch);
+                    fail(failureReason, SttResult.FAILURE_UPSTREAM_ERROR, latchReleased, recognitionLatch);
                     wsClose(webSocketRef, isClosed);
                     return;
                 }
@@ -261,7 +261,7 @@ public class XfyunSttService implements SttService {
                 wsClose(webSocketRef, isClosed); // 显式关闭
                 isClosed.set(true);
                 webSocketRef.set(null);
-                failAndRelease(failureReason, SttResult.FAILURE_UPSTREAM_ERROR, latchReleased, recognitionLatch);
+                fail(failureReason, SttResult.FAILURE_UPSTREAM_ERROR, latchReleased, recognitionLatch);
             }
 
             @Override
@@ -320,8 +320,8 @@ public class XfyunSttService implements SttService {
     /**
      * 记录失败原因并释放识别等待，重复调用只释放一次。
      */
-    static void failAndRelease(AtomicReference<String> failureReason, String reason,
-                               AtomicBoolean latchReleased, CountDownLatch latch) {
+    static void fail(AtomicReference<String> failureReason, String reason,
+                     AtomicBoolean latchReleased, CountDownLatch latch) {
         failureReason.set(reason);
         if (latchReleased.compareAndSet(false, true)) {
             latch.countDown();
