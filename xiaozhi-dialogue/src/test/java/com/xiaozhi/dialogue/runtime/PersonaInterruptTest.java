@@ -70,7 +70,7 @@ class PersonaInterruptTest {
         session.setToolsSessionHolder(toolsSessionHolder);
         lenient().when(toolsSessionHolder.getAllFunction()).thenReturn(List.of());
         lenient().when(sessionManager.getSession("s1")).thenReturn(session);
-        conversation = new Conversation("device", 1, "s1", "role", 1);
+        conversation = Conversation.of("device", 1, "s1", "role", 1);
         player = new FakePlayer(session, messageSender);
         synthesizer = new FakeSynthesizer(session, player);
         persona = Persona.builder()

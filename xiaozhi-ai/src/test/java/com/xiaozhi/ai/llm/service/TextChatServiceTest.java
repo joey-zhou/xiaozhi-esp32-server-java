@@ -74,7 +74,7 @@ class TextChatServiceTest {
 
     private Conversation openConversation() {
         when(conversationFactory.initSessionConversation("web:9", 9, role, SESSION_ID))
-                .thenReturn(new Conversation("web:9", 1, SESSION_ID, "测试角色", 9));
+                .thenReturn(Conversation.of("web:9", 1, SESSION_ID, "测试角色", 9));
         return textChatService.openConversation("web:9", 9, role, SESSION_ID);
     }
 

@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ConversationTest {
 
     private static Conversation newConversation() {
-        return new Conversation("device", 1, "session", "role", 1);
+        return Conversation.of("device", 1, "session", "role", 1);
     }
 
     /** 一轮工具调用产生的两条消息：带 toolCalls 的 AssistantMessage 和对应的 ToolResponseMessage */

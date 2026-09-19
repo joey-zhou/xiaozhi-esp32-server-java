@@ -10,6 +10,10 @@ import java.util.stream.Collectors;
 /**
  * 将 Spring AI 的消息列表序列化为单一文本块，专供"二次喂给大模型做摘要"场景。
  * <p>
+ * 入参是裸消息（文本不含前缀、元数据在 metadata 里），渲染前统一过一遍
+ * {@link UserMessageAssembler#assemble(Message)}，模型才看得到每句话的时间与情绪。
+ * 已经装配过的消息不要再传进来，前缀会拼两遍。
+ * <p>
  * 渲染约定：
  * <ul>
  *   <li>TOOL 消息 → {@code TOOL:<text>}</li>
@@ -28,6 +32,7 @@ public final class MessageHistoryFormatter {
      */
     public static String format(List<Message> messages) {
         return messages.stream()
+                .map(UserMessageAssembler::assemble)
                 .map(MessageHistoryFormatter::renderOne)
                 .collect(Collectors.joining(System.lineSeparator()));
     }

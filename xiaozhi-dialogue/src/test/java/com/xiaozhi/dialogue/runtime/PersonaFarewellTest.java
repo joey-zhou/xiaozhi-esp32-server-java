@@ -54,7 +54,7 @@ class PersonaFarewellTest {
                 .sessionId(SESSION_ID)
                 .synthesizer(synthesizer)
                 .player(player)
-                .conversation(new Conversation("device", 1, SESSION_ID, "role", 1))
+                .conversation(Conversation.of("device", 1, SESSION_ID, "role", 1))
                 .build();
         session.setPersona(persona);
         session.setPlayer(player);

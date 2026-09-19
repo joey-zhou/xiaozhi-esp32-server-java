@@ -82,7 +82,7 @@ public class Conversation extends ConversationIdentifier {
     private volatile boolean discarded;
 
     /**
-     * 纯内存对话，不加载历史、不压缩。
+     * 纯内存对话，不加载历史、不压缩。走 builder 而不是构造器链，省掉一长串占位的 null 与 0。
      *
      * @param ownerId   聊天参与者标识（设备场景: deviceId, Web 场景: web:userId）
      * @param roleId    角色ID
@@ -90,8 +90,14 @@ public class Conversation extends ConversationIdentifier {
      * @param roleDesc  角色描述（静态，构造时确定）
      * @param userId    用户ID（消息持久化需要）
      */
-    public Conversation(String ownerId, Integer roleId, String sessionId, String roleDesc, Integer userId) {
-        this(ownerId, roleId, sessionId, roleDesc, userId, null, null, null, 0, 0, 0, 0);
+    public static Conversation of(String ownerId, Integer roleId, String sessionId, String roleDesc, Integer userId) {
+        return builder()
+                .ownerId(ownerId)
+                .roleId(roleId)
+                .sessionId(sessionId)
+                .roleDesc(roleDesc)
+                .userId(userId)
+                .build();
     }
 
     /**
@@ -202,10 +208,11 @@ public class Conversation extends ConversationIdentifier {
     }
 
     /**
-     * 返回原始消息列表（不含系统提示词与摘要，文本保持"裸文本"，metadata 未拼前缀）。
+     * 原始消息快照（不含系统提示词与摘要，文本保持"裸文本"，metadata 未拼前缀）。
+     * 返回副本，调用方遍历期间本会话仍可继续追加消息。
      */
     public synchronized List<Message> rawMessages() {
-        return messages;
+        return List.copyOf(messages);
     }
 
     /**

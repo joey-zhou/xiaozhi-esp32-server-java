@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DialogueTurnConverterTest {
 
     private final DialogueTurnConverter converter = new DialogueTurnConverter();
-    private final Conversation conversation = new Conversation("device", 1, "session", "role", 1);
+    private final Conversation conversation = Conversation.of("device", 1, "session", "role", 1);
 
     @Test
     void turnWithoutAssistantPersistsUserOnly() {

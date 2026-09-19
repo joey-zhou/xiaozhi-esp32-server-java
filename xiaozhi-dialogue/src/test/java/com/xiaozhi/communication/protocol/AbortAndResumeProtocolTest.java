@@ -310,7 +310,7 @@ class AbortAndResumeProtocolTest {
      */
     private Persona installPersona(FakeDevice device) {
         ChatSession session = device.session();
-        conversation = new Conversation(device.deviceId(), 1, session.getSessionId(), "协议测试角色", 1);
+        conversation = Conversation.of(device.deviceId(), 1, session.getSessionId(), "协议测试角色", 1);
         personaListener = mock(PersonaListener.class);
         Persona persona = Persona.builder()
                 .sessionManager(harness.sessionManager())

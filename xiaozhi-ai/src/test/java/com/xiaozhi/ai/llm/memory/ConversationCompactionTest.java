@@ -462,7 +462,7 @@ class ConversationCompactionTest {
 
     @Test
     void conversationWithoutSummarizerNeverCompacts() {
-        Conversation conversation = new Conversation("device", 1, "session", "role", 1);
+        Conversation conversation = Conversation.of("device", 1, "session", "role", 1);
 
         for (int i = 0; i < 20; i++) {
             conversation.add(new UserMessage("问" + i));

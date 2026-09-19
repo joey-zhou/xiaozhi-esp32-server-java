@@ -386,7 +386,7 @@ class MultiTurnDialogueProtocolTest {
         Player player = new ScheduledPlayer(chatSession, harness.messageSender());
         chatSession.setPlayer(player);
         synthesizer = new GatedSynthesizer(chatSession, player);
-        conversation = new Conversation(chatSession.getDevice().getDeviceId(), 1,
+        conversation = Conversation.of(chatSession.getDevice().getDeviceId(), 1,
                 chatSession.getSessionId(), "协议测试角色", 1);
         Persona persona = Persona.builder()
                 .sessionManager(harness.sessionManager())

@@ -362,7 +362,7 @@ class ListenStateMachineTest {
                 .sttService(harness.stt())
                 .player(player)
                 .synthesizer(scriptedSynthesizer(session, player))
-                .conversation(new Conversation(device.getDeviceId(), device.getRoleId(),
+                .conversation(Conversation.of(device.getDeviceId(), device.getRoleId(),
                         session.getSessionId(), "协议测试角色", device.getUserId()))
                 .listener(recordingListener())
                 .build();

@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RoleSystemPromptTest {
 
     private static SystemMessage prompt(String roleDesc, String location) {
-        return new Conversation("device", 1, "session", roleDesc, 1)
+        return Conversation.of("device", 1, "session", roleDesc, 1)
                 .roleSystemMessage(new ConversationContext(location));
     }
 
