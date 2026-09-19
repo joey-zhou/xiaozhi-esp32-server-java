@@ -1,6 +1,7 @@
 package com.xiaozhi.communication.protocol;
 
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
+import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
@@ -223,6 +224,9 @@ class ProtocolTestHarness {
     /**
      * 默认的 Persona 装配：真实 ScheduledPlayer + 真实 OpusRecorder（参考帧走假 AEC），
      * STT 用脚本化假体，LLM 相关能力留空。用例需要别的 Persona 时重新 stub {@link #personaFactory()}。
+     * <p>
+     * Conversation 不能省：Persona 保证它非空。这里给的是没有 summarizer 的裸对话，
+     * flush 与 clear 落到 {@code compact} 的 summarizer 判空处直接返回，不出网也不落库。
      */
     private Persona buildPersona(ChatSession session) {
         if (session.getPersona() != null) {
@@ -234,9 +238,18 @@ class ProtocolTestHarness {
             player.setOpusRecorder(new OpusRecorder(session, messageService, aecService, storageServiceFactory));
             session.setPlayer(player);
         }
+        DeviceBO device = session.getDevice();
+        RoleBO role = device != null && device.getRoleId() != null
+                ? roleProfiles.get(device.getRoleId()) : defaultRole();
         Persona persona = Persona.builder()
                 .sessionManager(sessionManager)
                 .sessionId(session.getSessionId())
+                .conversation(Conversation.of(
+                        device != null ? device.getDeviceId() : session.getSessionId(),
+                        role != null ? role.getRoleId() : defaultRole().getRoleId(),
+                        session.getSessionId(),
+                        role != null ? role.getRoleDesc() : null,
+                        role != null ? role.getUserId() : null))
                 .sttService(sttService)
                 .player(player)
                 .build();

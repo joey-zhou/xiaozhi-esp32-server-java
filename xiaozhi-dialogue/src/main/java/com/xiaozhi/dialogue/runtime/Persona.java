@@ -15,6 +15,7 @@ import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.ai.tts.SpeechTokenFilter;
 import com.xiaozhi.utils.EmojiUtils;
 import lombok.Builder;
+import lombok.NonNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -107,8 +108,10 @@ public class Persona {
     /**
      * 一个Session在某个时刻，只有一个活跃的Conversation。
      * 当切换角色时，Conversation应该释放新建。切换角色一般是不频繁的。
+     * 构造时必须给，漏给在 build 处就抛，调用方不必判空。
      */
     @Getter
+    @NonNull
     private Conversation conversation;
 
 

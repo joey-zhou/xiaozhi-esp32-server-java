@@ -3,7 +3,6 @@ package com.xiaozhi.dialogue.llm.tool.function;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.dialogue.runtime.Persona;
-import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tool.session.ToolSession;
@@ -35,10 +34,7 @@ public class NewChatFunction implements ToolsGlobalRegistry.GlobalFunction {
                 if (persona == null) {
                     return "现在还开不了新话题";
                 }
-                Conversation conversation = persona.getConversation();
-                if (conversation != null) {
-                    conversation.clear();
-                }
+                persona.getConversation().clear();
                 String sayNewChat = params.get("sayNewChat");
                 if (sayNewChat == null) {
                     sayNewChat = "让我们聊聊新的话题吧！";

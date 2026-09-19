@@ -9,7 +9,6 @@ import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.utils.OpusProcessor;
-import io.jsonwebtoken.lang.Assert;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -158,7 +157,6 @@ public class OpusRecorder {
             return;
         }
         Conversation conversation = persona.getConversation();
-        Assert.notNull(conversation);
         SerialTaskRegistry.submit(conversation.getSessionId(),
                 () -> updateMessage(conversation, closedPath, createdAt));
     }

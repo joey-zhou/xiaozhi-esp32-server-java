@@ -1,6 +1,5 @@
 package com.xiaozhi.dialogue.llm.handler;
 
-import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.Synthesizer;
@@ -46,11 +45,8 @@ public class PersonaCleanup {
             }
         }
         if (persona != null) {
-            Conversation conversation = persona.getConversation();
-            if (conversation != null) {
-                // 设备断开就是这段对话的结束：没到上限的剩余轮次在这里进摘要，否则短对话永远进不了摘要
-                conversation.flush();
-            }
+            // 设备断开就是这段对话的结束：没到上限的剩余轮次在这里进摘要，否则短对话永远进不了摘要
+            persona.getConversation().flush();
         }
     }
 }

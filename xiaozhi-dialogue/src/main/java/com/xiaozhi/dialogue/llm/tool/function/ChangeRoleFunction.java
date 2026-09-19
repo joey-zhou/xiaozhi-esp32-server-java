@@ -74,7 +74,7 @@ public class ChangeRoleFunction implements ToolsGlobalRegistry.GlobalFunction {
                                 // 切换了角色，旧角色的对话到此结束：剩下的压成摘要，
                                 // 否则要等设备下次再用这个角色才有机会压缩
                                 Persona current = chatSession.getPersona();
-                                if(current != null && current.getConversation() != null){
+                                if(current != null){
                                     current.getConversation().flush();
                                 }
 

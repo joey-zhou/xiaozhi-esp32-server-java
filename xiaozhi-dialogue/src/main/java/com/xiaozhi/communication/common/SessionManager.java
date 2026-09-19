@@ -315,7 +315,7 @@ public class SessionManager {
     public Optional<Conversation> findConversation(String deviceId) {
         ChatSession session = getSessionByDeviceId(deviceId);
         if (session != null && session.getPersona() != null) {
-            return Optional.ofNullable(session.getPersona().getConversation());
+            return Optional.of(session.getPersona().getConversation());
         }
         return Optional.empty();
     }
