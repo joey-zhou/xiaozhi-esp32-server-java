@@ -1,6 +1,8 @@
 package com.xiaozhi.ai.llm.service;
 
+import com.xiaozhi.ai.llm.JsonMode;
 import com.xiaozhi.ai.llm.memory.MessageHistoryFormatter;
+import com.xiaozhi.ai.utils.LenientJson;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
@@ -43,8 +45,9 @@ public class AddresseeClassifier {
 
     private static final Set<MessageType> DIALOGUE_TYPES = Set.of(MessageType.USER, MessageType.ASSISTANT);
 
-    /** 转换器构造时要生成 JSON Schema，每次插话建一份太贵 */
-    private static final BeanOutputConverter<Verdict> VERDICT_CONVERTER = new BeanOutputConverter<>(Verdict.class);
+    /** 转换器构造时要生成 JSON Schema，每次插话建一份太贵；解析前先经 LenientJson 补齐结构，再用放宽的解析器读 */
+    private static final BeanOutputConverter<Verdict> VERDICT_CONVERTER =
+            new BeanOutputConverter<>(Verdict.class, LenientJson.mapper(), LenientJson::object);
 
     /** 模型调用是阻塞的，不能占用 ForkJoinPool.commonPool */
     private static final Executor CLASSIFY_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
@@ -94,10 +97,16 @@ public class AddresseeClassifier {
                 "history", MessageHistoryFormatter.format(recentDialogue(history)),
                 "spoken", spokenSentences == null ? "" : String.join("", spokenSentences),
                 "utterance", utterance));
-        String response = ChatClient.builder(chatModel)
+        ChatClient chatClient = ChatClient.builder(chatModel)
                 .defaultAdvisors(new SimpleLoggerAdvisor())
-                .build()
-                .prompt().user(prompt).call().content();
+                .build();
+        String response = JsonMode.call(chatModel, options -> {
+            ChatClient.ChatClientRequestSpec request = chatClient.prompt().user(prompt);
+            if (options != null) {
+                request = request.options(options);
+            }
+            return request.call().content();
+        });
         Verdict verdict = VERDICT_CONVERTER.convert(response);
         if (verdict == null || verdict.directed() == null) {
             log.warn("插话判定结果读不出 directed，按打断处理 - response: {}", response);

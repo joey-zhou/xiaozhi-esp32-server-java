@@ -1,6 +1,8 @@
 package com.xiaozhi.ai.llm.service;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -117,5 +119,28 @@ class AddresseeClassifierTest {
         assertThat(rendered).doesNotContain("用户第1句").doesNotContain("用户第2句");
         assertThat(rendered).contains("助手第2句").contains("用户第4句").contains("助手第4句");
         assertThat(rendered).contains("从前有座山。").contains("换一个故事");
+    }
+
+    // 模型很少规规矩矩只回一个 JSON：前面寒暄一句、后面补句解释、带思考标签、少个右括号都是常态。
+    // 这些都读不出来的话判定会静默失效——每次插话白付一次模型调用，行为却和没接判定一样
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "```json\n{\"directed\": false}\n```",
+            "好的，判定结果如下：{\"directed\": false}",
+            "{\"directed\": false}\n这句话明显是对旁人说的。",
+            "<think>用户在跟别人说话</think>\n{\"directed\": false}",
+            "{\"directed\": false"})
+    void sloppyButRecoverableOutputsStillCount(String output) {
+        when(chatModel.call(any(Prompt.class))).thenReturn(reply(output));
+
+        assertThat(classify("对，他这个逻辑有问题")).isFalse();
+    }
+
+    // 连 JSON 对象都没有的输出救不回来，按打断处理
+    @Test
+    void bareLiteralFallsBackToInterrupt() {
+        when(chatModel.call(any(Prompt.class))).thenReturn(reply("false"));
+
+        assertThat(classify("对，他这个逻辑有问题")).isTrue();
     }
 }
