@@ -171,7 +171,7 @@ class DialogueServiceSttRetryTest {
      * 重放那一次返回 second 并记下拿到的音频。本轮在后台线程收尾，断言用 Mockito 的等待窗口接住。
      */
     private void runTurn(SttResult first, SttResult second) {
-        when(sttService.stream(any(), any())).thenAnswer(invocation -> {
+        when(sttService.stream(any(), any(), any())).thenAnswer(invocation -> {
             Flux<byte[]> audio = invocation.getArgument(0);
             if (sttCalls.incrementAndGet() == 1) {
                 audio.blockLast(AWAIT_TIMEOUT);

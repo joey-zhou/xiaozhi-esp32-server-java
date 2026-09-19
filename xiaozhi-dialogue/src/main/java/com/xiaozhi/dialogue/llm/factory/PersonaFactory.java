@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue.llm.factory;
 
+import com.xiaozhi.ai.stt.Hotword;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.communication.message.MessageSender;
@@ -119,6 +120,7 @@ public class PersonaFactory {
                 .sessionId(session.getSessionId())
                 .conversation(conversation)
                 .sttService(sttService)
+                .sttHotwords(Hotword.parse(role.getSttHotwords()))
                 .chatModel(chatModel)
                 .synthesizer(synthesizer)
                 .player(session.getPlayer())

@@ -1,6 +1,7 @@
 package com.xiaozhi.ai.stt.providers;
 
 import com.xiaozhi.common.annotation.MonitoredOperation;
+import com.xiaozhi.ai.stt.Hotword;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -15,6 +16,7 @@ import reactor.core.publisher.Flux;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -37,6 +39,9 @@ public class VolcengineSttService implements SttService {
 
     // WebSocket API地址：双向流式模式（优化版本），仅在结果变化时下发数据包，首尾字时延更优
     private static final String WS_API_URL = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async";
+
+    // 直传热词的条数上限。官方按 200 token 计，中文热词按两字一词估，取 60 条留足余量
+    private static final int MAX_HOTWORDS = 60;
 
     /**
      * 资源ID：豆包流式语音识别大模型 2.0 小时版。
@@ -88,6 +93,12 @@ public class VolcengineSttService implements SttService {
     @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioFlux, Consumer<String> onPartialText) {
+        return stream(audioFlux, onPartialText, List.of());
+    }
+
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
+    @Override
+    public SttResult stream(Flux<byte[]> audioFlux, Consumer<String> onPartialText, List<Hotword> hotwords) {
         // 检查配置是否已设置
         if (apiKey == null || apiKey.isBlank()) {
             log.error("火山引擎语音识别配置未设置，无法进行识别");
@@ -130,7 +141,7 @@ public class VolcengineSttService implements SttService {
 
                 // 发送 full client request
                 try {
-                    byte[] fullRequest = buildFullClientRequest();
+                    byte[] fullRequest = buildFullClientRequest(hotwords);
                     webSocket.send(okio.ByteString.of(fullRequest));
                 } catch (Exception e) {
                     log.error("发送 full client request 失败", e);
@@ -228,7 +239,7 @@ public class VolcengineSttService implements SttService {
     /**
      * 构建 full client request 消息
      */
-    private byte[] buildFullClientRequest() throws Exception {
+    private byte[] buildFullClientRequest(List<Hotword> hotwords) throws Exception {
         // 构建请求JSON
         ObjectNode requestJson = objectMapper.createObjectNode();
 
@@ -260,6 +271,10 @@ public class VolcengineSttService implements SttService {
         // 二遍识别：流式快速出字 + VAD 判停后用非流式模型重识别该分句，提升最终结果准确率。
         // 仅双向流式优化版支持，开启后 definite=true 只出现在非流式重识别的结果中。
         request.put("enable_nonstream", true);
+        String context = buildHotwordContext(hotwords);
+        if (context != null) {
+            request.put("context", context);
+        }
         requestJson.set("request", request);
 
         String jsonStr = objectMapper.writeValueAsString(requestJson);
@@ -270,6 +285,22 @@ public class VolcengineSttService implements SttService {
 
         // 构建二进制消息
         return buildBinaryMessage(FULL_CLIENT_REQUEST, NO_SEQUENCE, JSON_SERIALIZATION, GZIP_COMPRESSION, compressedPayload);
+    }
+
+    /**
+     * 热词直传：{@code request.context} 是一个 JSON 字符串，内容为 {@code {"hotwords":[{"word":"x"}]}}，
+     * 不带权重，优先级高于账号里预建的热词词表。上限 200 token，超出由服务端截断，
+     * 这里按条数先收一道，避免整串被截在半个词上。
+     */
+    private String buildHotwordContext(List<Hotword> hotwords) throws Exception {
+        List<Hotword> limited = Hotword.limit(hotwords, MAX_HOTWORDS);
+        if (limited.isEmpty()) {
+            return null;
+        }
+        ObjectNode context = objectMapper.createObjectNode();
+        var words = context.putArray("hotwords");
+        limited.forEach(h -> words.addObject().put("word", h.text()));
+        return objectMapper.writeValueAsString(context);
     }
 
     /**

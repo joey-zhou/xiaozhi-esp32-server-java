@@ -17,6 +17,7 @@ public class RoleBO {
     private Integer ttsId;
     private Integer modelId;
     private Integer sttId;
+    private String sttHotwords;
     private Double temperature = 0.7d;
     private Double topP = 0.9d;
     private Float vadEnergyTh;

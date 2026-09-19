@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue.runtime;
 
+import com.xiaozhi.ai.stt.Hotword;
 import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
@@ -87,6 +88,10 @@ public class Persona {
 
     @Getter
     private SttService sttService;
+
+    /** 角色配置的语音识别热词，解析好一次，每轮识别直接用 */
+    @Getter
+    private List<Hotword> sttHotwords;
 
     /**
      * 与LLM Provider通信的具体实现类

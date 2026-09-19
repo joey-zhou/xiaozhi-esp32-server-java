@@ -2,6 +2,7 @@ package com.xiaozhi.ai.stt.providers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.xiaozhi.common.annotation.MonitoredOperation;
+import com.xiaozhi.ai.stt.Hotword;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -12,6 +13,9 @@ import org.java_websocket.handshake.ServerHandshake;
 import reactor.core.publisher.Flux;
 
 import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -35,7 +39,6 @@ public class FunASRSttService implements SttService {
 
     private static final String PROVIDER_NAME = "funasr";
 
-    private static final String SPEAKING_START = "{\"mode\":\"2pass\",\"wav_name\":\"voice.wav\",\"is_speaking\":true,\"wav_format\":\"pcm\",\"chunk_size\":[5,10,5],\"itn\":true}";
     private static final String SPEAKING_END = "{\"is_speaking\": false}";
     private static final int QUEUE_TIMEOUT_MS = 100; // 队列等待超时时间
     // 上游未终结音频流时的兜底上限，需远大于设备上行抖动，否则弱网会截断用户没说完的话
@@ -52,6 +55,26 @@ public class FunASRSttService implements SttService {
     @Override
     public String getProviderName() {
         return PROVIDER_NAME;
+    }
+
+    /**
+     * 开场消息。热词按协议放在 {@code hotwords} 字段，值是「词→权重」的 JSON 字符串，
+     * 没有热词时不带该字段。
+     */
+    private static String buildSpeakingStart(List<Hotword> hotwords) {
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("mode", "2pass");
+        message.put("wav_name", "voice.wav");
+        message.put("is_speaking", true);
+        message.put("wav_format", "pcm");
+        message.put("chunk_size", List.of(5, 10, 5));
+        message.put("itn", true);
+        if (hotwords != null && !hotwords.isEmpty()) {
+            Map<String, Integer> weights = new LinkedHashMap<>();
+            hotwords.forEach(h -> weights.put(h.text(), h.weight()));
+            message.put("hotwords", JsonUtil.toJson(weights));
+        }
+        return JsonUtil.toJson(message);
     }
 
     /**
@@ -77,6 +100,13 @@ public class FunASRSttService implements SttService {
     @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText) {
+        return stream(audioSink, onPartialText, List.of());
+    }
+
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
+    @Override
+    public SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText, List<Hotword> hotwords) {
+        String speakingStart = buildSpeakingStart(hotwords);
         // 使用阻塞队列存储音频数据
         BlockingQueue<byte[]> audioQueue = new LinkedBlockingQueue<>();
         AtomicBoolean isCompleted = new AtomicBoolean(false);
@@ -103,7 +133,7 @@ public class FunASRSttService implements SttService {
             @Override
             public void onOpen(ServerHandshake handshake) {
                 log.debug("FunASR WebSocket连接已打开");
-                send(SPEAKING_START);
+                send(speakingStart);
                 
                 // 启动虚拟线程发送音频数据
                 Thread.startVirtualThread(() -> {

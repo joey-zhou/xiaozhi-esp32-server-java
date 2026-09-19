@@ -48,6 +48,9 @@ public class RoleResp {
     @Schema(description = "STT服务ID")
     private Integer sttId;
 
+    @Schema(description = "语音识别热词，每行一个「词 [权重]」")
+    private String sttHotwords;
+
     @Schema(description = "温度参数")
     private Double temperature;
 

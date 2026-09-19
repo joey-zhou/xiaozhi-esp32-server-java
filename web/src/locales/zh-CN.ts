@@ -453,6 +453,9 @@ export default {
     localSttVosk: 'Vosk 本地识别',
     localSttUnavailable: '本地识别（模型未安装）',
     localSttDesc: '不配置第三方服务时使用服务端本地模型',
+    sttHotwords: '识别热词',
+    sttHotwordsPlaceholder: '每行一个，如：\n泽宇\n小米音箱 11',
+    sttHotwordsTip: '人名、品牌、设备名这类容易识别错的词。每行一个，可在词后加空格与权重（1-11，不填为10），最多100条。仅部分识别服务支持。',
   },
 
   template: {

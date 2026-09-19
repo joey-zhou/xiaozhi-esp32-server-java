@@ -98,6 +98,7 @@ class RoleAppServiceTest {
         req.setVoiceName("xiaoyun");
         req.setTtsPitch(1.3);
         req.setTtsSpeed(0.8);
+        req.setSttHotwords("泽宇\n小米音箱 11");
         req.setVadEnergyTh(0.1f);
         req.setVadSpeechTh(0.2f);
         req.setVadSilenceTh(0.3f);
@@ -119,6 +120,7 @@ class RoleAppServiceTest {
         assertThat(resp.getVoiceName()).isEqualTo("xiaoyun");
         assertThat(resp.getTtsPitch()).isEqualTo(1.3);
         assertThat(resp.getTtsSpeed()).isEqualTo(0.8);
+        assertThat(resp.getSttHotwords()).isEqualTo("泽宇\n小米音箱 11");
         assertThat(resp.getVadEnergyTh()).isEqualTo(0.1f);
         assertThat(resp.getVadSpeechTh()).isEqualTo(0.2f);
         assertThat(resp.getVadSilenceTh()).isEqualTo(0.3f);
@@ -157,6 +159,7 @@ class RoleAppServiceTest {
         assertThat(resp.getVoiceName()).isEqualTo("xiaoyun");
         assertThat(resp.getTtsPitch()).isEqualTo(1.3);
         assertThat(resp.getTtsSpeed()).isEqualTo(0.8);
+        assertThat(resp.getSttHotwords()).isEqualTo("泽宇\n小米音箱 11");
         assertThat(resp.getVadSilenceMs()).isEqualTo(500);
         assertThat(resp.getInactiveTimeoutSeconds()).isEqualTo(120);
         assertThat(resp.getState()).isEqualTo(Role.STATE_ENABLED);
@@ -212,7 +215,7 @@ class RoleAppServiceTest {
         return new Role(ROLE_ID, 7, "avatar/role.png", "小智", "语音助手", Role.STATE_ENABLED,
                 false, 120,
                 new LlmConfig(5, 0.2, 0.5),
-                new VoiceConfig(3, 4, "xiaoyun", 1.3, 0.8),
+                new VoiceConfig(3, 4, "xiaoyun", 1.3, 0.8, "泽宇\n小米音箱 11"),
                 new AudioConfig(0.1f, 0.2f, 0.3f, 500),
                 CREATED_AT, CREATED_AT);
     }
@@ -221,7 +224,7 @@ class RoleAppServiceTest {
     private static Role legacyRole() {
         return new Role(ROLE_ID, 7, null, "小智", null, Role.STATE_ENABLED, false, null,
                 new LlmConfig(5, null, null),
-                new VoiceConfig(3, null, null, null, null),
+                new VoiceConfig(3, null, null, null, null, null),
                 new AudioConfig(null, null, null, null),
                 CREATED_AT, CREATED_AT);
     }

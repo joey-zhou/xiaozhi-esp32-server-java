@@ -127,7 +127,7 @@ class DialogueServiceDiscardedTurnTest {
      * 返回后本轮只剩收尾几行，状态断言用 Mockito 的等待窗口接住。
      */
     private void runDiscardedTurn(String finalText, Runnable beforeSpeechEnd) throws InterruptedException {
-        when(sttService.stream(any(), any())).thenAnswer(invocation -> {
+        when(sttService.stream(any(), any(), any())).thenAnswer(invocation -> {
             Flux<byte[]> audio = invocation.getArgument(0);
             audio.blockLast(AWAIT_TIMEOUT);
             stateAtFinalText.set(awaitSegmentEnded());

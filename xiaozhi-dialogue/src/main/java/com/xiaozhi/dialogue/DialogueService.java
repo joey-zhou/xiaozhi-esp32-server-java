@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue;
 
+import com.xiaozhi.ai.stt.Hotword;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.communication.message.MessageSender;
@@ -347,11 +348,12 @@ public class DialogueService{
                 AtomicBoolean bargeIn = turn.bargeIn();
                 Consumer<String> onPartialText = partialText -> onSttPartialText(session, partialText, bargeIn);
                 SttService sttService = persona.getSttService();
-                SttResult sttResult = sttService.stream(turnSink.asFlux(), onPartialText);
+                SttResult sttResult = sttService.stream(turnSink.asFlux(), onPartialText, persona.getSttHotwords());
                 // 识别失败与用户没说话是两回事：失败的这段还在缓冲里，原样重放一次
                 if (sttResult != null && isRetryable(sttResult)
                         && (segment.isRotated() || session.getAudioSinks() == turnSink)) {
-                    sttResult = retryWithReplay(session, segment, sttService, sttResult, onPartialText);
+                    sttResult = retryWithReplay(session, segment, sttService, sttResult, onPartialText,
+                            persona.getSttHotwords());
                 }
 
                 // 中间段：终稿只拼接不回答，先把到目前为止的文本发给设备，用户知道服务端听到了
@@ -442,7 +444,7 @@ public class DialogueService{
      * 重试也失败时保留带文本的那份结果，失败前识别到的部分文本总比整段丢掉好。
      */
     private SttResult retryWithReplay(ChatSession session, SpeechTurn.Segment segment, SttService sttService,
-                                      SttResult failed, Consumer<String> onPartialText) {
+                                      SttResult failed, Consumer<String> onPartialText, List<Hotword> hotwords) {
         String sessionId = session.getSessionId();
         List<byte[]> pcmFrames = segment.isRotated() ? segment.pcm() : vadService.getPcmData(sessionId);
         if (pcmFrames.isEmpty()) {
@@ -451,7 +453,7 @@ public class DialogueService{
         }
         log.warn("识别失败({})，重放整段音频重试 - SessionId: {}, 帧数: {}",
                 failed.failureReason(), sessionId, pcmFrames.size());
-        SttResult retried = sttService.stream(Flux.fromIterable(pcmFrames), onPartialText);
+        SttResult retried = sttService.stream(Flux.fromIterable(pcmFrames), onPartialText, hotwords);
         if (retried != null && !retried.operationFailed()) {
             return retried;
         }

@@ -22,7 +22,7 @@ public class RoleConverter {
         LlmConfig llm = new LlmConfig(d.getModelId(), d.getTemperature(), d.getTopP());
 
         VoiceConfig voice = new VoiceConfig(d.getTtsId(), d.getSttId(), d.getVoiceName(),
-                d.getTtsPitch(), d.getTtsSpeed());
+                d.getTtsPitch(), d.getTtsSpeed(), d.getSttHotwords());
 
         AudioConfig audio = new AudioConfig(d.getVadEnergyTh(), d.getVadSpeechTh(),
                 d.getVadSilenceTh(), d.getVadSilenceMs());
@@ -62,6 +62,7 @@ public class RoleConverter {
             d.setVoiceName(voice.voiceName());
             d.setTtsPitch(voice.ttsPitch());
             d.setTtsSpeed(voice.ttsSpeed());
+            d.setSttHotwords(voice.sttHotwords());
         }
 
         AudioConfig audio = r.getAudioConfig();
@@ -101,6 +102,7 @@ public class RoleConverter {
             bo.setVoiceName(voice.voiceName());
             bo.setTtsPitch(voice.ttsPitch());
             bo.setTtsSpeed(voice.ttsSpeed());
+            bo.setSttHotwords(voice.sttHotwords());
         }
 
         AudioConfig audio = r.getAudioConfig();

@@ -8,14 +8,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 局部更新里 -1 与 null 是两回事：-1 是把 TTS / STT 切回本地，null 是这次没改。
  * 之前构造时就把 -1 抹成 null，merge 分不清两者，火山识别切回本地识别保存后还是火山。
+ * 热词同一套规则：切到不支持热词的识别服务时前端不提交该字段，已配的热词必须原样留着，
+ * 切回来还能用；用户手动清空则是提交空串，要真的清掉。
  */
 class VoiceConfigMergeTest {
 
-    private static final VoiceConfig STORED = new VoiceConfig(3, 4, "xiaoyun", 1.3, 0.8);
+    private static final VoiceConfig STORED = new VoiceConfig(3, 4, "xiaoyun", 1.3, 0.8, "泽宇\n小米音箱 11");
 
     @Test
     void minusOneClearsBackToLocal() {
-        VoiceConfig merged = STORED.merge(new VoiceConfig(-1, -1, null, null, null));
+        VoiceConfig merged = STORED.merge(new VoiceConfig(-1, -1, null, null, null, null));
 
         assertThat(merged.ttsId()).isNull();
         assertThat(merged.sttId()).isNull();
@@ -26,7 +28,7 @@ class VoiceConfigMergeTest {
 
     @Test
     void nullKeepsCurrentValue() {
-        VoiceConfig merged = STORED.merge(new VoiceConfig(null, null, "zhichu", null, null));
+        VoiceConfig merged = STORED.merge(new VoiceConfig(null, null, "zhichu", null, null, null));
 
         assertThat(merged.ttsId()).isEqualTo(3);
         assertThat(merged.sttId()).isEqualTo(4);
@@ -35,15 +37,30 @@ class VoiceConfigMergeTest {
 
     @Test
     void positiveIdReplacesCurrentValue() {
-        VoiceConfig merged = STORED.merge(new VoiceConfig(null, 9, null, null, null));
+        VoiceConfig merged = STORED.merge(new VoiceConfig(null, 9, null, null, null, null));
 
         assertThat(merged.sttId()).isEqualTo(9);
         assertThat(merged.ttsId()).isEqualTo(3);
     }
 
     @Test
+    void nullHotwordsKeepStoredValueWhenSwitchingToUnsupportedStt() {
+        VoiceConfig merged = STORED.merge(new VoiceConfig(-1, -1, null, null, null, null));
+
+        assertThat(merged.sttId()).isNull();
+        assertThat(merged.sttHotwords()).isEqualTo("泽宇\n小米音箱 11");
+    }
+
+    @Test
+    void blankHotwordsClearStoredValue() {
+        VoiceConfig merged = STORED.merge(new VoiceConfig(null, null, null, null, null, ""));
+
+        assertThat(merged.sttHotwords()).isEmpty();
+    }
+
+    @Test
     void nonPositiveIdsReadAsNullEverywhere() {
-        VoiceConfig local = new VoiceConfig(-1, 0, null, null, null);
+        VoiceConfig local = new VoiceConfig(-1, 0, null, null, null, null);
 
         assertThat(local.ttsId()).isNull();
         assertThat(local.sttId()).isNull();

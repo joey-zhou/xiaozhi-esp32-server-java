@@ -53,7 +53,7 @@ public class RoleAppService {
     public RoleResp create(RoleCreateReq req, Integer userId) {
         Role role = Role.newRole(userId, req.getRoleName(), req.getRoleDesc(), req.getAvatar(),
                 new LlmConfig(req.getModelId(), req.getTemperature(), req.getTopP()),
-                new VoiceConfig(req.getTtsId(), req.getSttId(), req.getVoiceName(), req.getTtsPitch(), req.getTtsSpeed()),
+                new VoiceConfig(req.getTtsId(), req.getSttId(), req.getVoiceName(), req.getTtsPitch(), req.getTtsSpeed(), req.getSttHotwords()),
                 new AudioConfig(req.getVadEnergyTh(), req.getVadSpeechTh(), req.getVadSilenceTh(), req.getVadSilenceMs()),
                 "1".equals(req.getIsDefault()),
                 req.getInactiveTimeoutSeconds());
@@ -69,7 +69,7 @@ public class RoleAppService {
 
         role.update(req.getRoleName(), req.getRoleDesc(), req.getAvatar(),
                 new LlmConfig(req.getModelId(), req.getTemperature(), req.getTopP()),
-                new VoiceConfig(req.getTtsId(), req.getSttId(), req.getVoiceName(), req.getTtsPitch(), req.getTtsSpeed()),
+                new VoiceConfig(req.getTtsId(), req.getSttId(), req.getVoiceName(), req.getTtsPitch(), req.getTtsSpeed(), req.getSttHotwords()),
                 new AudioConfig(req.getVadEnergyTh(), req.getVadSpeechTh(), req.getVadSilenceTh(), req.getVadSilenceMs()),
                 req.getIsDefault() == null ? null : "1".equals(req.getIsDefault()),
                 req.getInactiveTimeoutSeconds());

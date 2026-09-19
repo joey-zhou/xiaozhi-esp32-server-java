@@ -26,6 +26,7 @@ export interface Role {
   modelId?: number
   modelName?: string
   sttId?: number
+  sttHotwords?: string
   temperature?: number
   topP?: number
   vadEnergyTh?: number
@@ -71,6 +72,8 @@ export interface SttOption {
   label: string
   value: number
   desc?: string
+  /** 识别服务商，本地识别为空；决定热词输入框显不显示 */
+  provider?: string
 }
 
 /** 服务端本地语音识别状态，对应后端 LocalSttResp */
@@ -91,6 +94,7 @@ export interface RoleFormData {
   temperature?: number
   topP?: number
   sttId?: number
+  sttHotwords?: string
   vadSpeechTh?: number
   vadSilenceTh?: number
   vadEnergyTh?: number

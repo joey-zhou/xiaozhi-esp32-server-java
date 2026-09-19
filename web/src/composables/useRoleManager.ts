@@ -281,7 +281,8 @@ export function useRoleManager() {
           options.push({
             label: config.configName,
             value: Number(config.configId),
-            desc: config.configDesc
+            desc: config.configDesc,
+            provider: config.provider
           })
         })
       }
@@ -293,6 +294,15 @@ export function useRoleManager() {
     } finally {
       sttLoading.value = false
     }
+  }
+
+  /** 支持热词直传的识别服务商，与后端覆写了带热词重载的 provider 一一对应 */
+  const HOTWORD_PROVIDERS = ['tencent', 'volcengine', 'funasr']
+
+  /** 当前选中的识别服务是否支持热词，不支持时不显示热词输入框（已配的热词仍保留） */
+  function sttSupportsHotwords(sttId?: number | null) {
+    const option = sttOptions.value.find(o => o.value === sttId)
+    return !!option?.provider && HOTWORD_PROVIDERS.includes(option.provider)
   }
 
   function localSttLabelOf(provider?: string | null) {
@@ -349,6 +359,7 @@ export function useRoleManager() {
     loadAllModels,
     loadAllVoices,
     loadSttOptions,
+    sttSupportsHotwords,
     getModelInfo,
     getVoiceInfo,
     formatProviderName,

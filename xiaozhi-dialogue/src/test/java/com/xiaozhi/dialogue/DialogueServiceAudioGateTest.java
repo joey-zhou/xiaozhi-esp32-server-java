@@ -165,7 +165,7 @@ class DialogueServiceAudioGateTest {
                 .thenReturn(new VadResult(VadStatus.SPEECH_START, new byte[] {1, 1}));
         session.setPersona(persona);
         when(persona.getSttService()).thenReturn(sttService);
-        when(sttService.stream(any(), any())).thenAnswer(invocation -> {
+        when(sttService.stream(any(), any(), any())).thenAnswer(invocation -> {
             // 终稿回来之前新一轮已经换掉音频流，本轮结果作废
             session.createAudioStream();
             return SttResult.textOnly("过期的一句话");
@@ -184,7 +184,7 @@ class DialogueServiceAudioGateTest {
                 .thenReturn(new VadResult(VadStatus.SPEECH_START, new byte[] {1, 1}));
         session.setPersona(persona);
         when(persona.getSttService()).thenReturn(sttService);
-        when(sttService.stream(any(), any())).thenThrow(new IllegalStateException("识别连接断开"));
+        when(sttService.stream(any(), any(), any())).thenThrow(new IllegalStateException("识别连接断开"));
         when(player.isPaused()).thenReturn(true);
 
         dialogueService.processAudioData(session, opusFrame());

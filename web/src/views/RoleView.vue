@@ -66,6 +66,7 @@ const {
   loadAllModels,
   loadAllVoices,
   loadSttOptions,
+  sttSupportsHotwords,
   getModelInfo,
   formatProviderName,
 } = useRoleManager()
@@ -90,6 +91,7 @@ const formData = reactive<RoleFormData>({
   temperature: 0.7,
   topP: 0.9,
   sttId: undefined,
+  sttHotwords: '',
   vadSpeechTh: 0.5,
   vadSilenceTh: 0.3,
   vadEnergyTh: 0.01,
@@ -267,6 +269,7 @@ const handleEdit = (record: Role) => {
       temperature: record.temperature ?? 0.7,
       topP: record.topP ?? 0.9,
       sttId: record.sttId ?? (localSttAvailable.value ? -1 : undefined),
+      sttHotwords: record.sttHotwords || '',
       vadSpeechTh: record.vadSpeechTh ?? 0.5,
       vadSilenceTh: record.vadSilenceTh ?? 0.3,
       vadEnergyTh: record.vadEnergyTh ?? 0.01,
@@ -336,6 +339,8 @@ const handleSubmit = async () => {
       // 将 isDefault 布尔值转换为字符串 '1' 或 '0'
       isDefault: formData.isDefault ? '1' : '0',
       ttsId: ttsId,
+      // 识别服务不支持热词时不提交该字段，后端按「本次没改」处理，已配的热词原样保留
+      sttHotwords: sttSupportsHotwords(formData.sttId) ? (formData.sttHotwords || '') : undefined,
     }
 
     if (editingRoleId.value) {
@@ -413,6 +418,7 @@ const resetForm = () => {
     topP: 0.9,
     // 服务端没有本地识别模型时不预选，逼着选一个第三方配置
     sttId: localSttAvailable.value ? -1 : undefined,
+    sttHotwords: '',
     vadSpeechTh: 0.5,
     vadSilenceTh: 0.3,
     vadEnergyTh: 0.01,
@@ -995,6 +1001,20 @@ Promise.all([
                       {{ stt.label }}
                     </a-select-option>
                   </a-select>
+                </a-form-item>
+              </a-col>
+              <a-col v-if="sttSupportsHotwords(formData.sttId)" :xl="16" :lg="12" :xs="24">
+                <a-form-item
+                  :label="t('role.sttHotwords')"
+                  name="sttHotwords"
+                  :extra="t('role.sttHotwordsTip')"
+                >
+                  <a-textarea
+                    v-model:value="formData.sttHotwords"
+                    :placeholder="t('role.sttHotwordsPlaceholder')"
+                    :auto-size="{ minRows: 3, maxRows: 8 }"
+                    :maxlength="4000"
+                  />
                 </a-form-item>
               </a-col>
             </a-row>

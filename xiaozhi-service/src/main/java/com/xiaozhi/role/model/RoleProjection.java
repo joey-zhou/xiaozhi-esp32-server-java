@@ -20,6 +20,7 @@ public class RoleProjection {
     private Integer modelId;
     private String modelName;
     private Integer sttId;
+    private String sttHotwords;
     private Double temperature;
     private Double topP;
     private Float vadEnergyTh;

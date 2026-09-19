@@ -31,6 +31,7 @@ public class RoleDO extends BaseDO {
     private Integer modelId;
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Integer sttId;
+    private String sttHotwords;
     private Double temperature;
     private Double topP;
     private Float vadEnergyTh;

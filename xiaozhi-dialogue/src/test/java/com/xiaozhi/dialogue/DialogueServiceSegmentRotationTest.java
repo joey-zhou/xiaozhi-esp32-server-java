@@ -150,7 +150,7 @@ class DialogueServiceSegmentRotationTest {
 
     /** 按这条流第一帧的标记返回终稿：段首帧是 VAD 交给该段的第一帧，重放流的首帧是交出的 PCM */
     private void scriptStt(Map<Byte, SttResult> resultsByMarker) {
-        when(sttService.stream(any(), any())).thenAnswer(invocation -> {
+        when(sttService.stream(any(), any(), any())).thenAnswer(invocation -> {
             Flux<byte[]> audio = invocation.getArgument(0);
             sttCalls.incrementAndGet();
             List<byte[]> frames = audio.collectList().block(AWAIT_TIMEOUT);

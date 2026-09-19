@@ -15,6 +15,7 @@
         r.modelId,
         model_config.configName AS modelName,
         r.sttId,
+        r.sttHotwords,
         r.temperature,
         r.topP,
         r.vadEnergyTh,

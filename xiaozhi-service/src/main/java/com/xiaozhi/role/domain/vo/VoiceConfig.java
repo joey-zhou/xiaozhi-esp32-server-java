@@ -7,9 +7,11 @@ package com.xiaozhi.role.domain.vo;
  * <p>ttsId / sttId 的 -1 表示"用服务端本地能力"（前端的本地识别、Edge 音色都传 -1），
  * 对外一律读作 null；但在 {@link #merge(VoiceConfig)} 里 -1 是明确给出的值，要把当前值清掉，
  * 只有 null 才是"这次没改"。
+ * <p>sttHotwords 同理：空串是「清空热词」，null 才是「这次没改」。切换到不支持热词的识别服务时
+ * 前端不提交该字段，已配的热词原样保留。
  */
 public record VoiceConfig(Integer ttsId, Integer sttId, String voiceName,
-                           Double ttsPitch, Double ttsSpeed) {
+                           Double ttsPitch, Double ttsSpeed, String sttHotwords) {
 
     /** 语音音调默认值 */
     public static final Double DEFAULT_TTS_PITCH = 1.0;
@@ -18,7 +20,7 @@ public record VoiceConfig(Integer ttsId, Integer sttId, String voiceName,
     public static final Double DEFAULT_TTS_SPEED = 1.0;
 
     public static VoiceConfig defaults() {
-        return new VoiceConfig(null, null, null, DEFAULT_TTS_PITCH, DEFAULT_TTS_SPEED);
+        return new VoiceConfig(null, null, null, DEFAULT_TTS_PITCH, DEFAULT_TTS_SPEED, null);
     }
 
     /** 非正数表示本地能力，读作 null */
@@ -36,7 +38,7 @@ public record VoiceConfig(Integer ttsId, Integer sttId, String voiceName,
     public VoiceConfig withDefaults() {
         return new VoiceConfig(ttsId(), sttId(), voiceName,
                 ttsPitch != null ? ttsPitch : DEFAULT_TTS_PITCH,
-                ttsSpeed != null ? ttsSpeed : DEFAULT_TTS_SPEED);
+                ttsSpeed != null ? ttsSpeed : DEFAULT_TTS_SPEED, sttHotwords);
     }
 
     /**
@@ -52,7 +54,8 @@ public record VoiceConfig(Integer ttsId, Integer sttId, String voiceName,
                 patch.sttId != null ? patch.sttId() : sttId(),
                 patch.voiceName() != null ? patch.voiceName() : voiceName,
                 patch.ttsPitch() != null ? patch.ttsPitch() : ttsPitch,
-                patch.ttsSpeed() != null ? patch.ttsSpeed() : ttsSpeed);
+                patch.ttsSpeed() != null ? patch.ttsSpeed() : ttsSpeed,
+                patch.sttHotwords() != null ? patch.sttHotwords() : sttHotwords);
     }
 
     private static Integer normalize(Integer id) {

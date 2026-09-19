@@ -7,6 +7,7 @@ import com.tencent.asrv2.SpeechRecognizerResponse;
 import com.tencent.core.ws.Credential;
 import com.tencent.core.ws.SpeechClient;
 import com.xiaozhi.common.annotation.MonitoredOperation;
+import com.xiaozhi.ai.stt.Hotword;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -15,8 +16,10 @@ import com.xiaozhi.ai.utils.HttpUtil;
 import okhttp3.*;
 import reactor.core.publisher.Flux;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -35,6 +38,8 @@ public class TencentSttService implements SttService {
     // 上游未终结音频流时的兜底上限，需远大于设备上行抖动，否则弱网会截断用户没说完的话
     private static final long IDLE_TIMEOUT_MS = 5000;
     private static final long RECOGNITION_TIMEOUT_MS = 90000; // 识别超时时间（90秒）
+    // 临时热词表的条数上限，由腾讯侧规定
+    private static final int MAX_HOTWORDS = 128;
 
     // 使用腾讯云SDK的默认URL
     private static final String WS_API_URL = "wss://asr.cloud.tencent.com/asr/v2/";
@@ -85,6 +90,12 @@ public class TencentSttService implements SttService {
     @MonitoredOperation(name = "xiaozhi.stt.stream")
     @Override
     public SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText) {
+        return stream(audioSink, onPartialText, List.of());
+    }
+
+    @MonitoredOperation(name = "xiaozhi.stt.stream")
+    @Override
+    public SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText, List<Hotword> hotwords) {
         // 检查配置是否已设置
         if (secretId == null || secretKey == null || appId == null) {
             log.error("腾讯云语音识别配置未设置，无法进行识别");
@@ -122,6 +133,10 @@ public class TencentSttService implements SttService {
             request.setEngineModelType("16k_zh"); // 16k采样率中文模型
             request.setVoiceFormat(1); // PCM格式
             request.setVoiceId(voiceId);
+            String hotwordList = toHotwordList(hotwords);
+            if (hotwordList != null) {
+                request.setHotwordList(hotwordList);
+            }
 
             // 创建识别监听器
             SpeechRecognizerListener listener = new SpeechRecognizerListener() {
@@ -317,6 +332,18 @@ public class TencentSttService implements SttService {
 
         SttResult result = SttResult.textOnly(finalResult.get()).withFailure(failureReason.get());
         return timedOut ? result.withFailureIfEmpty(SttResult.FAILURE_TIMEOUT) : result;
+    }
+
+    /**
+     * 转成腾讯的临时热词表：{@code 词|权重} 用英文逗号分隔，最多 128 个。
+     * 词里含逗号或竖线会破坏这个格式，直接跳过；一个都没有时返回 null，不设该参数。
+     */
+    private static String toHotwordList(List<Hotword> hotwords) {
+        String list = Hotword.limit(hotwords, MAX_HOTWORDS).stream()
+                .filter(h -> h.text().indexOf(',') < 0 && h.text().indexOf('|') < 0)
+                .map(h -> h.text() + "|" + h.weight())
+                .collect(Collectors.joining(","));
+        return list.isEmpty() ? null : list;
     }
 
     // 在服务关闭时释放资源

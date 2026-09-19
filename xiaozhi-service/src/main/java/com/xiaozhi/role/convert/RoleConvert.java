@@ -41,6 +41,7 @@ public interface RoleConvert {
     @Mapping(target = "topP", source = "llmConfig.topP")
     @Mapping(target = "ttsId", source = "voiceConfig.ttsId")
     @Mapping(target = "sttId", source = "voiceConfig.sttId")
+    @Mapping(target = "sttHotwords", source = "voiceConfig.sttHotwords")
     @Mapping(target = "voiceName", source = "voiceConfig.voiceName")
     @Mapping(target = "ttsPitch", source = "voiceConfig.ttsPitch")
     @Mapping(target = "ttsSpeed", source = "voiceConfig.ttsSpeed")

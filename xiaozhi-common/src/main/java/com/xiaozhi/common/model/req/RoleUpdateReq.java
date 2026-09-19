@@ -6,6 +6,7 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
@@ -46,6 +47,10 @@ public class RoleUpdateReq {
 
     @Schema(description = "STT服务ID")
     private Integer sttId;
+
+    @Schema(description = "语音识别热词，每行一个「词 [权重]」")
+    @Size(max = 4000, message = "热词内容过长")
+    private String sttHotwords;
 
     @Schema(description = "温度参数")
     @DecimalMin(value = "0.0", message = "温度参数不能小于0")

@@ -1,7 +1,9 @@
 package com.xiaozhi.ai.stt;
 
+import com.xiaozhi.common.annotation.MonitoredOperation;
 import reactor.core.publisher.Flux;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -29,6 +31,16 @@ public interface SttService {
    */
   default SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText) {
     return stream(audioSink);
+  }
+
+  /**
+   * 带热词的流式处理。只有支持热词的 provider 覆写本方法，其余走没有热词的重载，热词被忽略。
+   *
+   * @param hotwords 本轮生效的热词，按角色配置，可能为空
+   */
+  @MonitoredOperation(name = "xiaozhi.stt.stream")
+  default SttResult stream(Flux<byte[]> audioSink, Consumer<String> onPartialText, List<Hotword> hotwords) {
+    return stream(audioSink, onPartialText);
   }
 
 }
