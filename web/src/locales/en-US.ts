@@ -453,6 +453,7 @@ export default {
     localSttVosk: 'Vosk Local Recognition',
     localSttUnavailable: 'Local Recognition (model not installed)',
     localSttDesc: 'Uses the server-side local model when no third-party service is configured',
+    agentOptionLabel: '{name} ({provider} Agent)',
     sttHotwords: 'Recognition Hotwords',
     sttHotwordsPlaceholder: 'One per line, e.g.\nZeyu\nMi Speaker 11',
     sttHotwordsTip: 'Names, brands and device names that are easily misrecognized. One per line, optionally followed by a space and a weight (1-11, defaults to 10), up to 100 entries. Supported by some recognition services only.',

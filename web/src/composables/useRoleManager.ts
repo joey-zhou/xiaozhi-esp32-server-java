@@ -173,7 +173,7 @@ export function useRoleManager() {
       AGENT_PROVIDERS.forEach(({ provider, label }, index) => {
         settledList(agentResults[index]!, provider).forEach((agent: Agent) => {
           models.push({
-            label: `${agent.agentName} (${label}智能体)`,
+            label: t('role.agentOptionLabel', { name: agent.agentName, provider: label }),
             value: agent.configId,
             desc: agent.agentDesc,
             type: 'agent',
