@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -48,12 +47,16 @@ public class SenseVoiceSttService implements SttService {
     private static final long RECOGNITION_TIMEOUT_MS = 90_000;
     private static final int PENDING_DECODES = 64;
 
-    private static final int DECODE_THREADS = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
+    /** 解码这份 CPU 预算：同时占用的核数上限，余下的核留给本地合成与对话主链路 */
+    private static final int DECODE_CORE_BUDGET = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
+    /** 模型加载前按默认线程数建池，加载时再按实际线程数收放 */
+    private static final int DEFAULT_NUM_THREADS = 2;
     private static final CountingRejectionHandler REJECTION_HANDLER =
             new CountingRejectionHandler(new ThreadPoolExecutor.AbortPolicy());
     // 平台线程：解码在 JNI 里长时间占着 CPU，放虚拟线程会把载体线程钉死
-    private static final ExecutorService DECODE_EXECUTOR = new ThreadPoolExecutor(
-            DECODE_THREADS, DECODE_THREADS,
+    private static final ThreadPoolExecutor DECODE_EXECUTOR = new ThreadPoolExecutor(
+            decodeConcurrency(DECODE_CORE_BUDGET, DEFAULT_NUM_THREADS),
+            decodeConcurrency(DECODE_CORE_BUDGET, DEFAULT_NUM_THREADS),
             0L, TimeUnit.MILLISECONDS,
             new LinkedBlockingQueue<>(PENDING_DECODES),
             r -> {
@@ -70,6 +73,30 @@ public class SenseVoiceSttService implements SttService {
     public SenseVoiceSttService(String modelDir, int numThreads) {
         this.modelDir = modelDir;
         this.numThreads = Math.max(1, numThreads);
+        resizeDecodePool(decodeConcurrency(DECODE_CORE_BUDGET, this.numThreads));
+    }
+
+    /**
+     * 同时解码的路数。每路解码占 numThreads 个核，路数 × numThreads 不得超过预算；
+     * 识别是整句离线解码，耗时直接算进首响，所以保单路速度、让并发路数去迁就预算。
+     */
+    static int decodeConcurrency(int coreBudget, int numThreads) {
+        return Math.max(1, coreBudget / Math.max(1, numThreads));
+    }
+
+    /** 收缩时先降 core 再降 max，扩张时反过来，否则 core 大于 max 会抛 IllegalArgumentException */
+    private static synchronized void resizeDecodePool(int concurrency) {
+        if (concurrency == DECODE_EXECUTOR.getMaximumPoolSize()) {
+            return;
+        }
+        if (concurrency < DECODE_EXECUTOR.getMaximumPoolSize()) {
+            DECODE_EXECUTOR.setCorePoolSize(concurrency);
+            DECODE_EXECUTOR.setMaximumPoolSize(concurrency);
+        } else {
+            DECODE_EXECUTOR.setMaximumPoolSize(concurrency);
+            DECODE_EXECUTOR.setCorePoolSize(concurrency);
+        }
+        log.info("SenseVoice 解码并发调整为 {} 路", concurrency);
     }
 
     /**
@@ -101,8 +128,8 @@ public class SenseVoiceSttService implements SttService {
                 .build();
         long start = System.currentTimeMillis();
         recognizer = new OfflineRecognizer(config);
-        log.info("SenseVoice 模型加载成功，路径: {}, 线程数: {}, 耗时: {}ms",
-                dir, numThreads, System.currentTimeMillis() - start);
+        log.info("SenseVoice 模型加载成功，路径: {}, 线程数: {}, 解码并发: {} 路, 耗时: {}ms",
+                dir, numThreads, DECODE_EXECUTOR.getMaximumPoolSize(), System.currentTimeMillis() - start);
     }
 
     public boolean isModelLoaded() {
