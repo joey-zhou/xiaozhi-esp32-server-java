@@ -51,11 +51,14 @@ Xiaozhi ESP32 Server Java 是基于 [Xiaozhi ESP32](https://github.com/78/xiaozh
 
 - **多模块 + 双进程架构** — 管理后台与对话服务独立运行，互不影响，支持分别扩容
 - **多 AI 平台集成** — OpenAI / 智谱 / 讯飞 / Ollama / Dify / Coze，MCP 工具协议扩展
-- **语音全链路** — 本地 & 云端 STT/TTS，音色克隆，实时打断，双向流式交互
-- **WebSocket + MQTT** — 实时双向通信，服务端主动唤醒，OTA 远程升级
+- **语音全链路** — 本地 & 云端 STT/TTS，音色克隆，双向流式交互，实时打断，智能防误打断，极速响应
+- **声纹识别** — 识别家庭成员，多成员独立记忆，共用设备互不干扰
+- **WebSocket + MQTT** — 实时双向通信，服务端主动唤醒与消息推送，OTA 分批升级与时间窗控制
+- **多设备就近应答** — 同空间多台设备同时唤醒，仅一台应答
 - **IoT 智能家居** — 语音指令控制设备，多设备协同，Function Call 智能决策
-- **RAG 知识库** — 文档上传，智能检索增强生成，长期记忆管理
-- **全链路监控** — Token / 时延 / 设备活跃度等多维度数据可视化
+- **RAG 知识库** — 多格式文档解析（PDF / Office / 图片），检索增强生成
+- **长期记忆与记忆图谱** — 记住用户偏好与关键信息，理解人物关系，跨会话记忆
+- **全链路监控** — Token / 时延 / 设备活跃度多维可视化，运维指标对接，设备接入一键自检
 - **一键部署** — bin 脚本 / Docker Compose，Flyway 自动建表，模型自动下载
 
 ### 技术栈
@@ -64,11 +67,11 @@ Xiaozhi ESP32 Server Java 是基于 [Xiaozhi ESP32](https://github.com/78/xiaozh
 |------|----------|
 | **后端** | Spring Boot、Spring MVC、MyBatis-Plus、Flyway、WebSocket |
 | **前端** | Vue.js、Ant Design、响应式布局 |
-| **数据层** | MySQL 8.0、Redis 7 |
-| **语音识别** | Vosk（本地）、FunASR、阿里云、阿里云 NLS、腾讯云、讯飞、火山引擎 |
+| **数据层** | MySQL 8.0、Redis 7、Qdrant（向量检索） |
+| **语音识别** | sherpa-onnx SenseVoice（本地）、Vosk（本地）、FunASR、阿里云、阿里云 NLS、腾讯云、讯飞、火山引擎 |
 | **语音合成** | sherpa-onnx（本地）、Edge TTS、阿里云、阿里云 NLS、腾讯云、讯飞、火山引擎、MiniMax |
 | **大语言模型** | OpenAI、智谱 AI、讯飞星火、火山方舟、星辰、Ollama、Dify、Coze |
-| **扩展能力** | MCP 工具协议、Function Call、RAG 知识库、音色克隆 |
+| **扩展能力** | MCP 工具协议与接入点、Function Call、RAG 知识库、长期记忆与记忆图谱、声纹识别、音色克隆 |
 
 ---
 
@@ -101,7 +104,7 @@ Xiaozhi ESP32 Server Java 是基于 [Xiaozhi ESP32](https://github.com/78/xiaozh
 > 部分功能未开源，有需求请通过下方联系方式沟通
 
 <div align="center">
-  <img src="docs/images/featture-comparison.png" alt="开源版 vs 商业版功能对比" width="900" />
+  <img src="docs/images/feature-comparison.png" alt="开源版 vs 商业版功能对比" width="900" />
 </div>
 
 ---
