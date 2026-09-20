@@ -29,6 +29,7 @@ permissions:
 
 jobs:
   build:
+    if: github.repository == 'joey-zhou/xiaozhi-esp32-server-java'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
