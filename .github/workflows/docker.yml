@@ -4,7 +4,7 @@ name: docker
 # 触发方式：
 #   - 打 v 开头的 tag（v1.2.0）→ 发布 1.2.0、1.2、latest 三个标签
 #   - 手动触发 → 发布 edge 标签，可选一并构建 arm64
-# 日常 push 不触发：一次构建要编译全部 Java 模块、装 Python 依赖并下载约 1.5GB 模型，很慢。
+# 日常 push 不触发：一次构建要编译全部 Java 模块并下载语音模型，很慢。
 on:
   push:
     tags:
@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # server 镜像带模型与 Python 依赖，runner 默认剩余空间不够，先腾出预装的 SDK
+      # server 镜像带语音模型，runner 默认剩余空间不够，先腾出预装的 SDK
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup
