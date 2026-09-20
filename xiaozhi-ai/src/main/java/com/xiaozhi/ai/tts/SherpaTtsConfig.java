@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
 @Data
 public class SherpaTtsConfig {
 
-    /** 同时进行的本地合成数上限，0 表示按 CPU 核数推导 */
+    /** 同时进行的本地合成数上限，0 表示跟随本地推理核预算、随在用的本地服务动态收放 */
     private int maxConcurrent = 0;
 
     /** 单次合成的 onnxruntime 线程数；与并发上限的乘积即合成占用的核数 */

@@ -102,6 +102,36 @@ class SherpaOnnxTtsServiceAdmissionTest {
         assertThat(executed).isFalse();
     }
 
+    // 并发跟着核预算收放，队列的物理容量按最大并发留足；实际排队上限要随当前并发走，
+    // 否则并发收缩后一条工作线程背着几十句的队列，句句都要等满超时才被放弃
+    @Test
+    void queueLimitFollowsCurrentConcurrencyNotPhysicalCapacity() throws Exception {
+        installPool(1, 64);
+        occupyWorker();
+        for (int i = 0; i < 8; i++) {
+            pool.execute(this::awaitRelease);
+        }
+
+        assertThatThrownBy(() -> SherpaOnnxTtsService.submitWithAdmission(() -> "音频"))
+            .isInstanceOf(TtsOverloadException.class)
+            .hasMessageContaining("排队已满");
+    }
+
+    @Test
+    void queueLimitGrowsWithConcurrency() throws Exception {
+        installPool(2, 64);
+        occupyWorker();
+        occupyWorker();
+        for (int i = 0; i < 8; i++) {
+            pool.execute(this::awaitRelease);
+        }
+
+        // 两路并发的排队上限是 16，第 9 句进得了队，只是等不到工作线程
+        assertThatThrownBy(() -> SherpaOnnxTtsService.submitWithAdmission(() -> "音频"))
+            .isInstanceOf(TtsOverloadException.class)
+            .hasMessageContaining("排队超过");
+    }
+
     private void installPool(int threads, int queueCapacity) {
         pool = new ThreadPoolExecutor(threads, threads, 0L, TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<>(queueCapacity),

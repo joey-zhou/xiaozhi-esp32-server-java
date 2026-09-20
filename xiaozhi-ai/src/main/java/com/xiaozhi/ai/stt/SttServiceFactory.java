@@ -28,7 +28,7 @@ public class SttServiceFactory {
     @Resource
     private RuntimePathConfig runtimePathConfig;
 
-    /** SenseVoice 单次解码用的 onnxruntime 线程数；解码并发路数由核预算（核数/2）除以它得到，调大它并发路数随之减少 */
+    /** SenseVoice 单次解码用的 onnxruntime 线程数；解码并发路数由分到的核预算除以它得到，调大它并发路数随之减少 */
     @Value("${xiaozhi.stt.sense-voice.num-threads:2}")
     private int senseVoiceNumThreads = 2;
 

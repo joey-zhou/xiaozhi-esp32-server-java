@@ -5,6 +5,8 @@ import com.xiaozhi.common.annotation.MonitoredOperation;
 import com.xiaozhi.ai.tts.TtsOverloadException;
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.XiaozhiTtsOptions;
+import com.xiaozhi.ai.utils.LocalInferenceBudget;
+import com.xiaozhi.ai.utils.LocalInferenceBudget.Kind;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.monitoring.CountingRejectionHandler;
 import com.xiaozhi.utils.AudioUtils;
@@ -41,10 +43,10 @@ public class SherpaOnnxTtsService implements TtsService {
     // 模型文件被替换后需重启进程才生效
     private static final Map<String, OfflineTts> ttsCache = new ConcurrentHashMap<>();
 
-    // 并发数缺省值：本地 STT 解码占核数的一半、声纹提取占四分之一，合成只能拿剩下的
-    private static final int DEFAULT_MAX_CONCURRENT = Math.max(1, Runtime.getRuntime().availableProcessors() / 4);
     // 单条许可对应的排队位数，乘出来的队列深度与 WAIT_TIMEOUT_MS 的等待上限量级一致
     private static final int QUEUE_PER_PERMIT = 8;
+    // 队列的物理容量按并发可能涨到的最大值留足，实际排队上限随当前并发在提交时判
+    private static final int QUEUE_CAPACITY = Runtime.getRuntime().availableProcessors() * QUEUE_PER_PERMIT;
     // 排队等待上限缺省值，超过则本句已不可能在用户容忍时间内播出
     private static final long DEFAULT_WAIT_TIMEOUT_MS = 8000;
 
@@ -159,9 +161,14 @@ public class SherpaOnnxTtsService implements TtsService {
      * 送进合成线程池并等结果。队列已满或排队超过等待上限即放弃本次，抛 {@link TtsOverloadException}。
      */
     static <T> T submitWithAdmission(Callable<T> task) throws Exception {
-        Future<T> future;
+        LocalInferenceBudget.shared().touch(Kind.TTS);
+        FutureTask<T> future = new FutureTask<>(task);
         try {
-            future = executor().submit(task);
+            ThreadPoolExecutor executor = executor();
+            if (executor.getQueue().size() >= executor.getMaximumPoolSize() * QUEUE_PER_PERMIT) {
+                REJECTION_HANDLER.rejectedExecution(future, executor);
+            }
+            executor.execute(future);
         } catch (RejectedExecutionException e) {
             droppedCount.incrementAndGet();
             throw new TtsOverloadException("本地合成排队已满，跳过本次合成");
@@ -198,13 +205,40 @@ public class SherpaOnnxTtsService implements TtsService {
 
     /**
      * 建合成线程池，由 {@code SherpaTtsConfig} 启动时调一次。
-     * maxConcurrent 非正数时按核数的四分之一推导，waitTimeout 非正数时用缺省 8 秒。
+     * maxConcurrent 非正数时并发跟随本地推理核预算，waitTimeout 非正数时用缺省 8 秒。
      */
     public static synchronized void configure(int maxConcurrent, int numThreads, long waitTimeout) {
         synthNumThreads = Math.max(1, numThreads);
         waitTimeoutMs = waitTimeout > 0 ? waitTimeout : DEFAULT_WAIT_TIMEOUT_MS;
         if (synthExecutor == null) {
-            synthExecutor = createExecutor(maxConcurrent > 0 ? maxConcurrent : DEFAULT_MAX_CONCURRENT);
+            synthExecutor = createExecutor(maxConcurrent > 0 ? maxConcurrent : budgetedConcurrency());
+        }
+        if (maxConcurrent <= 0) {
+            LocalInferenceBudget.shared().bind(Kind.TTS, cores -> resize(synthConcurrency(cores, synthNumThreads)));
+        }
+    }
+
+    /** 同时合成的句数。每句占 numThreads 个核，句数 × numThreads 不得超过分到的核数 */
+    static int synthConcurrency(int cores, int numThreads) {
+        return Math.max(1, cores / Math.max(1, numThreads));
+    }
+
+    private static int budgetedConcurrency() {
+        return synthConcurrency(LocalInferenceBudget.shared().coresFor(Kind.TTS), synthNumThreads);
+    }
+
+    /** 收缩时先降 core 再降 max，扩张时反过来，否则 core 大于 max 会抛 IllegalArgumentException */
+    private static synchronized void resize(int concurrency) {
+        ThreadPoolExecutor executor = executor();
+        if (concurrency == executor.getMaximumPoolSize()) {
+            return;
+        }
+        if (concurrency < executor.getMaximumPoolSize()) {
+            executor.setCorePoolSize(concurrency);
+            executor.setMaximumPoolSize(concurrency);
+        } else {
+            executor.setMaximumPoolSize(concurrency);
+            executor.setCorePoolSize(concurrency);
         }
     }
 
@@ -215,20 +249,20 @@ public class SherpaOnnxTtsService implements TtsService {
         }
         synchronized (SherpaOnnxTtsService.class) {
             if (synthExecutor == null) {
-                synthExecutor = createExecutor(DEFAULT_MAX_CONCURRENT);
+                synthExecutor = createExecutor(budgetedConcurrency());
             }
             return synthExecutor;
         }
     }
 
     private static ThreadPoolExecutor createExecutor(int maxConcurrent) {
-        int queueCapacity = maxConcurrent * QUEUE_PER_PERMIT;
-        log.info("sherpa-onnx TTS 合成线程池就绪 - 并发上限: {}, 排队上限: {}", maxConcurrent, queueCapacity);
+        log.info("sherpa-onnx TTS 合成线程池就绪 - 并发上限: {}, 排队上限: {}",
+                maxConcurrent, maxConcurrent * QUEUE_PER_PERMIT);
         // 平台线程：推理在 JNI 里长时间占着 CPU，放虚拟线程会把载体线程钉死
         return new ThreadPoolExecutor(
                 maxConcurrent, maxConcurrent,
                 0L, TimeUnit.MILLISECONDS,
-                new LinkedBlockingQueue<>(queueCapacity),
+                new LinkedBlockingQueue<>(Math.max(QUEUE_CAPACITY, maxConcurrent * QUEUE_PER_PERMIT)),
                 r -> {
                     Thread t = new Thread(r, "sherpa-tts-worker");
                     t.setDaemon(true);

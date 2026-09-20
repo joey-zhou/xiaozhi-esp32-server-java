@@ -8,6 +8,8 @@ import com.k2fsa.sherpa.onnx.OfflineSenseVoiceModelConfig;
 import com.k2fsa.sherpa.onnx.OfflineStream;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
+import com.xiaozhi.ai.utils.LocalInferenceBudget;
+import com.xiaozhi.ai.utils.LocalInferenceBudget.Kind;
 import com.xiaozhi.common.monitoring.CountingRejectionHandler;
 import com.xiaozhi.utils.AudioUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -47,16 +49,16 @@ public class SenseVoiceSttService implements SttService {
     private static final long RECOGNITION_TIMEOUT_MS = 90_000;
     private static final int PENDING_DECODES = 64;
 
-    /** 解码这份 CPU 预算：同时占用的核数上限，余下的核留给本地合成与对话主链路 */
-    private static final int DECODE_CORE_BUDGET = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
     /** 模型加载前按默认线程数建池，加载时再按实际线程数收放 */
     private static final int DEFAULT_NUM_THREADS = 2;
+    /** 单路解码的线程数，核预算重分时拿它换算并发路数 */
+    private static volatile int decodeNumThreads = DEFAULT_NUM_THREADS;
     private static final CountingRejectionHandler REJECTION_HANDLER =
             new CountingRejectionHandler(new ThreadPoolExecutor.AbortPolicy());
     // 平台线程：解码在 JNI 里长时间占着 CPU，放虚拟线程会把载体线程钉死
     private static final ThreadPoolExecutor DECODE_EXECUTOR = new ThreadPoolExecutor(
-            decodeConcurrency(DECODE_CORE_BUDGET, DEFAULT_NUM_THREADS),
-            decodeConcurrency(DECODE_CORE_BUDGET, DEFAULT_NUM_THREADS),
+            decodeConcurrency(LocalInferenceBudget.shared().coresFor(Kind.STT), DEFAULT_NUM_THREADS),
+            decodeConcurrency(LocalInferenceBudget.shared().coresFor(Kind.STT), DEFAULT_NUM_THREADS),
             0L, TimeUnit.MILLISECONDS,
             new LinkedBlockingQueue<>(PENDING_DECODES),
             r -> {
@@ -73,7 +75,10 @@ public class SenseVoiceSttService implements SttService {
     public SenseVoiceSttService(String modelDir, int numThreads) {
         this.modelDir = modelDir;
         this.numThreads = Math.max(1, numThreads);
-        resizeDecodePool(decodeConcurrency(DECODE_CORE_BUDGET, this.numThreads));
+        decodeNumThreads = this.numThreads;
+        LocalInferenceBudget budget = LocalInferenceBudget.shared();
+        budget.bind(Kind.STT, cores -> resizeDecodePool(decodeConcurrency(cores, decodeNumThreads)));
+        resizeDecodePool(decodeConcurrency(budget.coresFor(Kind.STT), this.numThreads));
     }
 
     /**
@@ -96,7 +101,6 @@ public class SenseVoiceSttService implements SttService {
             DECODE_EXECUTOR.setMaximumPoolSize(concurrency);
             DECODE_EXECUTOR.setCorePoolSize(concurrency);
         }
-        log.info("SenseVoice 解码并发调整为 {} 路", concurrency);
     }
 
     /**
@@ -206,6 +210,7 @@ public class SenseVoiceSttService implements SttService {
 
         Future<SttResult> future;
         try {
+            LocalInferenceBudget.shared().touch(Kind.STT);
             future = DECODE_EXECUTOR.submit(() -> decode(pcm));
         } catch (RejectedExecutionException e) {
             log.error("sherpa-onnx 识别线程池已满，拒绝本次识别任务");
