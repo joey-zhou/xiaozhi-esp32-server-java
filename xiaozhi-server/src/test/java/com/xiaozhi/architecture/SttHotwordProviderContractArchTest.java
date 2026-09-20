@@ -5,6 +5,7 @@ import com.xiaozhi.ai.stt.SttService;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
@@ -22,6 +23,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * 「哪些语音识别服务支持热词」这件事写在两个地方：Java 侧看 provider 有没有覆写
@@ -36,6 +38,13 @@ class SttHotwordProviderContractArchTest {
     private static final Pattern FRONTEND_ARRAY =
             Pattern.compile("HOTWORD_PROVIDERS\\s*=\\s*\\[([^\\]]*)]");
     private static final Pattern QUOTED_ITEM = Pattern.compile("'([^']+)'");
+
+    // 镜像构建只拷后端源码，没有前端可对；前端目录在而文件挪走了仍然要红
+    @BeforeEach
+    void frontendSourcesArePresent() {
+        assumeTrue(Files.isDirectory(Paths.get("../web")) || Files.isDirectory(Paths.get("web")),
+                "没有前端源码，跳过前后端热词清单的对账");
+    }
 
     @Test
     void providersOverridingTheHotwordOverloadMatchTheFrontendList() {

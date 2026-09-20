@@ -86,7 +86,7 @@ class ComponentScanCoverageArchTest {
 
     private static JavaClasses importModules(String[] modules) {
         ImportOption onlyThoseModules = location ->
-            Arrays.stream(modules).anyMatch(m -> location.contains(m + "target/classes/"));
+            Arrays.stream(modules).anyMatch(m -> location.contains(m + "target/"));
         return new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .withImportOption(onlyThoseModules)

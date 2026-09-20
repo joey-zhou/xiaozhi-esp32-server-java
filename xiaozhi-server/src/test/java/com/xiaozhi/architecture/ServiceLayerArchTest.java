@@ -51,15 +51,15 @@ class ServiceLayerArchTest {
      * 路径匹配失效会一个类都扫不到而假绿，用它的规则须先过 {@link #belowServerModulesAreActuallyScanned}。
      */
     private static final ImportOption BELOW_SERVER_MODULES = location ->
-        location.contains("/xiaozhi-service/target/classes/")
-            || location.contains("/xiaozhi-ai/target/classes/")
-            || location.contains("/xiaozhi-dialogue/target/classes/");
+        location.contains("/xiaozhi-service/target/")
+            || location.contains("/xiaozhi-ai/target/")
+            || location.contains("/xiaozhi-dialogue/target/");
 
     /**
      * §7 命名白名单只对 xiaozhi-service 生效：common/ai/dialogue/server 里同后缀的类是文档明文排除的技术类。
      */
     private static final ImportOption ONLY_SERVICE_MODULE =
-        location -> location.contains("/xiaozhi-service/target/classes/");
+        location -> location.contains("/xiaozhi-service/target/");
 
     /**
      * 存量：xiaozhi-ai 的这四个类直接返回 Resp。原枚举式判定面覆盖不到它们所在的包，

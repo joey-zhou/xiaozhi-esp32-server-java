@@ -52,11 +52,11 @@ class ModuleBoundaryArchTest {
 
     /** 路径匹配失效会扫到 0 个类而假绿，用它的规则须先过 {@link #serverModuleIsActuallyScanned}。 */
     private static final ImportOption ONLY_SERVER_MODULE =
-        location -> location.contains("/xiaozhi-server/target/classes/");
+        location -> location.contains("/xiaozhi-server/target/");
 
     /** 同上，用它的规则须先过 {@link #serviceModuleIsActuallyScanned}。 */
     private static final ImportOption ONLY_SERVICE_MODULE =
-        location -> location.contains("/xiaozhi-service/target/classes/");
+        location -> location.contains("/xiaozhi-service/target/");
 
     private static final String[] PACKAGES_ALLOWED_DOMAIN = {
         "com.xiaozhi.config..", "com.xiaozhi.device..", "com.xiaozhi.role.."
@@ -77,9 +77,9 @@ class ModuleBoundaryArchTest {
      * 包名枚举永远补不全。用它的规则须先过 {@link #modulesBelowServiceAreActuallyScanned}。
      */
     private static final ImportOption ONLY_MODULES_BELOW_SERVICE = location ->
-        location.contains("/xiaozhi-ai/target/classes/")
-            || location.contains("/xiaozhi-dialogue/target/classes/")
-            || location.contains("/xiaozhi-server/target/classes/");
+        location.contains("/xiaozhi-ai/target/")
+            || location.contains("/xiaozhi-dialogue/target/")
+            || location.contains("/xiaozhi-server/target/");
 
     /** §7 禁止业务类以 Helper/Util(s)/Manager/Store 结尾，这几个是存量，登记住不许再增 */
     private static final Set<String> LEGACY_FORBIDDEN_SUFFIX_BEANS = Set.of(

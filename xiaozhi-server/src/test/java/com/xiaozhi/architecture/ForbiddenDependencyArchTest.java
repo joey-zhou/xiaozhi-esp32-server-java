@@ -78,7 +78,7 @@ class ForbiddenDependencyArchTest {
 
     /** 路径匹配失效会扫到 0 个类而假绿，用它的规则须先过 {@link #serverModuleIsActuallyScanned}。 */
     private static final ImportOption ONLY_SERVER_MODULE =
-        location -> location.contains("/xiaozhi-server/target/classes/");
+        location -> location.contains("/xiaozhi-server/target/");
 
     private static JavaClasses xiaozhiClasses;
     private static JavaClasses serverClasses;
