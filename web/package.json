@@ -11,8 +11,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" -- && npm run build:tools",
-    "build:tools": "npm --prefix xiaozhi-assets-generator/web install --no-audit --no-fund && npm --prefix xiaozhi-assets-generator/web run build -- --outDir ../../dist/tools/assets-generator --emptyOutDir",
+    "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
@@ -22,10 +21,10 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "lint": "run-s lint:oxlint lint:eslint",
-    "lint:oxlint": "oxlint . -D correctness --ignore-path .gitignore --ignore-pattern \"public/**\" --ignore-pattern \"xiaozhi-assets-generator/**\"",
+    "lint:oxlint": "oxlint . -D correctness --ignore-path .gitignore --ignore-pattern \"public/**\"",
     "lint:eslint": "eslint . --max-warnings 0",
     "lint:fix": "run-s lint:fix:oxlint lint:fix:eslint",
-    "lint:fix:oxlint": "oxlint . --fix -D correctness --ignore-path .gitignore --ignore-pattern \"public/**\" --ignore-pattern \"xiaozhi-assets-generator/**\"",
+    "lint:fix:oxlint": "oxlint . --fix -D correctness --ignore-path .gitignore --ignore-pattern \"public/**\"",
     "lint:fix:eslint": "eslint . --fix",
     "format": "prettier --write src/"
   },

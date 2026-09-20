@@ -12,7 +12,7 @@ COPY . .
 # 不用 npm run build：它并行跑 vue-tsc 和 vite，内存峰值叠加会在 2GB 的 Docker 里 OOM。
 # 类型检查由 CI 负责，这里只出产物
 ENV NODE_OPTIONS=--max-old-space-size=2048
-RUN npm run build-only && npm run build:tools
+RUN npm run build-only
 
 # 生产阶段
 FROM nginx:alpine

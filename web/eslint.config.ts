@@ -15,13 +15,12 @@ export default defineConfigWithVueTs(
     files: ['**/*.{ts,mts,tsx,vue}'],
   },
 
-  // xiaozhi-assets-generator 是自带工具链的第三方子项目，public 下是运行时静态资源，都不受本项目规则约束
+  // public 下是运行时静态资源，不受本项目规则约束
   globalIgnores([
     '**/dist/**',
     '**/dist-ssr/**',
     '**/coverage/**',
     'public/**',
-    'xiaozhi-assets-generator/**',
   ]),
 
   pluginVue.configs['flat/essential'],
