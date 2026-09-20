@@ -175,11 +175,16 @@ class ScheduledPlayerSentenceBindingTest {
     @Test
     void stopDiscardsEncoderLeftoverSoNextTurnStartsClean() {
         OpusProcessor encoder = (OpusProcessor) ReflectionTestUtils.getField(player, "opusProcessor");
-        // 1.5 帧：编码出 1 帧，半帧留在编码器里
-        player.play(Flux.just(new Speech(pcm(FRAME_SAMPLES + FRAME_SAMPLES / 2), "被打断的一句。")), true);
+        // 1.5 帧：编码出 1 帧，半帧留在编码器里。音频流不收尾：打断发生在合成途中，
+        // 且流一旦结束，收尾 flush 会抢先把残留清零，轮到 stop() 时已无残留可验
+        player.play(Flux.concat(
+                Flux.just(new Speech(pcm(FRAME_SAMPLES + FRAME_SAMPLES / 2), "被打断的一句。")),
+                Flux.never()), true);
         OpusProcessor.LeftoverState state =
                 (OpusProcessor.LeftoverState) ReflectionTestUtils.getField(encoder, "leftoverStates");
-        awaitUntil(() -> state.leftoverCount > 0);
+        // 残留字段不带内存屏障，不能跨线程轮询；首帧下发晚于残留写入，等它即可
+        awaitUntil(() -> events.contains("frame"));
+        assertThat(state.leftoverCount).isPositive();
 
         player.stop();
 
