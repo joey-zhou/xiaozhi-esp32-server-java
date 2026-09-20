@@ -1,6 +1,7 @@
 package com.xiaozhi.server.web;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.RequestContextUtils;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
@@ -36,7 +37,7 @@ public class LogInterceptor implements HandlerInterceptor {
         MDC.put(TRACE_ID_MDC_KEY, UUID.randomUUID().toString().replace("-", "").substring(0, 16));
 
         if (request.getAttribute(START_TIME_ATTRIBUTE) == null) {
-            request.setAttribute(START_TIME_ATTRIBUTE, System.currentTimeMillis());
+            request.setAttribute(START_TIME_ATTRIBUTE, System.nanoTime());
         }
         if (handler instanceof HandlerMethod handlerMethod) {
             request.setAttribute(
@@ -55,7 +56,7 @@ public class LogInterceptor implements HandlerInterceptor {
 
         try {
             Object startTime = request.getAttribute(START_TIME_ATTRIBUTE);
-            long costMs = startTime instanceof Long value ? System.currentTimeMillis() - value : -1L;
+            long costMs = startTime instanceof Long value ? DateUtils.elapsedMillis(value) : -1L;
             Object userId = currentUserId();
             String requestPath = buildRequestPath(request);
             String handlerName = (String) request.getAttribute(HANDLER_ATTRIBUTE);

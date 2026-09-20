@@ -1,5 +1,6 @@
 package com.xiaozhi.communication.auth;
 
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -76,7 +77,7 @@ public class DeviceAuthService {
         if (!StringUtils.hasText(secret) || !StringUtils.hasText(deviceId)) {
             return "";
         }
-        long ts = System.currentTimeMillis() / 1000;
+        long ts = DateUtils.millis() / 1000;
         return sign(normalize(deviceId) + "|" + ts, secret) + "." + ts;
     }
 
@@ -94,7 +95,7 @@ public class DeviceAuthService {
         } catch (NumberFormatException e) {
             return false;
         }
-        long now = System.currentTimeMillis() / 1000;
+        long now = DateUtils.millis() / 1000;
         // 300s 容忍设备与服务端时钟偏差
         if (now - ts > expireSeconds || ts - now > 300) {
             return false;
@@ -104,7 +105,7 @@ public class DeviceAuthService {
     }
 
     public String generateVisionToken(String sessionId, String deviceId) {
-        long exp = System.currentTimeMillis() / 1000 + expireSeconds;
+        long exp = DateUtils.millis() / 1000 + expireSeconds;
         // 字段逐个转义再拼接，会话号或设备号里含分隔符时载荷不会被切错段
         String payload = encodeField(sessionId) + "|"
                 + encodeField(deviceId == null ? "" : normalize(deviceId)) + "|" + exp;
@@ -143,7 +144,7 @@ public class DeviceAuthService {
             return null;
         }
         try {
-            if (Long.parseLong(parts[2]) < System.currentTimeMillis() / 1000) {
+            if (Long.parseLong(parts[2]) < DateUtils.millis() / 1000) {
                 return null;
             }
         } catch (NumberFormatException e) {

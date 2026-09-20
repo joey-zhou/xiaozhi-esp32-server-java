@@ -12,6 +12,7 @@ import com.xiaozhi.ai.utils.LocalInferenceBudget;
 import com.xiaozhi.ai.utils.LocalInferenceBudget.Kind;
 import com.xiaozhi.common.monitoring.CountingRejectionHandler;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.DateUtils;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
@@ -130,10 +131,10 @@ public class SenseVoiceSttService implements SttService {
                 .setOfflineModelConfig(modelConfig)
                 .setDecodingMethod("greedy_search")
                 .build();
-        long start = System.currentTimeMillis();
+        long start = System.nanoTime();
         recognizer = new OfflineRecognizer(config);
         log.info("SenseVoice 模型加载成功，路径: {}, 线程数: {}, 解码并发: {} 路, 耗时: {}ms",
-                dir, numThreads, DECODE_EXECUTOR.getMaximumPoolSize(), System.currentTimeMillis() - start);
+                dir, numThreads, DECODE_EXECUTOR.getMaximumPoolSize(), DateUtils.elapsedMillis(start));
     }
 
     public boolean isModelLoaded() {
@@ -157,7 +158,7 @@ public class SenseVoiceSttService implements SttService {
             log.error("SenseVoice 模型未加载，无法识别");
             return SttResult.failure(SttResult.FAILURE_LOCAL_ERROR);
         }
-        long deadline = System.currentTimeMillis() + RECOGNITION_TIMEOUT_MS;
+        long startedAt = System.nanoTime();
 
         BlockingQueue<byte[]> audioQueue = new LinkedBlockingQueue<>();
         AtomicBoolean completed = new AtomicBoolean(false);
@@ -186,7 +187,7 @@ public class SenseVoiceSttService implements SttService {
                         break;
                     }
                 }
-                if (System.currentTimeMillis() >= deadline) {
+                if (DateUtils.elapsedMillis(startedAt) >= RECOGNITION_TIMEOUT_MS) {
                     timedOut = true;
                     break;
                 }
@@ -217,7 +218,7 @@ public class SenseVoiceSttService implements SttService {
             return SttResult.failure(SttResult.FAILURE_LOCAL_ERROR);
         }
         try {
-            return future.get(Math.max(1, deadline - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
+            return future.get(Math.max(1, RECOGNITION_TIMEOUT_MS - DateUtils.elapsedMillis(startedAt)), TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             // 与远端 provider 口径一致：超时不是本地错误，上层据此决定不重放
             log.warn("SenseVoice 解码超过单轮时长上限");
@@ -237,7 +238,7 @@ public class SenseVoiceSttService implements SttService {
      * 整句解码。sherpa 已把 SenseVoice 输出里的语种、情绪、事件标签拆到结果字段，文本是干净的。
      */
     SttResult decode(byte[] pcm) {
-        long start = System.currentTimeMillis();
+        long start = System.nanoTime();
         OfflineStream stream = recognizer.createStream();
         try {
             stream.acceptWaveform(AudioUtils.pcm16ToFloats(pcm), AudioUtils.SAMPLE_RATE);
@@ -245,7 +246,7 @@ public class SenseVoiceSttService implements SttService {
             OfflineRecognizerResult result = recognizer.getResult(stream);
             String text = result.getText() == null ? "" : result.getText().strip();
             String emotion = normalizeTag(result.getEmotion());
-            long elapsed = System.currentTimeMillis() - start;
+            long elapsed = DateUtils.elapsedMillis(start);
             double audioSeconds = pcm.length / (double) (AudioUtils.SAMPLE_RATE * 2);
             log.info("语音识别完成(sherpa-onnx): {} [情感: {}, 事件: {}, 音频: {}s, 耗时: {}ms, RTF: {}]",
                     text, emotion, normalizeTag(result.getEvent()), String.format("%.1f", audioSeconds), elapsed,

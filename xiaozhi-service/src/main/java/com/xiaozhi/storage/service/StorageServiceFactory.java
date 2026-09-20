@@ -7,6 +7,7 @@ import com.xiaozhi.storage.service.impl.AliyunOssStorageService;
 import com.xiaozhi.storage.service.impl.LocalStorageService;
 import com.xiaozhi.storage.service.impl.S3StorageService;
 import com.xiaozhi.storage.service.impl.TencentCosStorageService;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
@@ -160,12 +161,12 @@ public class StorageServiceFactory {
 
     private ConfigBO getDefaultOssConfig() {
         ConfigBO cached = cachedOssConfig;
-        if (cached != null && System.currentTimeMillis() - cachedOssConfigAt < OSS_CONFIG_CACHE_MILLIS) {
+        if (cached != null && DateUtils.millis() - cachedOssConfigAt < OSS_CONFIG_CACHE_MILLIS) {
             return cached;
         }
         ConfigBO result = configService.getDefaultBO("oss");
         cachedOssConfig = result;
-        cachedOssConfigAt = System.currentTimeMillis();
+        cachedOssConfigAt = DateUtils.millis();
         return result;
     }
 

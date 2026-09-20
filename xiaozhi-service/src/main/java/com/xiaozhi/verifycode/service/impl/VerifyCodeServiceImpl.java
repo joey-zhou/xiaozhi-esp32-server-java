@@ -3,6 +3,7 @@ package com.xiaozhi.verifycode.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.verifycode.convert.VerifyCodeConvert;
 import com.xiaozhi.verifycode.dal.mysql.dataobject.VerifyCodeDO;
 import com.xiaozhi.verifycode.dal.mysql.mapper.VerifyCodeMapper;
@@ -89,7 +90,7 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
         verifyCode.setSessionId(sessionId);
         verifyCode.setType(type);
         verifyCode.setCode(code);
-        verifyCode.setCreateTime(LocalDateTime.now());
+        verifyCode.setCreateTime(DateUtils.now());
         return verifyCodeMapper.insert(verifyCode);
     }
 
@@ -154,7 +155,7 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
         VerifyCodeDO verifyCode = new VerifyCodeDO();
         verifyCode.setAccount(account);
         verifyCode.setCode(code);
-        verifyCode.setCreateTime(LocalDateTime.now());
+        verifyCode.setCreateTime(DateUtils.now());
         if (verifyCodeMapper.insert(verifyCode) <= 0) {
             throw new IllegalStateException("生成验证码失败");
         }
@@ -216,12 +217,12 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
 
     /** 验证码有效期起点。 */
     private LocalDateTime validSince() {
-        return LocalDateTime.now().minusMinutes(VALID_MINUTES);
+        return DateUtils.now().minusMinutes(VALID_MINUTES);
     }
 
     @Override
     public int deleteExpired(int expiredBeforeMinutes, int batchSize) {
-        LocalDateTime expireBefore = LocalDateTime.now().minusMinutes(expiredBeforeMinutes);
+        LocalDateTime expireBefore = DateUtils.now().minusMinutes(expiredBeforeMinutes);
         int deleted = 0;
         while (true) {
             List<VerifyCodeDO> batch = verifyCodeMapper.selectList(new LambdaQueryWrapper<VerifyCodeDO>()

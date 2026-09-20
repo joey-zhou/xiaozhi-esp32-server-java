@@ -12,6 +12,7 @@ import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.server.web.chat.convert.WebChatConvert;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -79,11 +80,11 @@ public class WebChatAppService {
             this.userId = userId;
             this.roleId = roleId;
             this.saved = saved;
-            this.lastAccessMillis = System.currentTimeMillis();
+            this.lastAccessMillis = DateUtils.millis();
         }
 
         private void touch() {
-            this.lastAccessMillis = System.currentTimeMillis();
+            this.lastAccessMillis = DateUtils.millis();
         }
     }
 
@@ -188,7 +189,7 @@ public class WebChatAppService {
             SerialTaskRegistry.submit(sessionId, () -> createConversation(sessionId, userId, session, text));
         }
 
-        LocalDateTime userCreatedAt = LocalDateTime.now();
+        LocalDateTime userCreatedAt = DateUtils.now();
         AtomicBoolean turnCompleted = new AtomicBoolean();
         return textChatService.streamTurn(session.conversation, role, text, userCreatedAt, (reply, assistantCreatedAt) -> {
             turnCompleted.set(true);
@@ -321,7 +322,7 @@ public class WebChatAppService {
      */
     @Scheduled(fixedDelay = 5, timeUnit = TimeUnit.MINUTES)
     public void evictIdleSessions() {
-        long cutoff = System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(sessionIdleTimeoutMinutes);
+        long cutoff = DateUtils.millis() - TimeUnit.MINUTES.toMillis(sessionIdleTimeoutMinutes);
         sessions.entrySet().removeIf(entry -> {
             if (entry.getValue().lastAccessMillis > cutoff) {
                 return false;

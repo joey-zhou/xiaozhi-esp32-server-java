@@ -1,6 +1,7 @@
 package com.xiaozhi.ai.stt.providers;
 
 import com.xiaozhi.ai.stt.SttResult;
+import com.xiaozhi.utils.DateUtils;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
@@ -55,6 +56,11 @@ class SenseVoiceSttServiceTest {
         Sinks.Many<byte[]> sink = Sinks.many().multicast().onBackpressureBuffer();
 
         CompletableFuture<SttResult> result = CompletableFuture.supplyAsync(() -> service.stream(sink.asFlux()));
+        // 等订阅建立再发：出错时还没有订阅者的话，sink 会把缓冲里的那半句直接清掉
+        long waitStart = System.nanoTime();
+        while (sink.currentSubscriberCount() == 0 && DateUtils.elapsedMillis(waitStart) < 3000) {
+            Thread.onSpinWait();
+        }
         sink.tryEmitNext(new byte[]{9, 9});
         sink.tryEmitError(new IllegalStateException("upstream closed"));
 

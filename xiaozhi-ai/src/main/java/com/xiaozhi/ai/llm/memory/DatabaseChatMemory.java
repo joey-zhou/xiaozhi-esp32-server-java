@@ -6,6 +6,7 @@ import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.summary.service.SummaryService;
+import com.xiaozhi.utils.DateUtils;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -15,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -119,7 +119,7 @@ public class DatabaseChatMemory implements ChatMemory {
         if (message.getCreateTime() != null) {
             MessageTimeMetadata.setTimeMillis(
                 springMessage,
-                message.getCreateTime().atZone(ZoneId.systemDefault()).toInstant()
+                DateUtils.toInstant(message.getCreateTime())
             );
         }
         return springMessage;

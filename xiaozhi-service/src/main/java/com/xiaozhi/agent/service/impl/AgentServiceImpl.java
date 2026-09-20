@@ -10,6 +10,7 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.common.port.ProviderTokenClient;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -20,8 +21,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -100,7 +102,7 @@ public class AgentServiceImpl implements AgentService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** 平台侧才有、sys_config 没有列可存的字段 */
-    private record RemoteAgent(String name, String iconUrl, Date publishTime) {}
+    private record RemoteAgent(String name, String iconUrl, LocalDateTime publishTime) {}
 
     @Override
     public PageResult<AgentBO> page(int pageNo, int pageSize, String provider, String agentName, Integer userId) {
@@ -190,7 +192,7 @@ public class AgentServiceImpl implements AgentService {
      * @param force 库里还没有这个平台的智能体时为 true，此时不受节流限制
      */
     private CompletableFuture<Void> syncAsync(String provider, Integer userId, String snapshotKey, boolean force) {
-        long now = System.currentTimeMillis();
+        long now = DateUtils.millis();
         if (force) {
             lastSyncAt.put(snapshotKey, now);
         } else {
@@ -423,13 +425,13 @@ public class AgentServiceImpl implements AgentService {
     }
 
     /** coze 的发布时间是秒级时间戳，缺失或非法时留空，由配置的创建时间兜底 */
-    private static Date publishTimeOf(JsonNode botNode) {
+    private static LocalDateTime publishTimeOf(JsonNode botNode) {
         String publishTime = botNode.path("publish_time").asText();
         if (!StringUtils.hasText(publishTime)) {
             return null;
         }
         try {
-            return new Date(Long.parseLong(publishTime) * 1000);
+            return DateUtils.toDateTime(Instant.ofEpochSecond(Long.parseLong(publishTime)));
         } catch (NumberFormatException e) {
             return null;
         }

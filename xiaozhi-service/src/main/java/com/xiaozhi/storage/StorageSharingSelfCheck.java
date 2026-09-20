@@ -3,6 +3,7 @@ package com.xiaozhi.storage;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.communication.common.InstanceIdHolder;
 import com.xiaozhi.storage.service.StorageServiceFactory;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
@@ -12,7 +13,6 @@ import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -168,7 +168,7 @@ public class StorageSharingSelfCheck {
         try {
             Files.createDirectories(probe.getParent());
             Files.writeString(probe, "probeId=" + id + System.lineSeparator()
-                    + "writtenAt=" + LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    + "writtenAt=" + DateUtils.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                     + System.lineSeparator());
             return probe;
         } catch (Exception e) {

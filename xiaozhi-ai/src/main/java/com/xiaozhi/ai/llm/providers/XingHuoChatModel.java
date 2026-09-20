@@ -1,6 +1,7 @@
 package com.xiaozhi.ai.llm.providers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.JsonUtil;
 import okhttp3.*;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -443,7 +444,7 @@ public class XingHuoChatModel implements ChatModel {
                     }
                     
                     // 生成唯一ID
-                    String id = (String) toolCall.getOrDefault("id", "tool_" + System.currentTimeMillis() + "_" + i);
+                    String id = (String) toolCall.getOrDefault("id", "tool_" + DateUtils.millis() + "_" + i);
                     
                     assistantToolCalls.add(new AssistantMessage.ToolCall(
                             id,

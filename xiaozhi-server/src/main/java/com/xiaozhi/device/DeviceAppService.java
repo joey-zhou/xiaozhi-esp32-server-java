@@ -25,6 +25,7 @@ import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.summary.service.SummaryService;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.IpLocationClient;
 import com.xiaozhi.utils.CommonUtils;
 import jakarta.annotation.Resource;
@@ -304,8 +305,9 @@ public class DeviceAppService {
         firmwareInfo.put("version", "1.0.0");
         otaResponse.put("firmware", firmwareInfo);
         otaResponse.put("server_time", Map.of(
-            "timestamp", System.currentTimeMillis(),
-            "timezone_offset", 480
+            "timestamp", DateUtils.millis(),
+            // 分钟数。设备拿它把时间戳换算成本地时间，跟随应用所在时区
+            "timezone_offset", DateUtils.offset().getTotalSeconds() / 60
         ));
 
         DialogueServerInfo selectedServer = null;

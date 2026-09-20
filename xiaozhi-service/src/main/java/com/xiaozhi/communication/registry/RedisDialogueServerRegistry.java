@@ -1,5 +1,6 @@
 package com.xiaozhi.communication.registry;
 
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.JsonUtil;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -31,7 +32,7 @@ public class RedisDialogueServerRegistry implements DialogueServerRegistry {
 
     @Override
     public void register(DialogueServerInfo serverInfo) {
-        serverInfo.setLastHeartbeat(System.currentTimeMillis());
+        serverInfo.setLastHeartbeat(DateUtils.millis());
         String json = JsonUtil.toJson(serverInfo);
         stringRedisTemplate.opsForHash().put(REGISTRY_HASH_KEY, serverInfo.getInstanceId(), json);
         stringRedisTemplate.opsForValue().set(
@@ -49,7 +50,7 @@ public class RedisDialogueServerRegistry implements DialogueServerRegistry {
 
     @Override
     public void heartbeat(DialogueServerInfo serverInfo) {
-        serverInfo.setLastHeartbeat(System.currentTimeMillis());
+        serverInfo.setLastHeartbeat(DateUtils.millis());
         String json = JsonUtil.toJson(serverInfo);
         stringRedisTemplate.opsForHash().put(REGISTRY_HASH_KEY, serverInfo.getInstanceId(), json);
         stringRedisTemplate.opsForValue().set(

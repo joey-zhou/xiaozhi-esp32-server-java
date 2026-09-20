@@ -13,6 +13,7 @@ import com.xiaozhi.message.dal.mysql.mapper.ConversationMapper;
 import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.summary.service.SummaryService;
+import com.xiaozhi.utils.DateUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,7 +59,7 @@ public class ConversationServiceImpl implements ConversationService {
 
     @Override
     public void create(String sessionId, Integer userId, Integer roleId, String firstMessage) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = DateUtils.now();
         ConversationDO conversation = new ConversationDO();
         conversation.setSessionId(sessionId);
         conversation.setUserId(userId);
@@ -77,7 +78,7 @@ public class ConversationServiceImpl implements ConversationService {
     public void touch(String sessionId) {
         conversationMapper.update(null, new LambdaUpdateWrapper<ConversationDO>()
             .eq(ConversationDO::getSessionId, sessionId)
-            .set(ConversationDO::getUpdateTime, LocalDateTime.now()));
+            .set(ConversationDO::getUpdateTime, DateUtils.now()));
     }
 
     @Override

@@ -8,6 +8,7 @@ import com.xiaozhi.ai.llm.memory.ConversationFactory;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.common.model.bo.RoleBO;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -25,7 +26,6 @@ import reactor.core.publisher.Flux;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +81,7 @@ public class TextChatService {
 
         // 裸文本 UserMessage + 时间戳 metadata；Conversation 投影层会在送 LLM 前拼出 [时间戳] 文本 的前缀。
         // 无 speaker/emotion，故不挂 MessageMetadataBO。
-        Instant userInstant = userCreatedAt.atZone(ZoneId.systemDefault()).toInstant();
+        Instant userInstant = DateUtils.toInstant(userCreatedAt);
         UserMessage userMessage = new UserMessage(userText);
         MessageTimeMetadata.setTimeMillis(userMessage, userInstant);
         conversation.add(userMessage);
@@ -114,14 +114,14 @@ public class TextChatService {
                         return;
                     }
                     String reply = fullResponse.toString();
-                    LocalDateTime assistantCreatedAt = LocalDateTime.now();
+                    LocalDateTime assistantCreatedAt = DateUtils.now();
                     // 挂上本轮用量，对话据此判断上下文是否超限
                     AssistantMessage assistantMessage = AssistantMessage.builder()
                             .content(reply)
                             .properties(usage.get() != null ? Map.of(ChatMemory.USAGE_KEY, usage.get()) : Map.of())
                             .build();
                     MessageTimeMetadata.setTimeMillis(assistantMessage,
-                            assistantCreatedAt.atZone(ZoneId.systemDefault()).toInstant());
+                            DateUtils.toInstant(assistantCreatedAt));
                     conversation.add(assistantMessage);
                     turnCompleted.set(true);
                     onTurnCompleted.accept(reply, assistantCreatedAt);

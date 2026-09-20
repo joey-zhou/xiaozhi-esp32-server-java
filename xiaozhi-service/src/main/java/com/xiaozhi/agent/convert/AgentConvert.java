@@ -6,9 +6,6 @@ import com.xiaozhi.common.model.resp.AgentResp;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
-import java.util.Date;
 
 @Mapper(componentModel = "spring")
 public interface AgentConvert {
@@ -26,9 +23,4 @@ public interface AgentConvert {
     @Mapping(target = "botId", ignore = true)
     @Mapping(target = "iconUrl", ignore = true)
     AgentBO toBO(ConfigBO config);
-
-    /** publishTime 对外是 Date，配置里的时间是 LocalDateTime */
-    default Date toDate(LocalDateTime value) {
-        return value == null ? null : Timestamp.valueOf(value);
-    }
 }

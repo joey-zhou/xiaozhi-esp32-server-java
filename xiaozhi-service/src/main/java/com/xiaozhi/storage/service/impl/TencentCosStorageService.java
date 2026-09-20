@@ -11,6 +11,7 @@ import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.region.Region;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.storage.service.StorageService;
+import com.xiaozhi.utils.DateUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -152,7 +153,7 @@ public class TencentCosStorageService implements StorageService {
         }
         try {
             String key = extractObjectKey(storedPath);
-            Date expiration = new Date(System.currentTimeMillis() + PRESIGN_EXPIRE_MILLIS);
+            Date expiration = Date.from(DateUtils.instant().plusMillis(PRESIGN_EXPIRE_MILLIS));
             return cosClient.generatePresignedUrl(bucketName, key, expiration, HttpMethodName.GET).toString();
         } catch (Exception e) {
             log.warn("生成 COS 签名 URL 失败，返回原路径: {}", storedPath, e);

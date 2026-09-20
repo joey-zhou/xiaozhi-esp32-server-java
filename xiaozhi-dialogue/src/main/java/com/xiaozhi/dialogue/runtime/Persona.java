@@ -13,6 +13,7 @@ import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.ai.tts.SpeechTokenFilter;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.EmojiUtils;
 import lombok.Builder;
 import lombok.NonNull;
@@ -210,7 +211,7 @@ public class Persona {
                 });
             chatFlux = chatFlux.doOnNext(chatResponse -> {
                 // 首 token 时刻即助手消息创建时间；播放器落盘音频文件也以此关联到助手消息
-                Instant assistantMessageCreatedAt = Instant.now();
+                Instant assistantMessageCreatedAt = DateUtils.instant();
                 boolean isFirst = turn.ttft.compareAndSet(null, assistantMessageCreatedAt);
                 if (isFirst && player.getOpusRecorder() != null) {
                     player.getOpusRecorder().setAssistantMessageCreatedAt(assistantMessageCreatedAt);
@@ -295,7 +296,7 @@ public class Persona {
         }
         Instant assistantCreatedAt = null;
         if (assistant != null) {
-            assistantCreatedAt = turn.ttft.get() != null ? turn.ttft.get() : Instant.now();
+            assistantCreatedAt = turn.ttft.get() != null ? turn.ttft.get() : DateUtils.instant();
         }
         return DialogueTurn.builder()
                 .userMessage(turn.userMessage)
@@ -474,7 +475,7 @@ public class Persona {
      */
     public void chat(UserMessage userMessage, boolean useFunctionCall, long epoch){
         ChatSession session = getSession();
-        Instant now = Instant.now();
+        Instant now = DateUtils.instant();
         // 用户消息时间取 STT 出结果那一刻（构造时已写入）
         Turn turn = new Turn(now.toEpochMilli(), userMessage, MessageTimeMetadata.getTimeMillis(userMessage),
                 session.getUserSpeechAudio());

@@ -12,6 +12,7 @@ import com.xiaozhi.event.ChatSessionClosedEvent;
 import com.xiaozhi.event.DeviceOnlineEvent;
 import com.xiaozhi.event.DeviceUpdatedEvent;
 import com.xiaozhi.event.ChatSessionOpenedEvent;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -24,7 +25,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
@@ -306,7 +306,7 @@ public class SessionManager {
     public void updateLastActivity(String sessionId) {
         ChatSession session = sessions.get(sessionId);
         if (session != null) {
-            session.setLastActivityTime(Instant.now());
+            session.setLastActivityTime(DateUtils.instant());
         }
     }
 

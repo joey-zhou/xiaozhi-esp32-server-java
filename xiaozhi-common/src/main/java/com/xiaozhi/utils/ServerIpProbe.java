@@ -59,8 +59,8 @@ public class ServerIpProbe {
         // 如果正在初始化中，等待初始化完成
         if (initializing) {
             // 等待初始化完成，最多等待5秒
-            long startTime = System.currentTimeMillis();
-            while (initializing && System.currentTimeMillis() - startTime < 5000) {
+            long startTime = System.nanoTime();
+            while (initializing && DateUtils.elapsedMillis(startTime) < 5000) {
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {

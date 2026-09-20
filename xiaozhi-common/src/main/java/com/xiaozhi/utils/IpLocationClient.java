@@ -66,7 +66,7 @@ public class IpLocationClient {
     /** IP 归属缓存条目 */
     private record IPInfoCacheEntry(IPInfo info, long expireAtMillis) {
         boolean isValid() {
-            return expireAtMillis > System.currentTimeMillis();
+            return expireAtMillis > DateUtils.millis();
         }
     }
 
@@ -347,7 +347,7 @@ public class IpLocationClient {
                     // 强制设置IP地址为指定的IP（因为服务可能返回的是其他IP）
                     IPInfo result = new IPInfo(ipAddress, ipInfo.getLocation(), ipInfo.getIsp());
                     IP_INFO_CACHE.put(ipAddress,
-                            new IPInfoCacheEntry(result, System.currentTimeMillis() + IP_INFO_TTL_MS));
+                            new IPInfoCacheEntry(result, DateUtils.millis() + IP_INFO_TTL_MS));
                     return result;
                 }
             }
@@ -365,7 +365,7 @@ public class IpLocationClient {
         // 如果现有服务都无法查询，返回基本的IP信息
         IPInfo unknown = new IPInfo(ipAddress, "未知位置", "未知运营商");
         IP_INFO_CACHE.put(ipAddress,
-                new IPInfoCacheEntry(unknown, System.currentTimeMillis() + IP_INFO_FAILURE_TTL_MS));
+                new IPInfoCacheEntry(unknown, DateUtils.millis() + IP_INFO_FAILURE_TTL_MS));
         return unknown;
     }
 
@@ -403,7 +403,7 @@ public class IpLocationClient {
         for (String service : IP_INFO_SERVICES) {
             HttpURLConnection connection = null;
             BufferedReader reader = null;
-            long startTime = System.currentTimeMillis();
+            long startTime = System.nanoTime();
 
             try {
                 URL url = URI.create(service).toURL();
@@ -417,7 +417,7 @@ public class IpLocationClient {
                 connection.connect();
 
                 // 检查是否超时
-                if (System.currentTimeMillis() - startTime > 3000) {
+                if (DateUtils.elapsedMillis(startTime) > 3000) {
                     continue;
                 }
 
@@ -427,20 +427,17 @@ public class IpLocationClient {
                     StringBuilder response = new StringBuilder();
                     String line;
 
-                    // 设置最大读取时间
-                    long maxReadTime = startTime + 3000;
-
                     while ((line = reader.readLine()) != null) {
                         response.append(line).append("\n");
 
                         // 检查是否超过最大读取时间
-                        if (System.currentTimeMillis() > maxReadTime) {
+                        if (DateUtils.elapsedMillis(startTime) > 3000) {
                             break;
                         }
                     }
 
                     // 如果超时了但已经读取了部分数据，继续处理
-                    if (System.currentTimeMillis() <= maxReadTime || response.length() > 0) {
+                    if (DateUtils.elapsedMillis(startTime) <= 3000 || response.length() > 0) {
                         String content = response.toString();
 
                         // 解析IP信息

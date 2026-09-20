@@ -3,6 +3,7 @@ package com.xiaozhi.ai.tool;
 import com.xiaozhi.ai.tool.session.ToolSession;
 import com.xiaozhi.ai.tool.session.ToolSessionProvider;
 import com.xiaozhi.event.ToolCallCompletedEvent;
+import com.xiaozhi.utils.DateUtils;
 
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -170,12 +171,12 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
      * 发布工具调用事件
      */
     private void publishToolEvent(String sessionId, String toolName, String arguments,
-                                          String result, boolean success, long startTimeMs) {
+                                          String result, boolean success, long startNanos) {
         if (applicationContext == null) {
             return;
         }
         try {
-            long durationMs = startTimeMs > 0 ? System.currentTimeMillis() - startTimeMs : 0;
+            long durationMs = DateUtils.elapsedMillis(startNanos);
             applicationContext.publishEvent(new ToolCallCompletedEvent(
                     XiaoZhiToolCallingManager.class, sessionId, toolName, arguments, result, success, durationMs));
         } catch (Exception e) {
@@ -473,7 +474,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
             }
 
             // 记录工具调用开始时间
-            final long[] startTimeRef = new long[]{System.currentTimeMillis()};
+            final long[] startTimeRef = new long[]{System.nanoTime()};
             final boolean[] successRef = new boolean[]{true};
 
             String toolCallResult = ToolCallingObservationDocumentation.TOOL_CALL

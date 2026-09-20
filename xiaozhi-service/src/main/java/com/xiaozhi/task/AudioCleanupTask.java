@@ -3,6 +3,7 @@ package com.xiaozhi.task;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -61,7 +62,7 @@ public class AudioCleanupTask {
 
         int retentionDays = AudioUtils.AUDIO_RETENTION_DAYS;
         log.info("========== 开始执行音频文件清理任务（保留{}天）==========", retentionDays);
-        LocalDate expireDate = LocalDate.now().minusDays(retentionDays);
+        LocalDate expireDate = DateUtils.today().minusDays(retentionDays);
         int deletedDirs = 0;
 
         try (Stream<Path> dirs = Files.list(audioDir).filter(Files::isDirectory)) {

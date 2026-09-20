@@ -1,61 +1,75 @@
 package com.xiaozhi.utils;
 
-import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.concurrent.TimeUnit;
 
-public class DateUtils {
+/**
+ * 全仓唯一的取时入口。入库的时间列都是不带时区的 DATETIME，存的是应用所在时区的墙上时间，
+ * 所以「现在几点」和 Instant 与 LocalDateTime 的互转必须出自同一个时钟、同一个时区，
+ * 业务代码不得自己调 {@code LocalDateTime.now()}、{@code Instant.now()} 或 {@code ZoneId.systemDefault()}。
+ *
+ * <p>算耗时、超时用 {@code System.nanoTime()} 取起点、{@link #elapsedMillis} 取经过时间，不要拿两次墙上时间相减。
+ */
+public final class DateUtils {
 
-    private static final SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+    private static volatile Clock clock = Clock.systemDefaultZone();
 
-    public static String dayOfMonthStart() {
-        // 本月起始
-        Calendar thisMonthFirstDateCal = Calendar.getInstance();
-        // 获取上月
-        // thisMonthFirstDateCal.add(Calendar.MONTH, -1);
-        thisMonthFirstDateCal.set(Calendar.DAY_OF_MONTH, thisMonthFirstDateCal.getActualMinimum(Calendar.DAY_OF_MONTH));
-        String thisMonthFirstTime = format.format(thisMonthFirstDateCal.getTime()) + " 00:00:00";
-        return thisMonthFirstTime;
+    private DateUtils() {
     }
 
-    public static String dayOfMonthEnd() {
-        Calendar thisMonthEndDateCal = Calendar.getInstance();
-        // 获取上月
-        // thisMonthEndDateCal.add(Calendar.MONTH, -1);
-        thisMonthEndDateCal.set(Calendar.DAY_OF_MONTH, thisMonthEndDateCal.getActualMaximum(Calendar.DAY_OF_MONTH));
-        String thisMonthEndTime = format.format(thisMonthEndDateCal.getTime()) + " 23:59:59";
-        return thisMonthEndTime;
+    /** 入库与比较用的当前时间 */
+    public static LocalDateTime now() {
+        return LocalDateTime.now(clock);
     }
 
-    /**
-     * 计算时间差并返回秒数，精确到小数点后三位
-     *
-     * @param startTime 开始时间（毫秒）
-     * @param endTime   结束时间（毫秒）
-     * @return 时间差（秒），精确到小数点后三位
-     */
-    public static Double deltaTime(long startTime, long endTime) {
-        double deltaTime = (endTime - startTime) / 1000.0; // 毫秒转秒
-        DecimalFormat decimalFormat = new DecimalFormat("0.###"); // 保留 3 位小数
-        String formattedTime = decimalFormat.format(deltaTime); // 格式化为字符串
-        return Double.parseDouble(formattedTime); // 转换为 Double
+    public static LocalDate today() {
+        return LocalDate.now(clock);
+    }
+
+    public static Instant instant() {
+        return clock.instant();
+    }
+
+    public static long millis() {
+        return clock.millis();
     }
 
     /**
-     * 将字符串转换为日期对象
-     * @param date
-     * @param strFormat
-     * @return
+     * 自 {@code System.nanoTime()} 取的起点起经过的毫秒数。算耗时与超时用它而不是两次墙上时间相减，
+     * 系统对时把时钟拨快拨慢都不影响结果
      */
-    public static Date toDate(String date, String strFormat) {
-        try {
-            SimpleDateFormat df = new SimpleDateFormat(strFormat);
-            df.setLenient(false);
-            Date objDate = df.parse(date);
-            return objDate;
-        } catch (Exception var4) {
-            return null;
-        }
+    public static long elapsedMillis(long startNanos) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+    }
+
+    public static ZoneId zone() {
+        return clock.getZone();
+    }
+
+    /** 应用所在时区此刻相对 UTC 的偏移，夏令时期间与标准时间不同 */
+    public static ZoneOffset offset() {
+        return clock.getZone().getRules().getOffset(clock.instant());
+    }
+
+    public static LocalDateTime toDateTime(Instant instant) {
+        return instant == null ? null : LocalDateTime.ofInstant(instant, clock.getZone());
+    }
+
+    public static Instant toInstant(LocalDateTime dateTime) {
+        return dateTime == null ? null : dateTime.atZone(clock.getZone()).toInstant();
+    }
+
+    /** 仅供测试固定时间，用完必须 {@link #reset()} */
+    public static void use(Clock fixed) {
+        clock = fixed;
+    }
+
+    public static void reset() {
+        clock = Clock.systemDefaultZone();
     }
 }

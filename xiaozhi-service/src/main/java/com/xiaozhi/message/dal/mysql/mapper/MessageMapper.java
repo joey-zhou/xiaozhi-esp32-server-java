@@ -8,7 +8,7 @@ import com.xiaozhi.message.model.MessageProjection;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 @Mapper
 public interface MessageMapper extends BaseMapper<MessageDO> {
@@ -19,8 +19,8 @@ public interface MessageMapper extends BaseMapper<MessageDO> {
                                         @Param("sender") String sender,
                                         @Param("messageType") String messageType,
                                         @Param("roleId") Integer roleId,
-                                        @Param("startTime") Date startTime,
-                                        @Param("endTime") Date endTime,
+                                        @Param("startTime") LocalDateTime startTime,
+                                        @Param("endTime") LocalDateTime endTime,
                                         @Param("userId") Integer userId,
                                         @Param("sessionId") String sessionId,
                                         @Param("source") String source);

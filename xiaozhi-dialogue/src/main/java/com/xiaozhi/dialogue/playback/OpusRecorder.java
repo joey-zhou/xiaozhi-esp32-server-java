@@ -8,6 +8,7 @@ import com.xiaozhi.common.SerialTaskRegistry;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.OpusProcessor;
 import lombok.Getter;
 import lombok.Setter;
@@ -25,8 +26,6 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 
 /**
@@ -174,7 +173,7 @@ public class OpusRecorder {
         messageService.updateAssistantAudio(
             conversation.getOwnerId(),
             conversation.getRoleId(),
-            LocalDateTime.ofInstant(createdAt.truncatedTo(ChronoUnit.SECONDS), ZoneId.systemDefault()),
+            DateUtils.toDateTime(createdAt.truncatedTo(ChronoUnit.SECONDS)),
             storedPath,
             duration
         );

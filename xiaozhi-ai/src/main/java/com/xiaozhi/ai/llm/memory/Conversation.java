@@ -2,6 +2,7 @@ package com.xiaozhi.ai.llm.memory;
 
 import com.xiaozhi.ai.llm.TokenEstimator;
 import com.xiaozhi.common.AppVirtualThreads;
+import com.xiaozhi.utils.DateUtils;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -144,7 +145,7 @@ public class Conversation extends ConversationIdentifier {
             dropLeadingOrphans();
             size = messages.size();
         }
-        if (size >= 2 && Duration.between(MessageTimeMetadata.getTimeMillis(history.getLast()), Instant.now())
+        if (size >= 2 && Duration.between(MessageTimeMetadata.getTimeMillis(history.getLast()), DateUtils.instant())
                 .compareTo(STALE_HISTORY) >= 0) {
             log.info("{}的最后一条历史已超过{}小时，上一段对话已经结束，先全部压缩", getOwnerId(), STALE_HISTORY.toHours());
             compact(true, true);
@@ -378,7 +379,7 @@ public class Conversation extends ConversationIdentifier {
                 }
             }
             // 允许失败后立即重试一次（单次抖动很常见），连续失败到第二次才开始退避
-            if (!force && consecutiveFailures > 1 && Instant.now().isBefore(nextRetryAt)) {
+            if (!force && consecutiveFailures > 1 && DateUtils.instant().isBefore(nextRetryAt)) {
                 return;
             }
             // 最近几条留在上下文里，其余整组压掉；token 超预算时哪怕只剩最近几条也至少压一组。
@@ -441,7 +442,7 @@ public class Conversation extends ConversationIdentifier {
                 long delaySeconds = Math.min(
                         RETRY_BASE_DELAY.getSeconds() << Math.min(consecutiveFailures - 1, 10),
                         RETRY_MAX_DELAY.getSeconds());
-                nextRetryAt = Instant.now().plusSeconds(delaySeconds);
+                nextRetryAt = DateUtils.instant().plusSeconds(delaySeconds);
                 log.warn("{}对话摘要连续失败{}次，{}秒后才允许下一次重试", getOwnerId(), consecutiveFailures, delaySeconds);
             }
             return 0;

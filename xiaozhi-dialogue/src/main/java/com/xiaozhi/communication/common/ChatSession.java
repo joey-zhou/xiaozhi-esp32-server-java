@@ -15,6 +15,7 @@ import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.dialogue.runtime.SpeechTurn;
 import com.xiaozhi.dialogue.runtime.UserSpeechAudio;
+import com.xiaozhi.utils.DateUtils;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
@@ -24,7 +25,6 @@ import reactor.core.publisher.Sinks;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -155,7 +155,7 @@ public abstract class ChatSession {
 
     public ChatSession(String sessionId) {
         this.sessionId = sessionId;
-        this.lastActivityTime = Instant.now();
+        this.lastActivityTime = DateUtils.instant();
         this.dialogueContext = new DialogueContext();
     }
 
@@ -258,7 +258,7 @@ public abstract class ChatSession {
 
         instant = instant.truncatedTo(ChronoUnit.SECONDS);
 
-        LocalDateTime localDateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+        LocalDateTime localDateTime = DateUtils.toDateTime(instant);
         String date = localDateTime.format(DateTimeFormatter.ISO_LOCAL_DATE);
         String datetime = localDateTime.format(DateTimeFormatter.ISO_DATE_TIME).replace(":", "");
         DeviceBO device = this.getDevice();

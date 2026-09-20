@@ -7,6 +7,7 @@ import com.coze.openapi.client.connversations.message.model.Message;
 import com.coze.openapi.client.connversations.message.model.MessageType;
 import com.coze.openapi.service.auth.TokenAuth;
 import com.coze.openapi.service.service.CozeAPI;
+import com.xiaozhi.utils.DateUtils;
 
 import io.reactivex.Flowable;
 
@@ -83,7 +84,7 @@ public class CozeChatModel implements ChatModel, AutoCloseable {
                 .build();
 
         long timeout = 10L;
-        long start = System.currentTimeMillis();
+        long start = System.nanoTime();
 
         // the developer can also set the timeout.
         try {
@@ -96,7 +97,7 @@ public class CozeChatModel implements ChatModel, AutoCloseable {
             var assistantMessage = AssistantMessage.builder().content(message.getContent()).properties(messageMetadata).build();
             var generation = new Generation(assistantMessage,
                     ChatGenerationMetadata.builder().metadata(BeanUtil.beanToMap(chatPoll.getChat())).build());
-            log.info("耗时：{}ms", System.currentTimeMillis() - start);
+            log.info("耗时：{}ms", DateUtils.elapsedMillis(start));
             return ChatResponse.builder().generations(List.of(generation)).build();
         } catch (Exception e) {
             throw new RuntimeException(e);

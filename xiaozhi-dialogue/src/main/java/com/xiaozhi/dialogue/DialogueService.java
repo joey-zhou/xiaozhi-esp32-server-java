@@ -29,6 +29,7 @@ import com.xiaozhi.common.SerialTaskRegistry;
 
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.OpusProcessor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
@@ -43,7 +44,6 @@ import jakarta.annotation.Resource;
 
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -416,7 +416,7 @@ public class DialogueService{
                     // 音频保存：只在这里定路径，落盘与上传异步做，不占首字时间。
                     // 必须排在本轮任何可能触发落库的动作之前入队，落库才读得到回填后的路径
                     UserSpeechAudio userAudio =
-                            new UserSpeechAudio(session.getAudioPath(MessageBO.SENDER_USER, Instant.now()));
+                            new UserSpeechAudio(session.getAudioPath(MessageBO.SENDER_USER, DateUtils.instant()));
                     session.setUserSpeechAudio(userAudio);
                     saveUserAudio(session, userAudio, turn.collectPcm(vadService.getPcmData(sessionId)));
 
@@ -584,7 +584,7 @@ public class DialogueService{
         }
         UserMessage userMessage = UserMessage.builder().text(text).metadata(msgMeta).build();
         // 消息时间戳（投影层据此拼 [yyyy-MM-ddTHH:mm:ss] 前缀）
-        MessageTimeMetadata.setTimeMillis(userMessage, Instant.now());
+        MessageTimeMetadata.setTimeMillis(userMessage, DateUtils.instant());
         return userMessage;
     }
 
@@ -704,7 +704,7 @@ public class DialogueService{
                 if (pcm.length == 0) {
                     return;
                 }
-                Path path = session.getAudioPath(WAKE_WORD_AUDIO_TAG, Instant.now());
+                Path path = session.getAudioPath(WAKE_WORD_AUDIO_TAG, DateUtils.instant());
                 AudioUtils.saveAsWav(path, pcm);
                 storageServiceFactory.getStorageService().upload(path, path.toString());
                 log.debug("唤醒词音频已采集: {}", path);

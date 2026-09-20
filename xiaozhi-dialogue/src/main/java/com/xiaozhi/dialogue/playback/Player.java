@@ -6,6 +6,7 @@ import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.OpusProcessor;
 import io.jsonwebtoken.lang.Assert;
 import lombok.*;
@@ -132,7 +133,7 @@ public abstract class Player {
         if (reply) {
             spokenSentences.add(text);
         }
-        recentSentences.addLast(new RecentSentence(normalize(text), System.currentTimeMillis()));
+        recentSentences.addLast(new RecentSentence(normalize(text), DateUtils.millis()));
         while (recentSentences.size() > RECENT_SENTENCE_LIMIT) {
             recentSentences.pollFirst();
         }
@@ -149,7 +150,7 @@ public abstract class Player {
         if (normalized.isEmpty()) {
             return false;
         }
-        long now = System.currentTimeMillis();
+        long now = DateUtils.millis();
         long since = now - RECENT_SENTENCE_WINDOW_MS;
         long playingSince = now - PLAYING_SENTENCE_WINDOW_MS;
         int length = normalized.codePointCount(0, normalized.length());
@@ -244,7 +245,7 @@ public abstract class Player {
      */
     protected void sendOpusFrame(byte[] opusFrame, byte[] referencePcm)  {
         // 毫秒级时间戳（取低 32 位），随帧头下发；设备播放后在上行帧回显，用于 AEC 参考对齐
-        long timestamp = System.currentTimeMillis() & 0xFFFFFFFFL;
+        long timestamp = DateUtils.millis() & 0xFFFFFFFFL;
         messageService.sendBinaryMessage(session, opusFrame, timestamp);
         // log.info("发送Opus帧数据: {}", opusFrame.length);
         if (opusRecorder != null) {
@@ -256,7 +257,7 @@ public abstract class Player {
      * 下发一帧静音，保持设备播放时间轴连续。只作为 AEC 参考，不计入录音，不触发首帧回调
      */
     protected void sendSilenceFrame() {
-        long timestamp = System.currentTimeMillis() & 0xFFFFFFFFL;
+        long timestamp = DateUtils.millis() & 0xFFFFFFFFL;
         byte[] frame = OpusProcessor.silenceFrame();
         messageService.sendBinaryMessage(session, frame, timestamp);
         if (opusRecorder != null) {

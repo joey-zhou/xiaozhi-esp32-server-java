@@ -8,14 +8,13 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 
 public interface MessageService {
 
     PageResult<MessageProjection> page(int pageNo, int pageSize, String deviceId, String deviceName,
                                        String sender, String messageType, Integer roleId,
-                                       Date startTime, Date endTime, Integer userId, String sessionId,
+                                       LocalDateTime startTime, LocalDateTime endTime, Integer userId, String sessionId,
                                        String source);
 
 

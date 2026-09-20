@@ -3,6 +3,7 @@ package com.xiaozhi.dialogue.llm.tool.function;
 import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tool.session.ToolSession;
+import com.xiaozhi.utils.DateUtils;
 import okhttp3.OkHttpClient;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
@@ -10,7 +11,6 @@ import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -75,7 +75,7 @@ public class Quote0Function implements ToolsGlobalRegistry.GlobalFunction {
                     }
                 })
                 .toolMetadata(ToolMetadata.builder().returnDirect(true).build())
-                .description("更新墨水屏信息，当前的时间是：" + LocalDateTime.now())
+                .description("更新墨水屏信息，当前的时间是：" + DateUtils.now())
                 .inputSchema("""
                             {
                                 "type": "object",

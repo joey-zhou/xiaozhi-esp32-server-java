@@ -1,13 +1,13 @@
 package com.xiaozhi.ai.llm.memory;
 
 import com.xiaozhi.common.model.bo.MessageMetadataBO;
+import com.xiaozhi.utils.DateUtils;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
@@ -72,7 +72,7 @@ public final class UserMessageAssembler {
     public static String assemble(String text, Instant timestamp, String emotion) {
         StringBuilder sb = new StringBuilder();
         if (timestamp != null) {
-            LocalDateTime ldt = LocalDateTime.ofInstant(timestamp, ZoneId.systemDefault());
+            LocalDateTime ldt = DateUtils.toDateTime(timestamp);
             sb.append('[').append(ldt.format(TIMESTAMP_FORMATTER)).append(']');
         }
         if (StringUtils.hasText(emotion)) {

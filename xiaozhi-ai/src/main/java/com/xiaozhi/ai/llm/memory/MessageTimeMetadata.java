@@ -1,5 +1,6 @@
 package com.xiaozhi.ai.llm.memory;
 
+import com.xiaozhi.utils.DateUtils;
 import org.springframework.ai.chat.messages.Message;
 
 import java.time.Instant;
@@ -19,6 +20,6 @@ public final class MessageTimeMetadata {
     }
 
     public static Instant getTimeMillis(Message message) {
-        return (Instant) message.getMetadata().getOrDefault(ChatMemory.TIME_MILLIS_KEY, Instant.now());
+        return (Instant) message.getMetadata().getOrDefault(ChatMemory.TIME_MILLIS_KEY, DateUtils.instant());
     }
 }

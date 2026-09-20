@@ -21,6 +21,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -322,7 +323,7 @@ class VadServiceTest {
 
     /** VAD 用挂钟计静音时长，测试把静音起点回拨到确定毫秒数，避免真实等待 */
     private void rewindSilenceStart(long millis) {
-        ReflectionTestUtils.setField(vadState(), "silenceTime", System.currentTimeMillis() - millis);
+        ReflectionTestUtils.setField(vadState(), "silenceTime", System.nanoTime() - TimeUnit.MILLISECONDS.toNanos(millis));
     }
 
     private Object vadState() {

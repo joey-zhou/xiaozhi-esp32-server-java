@@ -6,6 +6,7 @@ import com.xiaozhi.operationlog.convert.OperationLogConvert;
 import com.xiaozhi.operationlog.dal.mysql.dataobject.OperationLogDO;
 import com.xiaozhi.operationlog.dal.mysql.mapper.OperationLogMapper;
 import com.xiaozhi.operationlog.service.OperationLogService;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -37,7 +38,7 @@ public class OperationLogServiceImpl implements OperationLogService {
 
     @Override
     public int deleteExpired(int retentionDays, int batchSize) {
-        LocalDateTime expireBefore = LocalDateTime.now().minusDays(retentionDays);
+        LocalDateTime expireBefore = DateUtils.now().minusDays(retentionDays);
         int deleted = 0;
         while (true) {
             List<Long> ids = operationLogMapper.selectList(new LambdaQueryWrapper<OperationLogDO>()

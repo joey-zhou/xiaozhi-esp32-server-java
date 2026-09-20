@@ -3,7 +3,6 @@ package com.xiaozhi.common.model.bo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 
 @Data
 public class AgentBO {
@@ -23,7 +22,7 @@ public class AgentBO {
     private String botId;
     private String agentDesc;
     private String iconUrl;
-    private Date publishTime;
+    private LocalDateTime publishTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -26,13 +26,13 @@ import com.xiaozhi.template.service.TemplateService;
 import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.userauth.service.UserAuthService;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -218,7 +218,7 @@ public class UserAppService {
 
         String suffix = tel.length() >= 4 ? tel.substring(tel.length() - 4) : tel;
         UserBO createUser = new UserBO();
-        createUser.setUsername("tel_" + suffix + "_" + System.currentTimeMillis() % 1000);
+        createUser.setUsername("tel_" + suffix + "_" + DateUtils.millis() % 1000);
         createUser.setPassword(authenticationService.encryptPassword(UUID.randomUUID().toString()));
         createUser.setName("用户" + suffix);
         createUser.setTel(tel);
@@ -249,7 +249,7 @@ public class UserAppService {
         UserBO createUser = new UserBO();
         createUser.setUsername("wx_" + openId.substring(0, Math.min(10, openId.length())));
         createUser.setPassword(authenticationService.encryptPassword(UUID.randomUUID().toString()));
-        createUser.setName("微信用户" + System.currentTimeMillis() % 10000);
+        createUser.setName("微信用户" + DateUtils.millis() % 10000);
         UserBO created = createUserWithDefaults(createUser);
 
         UserAuthBO auth = new UserAuthBO();
@@ -287,7 +287,7 @@ public class UserAppService {
     }
 
     public void recordLoginInfo(UserBO user, String loginIp) {
-        user.setLoginTime(LocalDateTime.now());
+        user.setLoginTime(DateUtils.now());
         user.setLoginIp(loginIp);
         userService.update(user);
     }

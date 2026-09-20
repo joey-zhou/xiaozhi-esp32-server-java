@@ -7,6 +7,7 @@ import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.communication.ServerAddressProvider;
 import com.xiaozhi.storage.service.StorageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.FileHashUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -18,7 +19,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Set;
 import java.util.UUID;
@@ -104,7 +104,7 @@ public class FileUploadController {
         }
 
         // 构建文件存储路径，按日期和类型分类
-        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        String datePath = DateUtils.today().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         String relativePath = type + "/" + datePath;
 
         // 生成唯一文件名

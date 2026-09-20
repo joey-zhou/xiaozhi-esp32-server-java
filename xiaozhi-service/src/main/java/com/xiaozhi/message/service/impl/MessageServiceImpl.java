@@ -17,6 +17,7 @@ import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.storage.service.StorageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -31,12 +32,10 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -61,7 +60,7 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public PageResult<MessageProjection> page(int pageNo, int pageSize, String deviceId, String deviceName,
                                               String sender, String messageType, Integer roleId,
-                                              Date startTime, Date endTime, Integer userId, String sessionId,
+                                              LocalDateTime startTime, LocalDateTime endTime, Integer userId, String sessionId,
                                               String source) {
         Page<MessageProjection> page = new Page<>(pageNo, pageSize);
         IPage<MessageProjection> iPage = messageMapper.selectPage(page, deviceId, deviceName, sender, messageType, roleId, startTime, endTime, userId, sessionId, source);
@@ -128,7 +127,7 @@ public class MessageServiceImpl implements MessageService {
      */
     private void deleteAudioDirectories(String deviceId) {
         String audioDeviceId = deviceId.replace(":", "-");
-        LocalDate today = LocalDate.now();
+        LocalDate today = DateUtils.today();
         for (int i = 0; i <= AudioUtils.AUDIO_RETENTION_DAYS; i++) {
             String date = today.minusDays(i).format(DateTimeFormatter.ISO_LOCAL_DATE);
             Path deviceDir = runtimePathConfig.resolveStorageKey(
@@ -173,7 +172,7 @@ public class MessageServiceImpl implements MessageService {
             return 0;
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = DateUtils.now();
         int rows = 0;
         for (MessageBO message : messages) {
             MessageDO messageDO = messageConvert.toDO(message);
@@ -291,7 +290,7 @@ public class MessageServiceImpl implements MessageService {
      * 按时间倒序取最近 N 条再翻正序：积压超限时优先保留离当前对话最近的历史
      */
     private List<MessageBO> latestAfter(LambdaQueryWrapper<MessageDO> filter, Instant time) {
-        LocalDateTime createTime = LocalDateTime.ofInstant(time, ZoneId.systemDefault());
+        LocalDateTime createTime = DateUtils.toDateTime(time);
         List<MessageBO> desc = messageMapper.selectList(filter
                 .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
                 .gt(MessageDO::getCreateTime, createTime)
@@ -325,7 +324,7 @@ public class MessageServiceImpl implements MessageService {
             LambdaUpdateWrapper<MessageDO> msgUpdate = new LambdaUpdateWrapper<MessageDO>()
                 .eq(MessageDO::getMessageId, messageDO.getMessageId())
                 .set(MessageDO::getAudioPath, audioPath)
-                .set(MessageDO::getUpdateTime, LocalDateTime.now());
+                .set(MessageDO::getUpdateTime, DateUtils.now());
             messageMapper.update(null, msgUpdate);
         }
     }
@@ -347,7 +346,7 @@ public class MessageServiceImpl implements MessageService {
         LambdaUpdateWrapper<MessageDO> update = new LambdaUpdateWrapper<MessageDO>()
             .eq(MessageDO::getMessageId, messageDO.getMessageId())
             .set(MessageDO::getMessage, spokenText)
-            .set(MessageDO::getUpdateTime, LocalDateTime.now());
+            .set(MessageDO::getUpdateTime, DateUtils.now());
         messageMapper.update(null, update);
     }
 
@@ -366,7 +365,7 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     public int purgeExpiredAudio(int retentionDays, int batchSize) {
-        LocalDateTime expireBefore = LocalDateTime.now().minusDays(retentionDays);
+        LocalDateTime expireBefore = DateUtils.now().minusDays(retentionDays);
         int purged = 0;
 
         while (true) {

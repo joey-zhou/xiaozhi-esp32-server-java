@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.dialogue.runtime.TimeoutMessageSupplier;
 import com.xiaozhi.enums.DeviceState;
+import com.xiaozhi.utils.DateUtils;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -68,7 +69,7 @@ public class InactiveSessionChecker {
     }
 
     void checkInactiveSessions() {
-        Instant now = Instant.now();
+        Instant now = DateUtils.instant();
         sessionManager.getAllSessions().forEach(session -> {
             try {
                 checkInactiveSession(session, now);

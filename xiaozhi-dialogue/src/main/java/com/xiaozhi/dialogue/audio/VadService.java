@@ -8,6 +8,7 @@ import com.xiaozhi.dialogue.audio.vad.VadModel.InferenceResult;
 import com.xiaozhi.dialogue.audio.vad.SileroVadModel;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.OpusProcessor;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -94,6 +95,7 @@ public class VadService {
         private RoleThresholds thresholds = RoleThresholds.DEFAULTS;
 
         private boolean speaking = false;
+        /** 静音起点，取自单调时钟；0 表示当前不在静音中 */
         private long silenceTime = 0;
 
         private int consecutiveSilenceFrames = 0;
@@ -138,13 +140,19 @@ public class VadService {
             if (speaking) {
                 silenceTime = 0;
             } else if (silenceTime == 0) {
-                silenceTime = System.currentTimeMillis();
+                silenceTime = monotonicNow();
             }
+        }
+
+        // 0 留给「不在静音中」
+        private static long monotonicNow() {
+            long now = System.nanoTime();
+            return now == 0 ? 1 : now;
         }
 
         public int getSilenceDuration() {
             if (silenceTime == 0) return 0;
-            return (int) (System.currentTimeMillis() - silenceTime);
+            return (int) DateUtils.elapsedMillis(silenceTime);
         }
 
         public int getConsecutiveSilenceFrames() { return consecutiveSilenceFrames; }
@@ -155,7 +163,7 @@ public class VadService {
                 consecutiveSilenceFrames++;
                 consecutiveSpeechFrames = 0;
                 if (silenceTime == 0) {
-                    silenceTime = System.currentTimeMillis();
+                    silenceTime = monotonicNow();
                 }
             } else {
                 consecutiveSpeechFrames++;

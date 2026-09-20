@@ -1,6 +1,7 @@
 package com.xiaozhi.ai.llm.memory;
 
 import com.xiaozhi.common.model.bo.SummaryBO;
+import com.xiaozhi.utils.DateUtils;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.messages.Message;
@@ -8,8 +9,6 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.util.StringUtils;
 
-import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -45,7 +44,7 @@ class LlmSummarizer implements Summarizer {
         String conversation = MessageHistoryFormatter.format(batch);
         String prompt = StringUtils.hasText(summary)
                 ? againTemplate.render(Map.of("last_summary", summary, "conversation", conversation))
-                : initTemplate.render(Map.of("datetime", LocalDate.now().toString(), "conversation", conversation));
+                : initTemplate.render(Map.of("datetime", DateUtils.today().toString(), "conversation", conversation));
         String result = chatClient.prompt().user(prompt).call().content();
         if (!StringUtils.hasText(result)) {
             throw new IllegalStateException("摘要模型返回为空");
@@ -56,7 +55,7 @@ class LlmSummarizer implements Summarizer {
                 .setSessionId(sessionId)
                 .setLastMessageTimestamp(MessageTimeMetadata.getTimeMillis(batch.getLast()))
                 .setSummary(result)
-                .setCreateTime(Instant.now()));
+                .setCreateTime(DateUtils.instant()));
         return result;
     }
 }

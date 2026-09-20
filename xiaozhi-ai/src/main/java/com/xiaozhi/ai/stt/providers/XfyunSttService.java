@@ -8,6 +8,7 @@ import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.ai.utils.HttpUtil;
+import com.xiaozhi.utils.DateUtils;
 import okhttp3.HttpUrl;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -110,7 +111,7 @@ public class XfyunSttService implements SttService {
         URL url = URI.create(XfyunSttService.hostUrl).toURL();
         SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US);
         format.setTimeZone(TimeZone.getTimeZone("GMT"));
-        String date = format.format(new Date());
+        String date = format.format(Date.from(DateUtils.instant()));
 
         StringBuilder builder = new StringBuilder("host: ").append(url.getHost()).append("\n")
                 .append("date: ").append(date).append("\n")

@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue.runtime;
 
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.EmojiUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +35,7 @@ public class Sentence implements Comparable<Sentence>{
     private List<String> moods=null;
 
     // 用于记录每一个句子的形成时间戳。
-    private final Instant createdAt = Instant.now();
+    private final Instant createdAt = DateUtils.instant();
 
     public Sentence(String text) {
         this.text = text;

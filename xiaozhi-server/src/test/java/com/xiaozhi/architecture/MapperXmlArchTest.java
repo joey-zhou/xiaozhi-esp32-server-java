@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 扫 classpath 上全部 Mapper XML，钉住 resultType 不得指向 Req/Resp。
+ * 扫 classpath 上全部 Mapper XML，钉住 resultType 不得指向 Req/Resp、SQL 不得读数据库时钟。
  */
 class MapperXmlArchTest {
 
@@ -27,6 +27,10 @@ class MapperXmlArchTest {
     private static final Pattern RESULT_TYPE = Pattern.compile("resultType\\s*=\\s*([\"'])([^\"']+)\\1");
 
     private static final Pattern DTO_PACKAGE = Pattern.compile("\\.model\\.(req|resp)\\.");
+
+    private static final Pattern DATABASE_CLOCK = Pattern.compile(
+        "\\b(NOW|CURRENT_TIMESTAMP|CURDATE|CURTIME|SYSDATE|LOCALTIME|LOCALTIMESTAMP|UTC_TIMESTAMP|UNIX_TIMESTAMP)\\b",
+        Pattern.CASE_INSENSITIVE);
 
     private static final Pattern NAMESPACE =
         Pattern.compile("<mapper\\s+namespace\\s*=\\s*[\"']([^\"']+)[\"']");
@@ -77,6 +81,25 @@ class MapperXmlArchTest {
 
         assertThat(offending)
             .as("resultType 直指 Req/Resp 会让 Service 返回 web 出参，SQL 直出的附加列应落到包内 XxxProjection")
+            .isEmpty();
+    }
+
+    @Test
+    void sqlDoesNotReadTheDatabaseClock() {
+        Map<String, Set<String>> offending = new LinkedHashMap<>();
+        mapperXml.forEach((uri, xml) -> {
+            Set<String> hits = new TreeSet<>();
+            Matcher matcher = DATABASE_CLOCK.matcher(xml);
+            while (matcher.find()) {
+                hits.add(matcher.group(1).toUpperCase());
+            }
+            if (!hits.isEmpty()) {
+                offending.put(uri, hits);
+            }
+        });
+
+        assertThat(offending)
+            .as("时间由应用时钟写入与比较，SQL 里再读数据库时钟会让同一张表出现两种口径；当前时间从 Java 用 DateUtils 取了传进来")
             .isEmpty();
     }
 

@@ -9,6 +9,7 @@ import com.xiaozhi.common.model.bo.MessageMetadataBO;
 import com.xiaozhi.dialogue.runtime.DialogueContext;
 import com.xiaozhi.dialogue.runtime.DialogueTurn;
 import com.xiaozhi.dialogue.runtime.ToolChainPair;
+import com.xiaozhi.utils.DateUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AbstractMessage;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -16,8 +17,6 @@ import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -80,7 +79,7 @@ public class DialogueTurnConverter {
                 if (userSpeechStoredPath != null) {
                     messageBO.setAudioPath(userSpeechStoredPath);
                 }
-                messageBO.setCreateTime(LocalDateTime.ofInstant(turn.getUserMessageCreatedAt(), ZoneId.systemDefault()));
+                messageBO.setCreateTime(DateUtils.toDateTime(turn.getUserMessageCreatedAt()));
                 // 从 UserMessage.metadata 抽取结构化元数据（speaker/emotion 等）写入 MessageBO.metadata
                 if (message instanceof UserMessage userMessage
                         && userMessage.getMetadata() != null
@@ -89,7 +88,7 @@ public class DialogueTurnConverter {
                 }
                 break;
             case ASSISTANT:
-                messageBO.setCreateTime(LocalDateTime.ofInstant(turn.getAssistantMessageCreatedAt(), ZoneId.systemDefault()));
+                messageBO.setCreateTime(DateUtils.toDateTime(turn.getAssistantMessageCreatedAt()));
                 if (!toolCallDetails.isEmpty()) {
                     try {
                         messageBO.setToolCalls(OBJECT_MAPPER.writeValueAsString(toolCallDetails));
@@ -118,7 +117,7 @@ public class DialogueTurnConverter {
         messageBO.setMessage(toolCallAssistantMessage.getText());
         messageBO.setRoleId(conversation.getRoleId());
         messageBO.setMessageType(MessageBO.MESSAGE_TYPE_TOOL_CALL);
-        messageBO.setCreateTime(LocalDateTime.ofInstant(turn.toolChainCreatedAt(), ZoneId.systemDefault()));
+        messageBO.setCreateTime(DateUtils.toDateTime(turn.toolChainCreatedAt()));
         try {
             messageBO.setToolCalls(ToolCallMessageCodec.encodeToolCalls(toolCallAssistantMessage.getToolCalls()));
         } catch (JsonProcessingException e) {
@@ -143,7 +142,7 @@ public class DialogueTurnConverter {
         messageBO.setMessage(responseText);
         messageBO.setRoleId(conversation.getRoleId());
         messageBO.setMessageType(MessageBO.MESSAGE_TYPE_TOOL_RESPONSE);
-        messageBO.setCreateTime(LocalDateTime.ofInstant(turn.toolChainCreatedAt(), ZoneId.systemDefault()));
+        messageBO.setCreateTime(DateUtils.toDateTime(turn.toolChainCreatedAt()));
         try {
             messageBO.setToolCalls(ToolCallMessageCodec.encodeToolResponses(toolResponseMessage.getResponses()));
         } catch (JsonProcessingException e) {

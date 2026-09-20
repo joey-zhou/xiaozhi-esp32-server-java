@@ -9,6 +9,7 @@ import com.xiaozhi.summary.convert.SummaryConvert;
 import com.xiaozhi.summary.dal.mysql.dataobject.SummaryDO;
 import com.xiaozhi.summary.dal.mysql.mapper.SummaryMapper;
 import com.xiaozhi.summary.service.SummaryService;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -18,7 +19,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 
@@ -80,7 +80,7 @@ public class SummaryServiceImpl implements SummaryService {
             summaryDO.setCompletionTokens(0);
         }
         if (summaryDO.getCreateTime() == null) {
-            summaryDO.setCreateTime(LocalDateTime.now());
+            summaryDO.setCreateTime(DateUtils.now());
         }
         try {
             summaryMapper.insert(summaryDO);
@@ -131,6 +131,6 @@ public class SummaryServiceImpl implements SummaryService {
     private LocalDateTime toLocalDateTime(Instant instant) {
         return instant == null
             ? null
-            : LocalDateTime.ofInstant(instant.truncatedTo(ChronoUnit.MILLIS), ZoneId.systemDefault());
+            : DateUtils.toDateTime(instant.truncatedTo(ChronoUnit.MILLIS));
     }
 }

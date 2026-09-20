@@ -1,5 +1,6 @@
 package com.xiaozhi.common.domain;
 
+import com.xiaozhi.utils.DateUtils;
 import org.springframework.context.ApplicationEvent;
 
 import java.time.Instant;
@@ -22,7 +23,7 @@ public abstract class AbstractDomainEvent extends ApplicationEvent implements Do
     protected AbstractDomainEvent(Object source) {
         super(source);
         this.eventId = UUID.randomUUID().toString();
-        this.occurredOn = Instant.now();
+        this.occurredOn = DateUtils.instant();
     }
 
     @Override

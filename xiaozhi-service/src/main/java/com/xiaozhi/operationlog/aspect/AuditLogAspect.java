@@ -16,6 +16,7 @@ import com.xiaozhi.common.annotation.Sensitive;
 import com.xiaozhi.common.model.bo.OperationLogBO;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.operationlog.service.OperationLogService;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.annotation.Resource;
@@ -61,7 +62,7 @@ public class AuditLogAspect {
 
     @Around("@annotation(auditLog)")
     public Object around(ProceedingJoinPoint pjp, AuditLog auditLog) throws Throwable {
-        long start = System.currentTimeMillis();
+        long start = System.nanoTime();
         Throwable error = null;
         try {
             return pjp.proceed();
@@ -69,7 +70,7 @@ public class AuditLogAspect {
             error = ex;
             throw ex;
         } finally {
-            int costMs = (int) (System.currentTimeMillis() - start);
+            int costMs = (int) DateUtils.elapsedMillis(start);
             saveLog(pjp, auditLog, costMs, error);
         }
     }

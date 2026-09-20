@@ -1,6 +1,7 @@
 package com.xiaozhi.dialogue.playback;
 
 import com.xiaozhi.common.Speech;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.EmojiUtils;
 
 import com.xiaozhi.communication.common.ChatSession;
@@ -14,7 +15,6 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
@@ -185,7 +185,7 @@ public class ScheduledPlayer extends Player {
                                 return;
                             }
                             // 更新活跃时间
-                            session.setLastActivityTime(Instant.now());
+                            session.setLastActivityTime(DateUtils.instant());
 
                             // 预编码的 Opus 帧（来自缓存直读），无需转换。命中句与未命中句在同一轮回复里
                             // 交替出现，入队前同样要走一遍句边界收尾，否则上一句留在编码器里的残样
@@ -644,7 +644,7 @@ public class ScheduledPlayer extends Player {
         }
 
         // 更新活跃时间
-        session.setLastActivityTime(Instant.now());
+        session.setLastActivityTime(DateUtils.instant());
 
         // 发送文本和表情（如果有），与首帧音频紧邻发送
         String text = speech.getText();

@@ -22,6 +22,7 @@ import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.summary.service.SummaryService;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.IpLocationClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,8 +34,11 @@ import org.mapstruct.factory.Mappers;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -95,6 +99,22 @@ class DeviceAppServiceTest {
         boundDevice.setDeviceName("客厅音箱");
         lenient().when(deviceService.getBO(DEVICE_ID)).thenReturn(boundDevice);
         lenient().when(serverAddressProvider.getWebsocketAddress()).thenReturn("ws://server.test/xiaozhi/v1/");
+    }
+
+    // 设备靠这两个值显示本地时间：时间戳是绝对时刻，偏移要跟随应用所在时区并随夏令时变化，不能写死东八区
+    @Test
+    void handleOtaTellsTheDeviceTheAppZoneOffset() {
+        Instant moment = Instant.parse("2026-07-01T00:00:00Z");
+        DateUtils.use(Clock.fixed(moment, ZoneId.of("America/Los_Angeles")));
+        try {
+            Map<String, Object> response = deviceAppService.handleOta(otaRequest());
+
+            assertThat(response.get("server_time")).isEqualTo(Map.of(
+                    "timestamp", moment.toEpochMilli(),
+                    "timezone_offset", -420));
+        } finally {
+            DateUtils.reset();
+        }
     }
 
     @Test

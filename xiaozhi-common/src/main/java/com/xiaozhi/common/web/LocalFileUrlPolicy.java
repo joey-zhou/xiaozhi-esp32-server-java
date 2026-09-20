@@ -2,6 +2,7 @@ package com.xiaozhi.common.web;
 
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.communication.ServerAddressProvider;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,7 +14,6 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -119,7 +119,7 @@ public class LocalFileUrlPolicy {
             return rawValue;
         }
         String path = stripSignature(value);
-        long expireAt = Instant.now().plus(Duration.ofHours(urlTtlHours)).getEpochSecond();
+        long expireAt = DateUtils.instant().plus(Duration.ofHours(urlTtlHours)).getEpochSecond();
         return path + (path.indexOf('?') >= 0 ? "&" : "?")
                 + EXPIRE_PARAM + "=" + expireAt
                 + "&" + SIGNATURE_PARAM + "=" + sign(relativePath(path), expireAt);
@@ -188,7 +188,7 @@ public class LocalFileUrlPolicy {
         } catch (NumberFormatException e) {
             return false;
         }
-        if (Instant.now().getEpochSecond() > expireAt) {
+        if (DateUtils.instant().getEpochSecond() > expireAt) {
             return false;
         }
         byte[] expected = sign(relativePath(path), expireAt).getBytes(StandardCharsets.UTF_8);

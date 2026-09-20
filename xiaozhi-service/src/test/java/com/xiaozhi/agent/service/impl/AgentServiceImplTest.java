@@ -15,7 +15,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -104,7 +103,7 @@ class AgentServiceImplTest {
         assertThat(agent.getCreateTime()).isEqualTo(createTime);
         assertThat(agent.getUpdateTime()).isEqualTo(updateTime);
         // 平台没给发布时间时由配置创建时间兜底
-        assertThat(agent.getPublishTime()).isEqualTo(Timestamp.valueOf(createTime));
+        assertThat(agent.getPublishTime()).isEqualTo(createTime);
         // 读列表不写库
         verify(configService, never()).saveAgentModel(any());
     }

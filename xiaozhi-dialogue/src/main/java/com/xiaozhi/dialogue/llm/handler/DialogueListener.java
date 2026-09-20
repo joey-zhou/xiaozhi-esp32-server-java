@@ -6,13 +6,13 @@ import com.xiaozhi.dialogue.runtime.PersonaListener;
 import com.xiaozhi.common.SerialTaskRegistry;
 import com.xiaozhi.dialogue.runtime.convert.DialogueTurnConverter;
 import com.xiaozhi.message.service.MessageService;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -48,7 +48,7 @@ public class DialogueListener implements PersonaListener {
 
     @Override
     public void onDialogueTurnTruncated(Conversation conversation, Instant assistantMessageCreatedAt, String spokenText) {
-        LocalDateTime createdAt = LocalDateTime.ofInstant(assistantMessageCreatedAt, ZoneId.systemDefault());
+        LocalDateTime createdAt = DateUtils.toDateTime(assistantMessageCreatedAt);
         SerialTaskRegistry.submit(conversation.getSessionId(), () -> {
             try {
                 messageService.truncateAssistant(conversation.getOwnerId(), conversation.getRoleId(),

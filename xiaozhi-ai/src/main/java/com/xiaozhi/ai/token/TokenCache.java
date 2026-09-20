@@ -1,5 +1,7 @@
 package com.xiaozhi.ai.token;
 
+import com.xiaozhi.utils.DateUtils;
+
 /**
  * Redis 中缓存的 token 值。
  */
@@ -34,10 +36,10 @@ public class TokenCache {
     }
 
     public boolean isExpired() {
-        return expireAt <= System.currentTimeMillis();
+        return expireAt <= DateUtils.millis();
     }
 
     public boolean shouldRefresh(long refreshAheadMillis) {
-        return expireAt - System.currentTimeMillis() <= refreshAheadMillis;
+        return expireAt - DateUtils.millis() <= refreshAheadMillis;
     }
 }

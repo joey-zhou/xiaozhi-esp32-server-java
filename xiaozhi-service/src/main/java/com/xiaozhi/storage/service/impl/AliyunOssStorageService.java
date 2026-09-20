@@ -6,6 +6,7 @@ import com.aliyun.oss.model.OSSObject;
 import com.aliyun.oss.model.ObjectMetadata;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.storage.service.StorageService;
+import com.xiaozhi.utils.DateUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -135,7 +136,7 @@ public class AliyunOssStorageService implements StorageService {
         }
         try {
             String key = extractObjectKey(storedPath);
-            Date expiration = new Date(System.currentTimeMillis() + PRESIGN_EXPIRE_MILLIS);
+            Date expiration = Date.from(DateUtils.instant().plusMillis(PRESIGN_EXPIRE_MILLIS));
             return ossClient.generatePresignedUrl(bucketName, key, expiration).toString();
         } catch (Exception e) {
             log.warn("生成 OSS 签名 URL 失败，返回原路径: {}", storedPath, e);

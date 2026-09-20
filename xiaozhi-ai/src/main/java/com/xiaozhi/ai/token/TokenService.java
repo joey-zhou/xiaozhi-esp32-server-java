@@ -3,6 +3,7 @@ package com.xiaozhi.ai.token;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.ai.token.provider.TokenProvider;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
@@ -132,7 +133,7 @@ public class TokenService implements ProviderTokenClient {
         if (json == null) {
             throw new IllegalStateException("Token缓存序列化失败");
         }
-        long ttlMillis = Math.max(tokenCache.getExpireAt() - System.currentTimeMillis(), 1000L);
+        long ttlMillis = Math.max(tokenCache.getExpireAt() - DateUtils.millis(), 1000L);
         stringRedisTemplate.opsForValue().set(buildTokenKey(config), json, Duration.ofMillis(ttlMillis));
     }
 
@@ -182,7 +183,7 @@ public class TokenService implements ProviderTokenClient {
     }
 
     private void validateToken(TokenCache tokenCache, ConfigBO config) {
-        if (tokenCache == null || !StringUtils.hasText(tokenCache.getToken()) || tokenCache.getExpireAt() <= System.currentTimeMillis()) {
+        if (tokenCache == null || !StringUtils.hasText(tokenCache.getToken()) || tokenCache.getExpireAt() <= DateUtils.millis()) {
             throw new IllegalStateException("Token无效，provider=" + config.getProvider() + ", configId=" + config.getConfigId());
         }
     }

@@ -2,6 +2,7 @@ package com.xiaozhi.ai.tts;
 
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.common.model.resp.SherpaVoiceResp;
+import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -33,17 +34,17 @@ public class SherpaVoiceProbe {
      */
     public List<SherpaVoiceResp> listVoices() {
         List<SherpaVoiceResp> snapshot = cachedVoices;
-        if (snapshot != null && System.currentTimeMillis() - cachedAtMillis < CACHE_TTL_MILLIS) {
+        if (snapshot != null && DateUtils.millis() - cachedAtMillis < CACHE_TTL_MILLIS) {
             return snapshot;
         }
         synchronized (this) {
             snapshot = cachedVoices;
-            if (snapshot != null && System.currentTimeMillis() - cachedAtMillis < CACHE_TTL_MILLIS) {
+            if (snapshot != null && DateUtils.millis() - cachedAtMillis < CACHE_TTL_MILLIS) {
                 return snapshot;
             }
             List<SherpaVoiceResp> scanned = scanVoices();
             cachedVoices = scanned;
-            cachedAtMillis = System.currentTimeMillis();
+            cachedAtMillis = DateUtils.millis();
             return scanned;
         }
     }

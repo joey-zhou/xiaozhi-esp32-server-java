@@ -3,12 +3,12 @@ package com.xiaozhi.summary.convert;
 import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.common.model.resp.SummaryResp;
 import com.xiaozhi.summary.dal.mysql.dataobject.SummaryDO;
+import com.xiaozhi.utils.DateUtils;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 
 @Mapper(componentModel = "spring")
 public interface SummaryConvert {
@@ -23,10 +23,10 @@ public interface SummaryConvert {
     SummaryResp toResp(SummaryBO summaryBO);
 
     default Instant map(LocalDateTime value) {
-        return value == null ? null : value.atZone(ZoneId.systemDefault()).toInstant();
+        return DateUtils.toInstant(value);
     }
 
     default LocalDateTime map(Instant value) {
-        return value == null ? null : LocalDateTime.ofInstant(value, ZoneId.systemDefault());
+        return DateUtils.toDateTime(value);
     }
 }

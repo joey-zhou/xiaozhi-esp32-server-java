@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.ai.token.TokenCache;
+import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.JsonUtil;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -63,7 +64,7 @@ public class CozeTokenProvider implements TokenProvider {
     }
 
     private String generateJwt(ConfigBO config) throws Exception {
-        long currentTime = System.currentTimeMillis() / 1000;
+        long currentTime = DateUtils.millis() / 1000;
         Map<String, Object> header = Map.of(
                 "alg", "RS256",
                 "typ", "JWT",
@@ -130,7 +131,7 @@ public class CozeTokenProvider implements TokenProvider {
         }
 
         long expiresIn = jsonResponse.path("expires_in").asLong(DEFAULT_DURATION_SECONDS);
-        long expireAt = System.currentTimeMillis() + expiresIn * 1000L;
+        long expireAt = DateUtils.millis() + expiresIn * 1000L;
         return new TokenCache(accessToken, expireAt);
     }
 }
