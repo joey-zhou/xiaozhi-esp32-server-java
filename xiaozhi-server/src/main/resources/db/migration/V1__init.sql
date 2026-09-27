@@ -3,31 +3,9 @@ SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- 创建本地用户并设置密码（使用mysql_native_password插件）
-CREATE USER IF NOT EXISTS 'xiaozhi'@'localhost' IDENTIFIED WITH mysql_native_password BY '123456';
-
--- 创建远程用户并设置密码（使用mysql_native_password插件）
-CREATE USER IF NOT EXISTS 'xiaozhi'@'%' IDENTIFIED WITH mysql_native_password BY '123456';
-
--- 仅授予本地用户对 xiaozhi 数据库的所有权限
-GRANT ALL PRIVILEGES ON xiaozhi.* TO 'xiaozhi'@'localhost';
-
--- 仅授予远程用户对 xiaozhi 数据库的所有权限
-GRANT ALL PRIVILEGES ON xiaozhi.* TO 'xiaozhi'@'%';
-
--- 刷新权限以使更改生效
-FLUSH PRIVILEGES;
-
--- 查看用户权限
-SHOW GRANTS FOR 'xiaozhi'@'localhost';
-SHOW GRANTS FOR 'xiaozhi'@'%';
-
--- 创建数据库（如果不存在）
-CREATE DATABASE IF NOT EXISTS `xiaozhi` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- xiaozhi.sys_user definition
-DROP TABLE IF EXISTS `xiaozhi`.`sys_user`;
-CREATE TABLE `xiaozhi`.`sys_user` (
+-- sys_user definition
+DROP TABLE IF EXISTS `sys_user`;
+CREATE TABLE `sys_user` (
   `userId` int unsigned NOT NULL AUTO_INCREMENT,
   `username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -51,14 +29,14 @@ CREATE TABLE `xiaozhi`.`sys_user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert admin user only if it doesn't exist
-INSERT INTO xiaozhi.sys_user (username, password, state, isAdmin, authRoleId, name, createTime, updateTime)
+INSERT INTO sys_user (username, password, state, isAdmin, authRoleId, name, createTime, updateTime)
 VALUES ('admin', '11cd9c061d614dcf37ec60c44c11d2ad', '1', '1', 1, '小智', '2025-03-09 18:32:29', '2025-03-09 18:32:35');
 
-update `xiaozhi`.`sys_user` set name = '小智' where username = 'admin';
+update `sys_user` set name = '小智' where username = 'admin';
 
--- xiaozhi.sys_device definition
-DROP TABLE IF EXISTS `xiaozhi`.`sys_device`;
-CREATE TABLE `xiaozhi`.`sys_device` (
+-- sys_device definition
+DROP TABLE IF EXISTS `sys_device`;
+CREATE TABLE `sys_device` (
   `deviceId` varchar(255) NOT NULL COMMENT '设备ID，主键',
   `deviceName` varchar(100) NOT NULL COMMENT '设备名称',
   `roleId` int unsigned DEFAULT NULL COMMENT '角色ID，主键',
@@ -77,9 +55,9 @@ CREATE TABLE `xiaozhi`.`sys_device` (
   KEY `userId` (`userId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='设备信息表';
 
--- xiaozhi.sys_message definition
-DROP TABLE IF EXISTS `xiaozhi`.`sys_message`;
-CREATE TABLE `xiaozhi`.`sys_message` (
+-- sys_message definition
+DROP TABLE IF EXISTS `sys_message`;
+CREATE TABLE `sys_message` (
   `messageId` bigint NOT NULL AUTO_INCREMENT COMMENT '消息ID，主键，自增',
   `userId` int unsigned DEFAULT NULL COMMENT '用户ID',
   `deviceId` varchar(30) NOT NULL COMMENT '设备ID',
@@ -106,9 +84,9 @@ CREATE TABLE `xiaozhi`.`sys_message` (
   KEY `statdate` (`statDate`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='人与AI对话消息表';
 
--- xiaozhi.sys_role definition
-DROP TABLE IF EXISTS `xiaozhi`.`sys_role`;
-CREATE TABLE `xiaozhi`.`sys_role` (
+-- sys_role definition
+DROP TABLE IF EXISTS `sys_role`;
+CREATE TABLE `sys_role` (
   `roleId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '角色ID，主键',
   `roleName` varchar(100) NOT NULL COMMENT '角色名称',
   `roleDesc` TEXT DEFAULT NULL COMMENT '角色描述',
@@ -135,9 +113,9 @@ CREATE TABLE `xiaozhi`.`sys_role` (
   KEY `userId` (`userId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
 
--- xiaozhi.sys_code definition
-DROP TABLE IF EXISTS `xiaozhi`.`sys_code`;
-CREATE TABLE `xiaozhi`.`sys_code` (
+-- sys_code definition
+DROP TABLE IF EXISTS `sys_code`;
+CREATE TABLE `sys_code` (
   `codeId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
   `code` varchar(100) NOT NULL COMMENT '验证码',
   `type` varchar(50) DEFAULT NULL COMMENT '设备类型',
@@ -151,9 +129,9 @@ CREATE TABLE `xiaozhi`.`sys_code` (
   KEY `deviceId` (`deviceId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='验证码表';
 
--- xiaozhi.sys_config definition
-DROP TABLE IF EXISTS `xiaozhi`.`sys_config`;
-CREATE TABLE `xiaozhi`.`sys_config` (
+-- sys_config definition
+DROP TABLE IF EXISTS `sys_config`;
+CREATE TABLE `sys_config` (
   `configId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '配置ID，主键',
   `userId` int unsigned NOT NULL COMMENT '创建用户ID',
   `configType` varchar(30) NOT NULL COMMENT '配置类型(llm, stt, tts等)',
@@ -177,9 +155,9 @@ CREATE TABLE `xiaozhi`.`sys_config` (
   KEY `provider` (`provider`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表(模型、语音识别、语音合成等)';
 
--- xiaozhi.sys_template definition
-DROP TABLE IF EXISTS `xiaozhi`.`sys_template`;
-CREATE TABLE `xiaozhi`.`sys_template` (
+-- sys_template definition
+DROP TABLE IF EXISTS `sys_template`;
+CREATE TABLE `sys_template` (
   `userId` int unsigned NOT NULL COMMENT '创建用户ID',
   `templateId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '模板ID',
   `templateName` varchar(100) NOT NULL COMMENT '模板名称',
@@ -196,7 +174,7 @@ CREATE TABLE `xiaozhi`.`sys_template` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='提示词模板表';
 
 -- Insert default template
-INSERT INTO `xiaozhi`.`sys_template` (`userId`, `templateName`, `templateDesc`, `templateContent`, `category`, `isDefault`) VALUES
+INSERT INTO `sys_template` (`userId`, `templateName`, `templateDesc`, `templateContent`, `category`, `isDefault`) VALUES
 (1, '通用助手', '适合日常对话的通用AI助手', '你是一个乐于助人的AI助手。请以友好、专业的方式回答用户的问题。提供准确、有用的信息，并尽可能简洁明了。避免使用复杂的符号或格式，保持自然流畅的对话风格。当用户的问题不明确时，可以礼貌地请求更多信息。请记住，你的回答将被转换为语音，所以要使用清晰、易于朗读的语言。', '基础角色', '0'),
 
 (1, '教育老师', '擅长解释复杂概念的教师角色', '你是一位经验丰富的教师，擅长通过简单易懂的方式解释复杂概念。回答问题时，考虑不同学习水平的学生，使用适当的比喻和例子，并鼓励批判性思考。避免使用难以在语音中表达的符号或公式，使用清晰的语言描述概念。引导学习过程而不是直接给出答案。使用自然的语调和节奏，就像在课堂上讲解一样。', '专业角色', '0'),
@@ -259,8 +237,8 @@ INSERT INTO `xiaozhi`.`sys_template` (`userId`, `templateName`, `templateDesc`, 
 理解用户的信息，酝酿你的愤怒情绪，你越想越生气。', '社交角色', '1');
 
 -- 创建mcp工具过滤配置表
-DROP TABLE IF EXISTS `xiaozhi`.`sys_mcp_tool_exclude`;
-CREATE TABLE `xiaozhi`.`sys_mcp_tool_exclude` (
+DROP TABLE IF EXISTS `sys_mcp_tool_exclude`;
+CREATE TABLE `sys_mcp_tool_exclude` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `excludeType` varchar(20) NOT NULL COMMENT '过滤类型：global-全局过滤，role-角色过滤',
   `bindType` varchar(20) NOT NULL COMMENT '绑定类型：mcp_server-MCP服务器，mcp_endpoint-MCP接入点',
@@ -275,8 +253,8 @@ CREATE TABLE `xiaozhi`.`sys_mcp_tool_exclude` (
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP工具过滤配置表';
 
 -- 创建聊天消息摘要记录表
-DROP TABLE IF EXISTS `xiaozhi`.`sys_summary`;
-CREATE TABLE `xiaozhi`.`sys_summary` (
+DROP TABLE IF EXISTS `sys_summary`;
+CREATE TABLE `sys_summary` (
   `deviceId` varchar(255) NOT NULL COMMENT '设备ID，联合索引第一个字段',
   `roleId` int unsigned NOT NULL COMMENT '角色ID，联合索引第二个字段',
   `lastMessageTimestamp` DATETIME(3) NOT NULL COMMENT '最后一条消息的创建时间戳，精确到毫秒，联合索引第三个字段',
@@ -287,9 +265,9 @@ CREATE TABLE `xiaozhi`.`sys_summary` (
   PRIMARY KEY (`deviceId`, `roleId`, `lastMessageTimestamp` DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='聊天消息摘要记录表';
 
--- xiaozhi.sys_operation_log definition
-DROP TABLE IF EXISTS `xiaozhi`.`sys_operation_log`;
-CREATE TABLE `xiaozhi`.`sys_operation_log` (
+-- sys_operation_log definition
+DROP TABLE IF EXISTS `sys_operation_log`;
+CREATE TABLE `sys_operation_log` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   `userId` INT NULL COMMENT '操作用户ID',
   `ip` VARCHAR(64) NULL COMMENT '客户端IP',
@@ -309,8 +287,8 @@ CREATE TABLE `xiaozhi`.`sys_operation_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作审计日志';
 
 -- 创建权限表
-DROP TABLE IF EXISTS `xiaozhi`.`sys_permission`;
-CREATE TABLE `xiaozhi`.`sys_permission` (
+DROP TABLE IF EXISTS `sys_permission`;
+CREATE TABLE `sys_permission` (
   `permissionId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '权限ID',
   `parentId` int unsigned DEFAULT NULL COMMENT '父权限ID',
   `name` varchar(100) NOT NULL COMMENT '权限名称',
@@ -329,8 +307,8 @@ CREATE TABLE `xiaozhi`.`sys_permission` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='权限表';
 
 -- 创建角色表
-DROP TABLE IF EXISTS `xiaozhi`.`sys_auth_role`;
-CREATE TABLE `xiaozhi`.`sys_auth_role` (
+DROP TABLE IF EXISTS `sys_auth_role`;
+CREATE TABLE `sys_auth_role` (
   `authRoleId` int unsigned NOT NULL AUTO_INCREMENT COMMENT '角色ID',
   `authRoleName` varchar(100) NOT NULL COMMENT '角色名称',
   `roleKey` varchar(100) NOT NULL COMMENT '角色标识',
@@ -343,8 +321,8 @@ CREATE TABLE `xiaozhi`.`sys_auth_role` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='权限角色表';
 
 -- 创建角色-权限关联表
-DROP TABLE IF EXISTS `xiaozhi`.`sys_auth_role_permission`;
-CREATE TABLE `xiaozhi`.`sys_auth_role_permission` (
+DROP TABLE IF EXISTS `sys_auth_role_permission`;
+CREATE TABLE `sys_auth_role_permission` (
   `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT 'ID',
   `authRoleId` int unsigned NOT NULL COMMENT '角色ID',
   `permissionId` int unsigned NOT NULL COMMENT '权限ID',
@@ -356,7 +334,7 @@ CREATE TABLE `xiaozhi`.`sys_auth_role_permission` (
 -- 插入菜单权限
 -- permissionId 自增顺序: 1-Dashboard, 2-用户管理, 3-设备管理, 4-对话管理, 5-角色配置,
 -- 6-提示词模板管理, 7-配置管理, 8-设置, 9-权限角色
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
 -- 主菜单
 (NULL, 'Dashboard', 'system:dashboard', 'menu', '/dashboard', 'page/Dashboard', 'dashboard', 1, '1', '1'),
 (NULL, '用户管理', 'system:user', 'menu', '/user', 'page/User', 'team', 2, '1', '1'),
@@ -369,34 +347,34 @@ INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `pe
 (NULL, '权限角色', 'system:auth-role', 'menu', '/auth-role', 'page/AuthRole', 'safety-certificate', 9, '1', '1');
 
 -- 配置管理子菜单 (parentId=7 即配置管理)
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
 (7, '模型配置', 'system:config:model', 'menu', '/config/model', 'page/config/ModelConfig', NULL, 1, '1', '1'),
 (7, '智能体管理', 'system:config:agent', 'menu', '/config/agent', 'page/config/Agent', NULL, 2, '1', '1'),
 (7, '语音识别配置', 'system:config:stt', 'menu', '/config/stt', 'page/config/SttConfig', NULL, 3, '1', '1'),
 (7, '语音合成配置', 'system:config:tts', 'menu', '/config/tts', 'page/config/TtsConfig', NULL, 4, '1', '1');
 
 -- 设置子菜单 (parentId=8 即设置)
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
 (8, '个人中心', 'system:setting:account', 'menu', '/setting/account', 'page/setting/Account', NULL, 1, '1', '1'),
 (8, '个人设置', 'system:setting:config', 'menu', '/setting/config', 'page/setting/Config', NULL, 2, '1', '1');
 
 -- 按钮权限: 保存授权
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`)
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`)
 SELECT `permissionId`, '保存授权', 'system:auth-role:assign', 'button', NULL, NULL, NULL, 1, '0', '1'
-FROM `xiaozhi`.`sys_permission`
+FROM `sys_permission`
 WHERE `permissionKey` = 'system:auth-role';
 
 -- 隐藏菜单: 文件能力
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `path`, `component`, `icon`, `sort`, `visible`, `status`) VALUES
 (NULL, '文件能力', 'system:file', 'menu', NULL, NULL, NULL, 99, '0', '1');
 
 -- API权限: 用户管理
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
 SELECT p.`permissionId`, '用户列表接口', 'system:user:api:list', 'api', 1, '0', '1'
-FROM `xiaozhi`.`sys_permission` p WHERE p.`permissionKey` = 'system:user';
+FROM `sys_permission` p WHERE p.`permissionKey` = 'system:user';
 
 -- API权限: 设备管理
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
 SELECT p.`permissionId`, src.`name`, src.`permissionKey`, 'api', src.`sort`, '0', '1'
 FROM (
     SELECT '设备列表接口' AS `name`, 'system:device:api:list' AS `permissionKey`, 1 AS `sort`
@@ -406,19 +384,19 @@ FROM (
     UNION ALL SELECT '设备批量更新接口', 'system:device:api:batch-update', 5
     UNION ALL SELECT '设备记忆删除接口', 'system:device:memory:api:delete', 6
 ) src
-JOIN `xiaozhi`.`sys_permission` p ON p.`permissionKey` = 'system:device';
+JOIN `sys_permission` p ON p.`permissionKey` = 'system:device';
 
 -- API权限: 对话管理（消息）
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
 SELECT p.`permissionId`, src.`name`, src.`permissionKey`, 'api', src.`sort`, '0', '1'
 FROM (
     SELECT '对话列表接口' AS `name`, 'system:role:memory:chat:api:list' AS `permissionKey`, 1 AS `sort`
     UNION ALL SELECT '对话删除接口', 'system:role:memory:chat:api:delete', 2
 ) src
-JOIN `xiaozhi`.`sys_permission` p ON p.`permissionKey` = 'system:message';
+JOIN `sys_permission` p ON p.`permissionKey` = 'system:message';
 
 -- API权限: 角色配置
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
 SELECT p.`permissionId`, src.`name`, src.`permissionKey`, 'api', src.`sort`, '0', '1'
 FROM (
     SELECT '角色列表接口' AS `name`, 'system:role:api:list' AS `permissionKey`, 1 AS `sort`
@@ -428,10 +406,10 @@ FROM (
     UNION ALL SELECT '摘要记忆列表接口', 'system:role:memory:summary:api:list', 5
     UNION ALL SELECT '摘要记忆删除接口', 'system:role:memory:summary:api:delete', 6
 ) src
-JOIN `xiaozhi`.`sys_permission` p ON p.`permissionKey` = 'system:role';
+JOIN `sys_permission` p ON p.`permissionKey` = 'system:role';
 
 -- API权限: 提示词模板
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
 SELECT p.`permissionId`, src.`name`, src.`permissionKey`, 'api', src.`sort`, '0', '1'
 FROM (
     SELECT '模板列表接口' AS `name`, 'system:prompt-template:api:list' AS `permissionKey`, 1 AS `sort`
@@ -439,10 +417,10 @@ FROM (
     UNION ALL SELECT '模板更新接口', 'system:prompt-template:api:update', 3
     UNION ALL SELECT '模板删除接口', 'system:prompt-template:api:delete', 4
 ) src
-JOIN `xiaozhi`.`sys_permission` p ON p.`permissionKey` = 'system:prompt-template';
+JOIN `sys_permission` p ON p.`permissionKey` = 'system:prompt-template';
 
 -- API权限: 配置管理
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
 SELECT p.`permissionId`, src.`name`, src.`permissionKey`, 'api', src.`sort`, '0', '1'
 FROM (
     SELECT '配置列表接口' AS `name`, 'system:config:api:list' AS `permissionKey`, 1 AS `sort`
@@ -450,45 +428,45 @@ FROM (
     UNION ALL SELECT '配置更新接口', 'system:config:api:update', 3
     UNION ALL SELECT '配置删除接口', 'system:config:api:delete', 4
 ) src
-JOIN `xiaozhi`.`sys_permission` p ON p.`permissionKey` = 'system:config';
+JOIN `sys_permission` p ON p.`permissionKey` = 'system:config';
 
 -- API权限: 智能体管理（配置子菜单）
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
 SELECT p.`permissionId`, '智能体列表接口', 'system:config:agent:api:list', 'api', 1, '0', '1'
-FROM `xiaozhi`.`sys_permission` p WHERE p.`permissionKey` = 'system:config:agent';
+FROM `sys_permission` p WHERE p.`permissionKey` = 'system:config:agent';
 
 -- API权限: 个人中心（设置子菜单）
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
 SELECT p.`permissionId`, '个人信息更新接口', 'system:setting:account:api:update', 'api', 1, '0', '1'
-FROM `xiaozhi`.`sys_permission` p WHERE p.`permissionKey` = 'system:setting:account';
+FROM `sys_permission` p WHERE p.`permissionKey` = 'system:setting:account';
 
 -- API权限: 权限角色
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
 SELECT p.`permissionId`, src.`name`, src.`permissionKey`, 'api', src.`sort`, '0', '1'
 FROM (
     SELECT '角色列表接口' AS `name`, 'system:auth-role:api:list' AS `permissionKey`, 1 AS `sort`
     UNION ALL SELECT '角色详情接口', 'system:auth-role:api:detail', 2
     UNION ALL SELECT '角色授权接口', 'system:auth-role:api:assign', 3
 ) src
-JOIN `xiaozhi`.`sys_permission` p ON p.`permissionKey` = 'system:auth-role';
+JOIN `sys_permission` p ON p.`permissionKey` = 'system:auth-role';
 
 -- API权限: 文件上传
-INSERT INTO `xiaozhi`.`sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
+INSERT INTO `sys_permission` (`parentId`, `name`, `permissionKey`, `permissionType`, `sort`, `visible`, `status`)
 SELECT p.`permissionId`, '文件上传接口', 'system:file:api:upload', 'api', 1, '0', '1'
-FROM `xiaozhi`.`sys_permission` p WHERE p.`permissionKey` = 'system:file';
+FROM `sys_permission` p WHERE p.`permissionKey` = 'system:file';
 
 -- 插入角色
-INSERT INTO `xiaozhi`.`sys_auth_role` (`authRoleName`, `roleKey`, `description`, `status`) VALUES
+INSERT INTO `sys_auth_role` (`authRoleName`, `roleKey`, `description`, `status`) VALUES
 ('管理员', 'admin', '系统管理员，拥有所有权限', '1'),
 ('普通用户', 'user', '普通用户，拥有基本操作权限', '1');
 
 -- 管理员角色权限（所有权限）
-INSERT INTO `xiaozhi`.`sys_auth_role_permission` (`authRoleId`, `permissionId`)
-SELECT 1, permissionId FROM `xiaozhi`.`sys_permission`;
+INSERT INTO `sys_auth_role_permission` (`authRoleId`, `permissionId`)
+SELECT 1, permissionId FROM `sys_permission`;
 
 -- 普通用户角色权限（只有部分权限）
-INSERT INTO `xiaozhi`.`sys_auth_role_permission` (`authRoleId`, `permissionId`)
-SELECT 2, permissionId FROM `xiaozhi`.`sys_permission` WHERE 
+INSERT INTO `sys_auth_role_permission` (`authRoleId`, `permissionId`)
+SELECT 2, permissionId FROM `sys_permission` WHERE 
 permissionKey IN (
     'system:setting',
     'system:setting:account',
@@ -497,9 +475,9 @@ permissionKey IN (
 );
 
 -- 将admin用户设为管理员角色
-UPDATE `xiaozhi`.`sys_user` SET `authRoleId` = 1 WHERE `username` = 'admin';
+UPDATE `sys_user` SET `authRoleId` = 1 WHERE `username` = 'admin';
 
 -- 将其他用户设为普通用户角色
-UPDATE `xiaozhi`.`sys_user` SET `authRoleId` = 2 WHERE `username` != 'admin';
+UPDATE `sys_user` SET `authRoleId` = 2 WHERE `username` != 'admin';
 
 SET FOREIGN_KEY_CHECKS = 1;

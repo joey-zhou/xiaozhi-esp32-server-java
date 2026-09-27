@@ -9,11 +9,11 @@
 -- 统一加宽到 512：裸 URL 一般在 120 字符左右，深层路径留足余量。
 -- 注意：入库前已剥离预签名 query（stripSignature），故存的是裸 URL，不含数百字符的签名串。
 
-ALTER TABLE `xiaozhi`.`sys_message`
+ALTER TABLE `sys_message`
   MODIFY COLUMN `audioPath` varchar(512) NULL DEFAULT NULL COMMENT '音频文件路径（本地相对路径或云存储 URL）';
 
-ALTER TABLE `xiaozhi`.`sys_user`
+ALTER TABLE `sys_user`
   MODIFY COLUMN `avatar` varchar(512) NULL DEFAULT NULL COMMENT '头像（本地相对路径或云存储 URL）';
 
-ALTER TABLE `xiaozhi`.`sys_role`
+ALTER TABLE `sys_role`
   MODIFY COLUMN `avatar` varchar(512) NULL DEFAULT NULL COMMENT '头像（本地相对路径或云存储 URL）';
