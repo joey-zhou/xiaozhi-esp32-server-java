@@ -10,12 +10,18 @@ on:
       - 'pom.xml'
       - 'xiaozhi-*/**'
       - 'repo/**'
+      # 契约测试读的前端文件与发布流水线
+      - 'web/src/composables/useRoleManager.ts'
+      - '.github/workflows/docker.yml'
       - '.github/workflows/backend.yml'
   pull_request:
     paths:
       - 'pom.xml'
       - 'xiaozhi-*/**'
       - 'repo/**'
+      # 契约测试读的前端文件与发布流水线
+      - 'web/src/composables/useRoleManager.ts'
+      - '.github/workflows/docker.yml'
       - '.github/workflows/backend.yml'
   workflow_dispatch:
 
