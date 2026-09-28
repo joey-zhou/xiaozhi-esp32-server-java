@@ -134,7 +134,7 @@ docker compose -f docker-compose-db.yml up -d
 bin/all.sh start
 ```
 
-这套 compose 把 MySQL 映射在 **3306**（不是 13306），与 `application-dev.yml` 的默认值对齐。
+这套 compose 把 MySQL 映射在 **3306**（不是 13306），与 `application-common.yml` 里数据源的默认值对齐。
 
 ## 系统要求
 

@@ -13,7 +13,11 @@ spring:
     exclude:
       - org.redisson.spring.starter.RedissonAutoConfigurationV2
 
+  # 两个进程连同一个库，地址与凭据只在这里写一次，部署时用同名环境变量覆盖
   datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/xiaozhi?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true}
+    username: ${SPRING_DATASOURCE_USERNAME:xiaozhi}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
       minimum-idle: 5

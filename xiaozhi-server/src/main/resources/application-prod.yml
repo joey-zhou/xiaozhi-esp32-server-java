@@ -1,29 +1,15 @@
 # ============================================================
 # 生产环境配置
+# 启动时指定 SPRING_PROFILES_ACTIVE=prod（或 --spring.profiles.active=prod）即可使用。
+# 每一项都可用同名环境变量覆盖，没设就用这里的默认值；
+# 数据库（spring.datasource.*）与 Redis（spring.data.redis.*）的默认值在 application-common.yml，
+# 地址不同的机器用 SPRING_DATASOURCE_URL / SPRING_DATA_REDIS_HOST 覆盖。
+# 服务器对外 IP 读 HOST_IP，不设则自动探测。
 # ============================================================
-
-spring:
-  # 数据源配置
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/xiaozhi?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
-    username: xiaozhi
-    password: 123456
-
-# 生产环境邮箱配置
-email:
-  smtp:
-    username: xxxx
-    password: xxxx
-
-# 阿里云短信配置
-sms:
-  aliyun:
-    access-key-id: ''
-    access-key-secret: ''
-    sign-name: ''
-    template-code: ''
 
 xiaozhi:
   server:
-    domain: connectai.chat
+    # 对外域名，留空则按服务器 IP 拼 OTA / WebSocket 地址下发给设备。
+    # 填了域名就按 https://<域名>/api/device/ota、wss://ws.<域名>/ws/xiaozhi/v1/ 下发，
+    # 需要自行把这些子域名解析并反向代理到对应端口，否则设备会连不上。
+    domain: ${XIAOZHI_SERVER_DOMAIN:}
