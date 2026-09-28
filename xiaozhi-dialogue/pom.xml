@@ -21,6 +21,11 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
         </dependency>
+        <!-- Actuator：ObservationRegistry 等由它自动配置，显式声明，不靠 Redisson 顺带引入 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
         <!-- Spring WebSocket -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
