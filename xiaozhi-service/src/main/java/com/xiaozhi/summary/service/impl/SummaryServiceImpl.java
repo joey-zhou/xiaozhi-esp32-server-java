@@ -8,6 +8,7 @@ import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.summary.convert.SummaryConvert;
 import com.xiaozhi.summary.dal.mysql.dataobject.SummaryDO;
 import com.xiaozhi.summary.dal.mysql.mapper.SummaryMapper;
+import com.xiaozhi.summary.model.SummaryProjection;
 import com.xiaozhi.summary.service.SummaryService;
 import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -34,8 +36,9 @@ public class SummaryServiceImpl implements SummaryService {
 
     @Override
     public PageResult<SummaryBO> page(String deviceId, Integer userId, Integer roleId, int pageNo, int pageSize) {
-        IPage<SummaryBO> result = summaryMapper.selectPage(new Page<>(pageNo, pageSize), deviceId, userId, roleId);
-        return new PageResult<>(result.getRecords(), result.getTotal(), pageNo, pageSize);
+        IPage<SummaryProjection> result = summaryMapper.selectPage(new Page<>(pageNo, pageSize), deviceId, userId, roleId);
+        List<SummaryBO> rows = result.getRecords().stream().map(summaryConvert::toBO).toList();
+        return new PageResult<>(rows, result.getTotal(), pageNo, pageSize);
     }
 
     @Override

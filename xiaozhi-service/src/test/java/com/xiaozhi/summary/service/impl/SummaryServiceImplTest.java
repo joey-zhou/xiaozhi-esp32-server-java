@@ -6,6 +6,7 @@ import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.summary.convert.SummaryConvert;
 import com.xiaozhi.summary.dal.mysql.dataobject.SummaryDO;
 import com.xiaozhi.summary.dal.mysql.mapper.SummaryMapper;
+import com.xiaozhi.summary.model.SummaryProjection;
 import com.xiaozhi.support.MybatisPlusTestHelper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -50,14 +51,17 @@ class SummaryServiceImplTest {
     @InjectMocks
     private SummaryServiceImpl summaryService;
 
-    // 分页由 XML 的 JOIN 直出 BO（含设备名、角色名），Service 只透传条件与分页参数
+    // 分页由 XML 的 JOIN 出结果集（含设备名、角色名），时间列必须经转换器按应用时区换成时刻：
+    // 让驱动直接读成 Instant 会按连接串里的时区换算，应用不在那个时区时列表里的 id 整体偏移，删除按 id 反查就对不上
     @Test
-    void pagePassesScopeThroughAndReturnsRowsAsIs() {
+    void pagePassesScopeThroughAndConvertsRowsThroughTheConverter() {
+        SummaryProjection row = new SummaryProjection();
         SummaryBO summaryBO = new SummaryBO();
-        Page<SummaryBO> page = new Page<>(2, 5);
-        page.setRecords(List.of(summaryBO));
+        Page<SummaryProjection> page = new Page<>(2, 5);
+        page.setRecords(List.of(row));
         page.setTotal(7);
         when(summaryMapper.selectPage(any(Page.class), eq("device-1"), eq(9), eq(1))).thenReturn(page);
+        when(summaryConvert.toBO(row)).thenReturn(summaryBO);
 
         var result = summaryService.page("device-1", 9, 1, 2, 5);
 
@@ -65,7 +69,6 @@ class SummaryServiceImplTest {
         assertThat(result.getTotal()).isEqualTo(7);
         assertThat(result.getPageNo()).isEqualTo(2);
         assertThat(result.getPageSize()).isEqualTo(5);
-        verifyNoInteractions(summaryConvert);
     }
 
     @Test

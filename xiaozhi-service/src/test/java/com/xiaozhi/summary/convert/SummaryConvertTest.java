@@ -3,6 +3,7 @@ package com.xiaozhi.summary.convert;
 import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.common.model.resp.SummaryResp;
 import com.xiaozhi.summary.dal.mysql.dataobject.SummaryDO;
+import com.xiaozhi.summary.model.SummaryProjection;
 import com.xiaozhi.utils.DateUtils;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
@@ -57,6 +58,32 @@ class SummaryConvertTest {
 
         assertThat(bo.getLastMessageTimestamp()).isNull();
         assertThat(bo.getCreateTime()).isNull();
+    }
+
+    // 列表出参里的 id 由创建时间换来，删除接口再按 id 换回创建时间去库里精确匹配。
+    // 应用不在东八区时（这里是洛杉矶），整条链路必须回到库里原样的墙上时间，否则删除一条都匹配不上
+    @Test
+    void pageRowIdLeadsBackToTheStoredWallClock() {
+        DateUtils.use(Clock.fixed(Instant.parse("2026-09-21T05:35:00Z"), ZoneId.of("America/Los_Angeles")));
+        try {
+            LocalDateTime stored = LocalDateTime.of(2026, 9, 20, 22, 32, 39, 564_000_000);
+            SummaryProjection row = new SummaryProjection();
+            row.setDeviceId("dev-1");
+            row.setDeviceName("客厅");
+            row.setRoleName("测试");
+            row.setCreateTime(stored);
+            row.setLastMessageTimestamp(stored.minusSeconds(5));
+
+            SummaryBO bo = convert.toBO(row);
+            SummaryResp resp = convert.toResp(bo);
+
+            assertThat(bo.getDeviceName()).isEqualTo("客厅");
+            assertThat(bo.getRoleName()).isEqualTo("测试");
+            assertThat(DateUtils.toDateTime(Instant.ofEpochMilli(resp.getId()))).isEqualTo(stored);
+            assertThat(resp.getCreateTime()).isEqualTo(stored);
+        } finally {
+            DateUtils.reset();
+        }
     }
 
     // 出参与消息列表一样给墙上时间，不能再按写死的东八区渲染；id 要能换回同一个时刻，删除接口按它反查

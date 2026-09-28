@@ -3,7 +3,7 @@
 <mapper namespace="com.xiaozhi.summary.dal.mysql.mapper.SummaryMapper">
 
     <!-- 摘要分页带设备名与角色名；指定设备只查这一台，否则查该用户名下全部设备（web:* 不在设备表里，天然排除） -->
-    <select id="selectPage" resultType="com.xiaozhi.common.model.bo.SummaryBO">
+    <select id="selectPage" resultType="com.xiaozhi.summary.model.SummaryProjection">
         SELECT
             s.deviceId,
             d.deviceName,

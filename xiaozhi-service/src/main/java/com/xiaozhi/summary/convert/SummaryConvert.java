@@ -3,6 +3,7 @@ package com.xiaozhi.summary.convert;
 import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.common.model.resp.SummaryResp;
 import com.xiaozhi.summary.dal.mysql.dataobject.SummaryDO;
+import com.xiaozhi.summary.model.SummaryProjection;
 import com.xiaozhi.utils.DateUtils;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -17,6 +18,8 @@ public interface SummaryConvert {
     @Mapping(target = "deviceName", ignore = true)
     @Mapping(target = "roleName", ignore = true)
     SummaryBO toBO(SummaryDO summaryDO);
+
+    SummaryBO toBO(SummaryProjection projection);
 
     SummaryDO toDO(SummaryBO summaryBO);
 

@@ -7,7 +7,12 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -19,7 +24,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 扫 classpath 上全部 Mapper XML，钉住 resultType 不得指向 Req/Resp、SQL 不得读数据库时钟。
+ * 扫 classpath 上全部 Mapper XML，钉住 resultType 不得指向 Req/Resp、结果类不得把时间列读成时刻、SQL 不得读数据库时钟。
  */
 class MapperXmlArchTest {
 
@@ -85,6 +90,29 @@ class MapperXmlArchTest {
     }
 
     @Test
+    void resultTypeReadsTimeColumnsAsWallClock() throws ClassNotFoundException {
+        Map<String, Set<String>> offending = new LinkedHashMap<>();
+        for (String xml : mapperXml.values()) {
+            Matcher matcher = RESULT_TYPE.matcher(xml);
+            while (matcher.find()) {
+                String type = matcher.group(2);
+                if (!type.startsWith("com.xiaozhi.")) {
+                    continue;
+                }
+                Set<String> fields = instantFields(Class.forName(type));
+                if (!fields.isEmpty()) {
+                    offending.put(type, fields);
+                }
+            }
+        }
+
+        assertThat(offending)
+            .as("时间列存的是应用时区的墙上时间，结果类里要用 LocalDateTime 接、再由转换器经 DateUtils 换成时刻；"
+                + "直接用 Instant/Date 接会由驱动按连接串里的时区换算，应用不在那个时区时整体偏移")
+            .isEmpty();
+    }
+
+    @Test
     void sqlDoesNotReadTheDatabaseClock() {
         Map<String, Set<String>> offending = new LinkedHashMap<>();
         mapperXml.forEach((uri, xml) -> {
@@ -118,6 +146,21 @@ class MapperXmlArchTest {
             .as("Mapper XML 新增/删除了语句：先确认新语句是否'单表且 MyBatis-Plus 能表达'——能表达就不该写进 XML；"
                 + "确实需要写 XML（JOIN/子查询等）就把变化同步进 STATEMENT_INVENTORY")
             .isEqualTo(STATEMENT_INVENTORY);
+    }
+
+    /** 连父类一起看，字段类型是按时刻存取的那几种即违规。 */
+    private static Set<String> instantFields(Class<?> type) {
+        Set<String> fields = new TreeSet<>();
+        for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
+            for (Field field : current.getDeclaredFields()) {
+                Class<?> fieldType = field.getType();
+                if (Instant.class == fieldType || Date.class.isAssignableFrom(fieldType)
+                    || OffsetDateTime.class == fieldType || ZonedDateTime.class == fieldType) {
+                    fields.add(field.getName() + ":" + fieldType.getSimpleName());
+                }
+            }
+        }
+        return fields;
     }
 
     /** 按类全名判断，resultType 落在 ..model.req.. / ..model.resp.. 下即违规。 */
