@@ -555,6 +555,8 @@ export default {
       llmPerfXCloudApiUrl: 'PerfXCloud API 接口地址',
       llmReplicateApiKey: '在 https://replicate.com/account/api-tokens 申请',
       llmReplicateApiUrl: 'Replicate API 接口地址',
+      llmRuncrateApiKey: '在 https://www.runcrate.ai/dashboard/api-keys 申请',
+      llmRuncrateApiUrl: 'Runcrate API 接口地址',
       llmSILICONFLOWApiKey: '在 https://cloud.siliconflow.cn/account/ak 申请',
       llmStepFunApiKey: '在 StepFun 平台申请',
       llmStepFunApiUrl: 'StepFun API 接口地址',

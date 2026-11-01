@@ -639,6 +639,28 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           help: 'config.help.llmTogetherAIApiUrl'
         }
       ],
+      // Runcrate
+      'Runcrate': [
+        {
+          name: 'apiKey',
+          label: 'API Key',
+          required: true,
+          inputType: 'password',
+          placeholder: 'rc_live_...',
+          span: 12,
+          help: 'config.help.llmRuncrateApiKey'
+        },
+        {
+          name: 'apiUrl',
+          label: 'API URL',
+          required: true,
+          inputType: 'text',
+          placeholder: 'https://api.runcrate.ai/v1',
+          span: 12,
+          suffix: '/chat/completions',
+          help: 'config.help.llmRuncrateApiUrl'
+        }
+      ],
       // Replicate
       'Replicate': [
         {
