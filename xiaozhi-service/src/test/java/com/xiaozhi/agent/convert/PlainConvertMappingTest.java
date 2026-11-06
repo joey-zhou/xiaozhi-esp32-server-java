@@ -25,6 +25,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * 
  * 六个逐字段直传的转换器，此前在整个测试套件里一次都没被真正执行过——
  * MapStruct 只在源、目标字段名一致时才生成搬运代码，改名一侧不改另一侧时
  * 它既不报错也不搬运，字段静默变 null。这里把每个转换器至少跑通一遍并断言关键字段。
