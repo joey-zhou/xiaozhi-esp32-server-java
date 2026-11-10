@@ -371,11 +371,12 @@ public class DialogueService{
 
                 // 中间段：终稿只拼接不回答，先把到目前为止的文本发给设备，用户知道服务端听到了
                 if (segment.isRotated()) {
-                    segment.complete(sttResult);
-                    String soFar = turn.textSoFar();
-                    if (StringUtils.hasText(soFar) && persona.getPlayer() != null) {
-                        persona.getPlayer().sendStt(soFar);
-                    }
+                    Player progressPlayer = persona.getPlayer();
+                    turn.completeRotated(segment, sttResult, soFar -> {
+                        if (progressPlayer != null) {
+                            progressPlayer.sendStt(soFar);
+                        }
+                    });
                     return;
                 }
 
@@ -408,7 +409,7 @@ public class DialogueService{
                 }
 
                 // 发送STT识别结果到设备
-                persona.getPlayer().sendStt(sttResult.text());
+                turn.announceFinal(sttResult.text(), persona.getPlayer()::sendStt);
 
                 // 从这里到 chat 接管之间本轮也算活跃，紧接着的第二句才能打断本句
                 long epoch = persona.prepareTurn();

@@ -12,6 +12,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * 一次说话的识别过程。
@@ -25,6 +26,13 @@ public final class SpeechTurn {
 
     private final List<Segment> segments = new CopyOnWriteArrayList<>();
     private final AtomicBoolean bargeIn = new AtomicBoolean(false);
+
+    /**
+     * 中间段的进度文本与最后的整句都经这把锁下发。最后一段在 {@link #merge} 里等的就是中间段的终稿，
+     * 终稿一登记它就可能放行，若不互斥，整句会先于进度文本到达，设备上最后留下的是半句话。
+     */
+    private final Object announceLock = new Object();
+    private boolean finalAnnounced;
 
     public Segment newSegment(Sinks.Many<byte[]> sink) {
         Segment segment = new Segment(sink);
@@ -41,8 +49,30 @@ public final class SpeechTurn {
         return bargeIn;
     }
 
+    /**
+     * 中间段收尾：登记终稿，把到目前为止的文本交给 announcer。
+     * 整句已经下发过（最后一段等不及本段、超时跳过了它）就不再发，免得半句覆盖整句。
+     */
+    public void completeRotated(Segment segment, SttResult sttResult, Consumer<String> announcer) {
+        synchronized (announceLock) {
+            segment.complete(sttResult);
+            String soFar = textSoFar();
+            if (!finalAnnounced && StringUtils.hasText(soFar)) {
+                announcer.accept(soFar);
+            }
+        }
+    }
+
+    /** 下发整句，排在所有已登记中间段的进度文本之后 */
+    public void announceFinal(String text, Consumer<String> announcer) {
+        synchronized (announceLock) {
+            finalAnnounced = true;
+            announcer.accept(text);
+        }
+    }
+
     /** 已换流各段中终稿已到的文本按顺序拼接，遇到还没出终稿的段就停 */
-    public String textSoFar() {
+    String textSoFar() {
         StringBuilder text = new StringBuilder();
         for (Segment segment : segments) {
             if (!segment.rotated) {
