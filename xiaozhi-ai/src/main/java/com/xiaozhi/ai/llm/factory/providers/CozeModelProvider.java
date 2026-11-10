@@ -5,9 +5,8 @@ import com.xiaozhi.ai.llm.providers.CozeChatModel;
 import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
-import com.xiaozhi.common.port.ConfigLookup;
+import com.xiaozhi.config.service.ConfigService;
 
-import java.util.List;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -21,7 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 public class CozeModelProvider implements ChatModelProvider {
     
     @Autowired
-    private ConfigLookup configLookup;
+    private ConfigService configService;
     
     @Autowired
     private ProviderTokenClient tokenClient;
@@ -35,19 +34,12 @@ public class CozeModelProvider implements ChatModelProvider {
     public ChatModel createChatModel(ConfigBO config, RoleBO role) {
         String model = config.getConfigName();
         
-        // Coze需要查询agent配置获取Token
-        List<ConfigBO> configs = configLookup.listConfigs(
-                config.getUserId(),
-                "agent",
-                "coze",
-                null,
-                null,
-                ConfigBO.STATE_ENABLED);
-        if (configs == null || configs.isEmpty()) {
-            throw new IllegalStateException("未找到Coze agent配置, userId=" + config.getUserId());
+        // coze 的智能体配置不带凭据，token 取自同步出它的那份平台凭据
+        ConfigBO credential = configService.getAgentCredential(config);
+        if (credential == null) {
+            throw new IllegalStateException("未找到Coze平台凭据, configId=" + config.getConfigId());
         }
-        ConfigBO queryConfig = configs.get(0);
-        String token = tokenClient.getToken(queryConfig);
+        String token = tokenClient.getToken(credential);
         
         var chatModel = new CozeChatModel(token, model);
         

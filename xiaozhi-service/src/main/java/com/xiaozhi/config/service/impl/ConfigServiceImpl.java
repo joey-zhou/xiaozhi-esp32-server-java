@@ -24,7 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class ConfigServiceImpl implements ConfigService {
@@ -168,6 +170,53 @@ public class ConfigServiceImpl implements ConfigService {
         }
         configRepository.save(config);
         return getBO(config.getConfigId());
+    }
+
+    @Override
+    public ConfigBO getAgentCredential(ConfigBO agentModel) {
+        Assert.notNull(agentModel.getUserId(), "查询平台凭据必须指定用户");
+        if (AgentProviders.COZE.equals(agentModel.getProvider())) {
+            return getPlatformCredential(agentModel.getUserId(), agentModel.getProvider());
+        }
+        if (!StringUtils.hasText(agentModel.getApiKey())) {
+            return null;
+        }
+        return listCredentials(agentModel.getUserId(), agentModel.getProvider()).stream()
+            .filter(credential -> agentModel.getApiKey().equals(credential.getApiKey()))
+            .findFirst()
+            .orElse(null);
+    }
+
+    @Override
+    public ConfigBO getPlatformCredential(Integer userId, String provider) {
+        Assert.notNull(userId, "查询平台凭据必须指定用户");
+        return listCredentials(userId, provider).stream()
+            .min(Comparator.comparing(ConfigBO::getConfigId))
+            .orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public void followAgentCredential(ConfigBO before, ConfigBO after) {
+        // coze 的智能体配置不带凭据字段，没有要跟的
+        if (!AgentProviders.CREDENTIAL_CONFIG_TYPE.equals(after.getConfigType())
+                || AgentProviders.COZE.equals(after.getProvider())
+                || !StringUtils.hasText(before.getApiKey())) {
+            return;
+        }
+        if (before.getApiKey().equals(after.getApiKey()) && Objects.equals(before.getApiUrl(), after.getApiUrl())) {
+            return;
+        }
+        for (ConfigBO model : listBO(after.getUserId(), AGENT_MODEL_CONFIG_TYPE, after.getProvider(),
+                null, null, ConfigBO.STATE_ENABLED)) {
+            if (before.getApiKey().equals(model.getApiKey())) {
+                saveAgentModel(model.setApiKey(after.getApiKey()).setApiUrl(after.getApiUrl()));
+            }
+        }
+    }
+
+    private List<ConfigBO> listCredentials(Integer userId, String provider) {
+        return listBO(userId, AgentProviders.CREDENTIAL_CONFIG_TYPE, provider, null, null, ConfigBO.STATE_ENABLED);
     }
 
     private LambdaQueryWrapper<ConfigDO> buildQuery(Integer userId, String configType, String provider,

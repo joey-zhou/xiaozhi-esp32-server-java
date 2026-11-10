@@ -57,9 +57,11 @@ public class ConfigAppService {
         AiConfig config = configRepository.findById(configId)
                 .orElseThrow(() -> new ResourceNotFoundException("配置不存在或无权访问"));
         // 拦截规则要的是改动前的值：空补丁合并出的就是聚合根当前字段的快照，不用再单独查一次配置
-        configChangePolicy.checkUpdate(config.mergePatch(new ConfigBO()), req, storageSwitchConfirmed);
+        ConfigBO before = config.mergePatch(new ConfigBO());
+        configChangePolicy.checkUpdate(before, req, storageSwitchConfirmed);
         config.update(configConvert.toBO(req));
         configRepository.save(config);
+        configService.followAgentCredential(before, config.mergePatch(new ConfigBO()));
         return configConvert.toResp(config);
     }
 

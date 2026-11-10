@@ -120,9 +120,7 @@ class AgentServiceImplTest {
 
         when(configService.listBO(1, "llm", "coze", null, null, ConfigBO.STATE_ENABLED))
             .thenReturn(List.of(stored));
-        // 没配平台凭据，同步这一路直接结束
-        when(configService.listBO(1, "agent", "coze", null, null, ConfigBO.STATE_ENABLED))
-            .thenReturn(List.of());
+        // 没配平台凭据（mock 默认返回 null），同步这一路直接结束
 
         PageResult<AgentBO> result = agentService.page(1, 10, "coze", null, 1);
 
@@ -171,27 +169,23 @@ class AgentServiceImplTest {
 
         when(configService.listBO(1, "llm", "coze", null, null, ConfigBO.STATE_ENABLED))
             .thenReturn(List.of(stored));
-        when(configService.listBO(1, "agent", "coze", null, null, ConfigBO.STATE_ENABLED))
-            .thenReturn(List.of());
 
         agentService.page(1, 10, "coze", null, 1);
         agentService.page(2, 10, "coze", null, 1);
 
         // 翻第二页不再向平台同步：取平台凭据只发生在第一次，列表本身每次都读库
-        verify(configService, times(1)).listBO(1, "agent", "coze", null, null, ConfigBO.STATE_ENABLED);
+        verify(configService, times(1)).getPlatformCredential(1, "coze");
     }
 
     @Test
     void pageSyncsEveryTimeWhileNothingIsStoredYet() {
         when(configService.listBO(1, "llm", "coze", null, null, ConfigBO.STATE_ENABLED))
             .thenReturn(List.of());
-        when(configService.listBO(1, "agent", "coze", null, null, ConfigBO.STATE_ENABLED))
-            .thenReturn(List.of());
 
         agentService.page(1, 10, "coze", null, 1);
         agentService.page(1, 10, "coze", null, 1);
 
         // 刚配好平台凭据的场景：库里还没有智能体时不受节流限制，否则要等节流窗口过去才看得见
-        verify(configService, times(2)).listBO(1, "agent", "coze", null, null, ConfigBO.STATE_ENABLED);
+        verify(configService, times(2)).getPlatformCredential(1, "coze");
     }
 }

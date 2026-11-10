@@ -3,7 +3,6 @@ package com.xiaozhi.config.service;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.port.ConfigLookup;
 import com.xiaozhi.common.model.PageResult;
-import org.springframework.util.Assert;
 
 import java.util.List;
 
@@ -39,6 +38,18 @@ public interface ConfigService extends ConfigLookup {
      */
     ConfigBO saveAgentModel(ConfigBO agentModel);
 
+    /**
+     * 智能体对话用的平台凭据。dify、xingchen 一份凭据落成一个智能体，按智能体配置上的 apiKey 找回那一份；
+     * coze 一份凭据下挂多个智能体，见 {@link #getPlatformCredential}。没有可用的凭据时返回 null
+     */
+    ConfigBO getAgentCredential(ConfigBO agentModel);
+
+    /** coze 这类一份凭据下挂多个智能体的平台，用户用的那份凭据；有多份时取最早建的，同步与对话取到的是同一份 */
+    ConfigBO getPlatformCredential(Integer userId, String provider);
+
+    /** dify、xingchen 的平台凭据改了 apiKey 或地址，它落成的智能体配置跟着改，绑定这些智能体的角色不用重选 */
+    void followAgentCredential(ConfigBO before, ConfigBO after);
+
     @Override
     default ConfigBO getConfig(Integer configId) {
         return getBO(configId);
@@ -52,15 +63,5 @@ public interface ConfigService extends ConfigLookup {
     @Override
     default ConfigBO getDefaultConfig(String configType, String modelType) {
         return getDefaultBO(configType, modelType);
-    }
-
-    /**
-     * AI 运行时的配置查询必须限定用户。userId 为空时 {@link #listBO} 会略过用户条件
-     * 退化成全库查询，取到其他用户的凭据。
-     */
-    @Override
-    default List<ConfigBO> listConfigs(Integer userId, String configType, String provider, String modelType, String isDefault, String state) {
-        Assert.notNull(userId, "查询配置必须指定用户");
-        return listBO(userId, configType, provider, modelType, isDefault, state);
     }
 }

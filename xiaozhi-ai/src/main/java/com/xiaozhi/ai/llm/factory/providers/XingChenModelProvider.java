@@ -4,9 +4,8 @@ import com.xiaozhi.ai.llm.factory.ChatModelProvider;
 import com.xiaozhi.ai.llm.providers.XingChenChatModel;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
-import com.xiaozhi.common.port.ConfigLookup;
+import com.xiaozhi.config.service.ConfigService;
 
-import java.util.List;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 public class XingChenModelProvider implements ChatModelProvider {
 
     @Autowired
-    private ConfigLookup configLookup;
+    private ConfigService configService;
 
     @Lazy
     @Autowired
@@ -35,23 +34,14 @@ public class XingChenModelProvider implements ChatModelProvider {
     
     @Override
     public ChatModel createChatModel(ConfigBO config, RoleBO role) {
-        String endpoint = config.getApiUrl();
-        
-        // XingChen需要查询agent配置获取ApiKey和Secret
-        List<ConfigBO> configs = configLookup.listConfigs(
-                config.getUserId(),
-                "agent",
-                "xingchen",
-                null,
-                null,
-                ConfigBO.STATE_ENABLED);
-        if (configs == null || configs.isEmpty()) {
-            throw new IllegalStateException("未找到XingChen agent配置, userId=" + config.getUserId());
+        ConfigBO credential = configService.getAgentCredential(config);
+        if (credential == null) {
+            throw new IllegalStateException("未找到XingChen平台凭据, configId=" + config.getConfigId());
         }
-        ConfigBO queryConfig = configs.get(0);
+        String endpoint = credential.getApiUrl();
         // 控制台字段：apiKey 是授权码(APIKey:APISecret)，直接当 Bearer token 用；apiSecret 实际存的是 FlowId
-        String bearerToken = queryConfig.getApiKey();
-        String flowId = queryConfig.getApiSecret();
+        String bearerToken = credential.getApiKey();
+        String flowId = credential.getApiSecret();
 
         var chatModel = new XingChenChatModel(endpoint, bearerToken, flowId, toolCallingManager);
         

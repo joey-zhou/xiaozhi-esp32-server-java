@@ -132,6 +132,26 @@ class ConfigAppServiceTest {
     }
 
     @Test
+    void updatedCredentialIsHandedOverWithItsPreviousValues() {
+        ConfigBO credential = new ConfigBO().setConfigType("agent").setProvider("dify")
+                .setApiKey("key-a").setApiUrl("https://api.dify.ai/v1");
+        ConfigUpdateReq req = new ConfigUpdateReq();
+        req.setApiKey("key-b");
+        when(configRepository.findById(1)).thenReturn(Optional.of(AiConfig.newConfig(1, credential)));
+        when(configConvert.toBO(req)).thenReturn(new ConfigBO().setApiKey("key-b"));
+        when(configConvert.toResp(any(AiConfig.class))).thenReturn(new ConfigResp());
+
+        service.update(1, req, true);
+
+        ArgumentCaptor<ConfigBO> before = ArgumentCaptor.forClass(ConfigBO.class);
+        ArgumentCaptor<ConfigBO> after = ArgumentCaptor.forClass(ConfigBO.class);
+        verify(configService).followAgentCredential(before.capture(), after.capture());
+        assertThat(before.getValue().getApiKey()).isEqualTo("key-a");
+        assertThat(after.getValue().getApiKey()).isEqualTo("key-b");
+        assertThat(after.getValue().getApiUrl()).isEqualTo("https://api.dify.ai/v1");
+    }
+
+    @Test
     void updateMissingConfigSkipsPolicy() {
         when(configRepository.findById(1)).thenReturn(Optional.empty());
 

@@ -60,8 +60,7 @@ public class AgentServiceImpl implements AgentService {
 
     /** 智能体落库后的配置类型 */
     private static final String MODEL_CONFIG_TYPE = "llm";
-    /** 平台凭据（appId、apiKey、空间 ID 等）另存一条配置，只供同步使用 */
-    private static final String CREDENTIAL_CONFIG_TYPE = "agent";
+    private static final String CREDENTIAL_CONFIG_TYPE = AgentProviders.CREDENTIAL_CONFIG_TYPE;
 
     private static final String DIFY_DEFAULT_NAME = "DIFY Agent";
     private static final String XINGCHEN_DEFAULT_NAME = "XingChen Agent";
@@ -330,13 +329,12 @@ public class AgentServiceImpl implements AgentService {
      * @return 平台没答复时返回 null，表示这一轮没有新快照
      */
     private Map<String, RemoteAgent> syncCoze(Integer userId) {
-        List<ConfigBO> credentials = configService.listBO(
-            userId, CREDENTIAL_CONFIG_TYPE, PROVIDER_COZE, null, null, ConfigBO.STATE_ENABLED);
-        if (credentials.isEmpty()) {
+        // 与对话用的是同一份凭据，同步出的智能体才能在对话时找回它
+        ConfigBO credential = configService.getPlatformCredential(userId, PROVIDER_COZE);
+        if (credential == null) {
             return Map.of();
         }
 
-        ConfigBO credential = credentials.getFirst();
         String token;
         try {
             token = tokenClient.getToken(credential);
