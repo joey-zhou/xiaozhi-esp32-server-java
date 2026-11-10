@@ -1,13 +1,12 @@
 package com.xiaozhi.task;
 
+import com.xiaozhi.common.DistributedLocks;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +16,6 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 /**
@@ -49,7 +47,7 @@ public class AudioCleanupTask {
     private MessageService messageService;
 
     @Resource
-    private RedissonClient redissonClient;
+    private DistributedLocks distributedLocks;
 
     // ---- 对话录音清理（凌晨1点）----
 
@@ -93,7 +91,7 @@ public class AudioCleanupTask {
      */
     @Scheduled(cron = "0 30 1 * * ?")
     public void purgeExpiredMessageAudio() {
-        runExclusively(MESSAGE_AUDIO_LOCK, this::doPurgeExpiredMessageAudio);
+        distributedLocks.runIfFree(MESSAGE_AUDIO_LOCK, this::doPurgeExpiredMessageAudio);
     }
 
     private void doPurgeExpiredMessageAudio() {
@@ -103,27 +101,4 @@ public class AudioCleanupTask {
         log.info("========== 过期对话录音清理完成，共{}条 ==========", purged);
     }
 
-    /**
-     * 抢到锁的实例执行 task，抢不到的直接跳过本轮（定时任务不需要排队补跑）。
-     * 不指定租期，由 Redisson 看门狗随线程存活续期，进程崩溃后锁自动过期。
-     */
-    private void runExclusively(String lockName, Runnable task) {
-        RLock lock = redissonClient.getLock(lockName);
-        boolean locked = false;
-        try {
-            locked = lock.tryLock(0, TimeUnit.SECONDS);
-            if (!locked) {
-                log.info("已有实例在执行，跳过本轮: {}", lockName);
-                return;
-            }
-            task.run();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("等待任务锁被中断: {}", lockName);
-        } finally {
-            if (locked && lock.isHeldByCurrentThread()) {
-                lock.unlock();
-            }
-        }
-    }
 }

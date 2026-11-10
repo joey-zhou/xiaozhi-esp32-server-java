@@ -1,5 +1,6 @@
 package com.xiaozhi.task;
 
+import com.xiaozhi.common.DistributedLocks;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.utils.AudioUtils;
@@ -60,7 +61,7 @@ class AudioCleanupTaskTest {
     void setUp() {
         originalAudioPath = AudioUtils.AUDIO_PATH;
         ReflectionTestUtils.setField(task, "messageService", messageService);
-        ReflectionTestUtils.setField(task, "redissonClient", redissonClient);
+        ReflectionTestUtils.setField(task, "distributedLocks", new DistributedLocks(redissonClient));
         ReflectionTestUtils.setField(task, "runtimePathConfig", runtimePathConfig);
     }
 

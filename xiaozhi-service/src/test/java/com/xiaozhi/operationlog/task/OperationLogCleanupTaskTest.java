@@ -1,5 +1,6 @@
 package com.xiaozhi.operationlog.task;
 
+import com.xiaozhi.common.DistributedLocks;
 import com.xiaozhi.operationlog.service.OperationLogService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,7 +38,7 @@ class OperationLogCleanupTaskTest {
     @Test
     void cleanupExpiredLogsSkipsEntirelyWhenLockIsHeldElsewhere() throws InterruptedException {
         ReflectionTestUtils.setField(task, "operationLogService", operationLogService);
-        ReflectionTestUtils.setField(task, "redissonClient", redissonClient);
+        ReflectionTestUtils.setField(task, "distributedLocks", new DistributedLocks(redissonClient));
         ReflectionTestUtils.setField(task, "retentionDays", 180);
         when(redissonClient.getLock("lock:task:operation-log-cleanup")).thenReturn(lock);
         when(lock.tryLock(0, TimeUnit.SECONDS)).thenReturn(false);
@@ -51,7 +52,7 @@ class OperationLogCleanupTaskTest {
     @Test
     void cleanupExpiredLogsUsesConfiguredRetentionAndReleasesLock() throws InterruptedException {
         ReflectionTestUtils.setField(task, "operationLogService", operationLogService);
-        ReflectionTestUtils.setField(task, "redissonClient", redissonClient);
+        ReflectionTestUtils.setField(task, "distributedLocks", new DistributedLocks(redissonClient));
         ReflectionTestUtils.setField(task, "retentionDays", 90);
         when(redissonClient.getLock("lock:task:operation-log-cleanup")).thenReturn(lock);
         when(lock.tryLock(0, TimeUnit.SECONDS)).thenReturn(true);
