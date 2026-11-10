@@ -39,9 +39,7 @@ public class CozeModelProvider implements ChatModelProvider {
         if (credential == null) {
             throw new IllegalStateException("未找到Coze平台凭据, configId=" + config.getConfigId());
         }
-        String token = tokenClient.getToken(credential);
-        
-        var chatModel = new CozeChatModel(token, model);
+        var chatModel = new CozeChatModel(() -> tokenClient.getToken(credential), model);
         
         log.info("Created Coze ChatModel: model={}", model);
         return chatModel;

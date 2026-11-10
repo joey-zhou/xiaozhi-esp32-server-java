@@ -47,6 +47,9 @@ public interface ConfigService extends ConfigLookup {
     /** coze 这类一份凭据下挂多个智能体的平台，用户用的那份凭据；有多份时取最早建的，同步与对话取到的是同一份 */
     ConfigBO getPlatformCredential(Integer userId, String provider);
 
+    /** 挂在这份平台凭据下的智能体配置：coze 是该用户全部 coze 智能体，dify、xingchen 是 apiKey 相同的那些 */
+    List<ConfigBO> listAgentModels(ConfigBO credential);
+
     /** dify、xingchen 的平台凭据改了 apiKey 或地址，它落成的智能体配置跟着改，绑定这些智能体的角色不用重选 */
     void followAgentCredential(ConfigBO before, ConfigBO after);
 

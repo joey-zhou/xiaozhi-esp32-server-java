@@ -14,6 +14,7 @@ import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.storage.service.StorageServiceFactory;
+import com.xiaozhi.agent.AgentProviders;
 import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.device.service.DeviceService;
@@ -287,6 +288,12 @@ public class RedisSubscriber {
                 } else if ("llm".equals(configType)) {
                     personaFactory.clearPersonasByModelId(configId);
                     chatModelFactory.removeCache(configId);
+                } else if (AgentProviders.CREDENTIAL_CONFIG_TYPE.equals(configType)) {
+                    // 平台凭据变了，挂在它下面的智能体按各自的模型配置清
+                    for (ConfigBO model : configService.listAgentModels(config)) {
+                        personaFactory.clearPersonasByModelId(model.getConfigId());
+                        chatModelFactory.removeCache(model.getConfigId());
+                    }
                 }
                 // Token 缓存（Coze OAuth、阿里云 Token 等）与 configType 无关，统一清除
                 tokenClient.removeCache(config);

@@ -196,6 +196,22 @@ public class ConfigServiceImpl implements ConfigService {
     }
 
     @Override
+    public List<ConfigBO> listAgentModels(ConfigBO credential) {
+        Assert.notNull(credential.getUserId(), "查询智能体配置必须指定用户");
+        List<ConfigBO> models = listBO(credential.getUserId(), AGENT_MODEL_CONFIG_TYPE, credential.getProvider(),
+            null, null, ConfigBO.STATE_ENABLED);
+        if (AgentProviders.COZE.equals(credential.getProvider())) {
+            return models;
+        }
+        if (!StringUtils.hasText(credential.getApiKey())) {
+            return List.of();
+        }
+        return models.stream()
+            .filter(model -> credential.getApiKey().equals(model.getApiKey()))
+            .toList();
+    }
+
+    @Override
     @Transactional
     public void followAgentCredential(ConfigBO before, ConfigBO after) {
         // coze 的智能体配置不带凭据字段，没有要跟的
@@ -207,11 +223,8 @@ public class ConfigServiceImpl implements ConfigService {
         if (before.getApiKey().equals(after.getApiKey()) && Objects.equals(before.getApiUrl(), after.getApiUrl())) {
             return;
         }
-        for (ConfigBO model : listBO(after.getUserId(), AGENT_MODEL_CONFIG_TYPE, after.getProvider(),
-                null, null, ConfigBO.STATE_ENABLED)) {
-            if (before.getApiKey().equals(model.getApiKey())) {
-                saveAgentModel(model.setApiKey(after.getApiKey()).setApiUrl(after.getApiUrl()));
-            }
+        for (ConfigBO model : listAgentModels(before)) {
+            saveAgentModel(model.setApiKey(after.getApiKey()).setApiUrl(after.getApiUrl()));
         }
     }
 

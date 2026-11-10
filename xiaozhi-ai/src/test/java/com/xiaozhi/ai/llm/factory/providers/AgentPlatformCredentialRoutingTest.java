@@ -13,6 +13,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -90,10 +91,13 @@ class AgentPlatformCredentialRoutingTest {
         ReflectionTestUtils.setField(provider, "configService", configService);
         ReflectionTestUtils.setField(provider, "tokenClient", tokenClient);
 
-        try (MockedConstruction<CozeChatModel> ignored = mockConstruction(CozeChatModel.class)) {
+        List<Supplier<?>> tokenSources = new ArrayList<>();
+        try (MockedConstruction<CozeChatModel> ignored = mockConstruction(CozeChatModel.class,
+                (model, context) -> tokenSources.add((Supplier<?>) context.arguments().getFirst()))) {
             provider.createChatModel(agent("coze", null).setConfigName("bot-1"), new RoleBO());
         }
 
+        assertThat(tokenSources).singleElement().extracting(Supplier::get).isEqualTo("token-1");
         verify(tokenClient).getToken(older);
         assertThat(configService.getPlatformCredential(USER_ID, "coze")).isSameAs(older);
     }

@@ -5,7 +5,7 @@ import com.coze.openapi.client.chat.*;
 import com.coze.openapi.client.chat.model.*;
 import com.coze.openapi.client.connversations.message.model.Message;
 import com.coze.openapi.client.connversations.message.model.MessageType;
-import com.coze.openapi.service.auth.TokenAuth;
+import com.coze.openapi.service.auth.Auth;
 import com.coze.openapi.service.service.CozeAPI;
 import com.xiaozhi.utils.DateUtils;
 
@@ -24,6 +24,7 @@ import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import reactor.core.publisher.Flux;
 
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -39,14 +40,10 @@ public class CozeChatModel implements ChatModel, AutoCloseable {
 
 
     /**
-     * 构造函数
-     * @param apiSecret Coze API密钥
-     * @param model     模型名称 (在Coze中不使用)
+     * @param accessToken 每次请求取一次 access_token；实例缓存得比 token 有效期长，不能在构造时取定
+     * @param model       扣子上的 botId
      */
-    public CozeChatModel(String apiSecret, String model) {
-
-        // 使用apiSecret作为access_token
-        TokenAuth authCli = new TokenAuth(apiSecret);
+    public CozeChatModel(Supplier<String> accessToken, String model) {
 
         // 使用endpoint或默认的Coze API地址
         String baseUrl = "https://api.coze.cn";
@@ -54,7 +51,7 @@ public class CozeChatModel implements ChatModel, AutoCloseable {
         // 初始化Coze API客户端
         this.coze = new CozeAPI.Builder()
                 .baseURL(baseUrl)
-                .auth(authCli)
+                .auth(new SuppliedTokenAuth(accessToken))
                 .readTimeout(60000) // 60秒超时
                 .build();
 
@@ -219,6 +216,21 @@ public class CozeChatModel implements ChatModel, AutoCloseable {
     @Override
     public void close() {
         coze.shutdownExecutor();
+    }
+
+    /** SDK 每发一次请求就调一次 token()，续期交给提供 token 的一方 */
+    private static final class SuppliedTokenAuth extends Auth {
+
+        private final Supplier<String> accessToken;
+
+        SuppliedTokenAuth(Supplier<String> accessToken) {
+            this.accessToken = accessToken;
+        }
+
+        @Override
+        public String token() {
+            return accessToken.get();
+        }
     }
 
     /**

@@ -55,7 +55,28 @@ class ConfigServiceAgentCredentialTest {
             .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> service.getPlatformCredential(null, "coze"))
             .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.listAgentModels(credential(1, "coze", null, null).setUserId(null)))
+            .isInstanceOf(IllegalArgumentException.class);
         verify(service, never()).listBO(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void agentsHangingOnAKeyedCredentialAreTheOnesWithItsApiKey() {
+        ConfigBO own = agent("dify", "key-a").setConfigId(20);
+        ConfigBO other = agent("dify", "key-b").setConfigId(21);
+        stubList("llm", "dify", own, other);
+
+        assertThat(service.listAgentModels(credential(1, "dify", "key-a", null))).containsExactly(own);
+        assertThat(service.listAgentModels(credential(1, "dify", null, null))).isEmpty();
+    }
+
+    @Test
+    void agentsHangingOnACozeCredentialAreAllTheUsersCozeAgents() {
+        ConfigBO first = agent("coze", null).setConfigId(20);
+        ConfigBO second = agent("coze", null).setConfigId(21);
+        stubList("llm", "coze", first, second);
+
+        assertThat(service.listAgentModels(credential(4, "coze", null, null))).containsExactly(first, second);
     }
 
     @Test

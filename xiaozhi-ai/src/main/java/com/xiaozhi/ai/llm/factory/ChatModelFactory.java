@@ -4,7 +4,8 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
-import com.xiaozhi.common.port.ConfigLookup;
+import com.xiaozhi.agent.AgentProviders;
+import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.event.AiConfigChangedEvent;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.model.ChatModel;
@@ -35,7 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ChatModelFactory {
     
     @Autowired
-    private ConfigLookup configLookup;
+    private ConfigService configService;
 
     
     /**
@@ -88,11 +89,11 @@ public class ChatModelFactory {
     ConfigBO resolveConfig(RoleBO role) {
         Integer modelId = role.getModelId();
         Assert.notNull(modelId, "配置ID不能为空");
-        ConfigBO config = configLookup.getConfig(modelId);
+        ConfigBO config = configService.getConfig(modelId);
         if (config != null && !ConfigBO.STATE_DISABLED.equals(config.getState())) {
             return config;
         }
-        ConfigBO fallback = configLookup.getDefaultConfig("llm", ConfigBO.ModelType.chat.getValue());
+        ConfigBO fallback = configService.getDefaultConfig("llm", ConfigBO.ModelType.chat.getValue());
         if (fallback == null) {
             throw new IllegalStateException("角色「" + role.getRoleName() + "」绑定的模型配置已停用，也没有可用的默认模型，"
                     + "请在配置管理里启用该配置或给角色改绑模型");
@@ -115,6 +116,19 @@ public class ChatModelFactory {
     public void onAiConfigChanged(AiConfigChangedEvent event) {
         if ("llm".equals(event.getConfigType())) {
             removeCache(event.getConfigId());
+        } else if (AgentProviders.CREDENTIAL_CONFIG_TYPE.equals(event.getConfigType())) {
+            removeAgentModels(event.getConfigId());
+        }
+    }
+
+    /** 平台凭据改了、停用或删了：挂在它下面的智能体模型还拿着改前的凭据，都要重建 */
+    private void removeAgentModels(Integer credentialId) {
+        ConfigBO credential = configService.getBO(credentialId);
+        if (credential == null) {
+            return;
+        }
+        for (ConfigBO model : configService.listAgentModels(credential)) {
+            removeCache(model.getConfigId());
         }
     }
 
@@ -149,7 +163,7 @@ public class ChatModelFactory {
     }
 
     public ChatModel getVisionModel() {
-        ConfigBO config = configLookup.getDefaultConfig("llm", ConfigBO.ModelType.vision.getValue());
+        ConfigBO config = configService.getDefaultConfig("llm", ConfigBO.ModelType.vision.getValue());
         Assert.notNull(config, "未配置多模态模型");
         // 走同一份缓存，避免每次多模态调用都新建 ChatModel(连带新建 HttpClient)
         String cacheKey = config.getConfigId() + ":vision";
@@ -157,7 +171,7 @@ public class ChatModelFactory {
     }
 
     public ChatModel getIntentModel() {
-        ConfigBO config = configLookup.getDefaultConfig("llm", ConfigBO.ModelType.intent.getValue());
+        ConfigBO config = configService.getDefaultConfig("llm", ConfigBO.ModelType.intent.getValue());
         Assert.notNull(config, "未配置意图识别模型");
         return createChatModel(config, new RoleBO());
     }
@@ -165,7 +179,7 @@ public class ChatModelFactory {
     public EmbeddingModel getEmbeddingModel(Integer configId) {
         Assert.notNull(configId, "配置ID不能为空");
         return embeddingModelCache.computeIfAbsent(configId, id -> {
-            ConfigBO config = configLookup.getConfig(id);
+            ConfigBO config = configService.getConfig(id);
             Assert.notNull(config, "未找到配置, configId=" + id);
             return getEmbeddingModel(config);
         });
