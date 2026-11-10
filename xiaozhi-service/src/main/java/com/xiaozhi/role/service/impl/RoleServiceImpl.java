@@ -91,6 +91,14 @@ public class RoleServiceImpl implements RoleService {
     }
 
     @Override
+    public long countByModelId(Integer modelId) {
+        if (modelId == null) {
+            return 0;
+        }
+        return roleMapper.selectCount(new LambdaQueryWrapper<RoleDO>().eq(RoleDO::getModelId, modelId));
+    }
+
+    @Override
     public RoleBO getDefaultOrFirstBO(Integer userId) {
         RoleDO roleDO = findDefaultOrFirstDO(userId);
         if (roleDO == null) {

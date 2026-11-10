@@ -1,15 +1,17 @@
 package com.xiaozhi.config;
 
 import com.xiaozhi.common.exception.ConfirmRequiredException;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.req.ConfigCreateReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
+import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.storage.service.StorageReferenceService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 /**
- * 配置写前的拦截规则：换对象存储前的存量校验要先查库才能判定，
+ * 配置写前的拦截规则：换对象存储前的存量校验、删对话模型前的角色引用都要先查库才能判定，
  * 因此从 ConfigAppService 收口到这里，AppService 只管调用与事务边界。
  * <p>
  * {@code check} 开头的方法不满足就抛异常；{@code confirmed} 表示用户已确认切换对象存储，
@@ -20,8 +22,13 @@ public class ConfigChangePolicy {
 
     private static final String OSS_CONFIG_TYPE = "oss";
 
+    private static final String LLM_CONFIG_TYPE = "llm";
+
     @Resource
     private StorageReferenceService storageReferenceService;
+
+    @Resource
+    private RoleService roleService;
 
     public void checkCreate(ConfigCreateReq req, boolean confirmed) {
         if (!confirmed && isOss(req.getConfigType()) && isDefault(req.getIsDefault())) {
@@ -36,6 +43,15 @@ public class ConfigChangePolicy {
     }
 
     public void checkDelete(ConfigBO current, boolean confirmed) {
+        // 删除是软删，配置从列表里消失，角色却还指着它；对话时会回退默认模型，
+        // 管理员看不出这些角色实际在用哪个模型，所以有角色绑着就不让删。
+        // TTS/STT 不拦：它们停用后回退默认或不识别，是既定的降级方式
+        if (isLlm(current.getConfigType()) && !isEmbedding(current.getModelType())) {
+            long boundRoles = roleService.countByModelId(current.getConfigId());
+            if (boundRoles > 0) {
+                throw new OperationFailedException("该模型仍被 " + boundRoles + " 个角色使用，请先将这些角色改绑到其他模型");
+            }
+        }
         // 删掉当前默认的那条 oss 配置，等于把存储切回本地，历史云地址一样解析不出来，
         // 与「默认让位」是同一件事，判定口径保持一致
         if (!confirmed && isOss(current.getConfigType()) && isDefault(current.getIsDefault())) {
@@ -76,6 +92,14 @@ public class ConfigChangePolicy {
     /** null 表示本次不改这个字段，与 {@link com.xiaozhi.config.domain.AiConfig#update} 的字段合并语义一致 */
     private static boolean changed(String patchValue, String currentValue) {
         return patchValue != null && !patchValue.equals(currentValue);
+    }
+
+    private static boolean isEmbedding(String modelType) {
+        return ConfigBO.ModelType.embedding.getValue().equals(modelType);
+    }
+
+    private static boolean isLlm(String configType) {
+        return LLM_CONFIG_TYPE.equals(configType);
     }
 
     private static boolean isOss(String configType) {

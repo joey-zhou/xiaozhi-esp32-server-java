@@ -15,9 +15,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 /**
@@ -87,6 +89,56 @@ class ChatModelFactoryTest {
 
         assertThat(result).isSameAs(fallbackModel);
         verify(openAiProvider).createChatModel(config, role);
+    }
+
+    /**
+     * 角色绑定的对话模型被停用后不能再拿它外呼计费；回退默认对话模型，与 TTS 停用时回退默认的处理一致
+     */
+    @Test
+    void disabledChatModelFallsBackToTheDefaultOne() {
+        RoleBO role = new RoleBO();
+        role.setModelId(11);
+        when(configLookup.getConfig(11)).thenReturn(new ConfigBO().setConfigId(11).setProvider("stub")
+            .setState(ConfigBO.STATE_DISABLED));
+        ConfigBO defaultConfig = new ConfigBO().setConfigId(99).setProvider("stub");
+        when(configLookup.getDefaultConfig("llm", ConfigBO.ModelType.chat.getValue())).thenReturn(defaultConfig);
+        when(stubProvider.createChatModel(any(), any())).thenReturn(stubModel);
+
+        chatModelFactory.getChatModel(role);
+
+        verify(stubProvider).createChatModel(defaultConfig, role);
+    }
+
+    /** 回退出来的模型挂在默认配置的名下：默认配置变更时它要跟着失效，原配置重新启用时不能继续用它 */
+    @Test
+    void fallbackModelIsCachedUnderTheDefaultConfig() {
+        RoleBO role = new RoleBO();
+        role.setModelId(11);
+        when(configLookup.getConfig(11)).thenReturn(new ConfigBO().setConfigId(11).setState(ConfigBO.STATE_DISABLED));
+        when(configLookup.getDefaultConfig("llm", ConfigBO.ModelType.chat.getValue()))
+            .thenReturn(new ConfigBO().setConfigId(99).setProvider("stub"));
+        when(stubProvider.createChatModel(any(), any())).thenReturn(stubModel, fallbackModel);
+
+        chatModelFactory.getChatModel(role);
+        chatModelFactory.removeCache(99);
+        ChatModel rebuilt = chatModelFactory.getChatModel(role);
+
+        assertThat(rebuilt).isSameAs(fallbackModel);
+    }
+
+    @Test
+    void disabledChatModelWithoutADefaultFailsWithAReadableMessage() {
+        RoleBO role = new RoleBO();
+        role.setRoleName("小助手");
+        role.setModelId(11);
+        when(configLookup.getConfig(11)).thenReturn(new ConfigBO().setConfigId(11).setState(ConfigBO.STATE_DISABLED));
+        when(configLookup.getDefaultConfig("llm", ConfigBO.ModelType.chat.getValue())).thenReturn(null);
+
+        assertThatThrownBy(() -> chatModelFactory.getChatModel(role))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("小助手")
+            .hasMessageContaining("已停用");
+        verify(stubProvider, never()).createChatModel(any(), any());
     }
 
     @Test

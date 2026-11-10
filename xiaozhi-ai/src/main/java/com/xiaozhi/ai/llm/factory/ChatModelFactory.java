@@ -73,13 +73,33 @@ public class ChatModelFactory {
     
     public ChatModel getChatModel(RoleBO role) {
         RoleBO effectiveRole = role != null ? role : new RoleBO();
-        Integer modelId = effectiveRole.getModelId();
-        Assert.notNull(modelId, "配置ID不能为空");
+        ConfigBO config = resolveConfig(effectiveRole);
         // 每轮重建会连带新建 HttpClient，等于每次对话都重新做一次 TCP+TLS 握手。
-        // temperature/topP 烘焙在模型的 defaultOptions 里，必须进 key，否则改了角色参数不生效
-        String cacheKey = cacheKey(modelId, effectiveRole);
-        return chatModelCache.get(cacheKey,
-                k -> createChatModel(configLookup.getConfig(modelId), effectiveRole));
+        // temperature/topP 烘焙在模型的 defaultOptions 里，必须进 key，否则改了角色参数不生效；
+        // key 按实际用的配置算，回退出来的默认模型不能挂在已停用配置的名下
+        String cacheKey = cacheKey(config.getConfigId(), effectiveRole);
+        return chatModelCache.get(cacheKey, k -> createChatModel(config, effectiveRole));
+    }
+
+    /**
+     * 角色这一轮实际要用的模型配置。绑定的配置已停用或不存在时回退默认聊天模型，与 TTS 停用时的处理一致；
+     * 不能照搬 STT 静默返回空的做法——模型建不起来，这一轮就彻底没法回答。连默认都没有才报错。
+     */
+    ConfigBO resolveConfig(RoleBO role) {
+        Integer modelId = role.getModelId();
+        Assert.notNull(modelId, "配置ID不能为空");
+        ConfigBO config = configLookup.getConfig(modelId);
+        if (config != null && !ConfigBO.STATE_DISABLED.equals(config.getState())) {
+            return config;
+        }
+        ConfigBO fallback = configLookup.getDefaultConfig("llm", ConfigBO.ModelType.chat.getValue());
+        if (fallback == null) {
+            throw new IllegalStateException("角色「" + role.getRoleName() + "」绑定的模型配置已停用，也没有可用的默认模型，"
+                    + "请在配置管理里启用该配置或给角色改绑模型");
+        }
+        log.warn("角色绑定的模型配置已停用或不存在，回退默认模型 - 角色: {}, 原配置: {}, 默认配置: {}",
+                role.getRoleName(), modelId, fallback.getConfigId());
+        return fallback;
     }
 
     static String cacheKey(Integer modelId, RoleBO role) {

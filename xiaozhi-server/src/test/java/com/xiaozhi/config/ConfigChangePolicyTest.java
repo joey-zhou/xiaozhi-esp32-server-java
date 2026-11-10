@@ -1,9 +1,11 @@
 package com.xiaozhi.config;
 
 import com.xiaozhi.common.exception.ConfirmRequiredException;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.req.ConfigCreateReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
+import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.storage.service.StorageReferenceService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +20,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * 钉住配置写前的护栏：换对象存储（新建默认、切默认、让位、改地址前缀、删除默认）
- * 未确认且当前存储上还有历史引用→拒绝。
+ * 未确认且当前存储上还有历史引用→拒绝；删除仍被角色使用的对话模型→拒绝。
  */
 @ExtendWith(MockitoExtension.class)
 class ConfigChangePolicyTest {
@@ -27,6 +29,9 @@ class ConfigChangePolicyTest {
 
     @Mock
     private StorageReferenceService storageReferenceService;
+
+    @Mock
+    private RoleService roleService;
 
     @InjectMocks
     private ConfigChangePolicy policy;
@@ -121,6 +126,48 @@ class ConfigChangePolicyTest {
                 .setConfigName("bucket")
                 .setAppId("ap-beijing")
                 .setIsDefault(isDefault);
+    }
+
+    // ---------- 删除仍被角色使用的对话模型 ----------
+
+    /** 删除是软删，配置从列表里消失而角色还指着它，管理员看不出这些角色实际在用哪个模型 */
+    @Test
+    void deletingAChatModelStillUsedByRolesIsRejected() {
+        ConfigBO existing = chatModel();
+        when(roleService.countByModelId(CONFIG_ID)).thenReturn(3L);
+
+        assertThatThrownBy(() -> policy.checkDelete(existing, true))
+                .isInstanceOf(OperationFailedException.class)
+                .hasMessageContaining("3 个角色");
+    }
+
+    @Test
+    void deletingAChatModelNoRoleUsesPasses() {
+        ConfigBO existing = chatModel();
+        when(roleService.countByModelId(CONFIG_ID)).thenReturn(0L);
+
+        assertThatCode(() -> policy.checkDelete(existing, true)).doesNotThrowAnyException();
+    }
+
+    /** TTS/STT 停用后有既定的降级（回退默认或本轮不识别），不改成拒删 */
+    @Test
+    void deletingTtsOrSttNeverChecksRoles() {
+        for (String type : new String[]{"tts", "stt"}) {
+            ConfigBO existing = new ConfigBO();
+            existing.setConfigId(CONFIG_ID);
+            existing.setConfigType(type);
+
+            assertThatCode(() -> policy.checkDelete(existing, true)).doesNotThrowAnyException();
+        }
+        verifyNoInteractions(roleService);
+    }
+
+    private static ConfigBO chatModel() {
+        ConfigBO bo = new ConfigBO();
+        bo.setConfigId(CONFIG_ID);
+        bo.setConfigType("llm");
+        bo.setModelType(ConfigBO.ModelType.chat.getValue());
+        return bo;
     }
 
     // ---------- 换对象存储（删除路径：删掉当前默认） ----------

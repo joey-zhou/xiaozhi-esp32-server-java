@@ -19,6 +19,9 @@ public interface RoleService {
 
     RoleBO getDefaultOrFirstBO(Integer userId);
 
+    /** 绑定了该模型配置的角色数，跨用户统计 */
+    long countByModelId(Integer modelId);
+
     // ===================== 写操作（待迁移到 RoleAppService） =====================
 
     Integer copyDefaultRole(Integer sourceUserId, Integer targetUserId);

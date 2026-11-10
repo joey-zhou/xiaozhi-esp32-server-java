@@ -211,20 +211,25 @@ public class PersonaFactory {
      * 初始化对话状态
      */
     public Synthesizer initSynthesizer(ChatSession session, Player player, RoleBO role) {
-        // 新增加的设备很有可能没有配置TTS，采用默认Edge需要传递null
-        ConfigBO ttsConfig = null;
-        if (role.getTtsId() != null && role.getTtsId() > 0) {
-            ttsConfig = configService.getBO(role.getTtsId());
-            if (ttsConfig != null && ConfigBO.STATE_DISABLED.equals(ttsConfig.getState())) {
-                log.warn("TTS服务配置已停用，回退默认TTS - Id: {}", role.getTtsId());
-                ttsConfig = null;
-            }
+        return SynthesizerFactory.create(session, resolveTtsService(role), player);
+    }
+
+    /**
+     * 角色没绑 TTS 配置时用 Edge，此时角色选的音色本来就是 Edge 的音色，照常带上。
+     * 绑定的配置停用或已不存在时回退默认 Edge，但<b>不能带角色原来的音色名</b>：
+     * 那是别家厂商的音色（如阿里的 longxiaochun），Edge 不认识就合成不出声音，回退等于没回退
+     */
+    TtsService resolveTtsService(RoleBO role) {
+        Integer ttsId = role.getTtsId();
+        if (ttsId == null || ttsId <= 0) {
+            return ttsFactory.getTtsService(null, role.getVoiceName(), role.getTtsPitch(), role.getTtsSpeed());
         }
-        String voiceName = role.getVoiceName();
-        TtsService ttsService = ttsFactory.getTtsService(ttsConfig, voiceName, role.getTtsPitch(), role.getTtsSpeed());
-
-        return SynthesizerFactory.create(session, ttsService, player);
-
+        ConfigBO ttsConfig = configService.getBO(ttsId);
+        if (ttsConfig == null || ConfigBO.STATE_DISABLED.equals(ttsConfig.getState())) {
+            log.warn("TTS服务配置已停用或不存在，回退默认TTS与默认音色 - Id: {}", ttsId);
+            return ttsFactory.getDefaultTtsService();
+        }
+        return ttsFactory.getTtsService(ttsConfig, role.getVoiceName(), role.getTtsPitch(), role.getTtsSpeed());
     }
 
 }
