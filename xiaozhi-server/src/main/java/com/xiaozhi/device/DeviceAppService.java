@@ -310,6 +310,7 @@ public class DeviceAppService {
             "timezone_offset", DateUtils.offset().getTotalSeconds() / 60
         ));
 
+        // selectServer 返回 null 只表示注册表里没有对话实例（还没有按容量准入），此时按配置的对话端口下发
         DialogueServerInfo selectedServer = null;
         try {
             selectedServer = dialogueServerRegistry.selectServer();

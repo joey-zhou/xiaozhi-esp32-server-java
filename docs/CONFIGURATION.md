@@ -66,7 +66,7 @@ Redis 没开 requirepass 时 `_PASSWORD` 必须留空，空串会被当口令发
 | `XIAOZHI_SERVER_DOMAIN` | 对外域名。留空按 IP 拼地址；填了则下发 `https://<域名>/api/device/ota` 与 `wss://ws.<域名>/ws/xiaozhi/v1/`，要自己把子域名反代过去 |
 | `XIAOZHI_SECURITY_TRUSTED_PROXIES` | 前面挂 Nginx/LB 时填代理 IP 或 CIDR，否则限流会把所有请求算成同一个 IP。docker 部署自带的 web 容器就是 nginx，填它在 compose 网络里的地址；不要填 `172.16.0.0/12` 这类大段，8091/8092 直接发布在宿主机上，大段可信等于谁都能伪造来源绕过限流 |
 
-改了服务端口要同步改 `xiaozhi.server.port` 与 `xiaozhi.dialogue.port`，否则下发给设备的地址还是旧端口。
+改了服务端口要同步改 `xiaozhi.server.port` 与 `xiaozhi.dialogue.port`，否则下发给设备的地址还是旧端口。dialogue 自己的 `server.port` 也取 `xiaozhi.dialogue.port`，不用另改。
 
 ### 安全相关的默认值
 

@@ -6,7 +6,8 @@
 # ============================================================
 
 server:
-  port: 8092
+  # 与 server 进程下发给设备的 WebSocket 端口取同一个配置，改端口只改 xiaozhi.dialogue.port
+  port: ${xiaozhi.dialogue.port:8092}
 
 spring:
   config:
