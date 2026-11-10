@@ -111,10 +111,13 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
 
     private final ToolExecutionExceptionProcessor toolExecutionExceptionProcessor;
 
+    private final ToolCallActivityRegistry toolCallActivity;
+
     private ToolCallingObservationConvention observationConvention = DEFAULT_OBSERVATION_CONVENTION;
 
     public XiaoZhiToolCallingManager(ObservationRegistry observationRegistry, ToolCallbackResolver toolCallbackResolver,
-                                     ToolExecutionExceptionProcessor toolExecutionExceptionProcessor) {
+                                     ToolExecutionExceptionProcessor toolExecutionExceptionProcessor,
+                                     ToolCallActivityRegistry toolCallActivity) {
         Assert.notNull(observationRegistry, "observationRegistry cannot be null");
         Assert.notNull(toolCallbackResolver, "toolCallbackResolver cannot be null");
         Assert.notNull(toolExecutionExceptionProcessor, "toolCallExceptionConverter cannot be null");
@@ -122,6 +125,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
         this.observationRegistry = observationRegistry;
         this.toolCallbackResolver = toolCallbackResolver;
         this.toolExecutionExceptionProcessor = toolExecutionExceptionProcessor;
+        this.toolCallActivity = toolCallActivity;
     }
 
     @Override
@@ -164,7 +168,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
      * 从 toolContext 取出发起本次工具调用时的对话轮次时间戳。
      */
     private static Long turnIdOf(ToolContext toolContext) {
-        return toolContext.getContext().get("conversationTimestamp") instanceof Long id ? id : null;
+        return toolContext.getContext().get(ToolSession.CONTEXT_TURN_ID) instanceof Long id ? id : null;
     }
 
     /**
@@ -236,11 +240,22 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
 
         ToolContext toolContext = buildToolContext(prompt, assistantMessage);
 
-        XiaoZhiToolCallingManager.ToolExecResult toolExecResult = executeToolCall(prompt, assistantMessage,
-                toolContext);
+        // 工具执行期间模型不出字，登记下来让对话侧的首字与静默超时把这段时间让出去
+        String activityKey = ToolCallActivityRegistry.keyOf(toolContext.getContext());
+        if (activityKey != null) {
+            toolCallActivity.begin(activityKey);
+        }
+        XiaoZhiToolCallingManager.ToolExecResult toolExecResult;
+        try {
+            toolExecResult = executeToolCall(prompt, assistantMessage, toolContext);
+        } finally {
+            if (activityKey != null) {
+                toolCallActivity.end(activityKey);
+            }
+        }
 
         // 将中间消息（模型的 tool_call 请求 + 工具执行结果）存入 ToolSession，供 Persona 注入 Conversation
-        String sessionId = toolContext.getContext().get("sessionId") instanceof String s ? s : null;
+        String sessionId = toolContext.getContext().get(ToolSession.CONTEXT_SESSION_ID) instanceof String s ? s : null;
         if (sessionId != null) {
             ToolSessionProvider provider = sessionProvider();
             if (provider != null) {
@@ -466,7 +481,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
                     .toolCallArguments(toolInputArguments)
                     .build();
             // 通过 sessionId 获取 ToolSession（Persona 只传 sessionId 避免序列化问题）
-            String sessionId = toolContext.getContext().get("sessionId") instanceof String s ? s : null;
+            String sessionId = toolContext.getContext().get(ToolSession.CONTEXT_SESSION_ID) instanceof String s ? s : null;
             ToolSession toolSession = null;
             if (sessionId != null) {
                 toolSession = sessionProvider() != null ? sessionProvider().getSession(sessionId) : null;
@@ -614,6 +629,8 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
 
         private ToolExecutionExceptionProcessor toolExecutionExceptionProcessor = DEFAULT_TOOL_EXECUTION_EXCEPTION_PROCESSOR;
 
+        private ToolCallActivityRegistry toolCallActivity = new ToolCallActivityRegistry();
+
         private Builder() {
         }
 
@@ -633,9 +650,14 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
             return this;
         }
 
+        public XiaoZhiToolCallingManager.Builder toolCallActivity(ToolCallActivityRegistry toolCallActivity) {
+            this.toolCallActivity = toolCallActivity;
+            return this;
+        }
+
         public XiaoZhiToolCallingManager build() {
             return new XiaoZhiToolCallingManager(this.observationRegistry, this.toolCallbackResolver,
-                    this.toolExecutionExceptionProcessor);
+                    this.toolExecutionExceptionProcessor, this.toolCallActivity);
         }
 
     }

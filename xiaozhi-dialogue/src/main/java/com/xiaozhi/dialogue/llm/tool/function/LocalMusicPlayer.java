@@ -5,7 +5,6 @@ import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tool.session.ToolSession;
-import com.xiaozhi.dialogue.runtime.Persona;
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.support.ToolCallbacks;
@@ -41,7 +40,7 @@ public class LocalMusicPlayer implements ToolsGlobalRegistry.GlobalFunction {
 
     @Tool(name = TOOL_NAME, description = "音乐播放器,播放指定名称的歌曲", returnDirect = true)
     public String playMusic(@ToolParam(description = "要播放的歌曲名称") String songName, ToolContext toolContext) {
-        String sessionId = (String) toolContext.getContext().get(Persona.TOOL_CONTEXT_SESSION_ID_KEY);
+        String sessionId = (String) toolContext.getContext().get(ToolSession.CONTEXT_SESSION_ID);
         ChatSession chatSession = sessionManager.getSession(sessionId);
         if (chatSession == null || chatSession.getPlayer() == null) {
             return "音乐播放失败";

@@ -1,7 +1,6 @@
 package com.xiaozhi.dialogue.llm.tool.function;
 
 import com.xiaozhi.communication.common.ChatSession;
-import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tool.session.ToolSession;
 import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
@@ -35,7 +34,7 @@ public class PlayMusicFunction implements ToolsGlobalRegistry.GlobalFunction {
 
     ToolCallback toolCallback = FunctionToolCallback
             .builder(TOOL_NAME, (Map<String, String> params, ToolContext toolContext) -> {
-                ChatSession chatSession = (ChatSession)toolContext.getContext().get(Persona.TOOL_CONTEXT_SESSION_ID_KEY);
+                ChatSession chatSession = (ChatSession)toolContext.getContext().get(ToolSession.CONTEXT_SESSION_ID);
                 String songName = params.get("songName");
                 try{
                     if (songName == null || songName.isEmpty()) {

@@ -6,7 +6,6 @@ import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tool.session.ToolSession;
 import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.ai.llm.tool.XiaozhiToolMetadata;
-import com.xiaozhi.dialogue.runtime.Persona;
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
@@ -24,7 +23,7 @@ public class SessionExitFunction implements ToolsGlobalRegistry.GlobalFunction {
 
     ToolCallback toolCallback = FunctionToolCallback
             .builder(TOOL_NAME, (Map<String, String> params, ToolContext toolContext) -> {
-                String sessionId = (String) toolContext.getContext().get(Persona.TOOL_CONTEXT_SESSION_ID_KEY);
+                String sessionId = (String) toolContext.getContext().get(ToolSession.CONTEXT_SESSION_ID);
                 ChatSession chatSession = sessionManager.getSession(sessionId);
                 if (chatSession == null || chatSession.getPlayer() == null) {
                     return "好的，再见！";

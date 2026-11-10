@@ -23,6 +23,7 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.ai.tool.ToolRegistrationService;
+import com.xiaozhi.ai.tool.ToolCallActivityRegistry;
 import com.xiaozhi.dialogue.adapter.ChatSessionToolAdapter;
 import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.dialogue.llm.handler.DialogueListener;
@@ -75,6 +76,8 @@ public class PersonaFactory {
     private DialogueListener dialogueListener;
     @Resource
     private StorageServiceFactory storageServiceFactory;
+    @Resource
+    private ToolCallActivityRegistry toolCallActivity;
 
     /**
      * 构建完整的 Persona 实例。
@@ -132,6 +135,7 @@ public class PersonaFactory {
                 .chatModel(chatModel)
                 .firstTokenTimeout(Duration.ofSeconds(llmFirstTokenTimeoutSeconds))
                 .idleTimeout(Duration.ofSeconds(llmIdleTimeoutSeconds))
+                .toolCallActivity(toolCallActivity)
                 .synthesizer(synthesizer)
                 .player(session.getPlayer())
                 .listener(dialogueListener)

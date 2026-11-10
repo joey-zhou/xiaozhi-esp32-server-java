@@ -28,7 +28,7 @@ public class NewChatFunction implements ToolsGlobalRegistry.GlobalFunction {
     ToolCallback toolCallback = FunctionToolCallback
             .builder(TOOL_NAME, (Map<String, String> params, ToolContext toolContext) -> {
                 // toolContext 里放的是 sessionId 字符串，会话对象要用它去 SessionManager 取
-                String sessionId = (String) toolContext.getContext().get(Persona.TOOL_CONTEXT_SESSION_ID_KEY);
+                String sessionId = (String) toolContext.getContext().get(ToolSession.CONTEXT_SESSION_ID);
                 ChatSession chatSession = sessionManager.getSession(sessionId);
                 Persona persona = chatSession != null ? chatSession.getPersona() : null;
                 if (persona == null) {

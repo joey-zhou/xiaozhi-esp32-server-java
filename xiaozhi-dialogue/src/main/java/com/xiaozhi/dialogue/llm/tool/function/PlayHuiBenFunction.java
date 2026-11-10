@@ -3,7 +3,6 @@ package com.xiaozhi.dialogue.llm.tool.function;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.RandomUtil;
 import com.xiaozhi.communication.common.ChatSession;
-import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tool.session.ToolSession;
@@ -33,7 +32,7 @@ public class PlayHuiBenFunction implements ToolsGlobalRegistry.GlobalFunction {
 
     ToolCallback toolCallback = FunctionToolCallback
             .builder(TOOL_NAME, (Map<String, String> params, ToolContext toolContext) -> {
-                ChatSession chatSession = (ChatSession) toolContext.getContext().get(Persona.TOOL_CONTEXT_SESSION_ID_KEY);
+                ChatSession chatSession = (ChatSession) toolContext.getContext().get(ToolSession.CONTEXT_SESSION_ID);
                 Integer num = MapUtil.getInt(params, "num");
                 try {
                     if (num == null || num < 5 || num > 1100) {

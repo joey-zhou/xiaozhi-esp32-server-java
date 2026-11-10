@@ -26,17 +26,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.xiaozhi.ai.tool.session.ToolSession;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class DifyChatModel implements ChatModel {
-    /**
-     * Persona 在 ToolContext 中放入的 sessionId 键，与
-     * {@code com.xiaozhi.dialogue.runtime.Persona.TOOL_CONTEXT_SESSION_ID_KEY} 保持一致。
-     * 此处用字面量是因为 xiaozhi-ai 模块不依赖 xiaozhi-dialogue。
-     */
-    private static final String TOOL_CONTEXT_SESSION_ID_KEY = "sessionId";
-
     private DifyChatClient chatClient;
 
     /**
@@ -223,7 +217,7 @@ public class DifyChatModel implements ChatModel {
         if (prompt.getOptions() instanceof ToolCallingChatOptions toolCallingChatOptions) {
             Map<String, Object> toolContext = toolCallingChatOptions.getToolContext();
             if (toolContext != null) {
-                Object value = toolContext.get(TOOL_CONTEXT_SESSION_ID_KEY);
+                Object value = toolContext.get(ToolSession.CONTEXT_SESSION_ID);
                 if (value instanceof String sessionId && !sessionId.isBlank()) {
                     return sessionId;
                 }

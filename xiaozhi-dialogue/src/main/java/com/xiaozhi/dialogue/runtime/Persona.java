@@ -30,6 +30,8 @@ import org.springframework.ai.chat.model.MessageAggregator;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import com.xiaozhi.ai.tool.ToolCallActivityRegistry;
+import com.xiaozhi.ai.tool.session.ToolSession;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
@@ -71,11 +73,6 @@ import lombok.extern.slf4j.Slf4j;
 @Builder(toBuilder = true)
 public class Persona {
 
-    /**
-     * ToolContext 中传递 sessionId 而非整个 ChatSession，避免序列化问题。
-     * XiaoZhiToolCallingManager 负责通过 SessionManager 还原为 ChatSession 再传给 Function。
-     */
-    public static final String TOOL_CONTEXT_SESSION_ID_KEY = "sessionId";
 
     private final SessionManager sessionManager;
     
@@ -117,9 +114,12 @@ public class Persona {
     @Builder.Default
     private Duration firstTokenTimeout = Duration.ofSeconds(30);
 
-    /** 两次输出之间的最长静默；模型调工具期间不出字，必须比工具的最长等待长 */
+    /** 两次输出之间的最长静默；等工具结果的那段不算，见 {@link #modelSilence} */
     @Builder.Default
     private Duration idleTimeout = Duration.ofSeconds(90);
+
+    /** 工具执行进度，首字与静默超时据此把等工具的时间让出去；为 null 时不让 */
+    private ToolCallActivityRegistry toolCallActivity;
 
     /** 当前轮次运行态，打断收尾与播完判定都从这里取 */
     @Builder.Default
@@ -191,9 +191,9 @@ public class Persona {
 
             ChatOptions chatOptions = ToolCallingChatOptions.builder()
                     .toolCallbacks(effectiveTools)
-                    .toolContext(TOOL_CONTEXT_SESSION_ID_KEY, sessionId)
-                    .toolContext("deviceId", conversation.getOwnerId())
-                    .toolContext("conversationTimestamp", turn.turnId)
+                    .toolContext(ToolSession.CONTEXT_SESSION_ID, sessionId)
+                    .toolContext(ToolSession.CONTEXT_OWNER_ID, conversation.getOwnerId())
+                    .toolContext(ToolSession.CONTEXT_TURN_ID, turn.turnId)
                     .build();
 
             // 准备期间被打断：用户消息已由打断收尾记入历史，这里不再生成
@@ -210,8 +210,10 @@ public class Persona {
 
             // 连接层的读超时管不到「响应头已到、正文半途停吐」，只能在流上对两次输出之间计时；
             // 超时照常走下面的失败收尾与兜底话术，否则上游卡住时设备永远停在「思考中」
+            String activityKey = ToolCallActivityRegistry.key(conversation.getOwnerId(), turn.turnId);
             Flux<ChatResponse> chatFlux = chatModel.stream(prompt)
-                .timeout(Mono.delay(firstTokenTimeout), response -> Mono.delay(idleTimeout))
+                .timeout(modelSilence(activityKey, firstTokenTimeout),
+                        response -> modelSilence(activityKey, idleTimeout))
                 .doOnError(error -> {
                     listener.onError(error);
                     failTurn(turn);
@@ -234,6 +236,23 @@ public class Persona {
             failTurn(turn);
             return Flux.error(e);
         }
+    }
+
+    /**
+     * 模型沉默满 limit 时发出。等工具结果的那段不算沉默：工具还在执行就整段顺延，
+     * 刚执行完就从结束那一刻重新起算；工具自己有执行上限，顺延是有界的
+     */
+    private Mono<Long> modelSilence(String activityKey, Duration limit) {
+        return modelSilence(activityKey, limit, limit);
+    }
+
+    private Mono<Long> modelSilence(String activityKey, Duration limit, Duration wait) {
+        return Mono.delay(wait).flatMap(tick -> {
+            Duration left = toolCallActivity == null
+                    ? Duration.ZERO
+                    : toolCallActivity.remainingQuiet(activityKey, limit);
+            return left.isZero() ? Mono.just(tick) : modelSilence(activityKey, limit, left);
+        });
     }
 
     /**

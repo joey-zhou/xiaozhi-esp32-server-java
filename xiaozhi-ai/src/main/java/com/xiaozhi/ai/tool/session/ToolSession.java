@@ -10,6 +10,15 @@ import org.springframework.ai.chat.messages.ToolResponseMessage;
  */
 public interface ToolSession {
 
+    /** toolContext 里的会话标识键 */
+    String CONTEXT_SESSION_ID = "sessionId";
+
+    /** toolContext 里的对话 owner 键（设备对话为 deviceId） */
+    String CONTEXT_OWNER_ID = "deviceId";
+
+    /** toolContext 里的本轮对话标识键，取值是轮次号，键名是历史沿用 */
+    String CONTEXT_TURN_ID = "conversationTimestamp";
+
     String getSessionId();
 
     Integer getRoleId();

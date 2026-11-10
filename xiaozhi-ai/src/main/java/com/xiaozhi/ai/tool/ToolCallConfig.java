@@ -19,10 +19,12 @@ public class ToolCallConfig {
     @Bean
     public ToolCallingManager toolCallingManager(ObservationRegistry observationRegistry,
                                                  @Autowired(required = false) ToolCallbackResolver toolCallbackResolver,
-                                                 @Autowired(required = false) ToolExecutionExceptionProcessor toolExecutionExceptionProcessor) {
+                                                 @Autowired(required = false) ToolExecutionExceptionProcessor toolExecutionExceptionProcessor,
+                                                 ToolCallActivityRegistry toolCallActivity) {
         return new XiaoZhiToolCallingManager(observationRegistry,
                 toolCallbackResolver != null ? toolCallbackResolver : name -> null,
-                toolExecutionExceptionProcessor == null ? defaultToolExecutionExceptionProcessor : toolExecutionExceptionProcessor);
+                toolExecutionExceptionProcessor == null ? defaultToolExecutionExceptionProcessor : toolExecutionExceptionProcessor,
+                toolCallActivity);
     }
 
     /**
