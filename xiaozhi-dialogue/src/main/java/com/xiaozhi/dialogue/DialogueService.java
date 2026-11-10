@@ -684,9 +684,14 @@ public class DialogueService{
             }
 
             // 再终止音频播放，清空播放队列
+            // 停播失败也要把后面的收尾做完，否则设备收不到 tts stop，一直停在说话状态不重开麦
             Player player = session.getPlayer();
-            if(player!=null){
-                player.stop();
+            if (player != null) {
+                try {
+                    player.stop();
+                } catch (Exception e) {
+                    log.warn("停止播放器失败 - SessionId: {}: {}", sessionId, e.getMessage());
+                }
             }
 
             // 已发送未播放的帧被设备丢弃、不会产生回声，清掉待喂入的 AEC 参考，

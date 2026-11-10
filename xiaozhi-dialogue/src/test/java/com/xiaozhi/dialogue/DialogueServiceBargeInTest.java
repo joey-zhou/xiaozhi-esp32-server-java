@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -126,6 +127,19 @@ class DialogueServiceBargeInTest {
         verify(persona).onInterrupted();
         verify(player).stop();
         verify(player, never()).resume();
+        verify(messageService).sendTtsMessage(session, null, "stop");
+    }
+
+    /** 停播出错时后面的收尾照做，设备要收到 tts stop 才会切回聆听重开麦 */
+    @Test
+    void failedPlayerStopStillTellsDeviceToStop() {
+        doAnswer(invocation -> {
+            throw new IllegalStateException("录音收尾出错");
+        }).when(player).stop();
+
+        dialogueService.abortDialogue(session, "设备端打断");
+
+        verify(aecService).clearReference("s1");
         verify(messageService).sendTtsMessage(session, null, "stop");
     }
 

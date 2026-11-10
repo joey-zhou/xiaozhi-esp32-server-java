@@ -19,6 +19,8 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -128,6 +130,72 @@ class OpusRecorderTest {
 
         try (Stream<Path> files = Files.list(tempDir)) {
             assertThat(files).isEmpty();
+        }
+    }
+
+    /**
+     * 打断时收尾在识别回调线程，播放线程可能已经进了发帧、稍后还会落下一帧。
+     * 这一帧不能为同一条消息重开文件：同一路径会被截成一帧的残片，再以残片更新消息音频
+     */
+    @Test
+    void lateFrameAfterAbortDoesNotOverwriteRecording() throws IOException {
+        Instant createdAt = Instant.ofEpochMilli(1_700_000_004_000L);
+        recorder.setAssistantMessageCreatedAt(createdAt);
+        List<byte[]> frames = opusFrames(4);
+        frames.subList(0, 3).forEach(frame -> recorder.onSendOpusFrame(frame, PCM, 1000L));
+
+        recorder.closeOpusFile();
+        recorder.onSendOpusFrame(frames.get(3), PCM, 1180L);
+
+        assertThat(granulePositions(audioPath(createdAt))).hasSize(3);
+        // 下一条消息照常录
+        Instant next = Instant.ofEpochMilli(1_700_000_005_000L);
+        recorder.setAssistantMessageCreatedAt(next);
+        recorder.onSendOpusFrame(frames.get(0), PCM, 2000L);
+        recorder.onSendStop();
+        assertThat(granulePositions(audioPath(next))).hasSize(1);
+    }
+
+    /** 播放线程不停发帧、另一线程反复收尾，每个落盘的录音都必须完整可读、帧序连续 */
+    @Test
+    void closingWhileFramesAreSentKeepsEveryRecordingIntact() throws Exception {
+        byte[] frame = opusFrames(1).get(0);
+        long samplesPerFrame = new OpusAudioData(frame).getNumberOfSamples();
+        AtomicBoolean running = new AtomicBoolean(true);
+        AtomicReference<Throwable> senderError = new AtomicReference<>();
+        Thread sender = Thread.ofPlatform().start(() -> {
+            try {
+                while (running.get()) {
+                    recorder.onSendOpusFrame(frame, PCM, 1000L);
+                }
+            } catch (Throwable t) {
+                senderError.set(t);
+            }
+        });
+        List<Instant> recorded = new ArrayList<>();
+        try {
+            for (int i = 0; i < 200; i++) {
+                Instant createdAt = Instant.ofEpochMilli(1_700_001_000_000L + i);
+                recorder.setAssistantMessageCreatedAt(createdAt);
+                recorded.add(createdAt);
+                Thread.sleep(1);
+                recorder.closeOpusFile();
+            }
+        } finally {
+            running.set(false);
+            sender.join();
+        }
+
+        assertThat(senderError.get()).isNull();
+        for (Instant createdAt : recorded) {
+            Path path = audioPath(createdAt);
+            if (!Files.exists(path)) {
+                continue;
+            }
+            List<Long> positions = granulePositions(path);
+            for (int i = 0; i < positions.size(); i++) {
+                assertThat(positions.get(i)).isEqualTo(samplesPerFrame * (i + 1));
+            }
         }
     }
 
