@@ -34,6 +34,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -102,8 +103,8 @@ class ConfigProbeTest {
 
         configProbe.probe(config);
 
-        verify(sttServiceFactory).removeCache(config);
-        verify(tokenClient).removeCache(config);
+        verify(sttServiceFactory).removeCache(config.getConfigId());
+        verify(tokenClient).removeCache(config.getConfigId());
     }
 
     @Test
@@ -154,8 +155,8 @@ class ConfigProbeTest {
 
         assertThat(response.success()).isFalse();
         assertThat(response.message()).isEqualTo("连接测试失败，详情见服务端日志");
-        verify(sttServiceFactory).removeCache(any(ConfigBO.class));
-        verify(tokenClient).removeCache(any(ConfigBO.class));
+        verify(sttServiceFactory).removeCache(anyInt());
+        verify(tokenClient).removeCache(anyInt());
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.xiaozhi.ai.stt;
 
+import com.xiaozhi.event.AiConfigChangedEvent;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.ai.stt.providers.*;
@@ -8,6 +9,8 @@ import com.xiaozhi.common.model.bo.ConfigBO;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Resource;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -199,8 +202,18 @@ public class SttServiceFactory {
         return vosk;
     }
 
-    public void removeCache(ConfigBO config) {
-        Integer configId = config.getConfigId();
+    /** 本进程内的配置变更；对话进程那侧由 RedisSubscriber 转调 {@link #removeCache} */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onAiConfigChanged(AiConfigChangedEvent event) {
+        if ("stt".equals(event.getConfigType())) {
+            removeCache(event.getConfigId());
+        }
+    }
+
+    public void removeCache(Integer configId) {
+        if (configId == null) {
+            return;
+        }
         // provider 可能已被运维改成别的值，旧 key 的 provider 段对不上；不再比较 provider，
         // 只按 configId 段清理，否则切走 provider 后旧实例/旧连接永远清不掉
         serviceCache.keySet().removeIf(k -> {

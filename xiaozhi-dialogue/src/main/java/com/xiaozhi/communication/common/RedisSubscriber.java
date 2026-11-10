@@ -282,9 +282,9 @@ public class RedisSubscriber {
             ConfigBO config = configService.getBO(configId);
             if (config != null) {
                 if ("stt".equals(configType)) {
-                    sttServiceFactory.removeCache(config);
+                    sttServiceFactory.removeCache(configId);
                 } else if ("tts".equals(configType)) {
-                    ttsServiceFactory.removeCache(config);
+                    ttsServiceFactory.removeCache(configId);
                 } else if ("llm".equals(configType)) {
                     personaFactory.clearPersonasByModelId(configId);
                     chatModelFactory.removeCache(configId);
@@ -296,7 +296,7 @@ public class RedisSubscriber {
                     }
                 }
                 // Token 缓存（Coze OAuth、阿里云 Token 等）与 configType 无关，统一清除
-                tokenClient.removeCache(config);
+                tokenClient.removeCache(configId);
                 log.info("已清除工厂缓存 - configType: {}, configId: {}", configType, configId);
             }
         } catch (Exception e) {

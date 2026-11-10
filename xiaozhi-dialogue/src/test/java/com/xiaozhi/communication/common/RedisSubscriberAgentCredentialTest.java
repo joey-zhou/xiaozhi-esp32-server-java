@@ -60,6 +60,6 @@ class RedisSubscriberAgentCredentialTest {
         verify(personaFactory).clearPersonasByModelId(21);
         verify(chatModelFactory).removeCache(20);
         verify(chatModelFactory).removeCache(21);
-        verify(tokenClient).removeCache(credential);
+        verify(tokenClient).removeCache(5);
     }
 }

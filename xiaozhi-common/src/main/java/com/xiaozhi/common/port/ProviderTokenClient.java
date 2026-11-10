@@ -9,6 +9,6 @@ public interface ProviderTokenClient {
 
     String getToken(ConfigBO config);
 
-    /** 丢弃该配置已缓存的 token，下次获取时重新换取。 */
-    void removeCache(ConfigBO config);
+    /** 丢弃这份配置已缓存的 token，下次获取时重新换取。只认 configId：配置可能刚把 provider 改掉 */
+    void removeCache(Integer configId);
 }

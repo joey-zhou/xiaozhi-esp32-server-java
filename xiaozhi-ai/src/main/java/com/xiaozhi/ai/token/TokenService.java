@@ -1,5 +1,6 @@
 package com.xiaozhi.ai.token;
 
+import com.xiaozhi.event.AiConfigChangedEvent;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.ai.token.provider.TokenProvider;
@@ -7,6 +8,8 @@ import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -95,12 +98,21 @@ public class TokenService implements ProviderTokenClient {
         throw new IllegalStateException("获取Token失败，provider=" + config.getProvider() + ", configId=" + config.getConfigId());
     }
 
+    /** token 按 provider:configId 存，配置可能刚把 provider 改掉，每个 provider 下的这份都删 */
     @Override
-    public void removeCache(ConfigBO config) {
-        if (config == null || !StringUtils.hasText(config.getProvider())) {
+    public void removeCache(Integer configId) {
+        if (configId == null) {
             return;
         }
-        stringRedisTemplate.delete(buildTokenKey(config));
+        stringRedisTemplate.delete(providerMap.keySet().stream()
+                .map(provider -> TOKEN_KEY_PREFIX + provider + ":" + configId)
+                .toList());
+    }
+
+    /** 本进程内的配置变更，任何类型的配置都可能换过 token；对话进程那侧由 RedisSubscriber 转调 {@link #removeCache} */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onAiConfigChanged(AiConfigChangedEvent event) {
+        removeCache(event.getConfigId());
     }
 
     private TokenProvider resolveProvider(String provider) {

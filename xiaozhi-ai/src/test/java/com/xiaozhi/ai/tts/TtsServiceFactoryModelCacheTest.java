@@ -2,7 +2,7 @@ package com.xiaozhi.ai.tts;
 
 import com.k2fsa.sherpa.onnx.OfflineTts;
 import com.xiaozhi.ai.tts.providers.SherpaOnnxTtsService;
-import com.xiaozhi.common.model.bo.ConfigBO;
+import com.xiaozhi.event.AiConfigChangedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -39,26 +39,36 @@ class TtsServiceFactoryModelCacheTest {
         Map<String, OfflineTts> modelCache = sherpaModelCache();
         modelCache.put(MODEL_CACHE_KEY, model);
 
-        new TtsServiceFactory().removeCache(sherpaConfig());
+        new TtsServiceFactory().removeCache(7);
 
         assertThat(modelCache).containsEntry(MODEL_CACHE_KEY, model);
         verify(model, never()).release();
     }
 
     @Test
-    void removeCacheEvictsOnlyMatchingProviderServiceInstances() {
+    void removeCacheEvictsOnlyThatConfigsServiceInstances() {
         TtsServiceFactory factory = new TtsServiceFactory();
         Map<String, TtsService> serviceCache = serviceCache(factory);
         serviceCache.put(SHERPA_SERVICE_KEY, mock(TtsService.class));
         serviceCache.put(EDGE_SERVICE_KEY, mock(TtsService.class));
 
-        factory.removeCache(sherpaConfig());
+        factory.removeCache(7);
 
         assertThat(serviceCache).containsOnlyKeys(EDGE_SERVICE_KEY);
     }
 
-    private static ConfigBO sherpaConfig() {
-        return new ConfigBO().setConfigId(7).setConfigType("tts").setProvider("sherpa-onnx");
+    @Test
+    void configChangeEvictsInstancesBuiltUnderTheProviderItHadBefore() {
+        TtsServiceFactory factory = new TtsServiceFactory();
+        Map<String, TtsService> serviceCache = serviceCache(factory);
+        // 配置 7 刚从 sherpa-onnx 改成别的 provider，缓存里还是按旧 provider 建的实例
+        serviceCache.put(SHERPA_SERVICE_KEY, mock(TtsService.class));
+        serviceCache.put(EDGE_SERVICE_KEY, mock(TtsService.class));
+
+        factory.onAiConfigChanged(new AiConfigChangedEvent(this, "tts", 7));
+        factory.onAiConfigChanged(new AiConfigChangedEvent(this, "stt", 8));
+
+        assertThat(serviceCache).containsOnlyKeys(EDGE_SERVICE_KEY);
     }
 
     @SuppressWarnings("unchecked")

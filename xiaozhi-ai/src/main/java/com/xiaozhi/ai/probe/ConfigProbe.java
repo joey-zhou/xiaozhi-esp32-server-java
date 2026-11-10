@@ -221,8 +221,8 @@ public class ConfigProbe {
             result = sttService.stream(Flux.fromIterable(speechFrames()).delayElements(FRAME_INTERVAL));
         } finally {
             // 临时凭据换来的连接与 Token 用完即弃，不留在按 configId 键控的共享缓存里
-            sttServiceFactory.removeCache(config);
-            tokenClient.removeCache(config);
+            sttServiceFactory.removeCache(config.getConfigId());
+            tokenClient.removeCache(config.getConfigId());
         }
         if (result == null) {
             return ConfigProbeResultBO.failure("识别服务未启动，请检查配置项是否填写完整");

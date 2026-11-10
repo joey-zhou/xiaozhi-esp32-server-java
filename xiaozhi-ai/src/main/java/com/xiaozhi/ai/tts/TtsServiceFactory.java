@@ -1,5 +1,6 @@
 package com.xiaozhi.ai.tts;
 
+import com.xiaozhi.event.AiConfigChangedEvent;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.utils.AudioUtils;
@@ -7,6 +8,8 @@ import com.xiaozhi.ai.tts.providers.*;
 import com.xiaozhi.common.model.bo.ConfigBO;
 
 import jakarta.annotation.Resource;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -125,36 +128,30 @@ public class TtsServiceFactory {
     }
 
     /**
-     * 清除指定配置的服务实例缓存。
+     * 清除这份配置的服务实例。只认 configId：配置可能刚把 provider 改掉，按新 provider 找不到旧实例。
      * <p>
      * 不清理 sherpa-onnx 的本地模型缓存。模型实例只由音色里的模型目录决定，与配置无关；
      * 且释放模型会 delete native 指针，与正在执行的合成并发即 use-after-free 崩进程。
      */
-    public void removeCache(ConfigBO config) {
-        if (config == null) {
+    public void removeCache(Integer configId) {
+        if (configId == null) {
             return;
         }
-
-        String provider = config.getProvider();
-        Integer configId = config.getConfigId();
-
-        // 如果是阿里云NLS，需要额外清理NlsClient缓存
-        if ("aliyun-nls".equals(provider)) {
-            AliyunNlsTtsService.clearClientCache(configId);
-        }
-
-        // 遍历缓存的所有键，找到匹配的键并移除
+        // 旧 provider 是 aliyun-nls 时它的 NlsClient 另存一份；对不存在的 configId 是 no-op
+        AliyunNlsTtsService.clearClientCache(configId);
+        String configSegment = String.valueOf(configId);
+        // 键格式 provider:configId:voiceName:pitch:speed，voiceName 可能含冒号，只看第二段
         serviceCache.keySet().removeIf(key -> {
-            String[] parts = key.split(":");
-            if (parts.length < 5) {  // 新格式是 provider:configId:voiceName:pitch:speed
-                return false;
-            }
-            String keyProvider = parts[0];
-            String keyConfigId = parts[1];
-
-            // 检查provider和configId是否匹配
-            return keyProvider.equals(provider) && keyConfigId.equals(String.valueOf(configId));
+            String[] parts = key.split(":", 3);
+            return parts.length >= 2 && parts[1].equals(configSegment);
         });
+    }
 
+    /** 本进程内的配置变更；对话进程那侧由 RedisSubscriber 转调 {@link #removeCache} */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onAiConfigChanged(AiConfigChangedEvent event) {
+        if ("tts".equals(event.getConfigType())) {
+            removeCache(event.getConfigId());
+        }
     }
 }
