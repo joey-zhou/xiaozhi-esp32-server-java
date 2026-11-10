@@ -162,7 +162,7 @@ class RateLimitInterceptorTest {
             entry("rate_limit:/api/device/ota:ip:10.0.0.7", 1L));
     }
 
-    /** 编码与矩阵参数写法不能各自算成一个新端点，否则换个写法就是一份新额度 */
+    /** 编码、矩阵参数与尾斜杠写法不能各自算成一个新端点，否则换个写法就是一份新额度 */
     @Test
     void sharesOneCounterAcrossEncodedAndSemicolonPaths() throws Exception {
         givenRedisCounters();
@@ -170,8 +170,10 @@ class RateLimitInterceptorTest {
 
         rateLimitInterceptor.preHandle(postRequest("/api/user/lo%67in"), new MockHttpServletResponse(), HANDLER);
         rateLimitInterceptor.preHandle(postRequest("/api/user/login;a=b"), new MockHttpServletResponse(), HANDLER);
+        rateLimitInterceptor.preHandle(postRequest("/api/user/login/"), new MockHttpServletResponse(), HANDLER);
+        rateLimitInterceptor.preHandle(postRequest("/api/user/login//"), new MockHttpServletResponse(), HANDLER);
 
-        assertThat(counters).containsExactly(entry("rate_limit:/api/user/login:ip:10.0.0.7", 2L));
+        assertThat(counters).containsExactly(entry("rate_limit:/api/user/login:ip:10.0.0.7", 4L));
     }
 
     @Test

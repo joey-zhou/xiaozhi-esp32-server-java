@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.util.UrlPathHelper;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -27,6 +28,37 @@ public class RequestContextUtils {
     /** IPv6 字面量（十六进制段 + 至少一个冒号，允许 :: 压缩，最终由 InetAddress 校验） */
     private static final Pattern IPV6_LITERAL = Pattern.compile(
             "^[0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){1,7}$");
+
+    /**
+     * 取归一化后的请求路径：URL 解码、去掉 matrix 参数（;a=b）与 contextPath，并剥掉尾部斜杠。
+     * <p>
+     * <b>按路径做的安全判定一律走本方法，不要直接读 getRequestURI()。</b>
+     * Spring 按解码后的路径选 handler 与匹配拦截器，而 getRequestURI() 返回的是原始串，
+     * 两者口径不一致时同一个资源会有多种等价写法：
+     * {@code /uploads/x.wav} 与 {@code /%75ploads/x.wav} 打到同一个文件，
+     * {@code /api/user/login}、{@code /api/user/login/}、{@code /api/user/lo%67in}、{@code /api/user/login;a=b} 打到同一个端点。
+     * 用原始串判定的话，换一种写法就能绕过挂在路径上的校验，或者换到一份新的限流额度。
+     *
+     * @param request HTTP 请求对象
+     * @return 以 / 开头的归一化路径；根路径返回 "/"
+     */
+    public static String canonicalPath(HttpServletRequest request) {
+        String path;
+        try {
+            path = UrlPathHelper.defaultInstance.getPathWithinApplication(request);
+        } catch (Exception e) {
+            // 畸形编码会让解码抛错，此时退回原始串——宁可把它当成一个陌生端点，也不要放行
+            path = request.getRequestURI();
+        }
+        if (path == null || path.isEmpty()) {
+            return "/";
+        }
+        int end = path.length();
+        while (end > 1 && path.charAt(end - 1) == '/') {
+            end--;
+        }
+        return end == path.length() ? path : path.substring(0, end);
+    }
 
     /**
      * 获取客户端真实 IP 地址

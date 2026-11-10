@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
+import com.xiaozhi.utils.RequestContextUtils;
 
 import jakarta.annotation.Resource;
 import jakarta.servlet.FilterChain;
@@ -19,7 +20,6 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerInterceptor;
-import org.springframework.web.util.UrlPathHelper;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -192,15 +192,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * 端点判定与 Redis key 必须用解码归一后的路径：Spring 按解码后的路径选 handler，
-     * 直接拿 getRequestURI() 的话 /api/user/lo%67in、/api/user/login;a=b 会各自算成新端点，换个写法就是一份新额度。
+     * 端点判定与 Redis key 必须用解码归一后的路径，理由见 {@link RequestContextUtils#canonicalPath}
      */
     static String canonicalPath(HttpServletRequest request) {
-        try {
-            return UrlPathHelper.defaultInstance.getPathWithinApplication(request);
-        } catch (Exception e) {
-            return request.getRequestURI();
-        }
+        return RequestContextUtils.canonicalPath(request);
     }
 
     /** 账号维度的 key 只存摘要，手机号/邮箱不进 Redis 也不进日志 */
@@ -317,7 +312,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
                     || (type.startsWith("application/") && type.endsWith("+json"));
         }
 
-        /** 开了尾斜杠匹配，/api/user/login/ 与 /api/user/login 是同一个端点 */
+        /** 与 RequestContextUtils.canonicalPath 同一口径：尾斜杠不产生新端点，否则限流 key 会分叉 */
         private static String normalizePath(String uri) {
             if (uri == null) {
                 return "";

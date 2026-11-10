@@ -20,6 +20,13 @@ x-app-environment: &app-environment
   HOST_IP: ${HOST_IP:-}
   # 设备接入鉴权密钥，留空等于不设防
   XIAOZHI_DEVICE_AUTH_SECRET: ${XIAOZHI_DEVICE_AUTH_SECRET:-}
+  # 可信反向代理，留空时只认 TCP 对端地址、不采信 X-Forwarded-For。
+  # 自带的 web 容器就是 nginx，不配的话全站匿名限流会共用网关那一份额度：
+  # 几十人同时登录，第 11 个人起就被限流，而日志里只看得到 172.x 的容器地址。
+  # 只填 web 容器地址或本 compose 网段内的具体地址，
+  # 不要填 172.16.0.0/12、10.0.0.0/8 这类大段——8091/8092 直接发布在宿主机上，
+  # 大段可信会让外部直连的流量自带一个 X-Forwarded-For 就换到新额度，限流从「共用一桶」变成「谁都能绕」。
+  XIAOZHI_SECURITY_TRUSTED_PROXIES: ${XIAOZHI_SECURITY_TRUSTED_PROXIES:-}
   TZ: ${TZ:-Asia/Shanghai}
 
 services:

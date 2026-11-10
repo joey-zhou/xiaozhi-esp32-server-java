@@ -13,7 +13,6 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
-import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
 
 import jakarta.annotation.Resource;
@@ -106,16 +105,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
         } catch (Exception e) {
             log.error("添加资源失败", e);
         }
-    }
-
-    /**
-     * 配置路径匹配参数
-     */
-    @Override
-    @SuppressWarnings("deprecation") // 暂时抑制过时警告
-    public void configurePathMatch(PathMatchConfigurer configurer) {
-        // 使用推荐的方法设置尾部斜杠匹配
-        configurer.setUseTrailingSlashMatch(true);
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.xiaozhi.file;
 
 import com.xiaozhi.common.web.LocalFileUrlPolicy;
+import com.xiaozhi.utils.RequestContextUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -44,12 +45,13 @@ public class LocalFileAccessInterceptor implements HandlerInterceptor {
         return false;
     }
 
+    /**
+     * 必须与 Spring 选静态资源时同一口径：拦截器按解码后的路径挂载，
+     * 这里若拿未解码的 getRequestURI()，/%75ploads/x.wav 会被判成「不受保护」而放行，
+     * 随后资源处理器照常按解码后的段吐出文件，整套签名等于没开。
+     */
     private static String requestPath(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        String contextPath = request.getContextPath();
-        if (contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)) {
-            uri = uri.substring(contextPath.length());
-        }
-        return uri.startsWith("/") ? uri.substring(1) : uri;
+        String path = RequestContextUtils.canonicalPath(request);
+        return path.startsWith("/") ? path.substring(1) : path;
     }
 }
