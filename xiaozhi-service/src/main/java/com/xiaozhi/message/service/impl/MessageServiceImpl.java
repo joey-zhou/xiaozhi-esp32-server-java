@@ -1,5 +1,6 @@
 package com.xiaozhi.message.service.impl;
 
+import com.xiaozhi.common.AfterCommit;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -22,8 +23,6 @@ import jakarta.annotation.Resource;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -98,7 +97,7 @@ public class MessageServiceImpl implements MessageService {
             throw new IllegalStateException("删除消息失败");
         }
         if (StringUtils.hasText(existing.getAudioPath())) {
-            runAfterCommit(() -> AudioUtils.deleteFile(existing.getAudioPath()));
+            AfterCommit.run(() -> AudioUtils.deleteFile(existing.getAudioPath()));
         }
     }
 
@@ -117,7 +116,7 @@ public class MessageServiceImpl implements MessageService {
             .set(MessageDO::getState, MessageBO.STATE_DELETED);
         int updated = messageMapper.update(null, updateWrapper);
 
-        runAfterCommit(() -> deleteAudioDirectories(deviceId));
+        AfterCommit.run(() -> deleteAudioDirectories(deviceId));
         eventPublisher.publishEvent(new ConversationHistoryClearedEvent(this, deviceId));
         return updated;
     }
@@ -134,22 +133,6 @@ public class MessageServiceImpl implements MessageService {
                     Path.of(AudioUtils.AUDIO_PATH, date, audioDeviceId).toString());
             AudioUtils.deleteDirectory(deviceDir);
         }
-    }
-
-    /**
-     * 事务提交后执行不可回滚的副作用；没有事务上下文时直接执行。
-     */
-    private void runAfterCommit(Runnable task) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            task.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                task.run();
-            }
-        });
     }
 
     @Override

@@ -14,6 +14,7 @@ import com.xiaozhi.role.domain.vo.AudioConfig;
 import com.xiaozhi.role.domain.vo.LlmConfig;
 import com.xiaozhi.role.domain.vo.VoiceConfig;
 import com.xiaozhi.role.service.RoleService;
+import com.xiaozhi.summary.service.SummaryService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,9 @@ public class RoleAppService {
 
     @Resource
     private DeviceService deviceService;
+
+    @Resource
+    private SummaryService summaryService;
 
     public PageResult<RoleResp> page(RolePageReq req, Integer userId) {
         RolePageReq r = req == null ? new RolePageReq() : req;
@@ -88,6 +92,8 @@ public class RoleAppService {
     /**
      * 删除角色。sys_device.roleId 上没有外键，硬删会留下悬空引用，绑定该角色的设备之后每次接入都会失败，
      * 因此仍有设备绑定时拒绝删除。
+     * <p>
+     * 改绑到别的角色的设备在这个角色下还留着对话摘要，换回来时接着用；角色删了就再也换不回来，一并删掉。
      */
     @Transactional
     public void delete(Integer roleId) {
@@ -96,6 +102,7 @@ public class RoleAppService {
             throw new IllegalStateException("该角色仍绑定 " + boundDevices + " 台设备，请先将设备改绑到其他角色");
         }
         roleRepository.delete(roleId);
+        summaryService.deleteByRoleId(roleId);
     }
 
     private long countBoundDevices(Integer roleId) {

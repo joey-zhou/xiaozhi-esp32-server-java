@@ -20,6 +20,9 @@ public interface SummaryService {
     /** 删除该设备名下全部摘要，不限角色；设备被删除时用于清理关联数据。 */
     int deleteByDeviceId(String deviceId);
 
+    /** 删除该角色下全部摘要，不限设备（含网页会话）；角色被删除时用于清理关联数据。 */
+    int deleteByRoleId(Integer roleId);
+
     /** 删除这些 Web 会话的全部摘要 */
     int deleteBySessionIds(Collection<String> sessionIds);
 

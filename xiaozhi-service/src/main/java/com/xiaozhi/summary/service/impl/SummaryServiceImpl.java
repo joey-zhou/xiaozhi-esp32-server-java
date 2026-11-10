@@ -106,6 +106,16 @@ public class SummaryServiceImpl implements SummaryService {
     }
 
     @Override
+    @Transactional
+    public int deleteByRoleId(Integer roleId) {
+        if (roleId == null) {
+            return 0;
+        }
+        return summaryMapper.delete(new LambdaQueryWrapper<SummaryDO>()
+            .eq(SummaryDO::getRoleId, roleId));
+    }
+
+    @Override
     public SummaryBO findLast(String deviceId, Integer roleId) {
         if (!StringUtils.hasText(deviceId) || roleId == null) {
             return null;
