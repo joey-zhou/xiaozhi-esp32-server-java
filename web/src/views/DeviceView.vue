@@ -191,7 +191,8 @@ const columns = computed<TableColumnsType>(() => [
 // 获取角色列表
 async function getRoles() {
   // 只是「添加设备」前的可用角色校验，拉不到不打断页面，也不额外弹提示
-  const page = await executeQueryRoles(() => queryRoles({}), { showError: false })
+  // 必须显式给分页，后端默认只返回 10 条，角色多了设备行会把已绑定的显示成「未知角色」
+  const page = await executeQueryRoles(() => queryRoles({ pageNo: 1, pageSize: 1000 }), { showError: false })
   if (page) {
     roleItems.value = page.list
   }

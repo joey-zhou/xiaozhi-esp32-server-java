@@ -64,7 +64,8 @@ const wsConfig = computed(() => ({
 // 获取角色列表
 const fetchRoles = async () => {
   try {
-    const res = await queryRoles({})
+    // 后端默认只返回 10 条，不给分页会让角色多时选不到
+    const res = await queryRoles({ pageNo: 1, pageSize: 1000 })
     if (res.data?.list) {
       roleList.value = res.data.list
       // 设置默认选中的角色（第一个默认角色或第一个角色）
