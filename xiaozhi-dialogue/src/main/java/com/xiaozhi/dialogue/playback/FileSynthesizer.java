@@ -13,7 +13,6 @@ import reactor.core.publisher.Flux;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -27,9 +26,6 @@ public class FileSynthesizer extends Synthesizer {
 
     // 保存LLM输出流的订阅引用，以便在cancel时取消上游订阅
     private volatile Disposable llmDisposable;
-
-    // 本轮角色音色已经失败过，后面的句子直接用兜底音色，不再每句都等一次失败
-    private final AtomicBoolean fallbackEngaged = new AtomicBoolean();
 
     public FileSynthesizer(ChatSession session, TtsService ttsService, Player player, TtsService fallbackTts) {
         super(session, ttsService, player, fallbackTts);
@@ -55,20 +51,19 @@ public class FileSynthesizer extends Synthesizer {
      */
     @Override
     public void synthesize(Flux<String> stringFlux) {
-        synthesize(stringFlux, true);
+        llmDisposable = subscribeSentences(stringFlux, true, new SynthesisRound());
     }
 
     /**
      * @param reply 是否本轮 LLM 回复，决定播放器是否把句子计入打断截断
      */
-    private void synthesize(Flux<String> stringFlux, boolean reply) {
-        fallbackEngaged.set(false);
-        llmDisposable = new SentenceHelper().convert(stringFlux).subscribe(
+    private Disposable subscribeSentences(Flux<String> stringFlux, boolean reply, SynthesisRound round) {
+        return new SentenceHelper().convert(stringFlux).subscribe(
             result -> {
                 String text = result.text();
                 String mood = result.mood();
                 Flux<Speech> lazyTtsFlux = Flux.create(sink -> {
-                    List<Speech> speech = sentenceSpeech(text);
+                    List<Speech> speech = sentenceSpeech(text, round);
                     if (!speech.isEmpty()) {
                         speech.getFirst().withMood(mood);
                         speech.forEach(sink::next);
@@ -85,10 +80,10 @@ public class FileSynthesizer extends Synthesizer {
      * 一句话的音频：先用角色音色合成；说不出来就改用兜底音色（本轮后面的句子也直接用它）。
      * 本地合成排队满了也走这条路：兜底音色是云端的，不占本地合成队列。
      */
-    private List<Speech> sentenceSpeech(String text) {
-        List<Speech> speech = fallbackEngaged.get() ? List.of() : roleSpeech(text);
+    private List<Speech> sentenceSpeech(String text, SynthesisRound round) {
+        List<Speech> speech = round.fallbackEngaged.get() ? List.of() : roleSpeech(text);
         if (speech.isEmpty()) {
-            fallbackEngaged.set(true);
+            round.fallbackEngaged.set(true);
             speech = fallbackSpeech(text);
         }
         if (speech.isEmpty()) {
@@ -127,7 +122,8 @@ public class FileSynthesizer extends Synthesizer {
      */
     @Override
     public void synthesize(String text) {
-        synthesize(Flux.just(text), false);
+        // 单句不属于本轮回复：不接管本轮的订阅句柄与合成状态，否则回复中途插一句提示后，打断就停不住回复
+        subscribeSentences(Flux.just(text), false, new SynthesisRound());
     }
 
 }

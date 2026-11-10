@@ -13,6 +13,7 @@ import reactor.core.publisher.Flux;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 /**
@@ -61,6 +62,15 @@ public abstract class Synthesizer {
         this.ttsService = ttsService;
         this.player = player;
         this.fallbackTts = fallbackTts;
+    }
+
+    /**
+     * 一轮合成的状态。本轮回复每次新建一份；单句（问候、告别、工具提示）用自己的一份，
+     * 不能改写本轮回复的，否则回复中途插的一句会把本轮的兜底状态冲掉
+     */
+    protected static final class SynthesisRound {
+        /** 本轮角色音色已经失败过，后面的句子直接用兜底音色，不再每句都等一次失败 */
+        final AtomicBoolean fallbackEngaged = new AtomicBoolean();
     }
 
     /**

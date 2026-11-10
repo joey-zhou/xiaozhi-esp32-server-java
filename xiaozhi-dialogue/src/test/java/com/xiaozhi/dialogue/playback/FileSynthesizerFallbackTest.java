@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Sinks;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -129,6 +130,44 @@ class FileSynthesizerFallbackTest {
         assertThat(collect(played.get(1))).extracting(Speech::getText).first().isEqualTo(SECOND_SENTENCE);
         verify(ttsService).textToSpeech(SECOND_SENTENCE);
         verify(fallbackTts, never()).textToSpeech(SECOND_SENTENCE);
+    }
+
+    /** 回复中途播一句工具提示之后，打断必须还能停住回复本身 */
+    @Test
+    void singleTextDuringReplyDoesNotDetachTheReply() {
+        Sinks.Many<String> tokens = Sinks.many().unicast().onBackpressureBuffer();
+        FileSynthesizer synthesizer = newSynthesizer(null);
+        synthesizer.synthesize(tokens.asFlux());
+
+        synthesizer.synthesize("请稍等。");
+        synthesizer.cancel();
+
+        assertThat(tokens.currentSubscriberCount()).as("回复的上游订阅要被取消").isZero();
+        assertThat(synthesizer.isActive()).isFalse();
+    }
+
+    /** 单句不能改写本轮的兜底状态：本轮已切到兜底音色的，后面的回复句照旧直接用兜底 */
+    @Test
+    void singleTextDoesNotResetTheTurnFallback() throws Exception {
+        when(ttsService.textToSpeech(SENTENCE)).thenThrow(new IllegalStateException("音色已下线"));
+        when(fallbackTts.textToSpeech(SENTENCE)).thenReturn(wav("first.wav"));
+        when(fallbackTts.textToSpeech(SECOND_SENTENCE)).thenReturn(wav("second.wav"));
+        when(ttsService.textToSpeech("请稍等。")).thenReturn(wav("hint.wav"));
+        Sinks.Many<String> tokens = Sinks.many().unicast().onBackpressureBuffer();
+        FileSynthesizer synthesizer = newSynthesizer(fallbackTts);
+        synthesizer.synthesize(tokens.asFlux());
+
+        tokens.tryEmitNext(SENTENCE);
+        tokens.tryEmitNext(SECOND_SENTENCE.substring(0, 1));
+        collect(played.get(0));
+        synthesizer.synthesize("请稍等。");
+        collect(played.get(1));
+        tokens.tryEmitNext(SECOND_SENTENCE.substring(1));
+        tokens.tryEmitComplete();
+
+        assertThat(played).hasSize(3);
+        assertThat(collect(played.get(2))).extracting(Speech::getText).first().isEqualTo(SECOND_SENTENCE);
+        verify(ttsService, never()).textToSpeech(SECOND_SENTENCE);
     }
 
     private List<Speech> synthesizeAndCollect(FileSynthesizer synthesizer, String text) {
