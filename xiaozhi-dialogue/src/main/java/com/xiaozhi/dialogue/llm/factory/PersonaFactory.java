@@ -29,9 +29,13 @@ import com.xiaozhi.dialogue.llm.handler.DialogueListener;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.util.Assert;
 import org.springframework.stereotype.Component;
+
+import java.time.Duration;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -40,6 +44,10 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 public class PersonaFactory {
+    @Value("${xiaozhi.llm.first-token-timeout-seconds:30}")
+    private long llmFirstTokenTimeoutSeconds = 30;
+    @Value("${xiaozhi.llm.idle-timeout-seconds:90}")
+    private long llmIdleTimeoutSeconds = 90;
     @Resource
     private MessageService chatMessageService;
     @Resource
@@ -122,6 +130,8 @@ public class PersonaFactory {
                 .sttService(sttService)
                 .sttHotwords(Hotword.parse(role.getSttHotwords()))
                 .chatModel(chatModel)
+                .firstTokenTimeout(Duration.ofSeconds(llmFirstTokenTimeoutSeconds))
+                .idleTimeout(Duration.ofSeconds(llmIdleTimeoutSeconds))
                 .synthesizer(synthesizer)
                 .player(session.getPlayer())
                 .listener(dialogueListener)
@@ -211,7 +221,11 @@ public class PersonaFactory {
      * 初始化对话状态
      */
     public Synthesizer initSynthesizer(ChatSession session, Player player, RoleBO role) {
-        return SynthesizerFactory.create(session, resolveTtsService(role), player);
+        TtsService ttsService = resolveTtsService(role);
+        // 角色的音色说不出来时改用默认音色；角色本来就用默认音色时没有另一个可换，别让同一个服务失败两次
+        TtsService fallbackTts = ttsFactory.getDefaultTtsService();
+        return SynthesizerFactory.create(session, ttsService, player,
+                fallbackTts == ttsService ? null : fallbackTts);
     }
 
     /**

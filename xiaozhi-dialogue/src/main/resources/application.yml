@@ -31,3 +31,10 @@ spring:
 # ============================================================
 sa-token:
   jwt-secret-key: xiaozhi-esp32-server-java-jwt-secret-key
+
+xiaozhi:
+  llm:
+    # 模型迟迟不出第一个字就放弃，给用户说一句兜底话术；上游卡住时不能让设备一直停在「思考中」
+    first-token-timeout-seconds: 30
+    # 两次输出之间的最长静默。模型调工具期间不出字，必须比工具的最长等待长，否则会误杀
+    idle-timeout-seconds: 90

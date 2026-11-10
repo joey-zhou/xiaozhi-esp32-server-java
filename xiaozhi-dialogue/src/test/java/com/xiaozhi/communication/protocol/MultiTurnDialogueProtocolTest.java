@@ -412,7 +412,7 @@ class MultiTurnDialogueProtocolTest {
         private volatile CountDownLatch gate;
 
         private GatedSynthesizer(ChatSession chatSession, Player player) {
-            super(chatSession, null, player);
+            super(chatSession, null, player, null);
         }
 
         @Override

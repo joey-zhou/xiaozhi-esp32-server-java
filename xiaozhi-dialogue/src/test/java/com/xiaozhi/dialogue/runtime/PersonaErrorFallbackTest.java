@@ -1,7 +1,7 @@
 package com.xiaozhi.dialogue.runtime;
 
+import com.xiaozhi.dialogue.playback.FaultNotice;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -50,9 +50,8 @@ class PersonaErrorFallbackTest {
         assertThat(spoken).containsExactly("你好", "呀");
     }
 
-    /** 兜底话术是 Persona 的私有常量，反射取出来对照，防止异常原文被当成回复播给用户 */
-    @SuppressWarnings("unchecked")
+    /** 兜底话术取自 FaultNotice，对照它防止异常原文被当成回复播给用户 */
     private static List<String> fallbackMessages() {
-        return (List<String>) ReflectionTestUtils.getField(Persona.class, "ERROR_FALLBACK_MESSAGES");
+        return FaultNotice.DISTRACTED.phrases();
     }
 }

@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue;
 
+import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.communication.server.websocket.WebSocketSession;
 import com.xiaozhi.enums.DeviceState;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +24,9 @@ class DialogueServiceSpeechSegmentTest {
 
     @Mock
     private org.springframework.web.socket.WebSocketSession springSession;
+
+    @Mock
+    private FaultNotifier faultNotifier;
 
     @InjectMocks
     private DialogueService dialogueService;

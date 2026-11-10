@@ -4,8 +4,15 @@ import com.xiaozhi.common.Speech;
 
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.ai.tts.TtsService;
+import com.xiaozhi.utils.AudioUtils;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -28,6 +35,7 @@ import reactor.core.publisher.Flux;
  * 同一个 Synthesizer 可组合不同的 Player，因此 Player 不在 Synthesizer 内部创建。
  */
 @Data
+@Slf4j
 public abstract class Synthesizer {
 
     protected final ChatSession chatSession;
@@ -37,14 +45,48 @@ public abstract class Synthesizer {
     private int firstChatDurationMillis = 0;
 
     /**
+     * 角色的语音合成说不出来时改用的音色（默认 Edge 与默认音色），为 null 表示没有兜底。
+     * 只在出错的这一轮里临时换声音，下一轮照常先试角色自己的
+     */
+    protected final TtsService fallbackTts;
+
+    /**
      * @param chatSession  当前会话
      * @param ttsService   底层 TTS Provider（由 TtsServiceFactory 创建）
      * @param player       播放音频的播放器
+     * @param fallbackTts  兜底音色，可为 null
      */
-    public Synthesizer(ChatSession chatSession, TtsService ttsService, Player player) {
+    public Synthesizer(ChatSession chatSession, TtsService ttsService, Player player, TtsService fallbackTts) {
         this.chatSession = chatSession;
         this.ttsService = ttsService;
         this.player = player;
+        this.fallbackTts = fallbackTts;
+    }
+
+    /**
+     * 用兜底音色现场合成这句话。调用方在弹性线程或虚拟线程上，合成是阻塞的。
+     *
+     * @return 兜底也说不出来时返回空列表
+     */
+    protected List<Speech> fallbackSpeech(String text) {
+        if (fallbackTts == null || !StringUtils.hasText(text)) {
+            return List.of();
+        }
+        try {
+            Path audioPath = fallbackTts.textToSpeech(text);
+            if (audioPath == null) {
+                return List.of();
+            }
+            List<byte[]> chunks = AudioUtils.readAsPcmChunks(audioPath.toString());
+            List<Speech> speech = new ArrayList<>(chunks.size());
+            for (byte[] chunk : chunks) {
+                speech.add(speech.isEmpty() ? new Speech(chunk, text) : new Speech(chunk));
+            }
+            return speech;
+        } catch (Exception e) {
+            log.warn("兜底音色也没能合成 - SessionId: {}, 原因: {}", chatSession.getSessionId(), e.getMessage());
+            return List.of();
+        }
     }
 
     /**

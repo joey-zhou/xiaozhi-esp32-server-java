@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue;
 
+import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.DeviceBO;
@@ -62,6 +63,9 @@ class DialogueServiceDiscardedTurnTest {
     private Player player;
     @Mock
     private org.springframework.web.socket.WebSocketSession springSession;
+
+    @Mock
+    private FaultNotifier faultNotifier;
 
     @InjectMocks
     private DialogueService dialogueService;

@@ -23,6 +23,7 @@ import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Sinks;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -32,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -149,6 +152,34 @@ public abstract class ChatSession {
 
     // ========== 超时断连标记 ==========
     private volatile boolean timeoutDisconnect;
+
+    // ========== 故障提示 ==========
+    /**
+     * 上次对用户播故障提示的时刻。识别坏掉时电视声、咳嗽也会被当成说话，每句都失败，
+     * 不限流设备就会一直道歉
+     */
+    private final AtomicReference<Instant> lastFaultNoticeAt = new AtomicReference<>();
+    /** 连续识别失败的次数，识别成功一次就清零 */
+    private final AtomicInteger consecutiveSttFailures = new AtomicInteger();
+
+    /** 距上次故障提示超过 interval 才放行，并记下这一次 */
+    public boolean claimFaultNotice(Duration interval) {
+        Instant now = DateUtils.instant();
+        Instant last = lastFaultNoticeAt.get();
+        if (last != null && Duration.between(last, now).compareTo(interval) < 0) {
+            return false;
+        }
+        return lastFaultNoticeAt.compareAndSet(last, now);
+    }
+
+    /** @return 记上这一次后的连续失败次数 */
+    public int recordSttFailure() {
+        return consecutiveSttFailures.incrementAndGet();
+    }
+
+    public void recordSttSuccess() {
+        consecutiveSttFailures.set(0);
+    }
 
     // --------------------设备mcp-------------------------
     private DeviceMcpHolder deviceMcpHolder = new DeviceMcpHolder();

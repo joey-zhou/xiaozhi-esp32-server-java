@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue;
 
+import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.common.SerialTaskRegistry;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.server.websocket.WebSocketSession;
@@ -55,6 +56,9 @@ class DialogueServiceUserAudioTest {
     private StorageService storageService;
     @Mock
     private org.springframework.web.socket.WebSocketSession springSession;
+
+    @Mock
+    private FaultNotifier faultNotifier;
 
     @InjectMocks
     private DialogueService dialogueService;

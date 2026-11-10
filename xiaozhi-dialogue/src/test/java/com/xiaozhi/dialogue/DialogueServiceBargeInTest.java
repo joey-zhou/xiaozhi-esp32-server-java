@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue;
 
+import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.ai.llm.service.AddresseeClassifier;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.communication.message.MessageSender;
@@ -46,6 +47,9 @@ class DialogueServiceBargeInTest {
     private Player player;
     @Mock
     private Persona persona;
+
+    @Mock
+    private FaultNotifier faultNotifier;
 
     @InjectMocks
     private DialogueService dialogueService;

@@ -17,6 +17,8 @@ import com.xiaozhi.common.model.bo.MessageMetadataBO;
 import org.springframework.ai.chat.messages.UserMessage;
 import com.xiaozhi.dialogue.audio.VadService.VadStatus;
 import com.xiaozhi.dialogue.audio.AecService;
+import com.xiaozhi.dialogue.playback.FaultNotice;
+import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.runtime.GoodbyeMessageSupplier;
 import com.xiaozhi.dialogue.runtime.Persona;
@@ -69,6 +71,9 @@ public class DialogueService{
     private static final String WAKE_WORD_AUDIO_TAG = "wakeword";
     /** 最后一段收句后等前面各段终稿的上限，前面的段早在换流时就已收流，正常几百毫秒内到齐 */
     private static final Duration SEGMENT_MERGE_WAIT = Duration.ofSeconds(15);
+
+    @Resource
+    private FaultNotifier faultNotifier;
 
     @Resource
     private PersonaFactory personaFactory;
@@ -353,8 +358,14 @@ public class DialogueService{
                 }
 
                 Persona persona = session.getPersona();
-                if (persona == null || persona.getSttService() == null) {
-                    releaseDiscardedTurn(session, turnSink);
+                if (persona == null) {
+                    // 会话没建起来（比如没有可用的对话模型），说什么都不会有回应
+                    discardWithNotice(session, turnSink, FaultNotice.UNAVAILABLE);
+                    return;
+                }
+                if (persona.getSttService() == null) {
+                    // 识别服务没配好或本地模型没就位，每一句都会落到这里
+                    discardWithNotice(session, turnSink, FaultNotice.CANNOT_HEAR);
                     return;
                 }
 
@@ -398,9 +409,15 @@ public class DialogueService{
                     return;
                 }
                 if (!StringUtils.hasText(text)) {
-                    releaseDiscardedTurn(session, turnSink);
+                    // 识别失败与用户没说话是两回事：失败了要给句话，没说话就安静地丢掉
+                    if (sttResult != null && sttResult.operationFailed()) {
+                        discardWithNotice(session, turnSink, sttFailureNotice(session));
+                    } else {
+                        releaseDiscardedTurn(session, turnSink);
+                    }
                     return;
                 }
+                session.recordSttSuccess();
                 // 播放刚结束时拾回的尾音也会被识别成一句话
                 if (isEcho(session, text)) {
                     log.info("识别到的是设备自己的回声，忽略 - SessionId: {}, text: {}", sessionId, text);
@@ -434,9 +451,12 @@ public class DialogueService{
                 log.error("流式识别错误: {}", e.getMessage(), e);
                 Player player = session.getPlayer();
                 if (player != null && player.isPaused()) {
+                    // 插话时出错，恢复原来的播放就是最好的交代，不再插一句道歉
                     player.resume();
+                    releaseDiscardedTurn(session, turnSink);
+                } else {
+                    discardWithNotice(session, turnSink, FaultNotice.DISTRACTED);
                 }
-                releaseDiscardedTurn(session, turnSink);
             } finally {
                 // 中间段异常退出也要给个空终稿，最后一段拼接时才不用等到超时
                 segment.complete(SttResult.textOnly(""));
@@ -480,6 +500,23 @@ public class DialogueService{
     }
 
     /**
+     * 丢弃本轮并对用户说一句。本轮已被新一轮取代（包括长句的中间段）或设备正在说话时只丢弃不播，
+     * 免得把道歉插进别的话里
+     */
+    private void discardWithNotice(ChatSession session, Sinks.Many<byte[]> turnSink, FaultNotice notice) {
+        boolean current = turnSink != null && session.getAudioSinks() == turnSink;
+        releaseDiscardedTurn(session, turnSink);
+        if (current && session.getDeviceState() != DeviceState.SPEAKING) {
+            faultNotifier.notice(session, notice);
+        }
+    }
+
+    /** 偶尔一次没听清就请用户重说；接连失败说明不是偶然，再让重说只会越说越烦 */
+    private static FaultNotice sttFailureNotice(ChatSession session) {
+        return session.recordSttFailure() >= 2 ? FaultNotice.CANNOT_HEAR : FaultNotice.MISHEARD;
+    }
+
+    /**
      * 本轮识别没有产出对话（空结果、回声、误打断、识别异常）时放开会话状态。
      * 本轮识别流已经终结，不复位会一直停在 THINKING，不活跃检查跳过该会话，
      * 超时告别与自动关闭对这条连接永久失效。
@@ -516,6 +553,8 @@ public class DialogueService{
             personaFactory.buildPersona(session).chat(text, false);
         } catch (Exception e) {
             log.error("处理唤醒词失败: {}", e.getMessage(), e);
+            // 用户叫了设备却一声不吭，只会以为设备坏了
+            faultNotifier.notice(session, FaultNotice.UNAVAILABLE);
         }
     }
 

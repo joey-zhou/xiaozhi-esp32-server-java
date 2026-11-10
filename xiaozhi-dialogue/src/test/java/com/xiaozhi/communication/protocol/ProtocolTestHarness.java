@@ -6,6 +6,7 @@ import com.xiaozhi.ai.llm.service.AddresseeClassifier;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
+import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.communication.common.ChatSession;
@@ -99,6 +100,7 @@ class ProtocolTestHarness {
     private final SessionManager sessionManager = new SessionManager();
     private final MessageHandler messageHandler = new MessageHandler();
     private final DialogueService dialogueService = new DialogueService();
+    private final FaultNotifier faultNotifier = new FaultNotifier();
     private final WebSocketHandler webSocketHandler = new WebSocketHandler();
     private final IntentService intentService = new IntentService();
 
@@ -178,7 +180,11 @@ class ProtocolTestHarness {
                 "addresseeClassifier", addresseeClassifier,
                 "goodbyeMessages", goodbyeMessages,
                 "eventPublisher", eventBus.publisher(),
-                "storageServiceFactory", storageServiceFactory);
+                "storageServiceFactory", storageServiceFactory,
+                "faultNotifier", faultNotifier);
+
+        inject(faultNotifier,
+                "ttsFactory", ttsServiceFactory);
 
         inject(messageHandler,
                 "deviceService", deviceService,
@@ -209,6 +215,7 @@ class ProtocolTestHarness {
         requireAllInjected(dialogueService);
         requireAllInjected(messageHandler);
         requireAllInjected(webSocketHandler);
+        requireAllInjected(faultNotifier);
 
         eventBus.register(sessionManager);
         eventBus.register(dialogueService);

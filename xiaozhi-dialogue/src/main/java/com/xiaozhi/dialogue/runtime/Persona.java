@@ -10,6 +10,7 @@ import com.xiaozhi.ai.llm.memory.ConversationContext;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.ai.llm.service.TextChatService;
 import com.xiaozhi.dialogue.playback.Player;
+import com.xiaozhi.dialogue.playback.FaultNotice;
 import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.ai.tts.SpeechTokenFilter;
@@ -32,11 +33,12 @@ import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -75,12 +77,6 @@ public class Persona {
      */
     public static final String TOOL_CONTEXT_SESSION_ID_KEY = "sessionId";
 
-    private static final List<String> ERROR_FALLBACK_MESSAGES = List.of(
-            "抱歉，我刚刚走神了，你能再说一遍吗？",
-            "哎呀，我这会儿没反应过来，再说一次好吗？",
-            "不好意思，刚才没听清，麻烦你再讲一遍。");
-    private static final Random FALLBACK_RANDOM = new Random();
-
     private final SessionManager sessionManager;
     
     @Setter
@@ -116,6 +112,14 @@ public class Persona {
     @NonNull
     private Conversation conversation;
 
+
+    /** 模型迟迟不出第一个字就放弃，走兜底话术 */
+    @Builder.Default
+    private Duration firstTokenTimeout = Duration.ofSeconds(30);
+
+    /** 两次输出之间的最长静默；模型调工具期间不出字，必须比工具的最长等待长 */
+    @Builder.Default
+    private Duration idleTimeout = Duration.ofSeconds(90);
 
     /** 当前轮次运行态，打断收尾与播完判定都从这里取 */
     @Builder.Default
@@ -204,7 +208,10 @@ public class Persona {
             List<Message> messages = conversation.messages(ctx);
             Prompt prompt = new Prompt(messages, chatOptions);
 
+            // 连接层的读超时管不到「响应头已到、正文半途停吐」，只能在流上对两次输出之间计时；
+            // 超时照常走下面的失败收尾与兜底话术，否则上游卡住时设备永远停在「思考中」
             Flux<ChatResponse> chatFlux = chatModel.stream(prompt)
+                .timeout(Mono.delay(firstTokenTimeout), response -> Mono.delay(idleTimeout))
                 .doOnError(error -> {
                     listener.onError(error);
                     failTurn(turn);
@@ -515,11 +522,9 @@ public class Persona {
                         answered.set(true);
                     }
                 })
-                .onErrorResume(error -> answered.get() ? Flux.empty() : Flux.just(errorFallbackMessage()));
-    }
-
-    static String errorFallbackMessage() {
-        return ERROR_FALLBACK_MESSAGES.get(FALLBACK_RANDOM.nextInt(ERROR_FALLBACK_MESSAGES.size()));
+                .onErrorResume(error -> answered.get()
+                        ? Flux.empty()
+                        : Flux.just(FaultNotice.DISTRACTED.pick()));
     }
 
     /**

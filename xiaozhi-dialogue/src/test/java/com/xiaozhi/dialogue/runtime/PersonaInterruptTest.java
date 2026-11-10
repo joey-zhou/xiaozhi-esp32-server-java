@@ -391,7 +391,7 @@ class PersonaInterruptTest {
         private volatile boolean forceActive;
 
         FakeSynthesizer(WebSocketSession session, Player player) {
-            super(session, null, player);
+            super(session, null, player, null);
         }
 
         @Override

@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue;
 
+import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
@@ -72,6 +73,9 @@ class DialogueServiceSttRetryTest {
     private Player player;
     @Mock
     private org.springframework.web.socket.WebSocketSession springSession;
+
+    @Mock
+    private FaultNotifier faultNotifier;
 
     @InjectMocks
     private DialogueService dialogueService;
