@@ -129,6 +129,51 @@ class DeviceAuthHandshakeInterceptorTest {
         }
     }
 
+    /**
+     * 设备鉴权密钥留空（docker 默认形态）只该放开 MAC 设备，网页聊天身份仍要认登录态，
+     * 否则任何人不带凭据就能以管理员的网页聊天身份接入
+     */
+    @Test
+    void webChatStillRequiresLoginWhenDeviceAuthDisabled() {
+        ReflectionTestUtils.setField(authService, "secret", "");
+
+        MockHttpServletRequest anonymous = new MockHttpServletRequest();
+        anonymous.setQueryString("device-id=user_chat_1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        assertThat(handshake(anonymous, response)).isFalse();
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
+
+        MockHttpServletRequest loggedIn = new MockHttpServletRequest();
+        loggedIn.setQueryString("device-id=user_chat_1&token=login-token");
+        try (MockedStatic<StpUtil> stpUtil = mockStatic(StpUtil.class)) {
+            stpUtil.when(() -> StpUtil.getLoginIdByToken("login-token")).thenReturn("1");
+
+            assertThat(handshake(loggedIn, new MockHttpServletResponse())).isTrue();
+        }
+    }
+
+    /** 库的排序规则不区分大小写，大小写变形的前缀不能绕开登录态校验 */
+    @Test
+    void webChatPrefixCheckIgnoresCase() {
+        ReflectionTestUtils.setField(authService, "secret", "");
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setQueryString("device-id=User_Chat_1");
+
+        assertThat(handshake(request, new MockHttpServletResponse())).isFalse();
+    }
+
+    /** 鉴权关闭时 MAC 设备照旧放行，改动不能波及真实设备 */
+    @Test
+    void macDeviceStillPassesWhenDeviceAuthDisabled() {
+        ReflectionTestUtils.setField(authService, "secret", "");
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("device-id", DEVICE_ID);
+
+        assertThat(handshake(request, new MockHttpServletResponse())).isTrue();
+    }
+
     @Test
     void rejectsWebClientWithInvalidLoginToken() {
         MockHttpServletRequest request = new MockHttpServletRequest();

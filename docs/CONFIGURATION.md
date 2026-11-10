@@ -64,7 +64,7 @@ Redis 没开 requirepass 时 `_PASSWORD` 必须留空，空串会被当口令发
 |------|------|
 | `HOST_IP` | 下发给设备的服务器 IP，留空自动探测 |
 | `XIAOZHI_SERVER_DOMAIN` | 对外域名。留空按 IP 拼地址；填了则下发 `https://<域名>/api/device/ota` 与 `wss://ws.<域名>/ws/xiaozhi/v1/`，要自己把子域名反代过去 |
-| `XIAOZHI_SECURITY_TRUSTED_PROXIES` | 前面挂 Nginx/LB 时填代理 IP 或 CIDR，否则限流会把所有请求算成同一个 IP |
+| `XIAOZHI_SECURITY_TRUSTED_PROXIES` | 前面挂 Nginx/LB 时填代理 IP 或 CIDR，否则限流会把所有请求算成同一个 IP。docker 部署自带的 web 容器就是 nginx，填它在 compose 网络里的地址；不要填 `172.16.0.0/12` 这类大段，8091/8092 直接发布在宿主机上，大段可信等于谁都能伪造来源绕过限流 |
 
 改了服务端口要同步改 `xiaozhi.server.port` 与 `xiaozhi.dialogue.port`，否则下发给设备的地址还是旧端口。
 
@@ -74,7 +74,7 @@ Redis 没开 requirepass 时 `_PASSWORD` 必须留空，空串会被当口令发
 
 | 变量 | 默认值 | 不改的后果 |
 |------|--------|-----------|
-| `XIAOZHI_DEVICE_AUTH_SECRET` | `xz-2026` | 任何人报一个 device-id 就能接进对话链路。server 与 dialogue 必须同值 |
+| `XIAOZHI_DEVICE_AUTH_SECRET` | 直接跑 jar 为 `xz-2026`；**docker 部署为空，即不鉴权** | 空值时任何人报一个设备 MAC 就能接进对话链路；`xz-2026` 是公开值，效果与空值相差无几。网页聊天身份不受此项影响，始终校验登录态。server 与 dialogue 必须同值 |
 | `JWT_SECRET_KEY` | 内置字符串 | 后台登录 token 可被伪造 |
 
 **存储与其它**

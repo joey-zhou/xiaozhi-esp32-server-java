@@ -33,6 +33,9 @@ public class DeviceAuthHandshakeInterceptor implements HandshakeInterceptor {
     /** 握手属性键：本连接被判定的设备标识 */
     public static final String ATTR_DEVICE_ID = "deviceId";
 
+    /** 网页聊天的会话身份前缀，后接登录用户 ID */
+    private static final String WEB_CHAT_PREFIX = "user_chat_";
+
     @Resource
     private DeviceAuthService deviceAuthService;
 
@@ -42,12 +45,18 @@ public class DeviceAuthHandshakeInterceptor implements HandshakeInterceptor {
         Map<String, String> params = parseQuery(request.getURI().getRawQuery());
         String deviceId = firstNonBlank(request.getHeaders().getFirst("device-id"),
                 params.get("device-id"));
-        if (!deviceAuthService.isEnabled()) {
-            return accept(attributes, deviceId);
-        }
         String token = stripBearer(request.getHeaders().getFirst("Authorization"));
         if (!StringUtils.hasText(token)) {
             token = stripBearer(firstNonBlank(params.get("token"), params.get("Authorization")));
+        }
+
+        // 网页聊天身份认的是管理端登录态，与设备鉴权开不开无关；
+        // 设备鉴权密钥留空时若一并放行，任何人不带凭据就能以别人的网页聊天身份接入
+        if (isWebChatIdentity(deviceId)) {
+            return verifyLogin(response, attributes, deviceId, token);
+        }
+        if (!deviceAuthService.isEnabled()) {
+            return accept(attributes, deviceId);
         }
 
         if (!StringUtils.hasText(deviceId)) {
@@ -65,11 +74,27 @@ public class DeviceAuthHandshakeInterceptor implements HandshakeInterceptor {
             }
             return reject(response, "设备token无效或已过期", deviceId);
         }
+        return verifyLogin(response, attributes, deviceId, token);
+    }
+
+    /**
+     * 按前缀忽略大小写判断：库的排序规则不区分大小写，User_Chat_1 会查到 user_chat_1 那台设备，
+     * 前缀判断若区分大小写，变形写法就会绕开登录态校验
+     */
+    private static boolean isWebChatIdentity(String deviceId) {
+        return deviceId != null && deviceId.regionMatches(true, 0, WEB_CHAT_PREFIX, 0, WEB_CHAT_PREFIX.length());
+    }
+
+    /** 非 MAC 的会话身份必须与登录用户逐字一致 */
+    private boolean verifyLogin(ServerHttpResponse response, Map<String, Object> attributes,
+                                String deviceId, String token) {
+        if (!StringUtils.hasText(token)) {
+            return reject(response, "缺少token", deviceId);
+        }
         try {
             Object loginId = StpUtil.getLoginIdByToken(token);
             if (loginId != null) {
-                // 非 MAC 的会话身份必须与登录用户逐字一致；大小写变形会被库排序规则当成同一行
-                if (!deviceId.equals("user_chat_" + loginId)) {
+                if (!deviceId.equals(WEB_CHAT_PREFIX + loginId)) {
                     return reject(response, "登录用户与会话身份不一致", deviceId);
                 }
                 return accept(attributes, deviceId);
