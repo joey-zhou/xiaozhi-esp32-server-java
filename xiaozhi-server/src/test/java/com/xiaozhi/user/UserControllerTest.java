@@ -196,7 +196,7 @@ class UserControllerTest extends ControllerTestSupport {
                 .andExpect(jsonPath("$.data.userId").value(3));
         }
 
-        verify(userAppService).recordLoginInfo(user, "10.0.0.7");
+        verify(userAppService).recordLoginInfo(user.getUserId(), "10.0.0.7");
     }
 
     @Test

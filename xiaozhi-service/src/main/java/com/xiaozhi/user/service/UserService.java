@@ -26,6 +26,9 @@ public interface UserService {
      */
     UserBO update(UserBO user);
 
+    /** 登录成功后记下时间与来源 IP。只写这两列：拿登录时读到的整份资料回写，会盖掉同一时刻管理端做的禁用、改密 */
+    void recordLogin(Integer userId, String loginIp);
+
     /** 账号 state 为禁用时抛 UnauthorizedException，user 为 null 时不判断。 */
     void requireEnabled(UserBO user);
 }

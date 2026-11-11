@@ -1,5 +1,7 @@
 package com.xiaozhi.user.service.impl;
 
+import com.xiaozhi.utils.DateUtils;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -167,6 +169,15 @@ public class UserServiceImpl implements UserService {
         // existing 是「库里那行 + 本次改动」，updateTime 也已由自动填充写回，
         // 直接转成 BO 返回，调用方拿完整资料不必再查一次用户表
         return userConvert.toBO(existing);
+    }
+
+    @Override
+    public void recordLogin(Integer userId, String loginIp) {
+        userMapper.update(null, new LambdaUpdateWrapper<UserDO>()
+            .set(UserDO::getLoginTime, DateUtils.now())
+            .set(UserDO::getLoginIp, loginIp)
+            .eq(UserDO::getUserId, userId));
+        CacheHelper.evictNow(cacheManager.getCache(CacheNames.USER), "bo:" + userId);
     }
 
     @Override

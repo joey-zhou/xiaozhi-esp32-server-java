@@ -286,10 +286,8 @@ public class UserAppService {
         return userConvert.toResp(userService.update(update));
     }
 
-    public void recordLoginInfo(UserBO user, String loginIp) {
-        user.setLoginTime(DateUtils.now());
-        user.setLoginIp(loginIp);
-        userService.update(user);
+    public void recordLoginInfo(Integer userId, String loginIp) {
+        userService.recordLogin(userId, loginIp);
     }
 
     public LoginResp buildLoginResp(Integer userId, String token, boolean isNewUser) {

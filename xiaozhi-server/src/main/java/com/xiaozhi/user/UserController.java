@@ -85,7 +85,7 @@ public class UserController extends BaseController {
     @Operation(summary = "用户名密码登录", description = "使用用户名/邮箱/手机号和密码进行登录")
     public ApiResponse<LoginResp> login(@Valid @RequestBody UserLoginReq req, HttpServletRequest request) {
         UserBO user = userAppService.login(req.getUsername(), req.getPassword());
-        userAppService.recordLoginInfo(user, trustedProxyPolicy.resolveClientIp(request));
+        userAppService.recordLoginInfo(user.getUserId(), trustedProxyPolicy.resolveClientIp(request));
 
         int expireSeconds = userAppService.getTokenExpireSeconds();
         StpUtil.login(user.getUserId(), expireSeconds);
@@ -103,7 +103,7 @@ public class UserController extends BaseController {
 
         UserBO user = userAppService.loginByTel(req.getTel());
 
-        userAppService.recordLoginInfo(user, trustedProxyPolicy.resolveClientIp(request));
+        userAppService.recordLoginInfo(user.getUserId(), trustedProxyPolicy.resolveClientIp(request));
 
         int expireSeconds = userAppService.getTokenExpireSeconds();
         StpUtil.login(user.getUserId(), expireSeconds);
@@ -127,7 +127,7 @@ public class UserController extends BaseController {
                 userAppService.loginByWechat(openId, unionId, new Gson().toJson(wxLoginInfo));
         UserBO user = result.user();
 
-        userAppService.recordLoginInfo(user, trustedProxyPolicy.resolveClientIp(request));
+        userAppService.recordLoginInfo(user.getUserId(), trustedProxyPolicy.resolveClientIp(request));
 
         int expireSeconds = userAppService.getTokenExpireSeconds();
         StpUtil.login(user.getUserId(), expireSeconds);

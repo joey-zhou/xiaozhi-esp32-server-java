@@ -221,4 +221,12 @@ class UserAppServiceLoginTest {
         assertThat(captor.getValue().getUsername()).isEqualTo("wx_ab");
         verify(roleService).copyDefaultRole(1, 7);
     }
+
+    @Test
+    void recordingALoginTouchesOnlyTheLoginColumns() {
+        userAppService.recordLoginInfo(10, "10.0.0.7");
+
+        verify(userService).recordLogin(10, "10.0.0.7");
+        verify(userService, never()).update(any());
+    }
 }
