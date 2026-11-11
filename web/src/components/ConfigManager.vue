@@ -585,7 +585,7 @@ fetchData()
                   :permission-prefix="configTypeInfo.permissionPrefix"
                   show-edit
                   :show-set-default="configType !== 'tts'"
-                  :show-delete="record.isDefault !== '1'"
+                  show-delete
                   :is-default="record.isDefault === '1'"
                   :delete-title="t('config.confirmDelete', { type: t(configTypeInfo.label) })"
                   @edit="() => handleEdit(record)"

@@ -32,7 +32,7 @@ export function updateConfig<T extends { configId?: number } = Config>(data: Par
  * @param confirmStorageSwitch 已确认删掉当前生效的对象存储配置会让历史文件不可访问
  */
 export function deleteConfig(configId: number, confirmStorageSwitch = false) {
-  return http.delete(`${api.config.root}/${configId}`, { params: { confirmStorageSwitch } })
+  return http.delete(`${api.config.root}/${configId}`, { confirmStorageSwitch })
 }
 
 /**
