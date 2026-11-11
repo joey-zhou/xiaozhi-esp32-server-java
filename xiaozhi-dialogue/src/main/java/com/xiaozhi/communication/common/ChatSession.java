@@ -23,7 +23,6 @@ import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Sinks;
 
 import java.nio.file.Path;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -33,8 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -51,8 +48,8 @@ public abstract class ChatSession {
     protected DeviceBO device;
 
     /**
-     * 对话上下文，承载与对话逻辑直接相关的状态（Persona、Player、工具回调等）。
-     * 内部实现细节，外部通过本类的直通方法访问。
+     * 对话上下文，承载与对话逻辑直接相关的状态（Persona、Player、工具回调、故障提示等）。
+     * 新的对话状态加在它上面，调用方经 {@link #getDialogueContext()} 访问，本类不再补直通方法。
      */
     private DialogueContext dialogueContext;
 
@@ -130,7 +127,7 @@ public abstract class ChatSession {
     /** 防止高频扫描重复触发告别语和关闭流程。 */
     private final AtomicBoolean inactivityClosing = new AtomicBoolean(false);
 
-    // ========== 对话层直通方法（内部委托给 dialogueContext，外部无需感知） ==========
+    // ========== 对话层直通方法：存量白名单，不再增加 ==========
 
     public Persona getPersona()                 { return dialogueContext.getPersona(); }
     public void setPersona(Persona persona)     { dialogueContext.setPersona(persona); }
@@ -152,34 +149,6 @@ public abstract class ChatSession {
 
     // ========== 超时断连标记 ==========
     private volatile boolean timeoutDisconnect;
-
-    // ========== 故障提示 ==========
-    /**
-     * 上次对用户播故障提示的时刻。识别坏掉时电视声、咳嗽也会被当成说话，每句都失败，
-     * 不限流设备就会一直道歉
-     */
-    private final AtomicReference<Instant> lastFaultNoticeAt = new AtomicReference<>();
-    /** 连续识别失败的次数，识别成功一次就清零 */
-    private final AtomicInteger consecutiveSttFailures = new AtomicInteger();
-
-    /** 距上次故障提示超过 interval 才放行，并记下这一次 */
-    public boolean claimFaultNotice(Duration interval) {
-        Instant now = DateUtils.instant();
-        Instant last = lastFaultNoticeAt.get();
-        if (last != null && Duration.between(last, now).compareTo(interval) < 0) {
-            return false;
-        }
-        return lastFaultNoticeAt.compareAndSet(last, now);
-    }
-
-    /** @return 记上这一次后的连续失败次数 */
-    public int recordSttFailure() {
-        return consecutiveSttFailures.incrementAndGet();
-    }
-
-    public void recordSttSuccess() {
-        consecutiveSttFailures.set(0);
-    }
 
     // --------------------设备mcp-------------------------
     private DeviceMcpHolder deviceMcpHolder = new DeviceMcpHolder();

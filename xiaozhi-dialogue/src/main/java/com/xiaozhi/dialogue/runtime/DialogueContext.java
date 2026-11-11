@@ -7,10 +7,14 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
+import com.xiaozhi.utils.DateUtils;
 import org.springframework.ai.tool.ToolCallback;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -46,6 +50,15 @@ public class DialogueContext {
      * 一轮 tool loop 可能触发多次工具调用，故按顺序累积而非覆盖，否则只有最后一次能被持久化。
      */
     private final List<ToolChainPair> toolChains = new ArrayList<>();
+
+    /**
+     * 上次对用户播故障提示的时刻。识别坏掉时电视声、咳嗽也会被当成说话，每句都失败，
+     * 不限流设备就会一直道歉
+     */
+    private final AtomicReference<Instant> lastFaultNoticeAt = new AtomicReference<>();
+
+    /** 连续识别失败的次数，识别成功一次就清零 */
+    private final AtomicInteger consecutiveSttFailures = new AtomicInteger();
 
     /**
      * 当前对话轮次标识，复用 toolContext 中已有的 conversationTimestamp。
@@ -120,6 +133,25 @@ public class DialogueContext {
         toolCallDetails.clear();
         toolChains.clear();
         currentTurnId = turnId;
+    }
+
+    /** 距上次故障提示超过 interval 才放行，并记下这一次 */
+    public boolean claimFaultNotice(Duration interval) {
+        Instant now = DateUtils.instant();
+        Instant last = lastFaultNoticeAt.get();
+        if (last != null && Duration.between(last, now).compareTo(interval) < 0) {
+            return false;
+        }
+        return lastFaultNoticeAt.compareAndSet(last, now);
+    }
+
+    /** @return 记上这一次后的连续失败次数 */
+    public int recordSttFailure() {
+        return consecutiveSttFailures.incrementAndGet();
+    }
+
+    public void recordSttSuccess() {
+        consecutiveSttFailures.set(0);
     }
 
     public synchronized boolean isFunctionCalled() {

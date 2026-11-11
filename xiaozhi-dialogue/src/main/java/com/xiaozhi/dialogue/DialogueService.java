@@ -417,7 +417,7 @@ public class DialogueService{
                     }
                     return;
                 }
-                session.recordSttSuccess();
+                session.getDialogueContext().recordSttSuccess();
                 // 播放刚结束时拾回的尾音也会被识别成一句话
                 if (isEcho(session, text)) {
                     log.info("识别到的是设备自己的回声，忽略 - SessionId: {}, text: {}", sessionId, text);
@@ -513,7 +513,7 @@ public class DialogueService{
 
     /** 偶尔一次没听清就请用户重说；接连失败说明不是偶然，再让重说只会越说越烦 */
     private static FaultNotice sttFailureNotice(ChatSession session) {
-        return session.recordSttFailure() >= 2 ? FaultNotice.CANNOT_HEAR : FaultNotice.MISHEARD;
+        return session.getDialogueContext().recordSttFailure() >= 2 ? FaultNotice.CANNOT_HEAR : FaultNotice.MISHEARD;
     }
 
     /**

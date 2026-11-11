@@ -39,7 +39,7 @@ public class FaultNotifier {
             log.warn("会话没有播放器，故障提示无法播放 - SessionId: {}, 类别: {}", session.getSessionId(), notice);
             return;
         }
-        if (!session.claimFaultNotice(NOTICE_INTERVAL)) {
+        if (!session.getDialogueContext().claimFaultNotice(NOTICE_INTERVAL)) {
             return;
         }
         Persona persona = session.getPersona();

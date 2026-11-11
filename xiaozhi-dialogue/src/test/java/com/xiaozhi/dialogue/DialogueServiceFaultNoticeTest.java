@@ -118,7 +118,7 @@ class DialogueServiceFaultNoticeTest {
     /** 接连失败说明不是偶然（比如密钥过期），再让用户重说只会越说越烦 */
     @Test
     void repeatedFailureTellsTheUserToComeBackLater() {
-        session.recordSttFailure();
+        session.getDialogueContext().recordSttFailure();
 
         runTurn(SttResult.failure(SttResult.FAILURE_UPSTREAM_ERROR));
 
@@ -128,12 +128,12 @@ class DialogueServiceFaultNoticeTest {
     /** 识别成功一次，之前的失败就不算「接连」了 */
     @Test
     void successfulRecognitionResetsTheFailureStreak() {
-        session.recordSttFailure();
+        session.getDialogueContext().recordSttFailure();
 
         runTurn(SttResult.textOnly("你好"));
 
         verify(persona, timeout(AWAIT_TIMEOUT.toMillis())).chat(any(), anyBoolean(), anyLong());
-        assertThat(session.recordSttFailure()).isEqualTo(1);
+        assertThat(session.getDialogueContext().recordSttFailure()).isEqualTo(1);
     }
 
     /** 用户本来就没说话（或只是噪声），安静地丢掉，不能对着空气道歉 */
