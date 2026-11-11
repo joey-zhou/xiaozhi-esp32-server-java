@@ -647,10 +647,8 @@ public class DialogueService{
     }
 
     /**
-     * 中止当前对话
-     * 先取消Synthesizer的上游Flux订阅，再停止Player。
-     * 如果不先取消Synthesizer，SentenceHelper会继续分句并调用player.play(newFlux)，
-     * 导致音频重叠或播放被清空后又有新音频进来。
+     * 中止当前对话。断合成、收尾历史、停播的先后由 {@link Persona#interrupt()} 负责，
+     * 这里做会话层的收尾：关音频流、通知设备停播、清 AEC 参考、执行告别回调。
      */
     public void abortDialogue(ChatSession session, String reason) {
         try {
@@ -664,29 +662,17 @@ public class DialogueService{
                 session.transitionTo(DeviceState.LISTENING);
             }
 
-            // 先取消语音合成器的上游Flux订阅，停止产生新的音频数据
             Persona persona = session.getPersona();
-            if (persona != null && persona.getSynthesizer() != null) {
-                persona.getSynthesizer().cancel();
-            }
-
-            // 历史截到用户听到的位置。要在 player.stop() 之前，此时播放器还记着下发到了哪句
-            if (persona != null) {
-                try {
-                    // ASR 触发的打断已在识别回调里同步递增过代次
-                    if (!ABORT_REASON_ASR.equals(reason)) {
-                        persona.markInterrupted();
-                    }
-                    persona.onInterrupted();
-                } catch (Exception e) {
-                    log.error("打断后收尾对话历史失败: {}", e.getMessage(), e);
-                }
-            }
-
-            // 再终止音频播放，清空播放队列
-            // 停播失败也要把后面的收尾做完，否则设备收不到 tts stop，一直停在说话状态不重开麦
             Player player = session.getPlayer();
-            if (player != null) {
+            if (persona != null) {
+                // ASR 触发的打断已在识别回调里同步递增过代次
+                if (!ABORT_REASON_ASR.equals(reason)) {
+                    persona.markInterrupted();
+                }
+                persona.interrupt();
+            } else if (player != null) {
+                // 会话还没建起 Persona 时，播放器是单独建的
+                // 停播失败也要把后面的收尾做完，否则设备收不到 tts stop，一直停在说话状态不重开麦
                 try {
                     player.stop();
                 } catch (Exception e) {

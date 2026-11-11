@@ -381,6 +381,34 @@ public class Persona {
     }
 
     /**
+     * 打断正在说的话：先断合成上游，再按用户听到的位置收尾历史，最后停播。
+     * 顺序不能换：先停播放器，合成还会继续往清空的队列里送帧；收尾要赶在停播之前，此时播放器还记着下发到了哪句。
+     * 收尾或停播失败只记日志，调用方后面的收尾（通知设备停播等）照常做
+     */
+    public void interrupt() {
+        if (synthesizer != null) {
+            synthesizer.cancel();
+        }
+        try {
+            onInterrupted();
+        } catch (Exception e) {
+            log.error("打断后收尾对话历史失败 - SessionId: {}", sessionId, e);
+        }
+        try {
+            player.stop();
+        } catch (Exception e) {
+            log.warn("停止播放器失败 - SessionId: {}: {}", sessionId, e.getMessage());
+        }
+    }
+
+    /** 非回复口播（如功能出错的一句话）：走单句入口，不接管本轮回复 */
+    public void say(String text) {
+        if (synthesizer != null && StringUtils.hasText(text)) {
+            synthesizer.synthesize(text);
+        }
+    }
+
+    /**
      * 打断发生时立刻调用（同步于触发线程）：记下要收尾的轮次并递增代次。
      * 之后再 prepareTurn 的轮次不受影响，之前 prepareTurn 还没进 chat 的轮次会被判为"还没开口就被打断"。
      */

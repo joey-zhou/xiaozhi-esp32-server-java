@@ -75,7 +75,7 @@ class DialogueServiceBargeInTest {
         verify(player).resume();
         verify(addresseeClassifier, never()).directedAtDevice(any(), any(), any(), any());
         verify(persona, never()).markInterrupted();
-        verify(persona, never()).onInterrupted();
+        verify(persona, never()).interrupt();
         verify(messageService, never()).sendTtsMessage(any(), isNull(), eq("stop"));
     }
 
@@ -124,15 +124,15 @@ class DialogueServiceBargeInTest {
 
         assertThat(proceed).isTrue();
         verify(persona).markInterrupted();
-        verify(persona).onInterrupted();
-        verify(player).stop();
+        verify(persona).interrupt();
         verify(player, never()).resume();
         verify(messageService).sendTtsMessage(session, null, "stop");
     }
 
-    /** 停播出错时后面的收尾照做，设备要收到 tts stop 才会切回聆听重开麦 */
+    /** 还没有 Persona 时：停播出错时后面的收尾照做，设备要收到 tts stop 才会切回聆听重开麦 */
     @Test
     void failedPlayerStopStillTellsDeviceToStop() {
+        session.setPersona(null);
         doAnswer(invocation -> {
             throw new IllegalStateException("录音收尾出错");
         }).when(player).stop();
@@ -154,7 +154,7 @@ class DialogueServiceBargeInTest {
         assertThat(proceed).isFalse();
         verify(player).resume();
         verify(persona, never()).markInterrupted();
-        verify(persona, never()).onInterrupted();
+        verify(persona, never()).interrupt();
         verify(player, never()).stop();
         verify(messageService, never()).sendTtsMessage(any(), isNull(), eq("stop"));
     }

@@ -2,7 +2,6 @@ package com.xiaozhi.dialogue.llm.handler;
 
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.dialogue.playback.Player;
-import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.dialogue.runtime.Persona;
 import org.springframework.stereotype.Component;
 
@@ -25,17 +24,18 @@ public class PersonaCleanup {
             return;
         }
         Persona persona = session.getPersona();
-        // 先断上游再停播放器，与打断路径同序，否则清完队列后新帧还会继续入队
-        if (persona != null) {
-            Synthesizer synthesizer = persona.getSynthesizer();
-            if (synthesizer != null) {
-                try {
-                    synthesizer.cancel();
-                } catch (Exception e) {
-                    log.warn("取消语音合成失败 - SessionId: {}: {}", session.getSessionId(), e.getMessage());
-                }
-            }
+        if (persona == null) {
+            stopPlayer(session);
+            return;
         }
+        // 说到一半断开也按打断收尾：用户听到的部分进历史
+        persona.interrupt();
+        // 设备断开就是这段对话的结束：没到上限的剩余轮次在这里进摘要，否则短对话永远进不了摘要
+        persona.getConversation().flush();
+    }
+
+    /** 会话还没建起 Persona 时（如故障提示用默认音色播），播放器是单独建的 */
+    private void stopPlayer(ChatSession session) {
         Player player = session.getPlayer();
         if (player != null) {
             try {
@@ -43,10 +43,6 @@ public class PersonaCleanup {
             } catch (Exception e) {
                 log.warn("停止播放器失败 - SessionId: {}: {}", session.getSessionId(), e.getMessage());
             }
-        }
-        if (persona != null) {
-            // 设备断开就是这段对话的结束：没到上限的剩余轮次在这里进摘要，否则短对话永远进不了摘要
-            persona.getConversation().flush();
         }
     }
 }

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -30,12 +31,16 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -340,6 +345,73 @@ class PersonaInterruptTest {
 
         assertThat(texts(conversation.rawMessages()))
                 .containsExactly("讲个故事", "从前有座山。", "换一个", "好的，换一个。");
+    }
+
+    @Test
+    void interruptCutsUpstreamThenSettlesHistoryThenStopsPlayback() {
+        FakePlayer playerSpy = spy(player);
+        FakeSynthesizer synthesizerSpy = spy(synthesizer);
+        persona = Persona.builder()
+                .sessionManager(sessionManager)
+                .sessionId("s1")
+                .listener(listener)
+                .chatModel(chatModel)
+                .synthesizer(synthesizerSpy)
+                .player(playerSpy)
+                .conversation(conversation)
+                .build();
+        session.setPersona(persona);
+        llmStreaming("从前有座山。山里有座庙。");
+        persona.chat(new UserMessage("讲个故事"), false);
+        playerSpy.speak("从前有座山。");
+
+        persona.interrupt();
+
+        // 先停播的话合成还会往清空的队列送帧；收尾要赶在停播之前，此时播放器还记着下发到了哪句
+        InOrder order = inOrder(synthesizerSpy, playerSpy);
+        order.verify(synthesizerSpy).cancel();
+        order.verify(playerSpy).spokenText();
+        order.verify(playerSpy).stop();
+        assertThat(texts(conversation.rawMessages())).containsExactly("讲个故事", "从前有座山。");
+    }
+
+    @Test
+    void interruptSwallowsAFailingStopSoTheCallerCanFinish() {
+        FakePlayer playerSpy = spy(player);
+        doThrow(new IllegalStateException("录音收尾出错")).when(playerSpy).stop();
+        persona = Persona.builder()
+                .sessionManager(sessionManager)
+                .sessionId("s1")
+                .listener(listener)
+                .chatModel(chatModel)
+                .synthesizer(synthesizer)
+                .player(playerSpy)
+                .conversation(conversation)
+                .build();
+
+        // 调用方后面还要通知设备停播，设备收不到 tts stop 就一直停在说话状态不重开麦
+        assertThatCode(persona::interrupt).doesNotThrowAnyException();
+    }
+
+    @Test
+    void sayGoesThroughTheSingleSentenceEntry() {
+        FakeSynthesizer synthesizerSpy = spy(synthesizer);
+        persona = Persona.builder()
+                .sessionManager(sessionManager)
+                .sessionId("s1")
+                .listener(listener)
+                .chatModel(chatModel)
+                .synthesizer(synthesizerSpy)
+                .player(player)
+                .conversation(conversation)
+                .build();
+
+        persona.say("请稍等");
+        persona.say(" ");
+
+        verify(synthesizerSpy).synthesize("请稍等");
+        verify(synthesizerSpy, never()).synthesize(any(Flux.class));
+        verify(synthesizerSpy, times(1)).synthesize(anyString());
     }
 
     /** 不真的发帧，只暴露"某句开始下发"与"播完"两个动作 */

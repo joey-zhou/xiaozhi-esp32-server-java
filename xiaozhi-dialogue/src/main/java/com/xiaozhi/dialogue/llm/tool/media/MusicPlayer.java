@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue.llm.tool.media;
 
+import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.common.Speech;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -89,7 +90,10 @@ public class MusicPlayer {
 
         } catch (Exception e) {
             log.error("播放音乐时发生错误", e);
-            session.getPersona().getSynthesizer().synthesize("播放音乐时发生错误");
+            Persona persona = session.getPersona();
+            if (persona != null) {
+                persona.say("播放音乐时发生错误");
+            }
         } finally {
             // 音频已全量读入内存，可安全删除临时文件
             if (audioFile != null) {
