@@ -3,18 +3,16 @@ package com.xiaozhi.dialogue.runtime;
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.communication.server.websocket.WebSocketSession;
-import com.xiaozhi.dialogue.playback.FaultNotice;
 import com.xiaozhi.dialogue.playback.Player;
-import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.utils.DateUtils;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -31,7 +29,8 @@ import static org.mockito.Mockito.when;
 
 /**
  * 故障提示的几条规矩：同一会话 30 秒内只播一次（识别坏掉时噪声也会被当成说话，不限流设备会一直道歉）；
- * 有角色就用角色的声音；会话没建起来时用默认音色；连接已断或没有播放器时不播。
+ * 连续识别失败要升级说法；有角色就用角色的声音，没有角色时用默认音色；
+ * 连接已断、没有播放器、设备正在说别的话时不播。设备状态交给播放器在真正开播时切。
  */
 @ExtendWith(MockitoExtension.class)
 class FaultNotifierTest {
@@ -44,8 +43,6 @@ class FaultNotifierTest {
     private TtsService defaultTts;
     @Mock
     private Persona persona;
-    @Mock
-    private Synthesizer synthesizer;
     @Mock
     private Player player;
     @Mock
@@ -64,7 +61,6 @@ class FaultNotifierTest {
         session = new WebSocketSession(springSession);
         session.setPlayer(player);
         session.setPersona(persona);
-        lenient().when(persona.getSynthesizer()).thenReturn(synthesizer);
     }
 
     @AfterEach
@@ -74,53 +70,85 @@ class FaultNotifierTest {
 
     @Test
     void speaksOneOfTheNoticesPhrasesInTheRolesVoice() {
-        notifier.notice(session, FaultNotice.MISHEARD);
+        assertThat(notifier.onSessionUnavailable(session)).isTrue();
 
-        verify(synthesizer).synthesize(argThat(
-                (String text) -> FaultNotice.MISHEARD.phrases().contains(text)));
-        assertThat(session.getDeviceState()).isEqualTo(DeviceState.SPEAKING);
+        verify(persona).say(argThat(text -> FaultNotice.UNAVAILABLE.phrases().contains(text)));
         verify(ttsFactory, never()).getDefaultTtsService();
+        // 状态由播放器开播时切，这里预占了就可能留下没有出口的 SPEAKING
+        assertThat(session.getDeviceState()).isNotEqualTo(DeviceState.SPEAKING);
+    }
+
+    @Test
+    void repeatedSttFailuresEscalateAndSuccessResetsTheCount() {
+        notifier.onSttFailed(session);
+        verify(persona).say(argThat(text -> FaultNotice.MISHEARD.phrases().contains(text)));
+
+        clockAt(START.plus(FaultNotifier.NOTICE_INTERVAL).plusSeconds(1));
+        notifier.onSttFailed(session);
+        verify(persona).say(argThat(text -> FaultNotice.CANNOT_HEAR.phrases().contains(text)));
+
+        notifier.onSttSucceeded(session);
+        assertThat(session.getDialogueContext().recordSttFailure()).isEqualTo(1);
     }
 
     @Test
     void noticesAreThrottledPerSession() {
-        notifier.notice(session, FaultNotice.MISHEARD);
+        notifier.onSttUnavailable(session);
         clockAt(START.plus(FaultNotifier.NOTICE_INTERVAL).minusSeconds(1));
-        notifier.notice(session, FaultNotice.CANNOT_HEAR);
-        verify(synthesizer, times(1)).synthesize(anyString());
+        assertThat(notifier.onDialogueFailed(session)).isFalse();
+        verify(persona, times(1)).say(anyString());
 
         clockAt(START.plus(FaultNotifier.NOTICE_INTERVAL).plusSeconds(1));
-        notifier.notice(session, FaultNotice.CANNOT_HEAR);
-        verify(synthesizer, times(2)).synthesize(anyString());
+        assertThat(notifier.onDialogueFailed(session)).isTrue();
+        verify(persona, times(2)).say(anyString());
     }
 
-    /** 会话没建起来就没有角色的合成器，只能用默认音色说 */
+    /** 会话没建起来就没有角色，只能用默认音色说 */
     @Test
     void sessionWithoutAPersonaUsesTheDefaultVoice() {
         session.setPersona(null);
         when(ttsFactory.getDefaultTtsService()).thenReturn(defaultTts);
 
-        notifier.notice(session, FaultNotice.UNAVAILABLE);
+        assertThat(notifier.onSessionUnavailable(session)).isTrue();
 
         verify(ttsFactory).getDefaultTtsService();
+    }
+
+    /** 设备正在说别的话（如上一轮回复）时不插一句道歉 */
+    @Test
+    void deviceSpeakingSomethingElseIsLeftAlone() {
+        when(player.hasContent()).thenReturn(true);
+
+        assertThat(notifier.onSttFailed(session)).isFalse();
+
+        verify(persona, never()).say(anyString());
+    }
+
+    @Test
+    void failedReplyIsHandedBackForThePersonaToSay() {
+        assertThat(notifier.replyFailed(session))
+                .hasValueSatisfying(text -> assertThat(FaultNotice.DISTRACTED.phrases()).contains(text));
+        // 同样受限流：刚说过一句就不再给
+        assertThat(notifier.replyFailed(session)).isEmpty();
+        verify(persona, never()).say(anyString());
     }
 
     @Test
     void closedConnectionIsLeftAlone() {
         when(springSession.isOpen()).thenReturn(false);
 
-        notifier.notice(session, FaultNotice.MISHEARD);
+        assertThat(notifier.onSttFailed(session)).isFalse();
 
-        verify(synthesizer, never()).synthesize(anyString());
+        verify(persona, never()).say(anyString());
     }
 
     @Test
     void sessionWithoutAPlayerIsLeftAlone() {
         session.setPlayer(null);
 
-        notifier.notice(session, FaultNotice.MISHEARD);
+        assertThat(notifier.onSttFailed(session)).isFalse();
 
-        verify(synthesizer, never()).synthesize(anyString());
+        verify(persona, never()).say(anyString());
     }
 
     private static void clockAt(Instant instant) {

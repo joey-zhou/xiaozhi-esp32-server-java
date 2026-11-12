@@ -13,6 +13,7 @@ import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.ScheduledPlayer;
 import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.dialogue.playback.SynthesizerFactory;
+import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.ai.stt.SttService;
@@ -78,6 +79,8 @@ public class PersonaFactory {
     private StorageServiceFactory storageServiceFactory;
     @Resource
     private ToolCallActivityRegistry toolCallActivity;
+    @Resource
+    private FaultNotifier faultNotifier;
 
     /**
      * 构建完整的 Persona 实例。
@@ -136,6 +139,7 @@ public class PersonaFactory {
                 .firstTokenTimeout(Duration.ofSeconds(llmFirstTokenTimeoutSeconds))
                 .idleTimeout(Duration.ofSeconds(llmIdleTimeoutSeconds))
                 .toolCallActivity(toolCallActivity)
+                .faultNotifier(faultNotifier)
                 .synthesizer(synthesizer)
                 .player(session.getPlayer())
                 .listener(dialogueListener)

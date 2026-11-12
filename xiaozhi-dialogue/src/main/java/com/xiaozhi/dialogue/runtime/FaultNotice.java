@@ -1,4 +1,4 @@
-package com.xiaozhi.dialogue.playback;
+package com.xiaozhi.dialogue.runtime;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;

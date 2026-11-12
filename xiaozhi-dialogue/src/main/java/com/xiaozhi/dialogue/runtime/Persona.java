@@ -10,7 +10,6 @@ import com.xiaozhi.ai.llm.memory.ConversationContext;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.ai.llm.service.TextChatService;
 import com.xiaozhi.dialogue.playback.Player;
-import com.xiaozhi.dialogue.playback.FaultNotice;
 import com.xiaozhi.dialogue.playback.Synthesizer;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.ai.tts.SpeechTokenFilter;
@@ -120,6 +119,9 @@ public class Persona {
 
     /** 工具执行进度，首字与静默超时据此把等工具的时间让出去；为 null 时不让 */
     private ToolCallActivityRegistry toolCallActivity;
+
+    /** 模型失败时向它要一句提示，为空时不补 */
+    private FaultNotifier faultNotifier;
 
     /** 当前轮次运行态，打断收尾与播完判定都从这里取 */
     @Builder.Default
@@ -558,10 +560,10 @@ public class Persona {
     }
 
     /**
-     * LLM 一个字都没返回就失败时补一句口播，避免设备完全静默让用户干等。
+     * LLM 一个字都没返回就失败时补一句口播，避免设备完全静默让用户干等。这句不是回复，走 {@link #say}。
      * 已经开口再失败则直接收尾——中途插一句道歉比沉默更突兀。
      */
-    static Flux<String> withErrorFallback(Flux<String> speechFlux) {
+    Flux<String> withErrorFallback(Flux<String> speechFlux) {
         AtomicBoolean answered = new AtomicBoolean(false);
         return speechFlux
                 .doOnNext(text -> {
@@ -569,9 +571,13 @@ public class Persona {
                         answered.set(true);
                     }
                 })
-                .onErrorResume(error -> answered.get()
-                        ? Flux.empty()
-                        : Flux.just(FaultNotice.DISTRACTED.pick()));
+                .onErrorResume(error -> {
+                    ChatSession session = getSession();
+                    if (!answered.get() && faultNotifier != null && session != null) {
+                        faultNotifier.replyFailed(session).ifPresent(this::say);
+                    }
+                    return Flux.empty();
+                });
     }
 
     /**

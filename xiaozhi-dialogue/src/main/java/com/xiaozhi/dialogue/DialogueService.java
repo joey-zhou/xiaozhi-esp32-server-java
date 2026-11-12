@@ -17,7 +17,6 @@ import com.xiaozhi.common.model.bo.MessageMetadataBO;
 import org.springframework.ai.chat.messages.UserMessage;
 import com.xiaozhi.dialogue.audio.VadService.VadStatus;
 import com.xiaozhi.dialogue.audio.AecService;
-import com.xiaozhi.dialogue.playback.FaultNotice;
 import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.runtime.GoodbyeMessageSupplier;
@@ -360,12 +359,11 @@ public class DialogueService{
                 Persona persona = session.getPersona();
                 if (persona == null) {
                     // 会话没建起来（比如没有可用的对话模型），说什么都不会有回应
-                    discardWithNotice(session, turnSink, FaultNotice.UNAVAILABLE);
+                    discardWithNotice(session, turnSink, faultNotifier::onSessionUnavailable);
                     return;
                 }
                 if (persona.getSttService() == null) {
-                    // 识别服务没配好或本地模型没就位，每一句都会落到这里
-                    discardWithNotice(session, turnSink, FaultNotice.CANNOT_HEAR);
+                    discardWithNotice(session, turnSink, faultNotifier::onSttUnavailable);
                     return;
                 }
 
@@ -411,13 +409,13 @@ public class DialogueService{
                 if (!StringUtils.hasText(text)) {
                     // 识别失败与用户没说话是两回事：失败了要给句话，没说话就安静地丢掉
                     if (sttResult != null && sttResult.operationFailed()) {
-                        discardWithNotice(session, turnSink, sttFailureNotice(session));
+                        discardWithNotice(session, turnSink, faultNotifier::onSttFailed);
                     } else {
                         releaseDiscardedTurn(session, turnSink);
                     }
                     return;
                 }
-                session.getDialogueContext().recordSttSuccess();
+                faultNotifier.onSttSucceeded(session);
                 // 播放刚结束时拾回的尾音也会被识别成一句话
                 if (isEcho(session, text)) {
                     log.info("识别到的是设备自己的回声，忽略 - SessionId: {}, text: {}", sessionId, text);
@@ -455,7 +453,7 @@ public class DialogueService{
                     player.resume();
                     releaseDiscardedTurn(session, turnSink);
                 } else {
-                    discardWithNotice(session, turnSink, FaultNotice.DISTRACTED);
+                    discardWithNotice(session, turnSink, faultNotifier::onDialogueFailed);
                 }
             } finally {
                 // 中间段异常退出也要给个空终稿，最后一段拼接时才不用等到超时
@@ -500,20 +498,14 @@ public class DialogueService{
     }
 
     /**
-     * 丢弃本轮并对用户说一句。本轮已被新一轮取代（包括长句的中间段）或设备正在说话时只丢弃不播，
-     * 免得把道歉插进别的话里
+     * 丢弃本轮并上报故障。本轮已被新一轮取代（包括长句的中间段）时只丢弃：那是旧轮的事，报上去会把道歉插进新一轮
      */
-    private void discardWithNotice(ChatSession session, Sinks.Many<byte[]> turnSink, FaultNotice notice) {
+    private void discardWithNotice(ChatSession session, Sinks.Many<byte[]> turnSink, Consumer<ChatSession> report) {
         boolean current = turnSink != null && session.getAudioSinks() == turnSink;
         releaseDiscardedTurn(session, turnSink);
-        if (current && session.getDeviceState() != DeviceState.SPEAKING) {
-            faultNotifier.notice(session, notice);
+        if (current) {
+            report.accept(session);
         }
-    }
-
-    /** 偶尔一次没听清就请用户重说；接连失败说明不是偶然，再让重说只会越说越烦 */
-    private static FaultNotice sttFailureNotice(ChatSession session) {
-        return session.getDialogueContext().recordSttFailure() >= 2 ? FaultNotice.CANNOT_HEAR : FaultNotice.MISHEARD;
     }
 
     /**
@@ -553,8 +545,11 @@ public class DialogueService{
             personaFactory.buildPersona(session).chat(text, false);
         } catch (Exception e) {
             log.error("处理唤醒词失败: {}", e.getMessage(), e);
-            // 用户叫了设备却一声不吭，只会以为设备坏了
-            faultNotifier.notice(session, FaultNotice.UNAVAILABLE);
+            // 用户叫了设备却一声不吭，只会以为设备坏了。这次不说的话，退出上面预占的 SPEAKING，
+            // 否则没有播放来收尾，不活跃检查会永远跳过这个会话
+            if (!faultNotifier.onSessionUnavailable(session) && session.getDeviceState() == DeviceState.SPEAKING) {
+                session.transitionTo(DeviceState.IDLE);
+            }
         }
     }
 

@@ -7,7 +7,6 @@ import com.xiaozhi.common.Speech;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.communication.server.websocket.WebSocketSession;
-import com.xiaozhi.dialogue.playback.FaultNotice;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.playback.Synthesizer;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +26,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -63,6 +63,8 @@ class PersonaLlmTimeoutTest {
     private ToolsSessionHolder toolsSessionHolder;
     @Mock
     private MessageSender messageSender;
+    @Mock
+    private FaultNotifier faultNotifier;
 
     private final ToolCallActivityRegistry activity = new ToolCallActivityRegistry();
     private RecordingSynthesizer synthesizer;
@@ -76,6 +78,7 @@ class PersonaLlmTimeoutTest {
         lenient().when(sessionManager.getSession("s1")).thenReturn(session);
         SilentPlayer player = new SilentPlayer(session, messageSender);
         synthesizer = new RecordingSynthesizer(session, player);
+        lenient().when(faultNotifier.replyFailed(session)).thenReturn(Optional.of("抱歉，我刚刚走神了"));
         persona = Persona.builder()
                 .sessionManager(sessionManager)
                 .sessionId("s1")
@@ -87,6 +90,7 @@ class PersonaLlmTimeoutTest {
                 .firstTokenTimeout(FIRST_TOKEN)
                 .idleTimeout(IDLE)
                 .toolCallActivity(activity)
+                .faultNotifier(faultNotifier)
                 .build();
         session.setPersona(persona);
         session.setPlayer(player);
@@ -99,8 +103,8 @@ class PersonaLlmTimeoutTest {
         persona.chat(new UserMessage("讲个故事"), false);
 
         assertThat(synthesizer.finished.await(3, TimeUnit.SECONDS)).as("超时后本轮必须收尾").isTrue();
-        assertThat(synthesizer.texts).hasSize(1);
-        assertThat(FaultNotice.DISTRACTED.phrases()).contains(synthesizer.texts.getFirst());
+        // 这句不是回复，走单句口播，不进回复流
+        assertThat(synthesizer.texts).containsExactly("抱歉，我刚刚走神了");
         verify(listener, timeout(1000)).onError(isA(TimeoutException.class));
     }
 
@@ -113,6 +117,7 @@ class PersonaLlmTimeoutTest {
 
         assertThat(synthesizer.finished.await(3, TimeUnit.SECONDS)).as("静默超时后本轮必须收尾").isTrue();
         assertThat(String.join("", synthesizer.texts)).isEqualTo("从前有座山。");
+        verify(faultNotifier, never()).replyFailed(any());
         verify(listener, timeout(1000)).onError(isA(TimeoutException.class));
     }
 
