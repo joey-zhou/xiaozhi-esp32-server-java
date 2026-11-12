@@ -102,6 +102,16 @@ public class OpusRecorder {
     }
 
     /**
+     * 不属于任何一条助手消息的帧（问候、告别、故障提示）只作为 AEC 参考，不写入录音，
+     * 否则会续写进上一条助手消息的录音里
+     */
+    public void onSendUnrecordedFrame(byte[] opusFrame, byte[] referencePcm, long timestamp) {
+        if (aecService != null) {
+            aecService.feedReference(session.getSessionId(), opusFrame, referencePcm, timestamp);
+        }
+    }
+
+    /**
      * 静音帧只作为 AEC 参考，不写入录音。静音帧的源 PCM 是常量，不必解码
      */
     public void onSendSilenceFrame(byte[] opusFrame, long timestamp) {

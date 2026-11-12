@@ -46,10 +46,6 @@ public class FaultNotifier {
         Synthesizer synthesizer = persona != null
                 ? persona.getSynthesizer()
                 : SynthesizerFactory.create(session, ttsFactory.getDefaultTtsService(), player, null);
-        // 提示语不是哪一轮对话的回答，不能挂到上一轮助手消息的录音上
-        if (player.getOpusRecorder() != null) {
-            player.getOpusRecorder().setAssistantMessageCreatedAt(null);
-        }
         String text = notice.pick();
         log.info("播放故障提示 - SessionId: {}, 类别: {}, 内容: {}", session.getSessionId(), notice, text);
         session.transitionTo(DeviceState.SPEAKING);

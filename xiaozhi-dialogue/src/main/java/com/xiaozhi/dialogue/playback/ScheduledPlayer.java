@@ -655,7 +655,7 @@ public class ScheduledPlayer extends Player {
         }
 
         // 发送音频帧
-        sendOpusFrame(speech.getOutput(), queued.referencePcm());
+        sendOpusFrame(speech.getOutput(), queued.referencePcm(), queued.reply());
 
         // 更新播放位置（每帧增加60ms）
         playPosition += OPUS_FRAME_SEND_INTERVAL_NS;

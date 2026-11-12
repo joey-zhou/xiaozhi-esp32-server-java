@@ -242,14 +242,19 @@ public abstract class Player {
      *
      * @param referencePcm 该帧编码前的 PCM，直接作为服务端 AEC 的参考信号；
      *                     缓存命中直读的帧没有源 PCM，传 null 由 AEC 侧解码补上
+     * @param reply        是否本轮回复的帧，只有回复帧写进录音
      */
-    protected void sendOpusFrame(byte[] opusFrame, byte[] referencePcm)  {
+    protected void sendOpusFrame(byte[] opusFrame, byte[] referencePcm, boolean reply)  {
         // 毫秒级时间戳（取低 32 位），随帧头下发；设备播放后在上行帧回显，用于 AEC 参考对齐
         long timestamp = DateUtils.millis() & 0xFFFFFFFFL;
         messageService.sendBinaryMessage(session, opusFrame, timestamp);
         // log.info("发送Opus帧数据: {}", opusFrame.length);
         if (opusRecorder != null) {
-            opusRecorder.onSendOpusFrame(opusFrame, referencePcm, timestamp);
+            if (reply) {
+                opusRecorder.onSendOpusFrame(opusFrame, referencePcm, timestamp);
+            } else {
+                opusRecorder.onSendUnrecordedFrame(opusFrame, referencePcm, timestamp);
+            }
         }
     }
 

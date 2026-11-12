@@ -605,10 +605,6 @@ public class Persona {
         if (session == null || !session.isAudioChannelOpen()){
             return ;
         }
-        // 告别语不需要保存opus音频文件，重置时间戳防止复用上一轮对话的值
-        if (player.getOpusRecorder() != null) {
-            player.getOpusRecorder().setAssistantMessageCreatedAt(null);
-        }
         player.setFunctionAfterChat(() -> {
             session.setPersona(null);
             session.setPlayer(null);

@@ -19,6 +19,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -63,6 +64,15 @@ class ScheduledPlayerRecordingTest {
         inOrder.verify(recorder).onSendStart();
         inOrder.verify(recorder, times(2)).onSendOpusFrame(any(), any(), anyLong());
         inOrder.verify(recorder).onSendStop();
+    }
+
+    @Test
+    void framesOutsideAnyReplyOnlyFeedTheAec() {
+        player.play(Flux.just(Speech.ofOpus(new byte[]{1}, "你好呀。"), Speech.ofOpus(new byte[]{2})), false);
+
+        verify(sender, timeout(5000)).sendTtsMessage(any(), isNull(), eq("stop"));
+        verify(recorder, timeout(5000).times(2)).onSendUnrecordedFrame(any(), any(), anyLong());
+        verify(recorder, never()).onSendOpusFrame(any(), any(), anyLong());
     }
 
     // 参考信号必须是这一帧编码前的原始 PCM，取错会让 AEC 拿着对不上的信号做滤波

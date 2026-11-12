@@ -73,6 +73,21 @@ class OpusRecorderTest {
     }
 
     @Test
+    void framesOutsideAnyReplyAreFedToAecButNotRecorded() throws IOException {
+        // 上一轮回复留下的关联还在：问候、故障提示这类帧写进来就成了那条助手消息录音的一部分
+        Instant createdAt = Instant.ofEpochMilli(1_700_000_002_000L);
+        recorder.setAssistantMessageCreatedAt(createdAt);
+        List<byte[]> frames = opusFrames(2);
+
+        recorder.onSendUnrecordedFrame(frames.get(0), PCM, 1000L);
+        recorder.onSendUnrecordedFrame(frames.get(1), PCM, 1060L);
+        recorder.onSendStop();
+
+        verify(aecService, times(2)).feedReference(any(), any(), any(), anyLong());
+        assertThat(audioPath(createdAt)).doesNotExist();
+    }
+
+    @Test
     void silenceFramesAreFedToAecButNotRecorded() throws IOException {
         Instant createdAt = Instant.ofEpochMilli(1_700_000_001_000L);
         recorder.setAssistantMessageCreatedAt(createdAt);
