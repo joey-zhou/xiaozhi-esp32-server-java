@@ -408,6 +408,11 @@ class MultiTurnDialogueProtocolTest {
      */
     private static final class GatedSynthesizer extends Synthesizer {
 
+        @Override
+        protected Flux<Speech> roleSentence(String text) {
+            return Flux.empty();
+        }
+
         private volatile Disposable disposable;
         private volatile CountDownLatch gate;
 

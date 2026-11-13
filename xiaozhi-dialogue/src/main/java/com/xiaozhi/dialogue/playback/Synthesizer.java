@@ -1,20 +1,22 @@
 package com.xiaozhi.dialogue.playback;
 
-import com.xiaozhi.common.Speech;
-
-import com.xiaozhi.communication.common.ChatSession;
+import com.xiaozhi.ai.tts.SentenceHelper;
 import com.xiaozhi.ai.tts.TtsService;
+import com.xiaozhi.common.Speech;
+import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.utils.AudioUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 
 /**
  * 语音合成器基类，TtsService 的高层编排器。
@@ -51,6 +53,9 @@ public abstract class Synthesizer {
      */
     protected final TtsService fallbackTts;
 
+    /** 当前这一轮回复，打断时 cancel 的就是它 */
+    private volatile SynthesisRound currentRound;
+
     /**
      * @param chatSession  当前会话
      * @param ttsService   底层 TTS Provider（由 TtsServiceFactory 创建）
@@ -65,20 +70,118 @@ public abstract class Synthesizer {
     }
 
     /**
-     * 一轮合成的状态。本轮回复每次新建一份；单句（问候、告别、工具提示）用自己的一份，
+     * 一轮合成的状态。本轮回复每次新建一份；单句（问候、告别、提示）用自己的一份，
      * 不能改写本轮回复的，否则回复中途插的一句会把本轮的兜底状态冲掉
      */
     protected static final class SynthesisRound {
         /** 本轮角色音色已经失败过，后面的句子直接用兜底音色，不再每句都等一次失败 */
         final AtomicBoolean fallbackEngaged = new AtomicBoolean();
+        /** 本轮对上游文本流的订阅，打断时断开它，就不会再有新句子进来 */
+        volatile Disposable upstream;
     }
 
     /**
-     * 用兜底音色现场合成这句话。调用方在弹性线程或虚拟线程上，合成是阻塞的。
+     * 一轮回复。
+     *
+     * @param stringFlux 文本流，每个元素来自 LLM 的输出（多是 token），按标点分句后逐句合成
+     */
+    public void synthesize(Flux<String> stringFlux) {
+        SynthesisRound round = new SynthesisRound();
+        currentRound = round;
+        round.upstream = new SentenceHelper().convert(stringFlux).subscribe(
+            result -> player.play(sentence(result.text(), result.mood(), round), true),
+            // 上游分句流出错时接住，否则 Reactor 会把异常丢回 LLM 的投递线程
+            error -> log.error("分句流异常，本轮TTS合成中止 - SessionId: {}", chatSession.getSessionId(), error));
+    }
+
+    /**
+     * 单句（问候、告别、故障提示）。用自己的轮次状态，不接管本轮回复的订阅：
+     * 回复中途插的一句不能让打断停不住回复本身
+     */
+    public void synthesize(String text) {
+        player.play(sentence(text, null, new SynthesisRound()), false);
+    }
+
+    /** 断开本轮回复的上游，不再产生新句子。已经排进播放队列的由播放器停 */
+    public void cancel() {
+        SynthesisRound round = currentRound;
+        if (round != null && round.upstream != null) {
+            round.upstream.dispose();
+        }
+    }
+
+    /** 本轮回复的上游是否还在出字。打断判断用：播放器停了，上游还在工作也要打断 */
+    public boolean isActive() {
+        SynthesisRound round = currentRound;
+        return round != null && round.upstream != null && !round.upstream.isDisposed();
+    }
+
+    /**
+     * 用角色音色说一句。说不出来就抛错或给空流，由基类换兜底音色。
+     * 首帧的文本与表情由基类挂上
+     */
+    protected abstract Flux<Speech> roleSentence(String text);
+
+    /**
+     * 一句话的音频流。各句在出字时就排进播放队列、轮到它才订阅：走哪个音色要在订阅那一刻决定，
+     * 否则前一句失败之前就排好的句子还会再去等一次失败
+     */
+    protected Flux<Speech> sentence(String text, String mood, SynthesisRound round) {
+        return Flux.defer(() -> round.fallbackEngaged.get()
+                ? fallback(text, mood)
+                : roleThenFallback(text, mood, round));
+    }
+
+    /** 角色音色一帧都没出就失败时换兜底音色重说这句，本轮后面的句子也直接用它；说了半句再重说会重复 */
+    private Flux<Speech> roleThenFallback(String text, String mood, SynthesisRound round) {
+        AtomicBoolean emitted = new AtomicBoolean();
+        AtomicBoolean cancelled = new AtomicBoolean();
+        Flux<Speech> role = roleSentence(text)
+                .doOnNext(speech -> {
+                    if (emitted.compareAndSet(false, true)) {
+                        speech.withText(text).withMood(mood);
+                    }
+                })
+                .onErrorResume(error -> {
+                    if (error instanceof CancellationException) {
+                        cancelled.set(true);
+                    } else if (emitted.get()) {
+                        log.error("TTS合成中途出错，这句只说了一半 - SessionId: {}", chatSession.getSessionId(), error);
+                    } else {
+                        log.error("角色音色没能说出这句，改用兜底音色 - SessionId: {}", chatSession.getSessionId(), error);
+                    }
+                    return Flux.empty();
+                });
+        return role.concatWith(Flux.defer(() -> {
+            if (emitted.get() || cancelled.get()) {
+                return Flux.empty();
+            }
+            round.fallbackEngaged.set(true);
+            return fallback(text, mood);
+        }));
+    }
+
+    /** 兜底音色说这句 */
+    private Flux<Speech> fallback(String text, String mood) {
+        return Flux.defer(() -> {
+                    List<Speech> speech = fallbackSpeech(text);
+                    if (speech.isEmpty()) {
+                        log.error("这句话没能说出来 - SessionId: {}", chatSession.getSessionId());
+                        return Flux.<Speech>empty();
+                    }
+                    speech.getFirst().withMood(mood);
+                    return Flux.fromIterable(speech);
+                })
+                // 兜底合成是阻塞的，不能压在上游 TTS 的回调线程上
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * 用兜底音色现场合成这句话。
      *
      * @return 兜底也说不出来时返回空列表
      */
-    protected List<Speech> fallbackSpeech(String text) {
+    private List<Speech> fallbackSpeech(String text) {
         if (fallbackTts == null || !StringUtils.hasText(text)) {
             return List.of();
         }
@@ -98,29 +201,4 @@ public abstract class Synthesizer {
             return List.of();
         }
     }
-
-    /**
-     * 语音合成。
-     * @param stringFlux 文本流，流的每一个元素来自于LLM的输出，主要是token。
-     *                   一般不能直接提交进行TTS语音合成，需要由具体的Provider实现重整成句子再进行语音合成。
-     */
-    abstract public void synthesize(Flux<String> stringFlux);
-
-    /**
-     * 取消语音合成，停止上游Flux订阅。
-     * 在用户打断（abort）时由外部调用，确保不再产生新的音频数据。
-     */
-    abstract public void cancel();
-
-    /**
-     * 检查语音合成管道是否仍在活跃（LLM生成中、TTS合成中等）。
-     * 用于打断判断，即使Player已停止播放，如果上游管道仍在工作也应被打断。
-     */
-    abstract public boolean isActive();
-
-    /**
-     * 语音合成。
-     * @param text 一般是完整的句子或者完整的可以一次性提交进行语音合成的文本。
-     */
-    abstract public void synthesize(String text);
 }

@@ -376,6 +376,11 @@ class ListenStateMachineTest {
      */
     private Synthesizer scriptedSynthesizer(ChatSession session, Player player) {
         return new Synthesizer(session, (TtsService) null, player, null) {
+
+            @Override
+            protected Flux<Speech> roleSentence(String text) {
+                return Flux.empty();
+            }
             private final AtomicBoolean active = new AtomicBoolean();
 
             @Override

@@ -190,6 +190,11 @@ class PersonaLlmTimeoutTest {
 
     /** 记下交给合成器的每一段文本，流结束（正常或出错）时放行 */
     static class RecordingSynthesizer extends Synthesizer {
+
+        @Override
+        protected Flux<Speech> roleSentence(String text) {
+            return Flux.empty();
+        }
         final List<String> texts = new CopyOnWriteArrayList<>();
         final CountDownLatch finished = new CountDownLatch(1);
 

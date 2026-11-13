@@ -1,20 +1,16 @@
 package com.xiaozhi.dialogue.playback;
 
-import com.xiaozhi.common.Speech;
-
-import com.xiaozhi.communication.common.ChatSession;
-import com.xiaozhi.ai.tts.SentenceHelper;
-import com.xiaozhi.ai.tts.TtsOverloadException;
 import com.xiaozhi.ai.tts.TtsService;
+import com.xiaozhi.common.Speech;
+import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.utils.AudioUtils;
-import reactor.core.Disposable;
+import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 
-import lombok.extern.slf4j.Slf4j;
 /**
  * 语音合成器，用于非流式TTS（先生成完整音频文件再播放）。
  * 适用于不支持流式输出的TTS Provider（如 SherpaOnnx）。
@@ -24,106 +20,27 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class FileSynthesizer extends Synthesizer {
 
-    // 保存LLM输出流的订阅引用，以便在cancel时取消上游订阅
-    private volatile Disposable llmDisposable;
-
     public FileSynthesizer(ChatSession session, TtsService ttsService, Player player, TtsService fallbackTts) {
         super(session, ttsService, player, fallbackTts);
     }
 
+    /** 整句合成成文件再分块读出；合成是阻塞的，放到弹性线程上。本地合成排队满了也按失败处理，由基类换兜底音色 */
     @Override
-    public void cancel() {
-        if (llmDisposable != null && !llmDisposable.isDisposed()) {
-            llmDisposable.dispose();
-        }
-    }
-
-    @Override
-    public boolean isActive() {
-        return llmDisposable != null && !llmDisposable.isDisposed();
-    }
-
-    /**
-     * 将LLM输出的token流转化为语音并推送到播放器。
-     * 使用 SentenceHelper 按标点分句，逐句调用TTS生成完整音频文件后交给播放器。
-     *
-     * @param stringFlux LLM输出的token流
-     */
-    @Override
-    public void synthesize(Flux<String> stringFlux) {
-        llmDisposable = subscribeSentences(stringFlux, true, new SynthesisRound());
-    }
-
-    /**
-     * @param reply 是否本轮 LLM 回复，决定播放器是否把句子计入打断截断
-     */
-    private Disposable subscribeSentences(Flux<String> stringFlux, boolean reply, SynthesisRound round) {
-        return new SentenceHelper().convert(stringFlux).subscribe(
-            result -> {
-                String text = result.text();
-                String mood = result.mood();
-                Flux<Speech> lazyTtsFlux = Flux.create(sink -> {
-                    List<Speech> speech = sentenceSpeech(text, round);
-                    if (!speech.isEmpty()) {
-                        speech.getFirst().withMood(mood);
-                        speech.forEach(sink::next);
+    protected Flux<Speech> roleSentence(String text) {
+        return Flux.defer(() -> {
+                    try {
+                        Path audioPath = ttsService.textToSpeech(text);
+                        if (audioPath == null) {
+                            log.error("TTS服务返回空音频文件 - SessionId: {}", chatSession.getSessionId());
+                            return Flux.<Speech>empty();
+                        }
+                        // 分块读取PCM，避免全量加载进内存
+                        List<byte[]> chunks = AudioUtils.readAsPcmChunks(audioPath.toString());
+                        return Flux.fromIterable(chunks).map(Speech::new);
+                    } catch (Exception e) {
+                        return Flux.<Speech>error(e);
                     }
-                    sink.complete();
-                });
-                player.play(lazyTtsFlux, reply);
-            },
-            // 上游分句流出错时接住，否则 Reactor 会把异常丢回 LLM 的投递线程
-            error -> log.error("分句流异常，本轮TTS合成中止 - SessionId: {}", chatSession.getSessionId(), error));
+                })
+                .subscribeOn(Schedulers.boundedElastic());
     }
-
-    /**
-     * 一句话的音频：先用角色音色合成；说不出来就改用兜底音色（本轮后面的句子也直接用它）。
-     * 本地合成排队满了也走这条路：兜底音色是云端的，不占本地合成队列。
-     */
-    private List<Speech> sentenceSpeech(String text, SynthesisRound round) {
-        List<Speech> speech = round.fallbackEngaged.get() ? List.of() : roleSpeech(text);
-        if (speech.isEmpty()) {
-            round.fallbackEngaged.set(true);
-            speech = fallbackSpeech(text);
-        }
-        if (speech.isEmpty()) {
-            log.error("这句话没能说出来 - SessionId: {}", chatSession.getSessionId());
-        }
-        return speech;
-    }
-
-    /** 角色音色合成一句，失败返回空列表 */
-    private List<Speech> roleSpeech(String text) {
-        try {
-            Path audioPath = ttsService.textToSpeech(text);
-            if (audioPath == null) {
-                log.error("TTS服务返回空音频文件，改用兜底音色 - SessionId: {}", chatSession.getSessionId());
-                return List.of();
-            }
-            // 分块读取PCM，避免全量加载进内存
-            List<byte[]> chunks = AudioUtils.readAsPcmChunks(audioPath.toString());
-            List<Speech> speech = new ArrayList<>(chunks.size());
-            for (byte[] chunk : chunks) {
-                speech.add(speech.isEmpty() ? new Speech(chunk, text) : new Speech(chunk));
-            }
-            return speech;
-        } catch (TtsOverloadException e) {
-            log.warn("本地TTS过载，改用兜底音色: {} - SessionId: {}", e.getMessage(), chatSession.getSessionId());
-            return List.of();
-        } catch (Exception e) {
-            log.error("TTS合成出错，改用兜底音色: {} - SessionId: {}", e.getMessage(), chatSession.getSessionId());
-            return List.of();
-        }
-    }
-
-    /**
-     * 直接合成单个文本
-     * @param text 待合成的文本
-     */
-    @Override
-    public void synthesize(String text) {
-        // 单句不属于本轮回复：不接管本轮的订阅句柄与合成状态，否则回复中途插一句提示后，打断就停不住回复
-        subscribeSentences(Flux.just(text), false, new SynthesisRound());
-    }
-
 }

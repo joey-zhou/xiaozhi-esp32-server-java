@@ -459,6 +459,11 @@ class PersonaInterruptTest {
 
     /** 只订阅 token 流，把订阅句柄交给 cancel/isActive；forceActive 模拟 TTS 仍在回音频 */
     static class FakeSynthesizer extends Synthesizer {
+
+        @Override
+        protected Flux<Speech> roleSentence(String text) {
+            return Flux.empty();
+        }
         private volatile Disposable disposable;
         private volatile boolean forceActive;
 
