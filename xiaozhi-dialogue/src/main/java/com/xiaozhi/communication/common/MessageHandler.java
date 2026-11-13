@@ -24,7 +24,7 @@ import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.enums.ListenState;
-import com.xiaozhi.event.ChatAbortedEvent;
+import com.xiaozhi.dialogue.event.ChatAbortedEvent;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;

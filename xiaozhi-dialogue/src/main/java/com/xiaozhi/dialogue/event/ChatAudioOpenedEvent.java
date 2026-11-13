@@ -1,4 +1,4 @@
-package com.xiaozhi.event;
+package com.xiaozhi.dialogue.event;
 
 import com.xiaozhi.common.domain.AbstractDomainEvent;
 import lombok.Getter;

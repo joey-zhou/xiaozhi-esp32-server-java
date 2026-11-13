@@ -2,7 +2,7 @@ package com.xiaozhi.communication.message;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xiaozhi.communication.common.ChatSession;
-import com.xiaozhi.event.TtsPlaybackCompletedEvent;
+import com.xiaozhi.dialogue.event.TtsPlaybackCompletedEvent;
 import com.xiaozhi.utils.JsonUtil;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;

@@ -13,7 +13,7 @@ import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.dialogue.runtime.PersonaListener;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
-import com.xiaozhi.event.ChatAbortedEvent;
+import com.xiaozhi.dialogue.event.ChatAbortedEvent;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.utils.OpusProcessor;
 import org.junit.jupiter.api.AfterEach;

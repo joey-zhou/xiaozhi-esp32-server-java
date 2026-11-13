@@ -5,7 +5,7 @@ import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
-import com.xiaozhi.event.ChatAbortedEvent;
+import com.xiaozhi.dialogue.event.ChatAbortedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

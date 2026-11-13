@@ -24,8 +24,8 @@ import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.dialogue.runtime.SpeechTurn;
 import com.xiaozhi.dialogue.runtime.UserSpeechAudio;
 import com.xiaozhi.enums.DeviceState;
-import com.xiaozhi.event.ChatAbortedEvent;
-import com.xiaozhi.event.SpeechRecognizedEvent;
+import com.xiaozhi.dialogue.event.ChatAbortedEvent;
+import com.xiaozhi.dialogue.event.SpeechRecognizedEvent;
 import com.xiaozhi.common.SerialTaskRegistry;
 
 import com.xiaozhi.storage.service.StorageServiceFactory;

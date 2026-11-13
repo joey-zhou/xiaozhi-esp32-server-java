@@ -16,7 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
-import com.xiaozhi.event.TtsPlaybackCompletedEvent;
+import com.xiaozhi.dialogue.event.TtsPlaybackCompletedEvent;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 

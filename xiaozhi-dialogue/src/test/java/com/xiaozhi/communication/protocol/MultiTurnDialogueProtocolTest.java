@@ -12,7 +12,7 @@ import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.dialogue.runtime.PersonaListener;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
-import com.xiaozhi.event.TtsPlaybackCompletedEvent;
+import com.xiaozhi.dialogue.event.TtsPlaybackCompletedEvent;
 import com.xiaozhi.utils.AudioUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

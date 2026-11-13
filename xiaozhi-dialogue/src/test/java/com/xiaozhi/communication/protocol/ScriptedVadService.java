@@ -1,7 +1,7 @@
 package com.xiaozhi.communication.protocol;
 
 import com.xiaozhi.dialogue.audio.VadService;
-import com.xiaozhi.event.TtsPlaybackCompletedEvent;
+import com.xiaozhi.dialogue.event.TtsPlaybackCompletedEvent;
 
 import java.util.ArrayList;
 import java.util.List;
