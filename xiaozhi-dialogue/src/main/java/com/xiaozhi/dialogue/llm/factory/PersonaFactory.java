@@ -105,13 +105,8 @@ public class PersonaFactory {
             return session.getPersona();
         }
 
-        // Player应该是可以独立于Persona而存在的，同时也可以看作是角色的嘴巴/声带。
-        Player player = session.getPlayer();
-        if(player == null){
-            player = new ScheduledPlayer(session, sessionMessageService);
-            player.setOpusRecorder(new OpusRecorder(session, chatMessageService, aecService, storageServiceFactory));
-            session.setPlayer(player);
-        }
+        // 下面装配 Persona 的任何一步失败，故障提示都要靠播放器说出来
+        Player player = playerOf(session);
         // 初始化Conversation(相当于角色的记忆）
         String ownerId = device.getDeviceId();
         Integer userId = device.getUserId();
@@ -146,6 +141,20 @@ public class PersonaFactory {
                 .build();
         session.setPersona(persona);
         return persona;
+    }
+
+    /**
+     * 会话的播放器，没有就建一个。播放器可以先于 Persona 存在，也可以看作角色的嘴巴：
+     * 开播前就到的打断、Persona 装配失败时的故障提示都要用它
+     */
+    public Player playerOf(ChatSession session) {
+        Player player = session.getPlayer();
+        if (player == null) {
+            player = new ScheduledPlayer(session, sessionMessageService);
+            player.setOpusRecorder(new OpusRecorder(session, chatMessageService, aecService, storageServiceFactory));
+            session.setPlayer(player);
+        }
+        return player;
     }
 
     /**

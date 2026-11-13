@@ -1,6 +1,10 @@
 package com.xiaozhi.dialogue;
 
 import com.xiaozhi.dialogue.runtime.FaultNotifier;
+import com.xiaozhi.dialogue.event.AbortReason;
+import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
+import com.xiaozhi.enums.DeviceState;
+import com.xiaozhi.dialogue.event.ChatAbortedEvent;
 import com.xiaozhi.ai.llm.service.AddresseeClassifier;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.communication.message.MessageSender;
@@ -8,6 +12,9 @@ import com.xiaozhi.communication.server.websocket.WebSocketSession;
 import com.xiaozhi.dialogue.audio.AecService;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.runtime.Persona;
+import org.springframework.context.ApplicationEventPublisher;
+import org.mockito.ArgumentCaptor;
+import com.xiaozhi.common.model.bo.DeviceBO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,6 +58,10 @@ class DialogueServiceBargeInTest {
 
     @Mock
     private FaultNotifier faultNotifier;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private PersonaFactory personaFactory;
 
     @InjectMocks
     private DialogueService dialogueService;
@@ -63,6 +74,10 @@ class DialogueServiceBargeInTest {
         session = new WebSocketSession(springSession);
         session.setPlayer(player);
         session.setPersona(persona);
+        DeviceBO device = new DeviceBO();
+        device.setDeviceId("dev-1");
+        session.setDevice(device);
+        lenient().when(personaFactory.playerOf(session)).thenReturn(player);
     }
 
     @Test
@@ -76,7 +91,7 @@ class DialogueServiceBargeInTest {
         verify(addresseeClassifier, never()).directedAtDevice(any(), any(), any(), any());
         verify(persona, never()).markInterrupted();
         verify(persona, never()).interrupt();
-        verify(messageService, never()).sendTtsMessage(any(), isNull(), eq("stop"));
+        verify(player, never()).abort();
     }
 
     @Test
@@ -126,21 +141,46 @@ class DialogueServiceBargeInTest {
         verify(persona).markInterrupted();
         verify(persona).interrupt();
         verify(player, never()).resume();
-        verify(messageService).sendTtsMessage(session, null, "stop");
+        verify(player).abort();
     }
 
-    /** 还没有 Persona 时：停播出错时后面的收尾照做，设备要收到 tts stop 才会切回聆听重开麦 */
+    /** 直调打断，收尾后发一个事实事件 */
     @Test
-    void failedPlayerStopStillTellsDeviceToStop() {
-        session.setPersona(null);
-        doAnswer(invocation -> {
-            throw new IllegalStateException("录音收尾出错");
-        }).when(player).stop();
+    void confirmedInterruptIsPublishedAsAbortEvent() {
+        when(addresseeClassifier.directedAtDevice(any(), any(), any(), eq("换一个"))).thenReturn(true);
 
-        dialogueService.abortDialogue(session, "设备端打断");
+        dialogueService.resolveBargeIn(session, persona, "换一个");
+
+        ArgumentCaptor<ChatAbortedEvent> captor = ArgumentCaptor.forClass(ChatAbortedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().getSessionId()).isEqualTo("s1");
+        assertThat(captor.getValue().getDeviceId()).isEqualTo("dev-1");
+        assertThat(captor.getValue().getReason()).isEqualTo(AbortReason.BARGE_IN);
+    }
+
+    /** 还没有 Persona 时：照样让播放器停播并告诉设备，清掉 AEC 参考 */
+    @Test
+    void abortWithoutAPersonaStillStopsThePlayer() {
+        session.setPersona(null);
+
+        dialogueService.abortDialogue(session, AbortReason.DEVICE_ABORT);
 
         verify(aecService).clearReference("s1");
-        verify(messageService).sendTtsMessage(session, null, "stop");
+        verify(player).abort();
+        assertThat(session.getDeviceState()).isEqualTo(DeviceState.LISTENING);
+    }
+
+    /** 插话打断时新一轮的识别流已经在跑：不关流、不切回聆听、不再递增一次代次 */
+    @Test
+    void bargeInKeepsTheNewRecognitionRunning() {
+        session.transitionTo(DeviceState.THINKING);
+
+        dialogueService.abortDialogue(session, AbortReason.BARGE_IN);
+
+        verify(persona, never()).markInterrupted();
+        verify(persona).interrupt();
+        verify(player).abort();
+        assertThat(session.getDeviceState()).isEqualTo(DeviceState.THINKING);
     }
 
     @Test
@@ -156,6 +196,6 @@ class DialogueServiceBargeInTest {
         verify(persona, never()).markInterrupted();
         verify(persona, never()).interrupt();
         verify(player, never()).stop();
-        verify(messageService, never()).sendTtsMessage(any(), isNull(), eq("stop"));
+        verify(player, never()).abort();
     }
 }

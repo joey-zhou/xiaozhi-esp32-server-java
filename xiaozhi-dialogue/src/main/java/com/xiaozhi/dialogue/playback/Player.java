@@ -278,6 +278,32 @@ public abstract class Player {
     }
 
     /**
+     * 打断：停掉在播和待播的，无条件告诉设备停播（设备可能在开播前就发来 abort），录音收尾，
+     * 告别途中被打断就把告别后的收尾（关会话）照做。停播失败也要把后面做完，否则设备收不到 tts stop，
+     * 一直停在说话状态不重开麦。设备状态由打断方按打断原因切：插话打断时新一轮的识别已经在跑
+     */
+    public void abort() {
+        try {
+            stop();
+        } catch (Exception e) {
+            log.warn("停止播放器失败 - SessionId: {}: {}", session.getSessionId(), e.getMessage());
+        }
+        try {
+            messageService.sendTtsMessage(session, null, "stop");
+            isPlaying = false;
+        } finally {
+            if (opusRecorder != null) {
+                opusRecorder.onSendStop();
+            }
+        }
+        Runnable afterChat = functionAfterChat;
+        if (afterChat != null) {
+            functionAfterChat = null;
+            afterChat.run();
+        }
+    }
+
+    /**
      * 发送停止消息
      * 此方法不对外暴露，只有播放器能发起停止消息。外部应该通过stop 或其它间接方式停止。
      */

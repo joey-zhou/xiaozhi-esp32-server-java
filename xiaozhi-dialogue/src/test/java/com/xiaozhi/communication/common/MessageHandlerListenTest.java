@@ -1,8 +1,10 @@
 package com.xiaozhi.communication.common;
 
+import com.xiaozhi.communication.domain.AbortMessage;
 import com.xiaozhi.communication.domain.ListenMessage;
 import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.communication.server.websocket.WebSocketSession;
+import com.xiaozhi.dialogue.event.AbortReason;
 import com.xiaozhi.dialogue.DialogueService;
 import com.xiaozhi.dialogue.audio.AecService;
 import com.xiaozhi.dialogue.audio.VadService;
@@ -17,7 +19,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationContext;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,8 +58,6 @@ class MessageHandlerListenTest {
     @Mock
     private MessageSender messageService;
     @Mock
-    private ApplicationContext applicationContext;
-    @Mock
     private Player player;
     @Mock
     private org.springframework.web.socket.WebSocketSession springSession;
@@ -75,7 +74,6 @@ class MessageHandlerListenTest {
         ReflectionTestUtils.setField(messageHandler, "aecService", aecService);
         ReflectionTestUtils.setField(messageHandler, "personaFactory", personaFactory);
         ReflectionTestUtils.setField(messageHandler, "messageService", messageService);
-        ReflectionTestUtils.setField(messageHandler, "applicationContext", applicationContext);
 
         lenient().when(springSession.getId()).thenReturn(SESSION_ID);
         session = new WebSocketSession(springSession);
@@ -206,6 +204,17 @@ class MessageHandlerListenTest {
         order.verify(aecService).initSession(SESSION_ID);
         order.verify(messageService).sendSttMessage(session, "讲个笑话");
         order.verify(dialogueService).handleText(any(), any());
+    }
+
+    /** 设备给的原因文本只记日志，收尾按固定原因走 */
+    @Test
+    void deviceAbortIsHandedToDialogueServiceDirectly() {
+        AbortMessage abort = new AbortMessage();
+        abort.setReason("user_interrupt");
+
+        messageHandler.handleMessage(abort, SESSION_ID);
+
+        verify(dialogueService).abortDialogue(session, AbortReason.DEVICE_ABORT);
     }
 
     private static ListenMessage listen(ListenState state, ListenMode mode) {

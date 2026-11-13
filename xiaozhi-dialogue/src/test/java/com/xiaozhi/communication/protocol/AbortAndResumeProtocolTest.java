@@ -13,6 +13,7 @@ import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.dialogue.runtime.PersonaListener;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
+import com.xiaozhi.dialogue.event.AbortReason;
 import com.xiaozhi.dialogue.event.ChatAbortedEvent;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.utils.OpusProcessor;
@@ -101,10 +102,10 @@ class AbortAndResumeProtocolTest {
         AwaitHelper.until("播放已开始下发真帧", () -> spokenFrames(device).size() >= 3);
         device.abort("wake_word_detected");
 
-        // 打断原因原样透传，服务端不改写
+        // 设备给的原因只记日志，收尾与事件里都是固定的枚举，设备可控的文本不驱动收尾分支
         List<ChatAbortedEvent> aborted = harness.events().eventsOf(ChatAbortedEvent.class);
         assertThat(aborted).hasSize(1);
-        assertThat(aborted.get(0).getReason()).isEqualTo("wake_word_detected");
+        assertThat(aborted.get(0).getReason()).isEqualTo(AbortReason.DEVICE_ABORT);
         assertThat(aborted.get(0).getSessionId()).isEqualTo(device.sessionId());
 
         Player player = session.getPlayer();

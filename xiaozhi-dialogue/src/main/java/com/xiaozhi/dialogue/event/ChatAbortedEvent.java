@@ -2,22 +2,22 @@ package com.xiaozhi.dialogue.event;
 
 import com.xiaozhi.common.domain.AbstractDomainEvent;
 import lombok.Getter;
-import org.springframework.util.StringUtils;
 
 /**
- * 设备端（客户端）发起打断的事件
+ * 对话已被中止（事实）：停播、历史收尾都做完之后发出。要打断对话的一方直调 DialogueService.abortDialogue，
+ * 不发这个事件
  */
 @Getter
 public class ChatAbortedEvent extends AbstractDomainEvent {
 
     private final String sessionId;
     private final String deviceId;
-    private final String reason;
+    private final AbortReason reason;
 
-    public ChatAbortedEvent(Object source, String sessionId, String deviceId, String reason) {
+    public ChatAbortedEvent(Object source, String sessionId, String deviceId, AbortReason reason) {
         super(source);
         this.sessionId = sessionId;
         this.deviceId = deviceId;
-        this.reason = StringUtils.hasText(reason) ? reason : "设备端打断";
+        this.reason = reason;
     }
 }

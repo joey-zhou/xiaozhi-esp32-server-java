@@ -5,6 +5,7 @@ import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
+import com.xiaozhi.dialogue.event.AbortReason;
 import com.xiaozhi.dialogue.event.ChatAbortedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +63,7 @@ class GoodbyeAndReconnectProtocolTest {
         // 中止事件带的原因是设备主动退出，区别于普通打断
         List<ChatAbortedEvent> aborts = harness.events().eventsOf(ChatAbortedEvent.class);
         assertThat(aborts).hasSize(1);
-        assertThat(aborts.get(0).getReason()).isEqualTo("设备主动退出");
+        assertThat(aborts.get(0).getReason()).isEqualTo(AbortReason.DEVICE_GOODBYE);
         assertThat(aborts.get(0).getDeviceId()).isEqualTo(DEVICE_ID);
         // 会话注册表与设备反向索引一并清空
         assertThat(harness.sessionManager().getSession(sessionId)).isNull();
