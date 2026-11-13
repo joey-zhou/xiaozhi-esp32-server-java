@@ -74,7 +74,7 @@ Redis 没开 requirepass 时 `_PASSWORD` 必须留空，空串会被当口令发
 
 | 变量 | 默认值 | 不改的后果 |
 |------|--------|-----------|
-| `XIAOZHI_DEVICE_AUTH_SECRET` | 直接跑 jar 为 `xz-2026`；**docker 部署为空，即不鉴权** | 空值时任何人报一个设备 MAC 就能接进对话链路；`xz-2026` 是公开值，效果与空值相差无几。网页聊天身份不受此项影响，始终校验登录态。server 与 dialogue 必须同值 |
+| `XIAOZHI_DEVICE_AUTH_SECRET` | **为空，即不鉴权**（直接跑 jar 与 docker 部署一致） | 空值时任何人报一个设备 MAC 就能接进对话链路；`xz-2026` 是公开值，效果与空值相差无几。网页聊天身份不受此项影响，始终校验登录态。server 与 dialogue 必须同值 |
 | `JWT_SECRET_KEY` | 内置字符串 | 后台登录 token 可被伪造 |
 
 **存储与其它**

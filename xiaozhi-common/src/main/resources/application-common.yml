@@ -103,10 +103,10 @@ logging:
 # 小智扩展配置
 # ============================================================
 xiaozhi:
-  # 设备接入鉴权：OTA 下发签名 token，握手校验。留空不鉴权，生产部署必须配。
+  # 设备接入鉴权：OTA 下发签名 token，握手校验。默认留空即不鉴权，生产部署必须配。
   # 由环境变量 XIAOZHI_DEVICE_AUTH_SECRET 提供，server 与 dialogue 必须同值。
   device-auth:
-    secret: ${XIAOZHI_DEVICE_AUTH_SECRET:xz-2026}
+    secret: ${XIAOZHI_DEVICE_AUTH_SECRET:}
     expire-seconds: 2592000
     allowed-devices:  # 逗号分隔的设备MAC，白名单免 token
   runtime:
