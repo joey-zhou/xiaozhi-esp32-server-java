@@ -1,6 +1,8 @@
 package com.xiaozhi.communication.auth;
 
 import com.xiaozhi.utils.DateUtils;
+import com.xiaozhi.utils.HmacSha256;
+import com.xiaozhi.utils.HmacSha256.Encoding;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -9,16 +11,12 @@ import org.springframework.util.StringUtils;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -78,7 +76,7 @@ public class DeviceAuthService {
             return "";
         }
         long ts = DateUtils.millis() / 1000;
-        return sign(normalize(deviceId) + "|" + ts, secret) + "." + ts;
+        return HmacSha256.sign(secret, normalize(deviceId) + "|" + ts, Encoding.URL_SAFE) + "." + ts;
     }
 
     public boolean verifyDeviceToken(String token, String deviceId) {
@@ -100,8 +98,7 @@ public class DeviceAuthService {
         if (now - ts > expireSeconds || ts - now > 300) {
             return false;
         }
-        String expected = sign(normalize(deviceId) + "|" + ts, secret);
-        return constantTimeEquals(token.substring(0, dot), expected);
+        return HmacSha256.verify(secret, normalize(deviceId) + "|" + ts, token.substring(0, dot), Encoding.URL_SAFE);
     }
 
     public String generateVisionToken(String sessionId, String deviceId) {
@@ -110,7 +107,7 @@ public class DeviceAuthService {
         String payload = encodeField(sessionId) + "|"
                 + encodeField(deviceId == null ? "" : normalize(deviceId)) + "|" + exp;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes(StandardCharsets.UTF_8))
-                + "." + sign(payload, visionSecret);
+                + "." + HmacSha256.sign(visionSecret, payload, Encoding.URL_SAFE);
     }
 
     private static String encodeField(String value) {
@@ -136,7 +133,7 @@ public class DeviceAuthService {
         } catch (IllegalArgumentException e) {
             return null;
         }
-        if (!constantTimeEquals(token.substring(dot + 1), sign(payload, visionSecret))) {
+        if (!HmacSha256.verify(visionSecret, payload, token.substring(dot + 1), Encoding.URL_SAFE)) {
             return null;
         }
         String[] parts = payload.split("\\|", -1);
@@ -162,20 +159,5 @@ public class DeviceAuthService {
 
     private static String normalize(String deviceId) {
         return deviceId.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private static String sign(String content, String key) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return Base64.getUrlEncoder().withoutPadding()
-                    .encodeToString(mac.doFinal(content.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new IllegalStateException("HMAC-SHA256签名失败", e);
-        }
-    }
-
-    private static boolean constantTimeEquals(String a, String b) {
-        return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
     }
 }

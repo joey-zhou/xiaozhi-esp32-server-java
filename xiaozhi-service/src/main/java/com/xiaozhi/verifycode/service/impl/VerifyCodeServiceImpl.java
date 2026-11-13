@@ -16,17 +16,20 @@ import org.springframework.util.StringUtils;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @Slf4j
 public class VerifyCodeServiceImpl implements VerifyCodeService {
 
     private static final int VALID_MINUTES = 10;
+
+    /** 验证码是凭据，不能用可预测的随机数 */
+    private static final SecureRandom CODE_RANDOM = new SecureRandom();
 
     /** 同一账号在有效期窗口内允许的校验次数，达到即作废该账号所有未过期的码。 */
     private static final int MAX_ATTEMPTS = 5;
@@ -151,7 +154,7 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
         deleteByAccount(account);
         resetAttempts(account);
 
-        String code = String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
+        String code = String.format("%06d", CODE_RANDOM.nextInt(1_000_000));
         VerifyCodeDO verifyCode = new VerifyCodeDO();
         verifyCode.setAccount(account);
         verifyCode.setCode(code);

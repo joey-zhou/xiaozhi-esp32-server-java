@@ -3,19 +3,16 @@ package com.xiaozhi.common.web;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.communication.ServerAddressProvider;
 import com.xiaozhi.utils.DateUtils;
+import com.xiaozhi.utils.HmacSha256;
+import com.xiaozhi.utils.HmacSha256.Encoding;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.StringJoiner;
 import java.util.UUID;
@@ -122,7 +119,7 @@ public class LocalFileUrlPolicy {
         long expireAt = DateUtils.instant().plus(Duration.ofHours(urlTtlHours)).getEpochSecond();
         return path + (path.indexOf('?') >= 0 ? "&" : "?")
                 + EXPIRE_PARAM + "=" + expireAt
-                + "&" + SIGNATURE_PARAM + "=" + sign(relativePath(path), expireAt);
+                + "&" + SIGNATURE_PARAM + "=" + HmacSha256.sign(signingKey(), signedContent(path, expireAt), Encoding.URL_SAFE);
     }
 
     /**
@@ -191,26 +188,14 @@ public class LocalFileUrlPolicy {
         if (DateUtils.instant().getEpochSecond() > expireAt) {
             return false;
         }
-        byte[] expected = sign(relativePath(path), expireAt).getBytes(StandardCharsets.UTF_8);
-        return MessageDigest.isEqual(signature.getBytes(StandardCharsets.UTF_8), expected);
+        return HmacSha256.verify(signingKey(), signedContent(path, expireAt), signature, Encoding.URL_SAFE);
     }
 
-    /** 签名内容统一去掉前导斜杠，保证下发地址与请求地址算出同一个签名 */
-    private static String relativePath(String path) {
+    /** 签名内容里的路径统一去掉前导斜杠与查询串，保证下发地址与请求地址算出同一个签名 */
+    private static String signedContent(String path, long expireAt) {
         String value = path.startsWith("/") ? path.substring(1) : path;
         int mark = value.indexOf('?');
-        return mark < 0 ? value : value.substring(0, mark);
-    }
-
-    private String sign(String path, long expireAt) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(signingKey().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            byte[] digest = mac.doFinal((path + "|" + expireAt).getBytes(StandardCharsets.UTF_8));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
-        } catch (Exception e) {
-            throw new IllegalStateException("文件地址签名失败", e);
-        }
+        return (mark < 0 ? value : value.substring(0, mark)) + "|" + expireAt;
     }
 
     /**

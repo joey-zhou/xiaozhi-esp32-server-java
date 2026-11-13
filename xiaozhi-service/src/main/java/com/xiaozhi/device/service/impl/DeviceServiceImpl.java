@@ -25,15 +25,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class DeviceServiceImpl implements DeviceService {
 
     /** 验证码摇号最多重试次数 */
     private static final int CODE_ALLOCATE_ATTEMPTS = 5;
+
+    /** 绑定码是凭据，不能用可预测的随机数 */
+    private static final SecureRandom CODE_RANDOM = new SecureRandom();
 
     @Resource
     private DeviceMapper deviceMapper;
@@ -145,7 +148,7 @@ public class DeviceServiceImpl implements DeviceService {
      */
     private String allocateUnusedCode() {
         for (int i = 0; i < CODE_ALLOCATE_ATTEMPTS; i++) {
-            String code = String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
+            String code = String.format("%06d", CODE_RANDOM.nextInt(1_000_000));
             if (verifyCodeService.findValid(code, null, null) == null) {
                 return code;
             }

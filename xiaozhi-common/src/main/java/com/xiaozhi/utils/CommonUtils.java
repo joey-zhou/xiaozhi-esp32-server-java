@@ -2,15 +2,10 @@ package com.xiaozhi.utils;
 
 import org.apache.commons.lang3.StringUtils;
 
-import javax.crypto.Mac;
 import java.util.regex.Pattern;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.UnsupportedEncodingException;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
-import java.util.Random;
 
 public class CommonUtils {
 
@@ -28,15 +23,6 @@ public class CommonUtils {
         return (firstByte & 1) == 0;
     }
 
-
-    public static Integer CaptchaCode() {
-        StringBuilder str = new StringBuilder();
-        Random random = new Random();
-        for (int i = 0; i < 6; i++) {
-            str.append(random.nextInt(10));
-        }
-        return Integer.valueOf(str.toString());
-    }
 
     public static String left(String str, int index) {
         if (StringUtils.isBlank(str)) {
@@ -59,22 +45,6 @@ public class CommonUtils {
         }
         return StringUtils.left(str, index).concat(StringUtils
                 .removeStart(StringUtils.leftPad(StringUtils.right(str, end), StringUtils.length(str), "*"), "***"));
-    }
-
-    /**
-     * 使用 HMAC-SHA256 对内容签名，返回 Base64 编码结果，失败时返回 null
-     */
-    public static String hmacSha256(String content, String secretKey) {
-        try {
-            SecretKeySpec keySpec = new SecretKeySpec(
-                    secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(keySpec);
-            return Base64.getEncoder().encodeToString(
-                    mac.doFinal(content.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            return null;
-        }
     }
 
     /**
