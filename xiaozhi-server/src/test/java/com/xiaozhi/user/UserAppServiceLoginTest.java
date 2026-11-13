@@ -4,7 +4,7 @@ import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.bo.UserAuthBO;
 import com.xiaozhi.common.model.bo.UserBO;
-import com.xiaozhi.common.port.DeviceWriter;
+import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.security.service.AuthenticationService;
 import com.xiaozhi.template.service.TemplateService;
@@ -46,7 +46,7 @@ class UserAppServiceLoginTest {
     @Mock
     private TemplateService templateService;
     @Mock
-    private DeviceWriter deviceWriter;
+    private DeviceService deviceService;
     @Mock
     private AuthenticationService authenticationService;
     @Mock
@@ -60,7 +60,7 @@ class UserAppServiceLoginTest {
         ReflectionTestUtils.setField(userAppService, "userService", userService);
         ReflectionTestUtils.setField(userAppService, "roleService", roleService);
         ReflectionTestUtils.setField(userAppService, "templateService", templateService);
-        ReflectionTestUtils.setField(userAppService, "deviceWriter", deviceWriter);
+        ReflectionTestUtils.setField(userAppService, "deviceService", deviceService);
         ReflectionTestUtils.setField(userAppService, "authenticationService", authenticationService);
         ReflectionTestUtils.setField(userAppService, "userAuthService", userAuthService);
         lenient().when(authenticationService.encryptPassword(anyString())).thenReturn("encrypted");
@@ -119,7 +119,7 @@ class UserAppServiceLoginTest {
             .isEqualTo("encrypted");
 
         verify(templateService).copyTemplates(1, 7);
-        verify(deviceWriter).register("user_chat_7", "网页聊天", "web", 7, 11);
+        verify(deviceService).registerWebChat(7, 11);
     }
 
     @Test
@@ -183,7 +183,7 @@ class UserAppServiceLoginTest {
         assertThat(captor.getValue().getPlatform()).isEqualTo("wechat");
         assertThat(captor.getValue().getProfile()).isEqualTo("{\"n\":1}");
 
-        verify(deviceWriter).register("user_chat_7", "网页聊天", "web", 7, 11);
+        verify(deviceService).registerWebChat(7, 11);
     }
 
     @Test

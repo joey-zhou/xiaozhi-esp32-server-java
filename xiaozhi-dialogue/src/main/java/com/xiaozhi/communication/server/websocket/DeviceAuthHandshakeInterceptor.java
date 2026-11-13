@@ -1,6 +1,7 @@
 package com.xiaozhi.communication.server.websocket;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.xiaozhi.communication.WebChatDevice;
 import com.xiaozhi.communication.auth.DeviceAuthService;
 import com.xiaozhi.utils.CommonUtils;
 import jakarta.annotation.Resource;
@@ -33,9 +34,6 @@ public class DeviceAuthHandshakeInterceptor implements HandshakeInterceptor {
     /** 握手属性键：本连接被判定的设备标识 */
     public static final String ATTR_DEVICE_ID = "deviceId";
 
-    /** 网页聊天的会话身份前缀，后接登录用户 ID */
-    private static final String WEB_CHAT_PREFIX = "user_chat_";
-
     @Resource
     private DeviceAuthService deviceAuthService;
 
@@ -52,7 +50,7 @@ public class DeviceAuthHandshakeInterceptor implements HandshakeInterceptor {
 
         // 网页聊天身份认的是管理端登录态，与设备鉴权开不开无关；
         // 设备鉴权密钥留空时若一并放行，任何人不带凭据就能以别人的网页聊天身份接入
-        if (isWebChatIdentity(deviceId)) {
+        if (WebChatDevice.isWebChat(deviceId)) {
             return verifyLogin(response, attributes, deviceId, token);
         }
         if (!deviceAuthService.isEnabled()) {
@@ -77,14 +75,6 @@ public class DeviceAuthHandshakeInterceptor implements HandshakeInterceptor {
         return verifyLogin(response, attributes, deviceId, token);
     }
 
-    /**
-     * 按前缀忽略大小写判断：库的排序规则不区分大小写，User_Chat_1 会查到 user_chat_1 那台设备，
-     * 前缀判断若区分大小写，变形写法就会绕开登录态校验
-     */
-    private static boolean isWebChatIdentity(String deviceId) {
-        return deviceId != null && deviceId.regionMatches(true, 0, WEB_CHAT_PREFIX, 0, WEB_CHAT_PREFIX.length());
-    }
-
     /** 非 MAC 的会话身份必须与登录用户逐字一致 */
     private boolean verifyLogin(ServerHttpResponse response, Map<String, Object> attributes,
                                 String deviceId, String token) {
@@ -94,7 +84,9 @@ public class DeviceAuthHandshakeInterceptor implements HandshakeInterceptor {
         try {
             Object loginId = StpUtil.getLoginIdByToken(token);
             if (loginId != null) {
-                if (!deviceId.equals(WEB_CHAT_PREFIX + loginId)) {
+                // 登录 ID 就是用户 ID；逐字比较，大小写变形的身份也拒绝
+                String expected = WebChatDevice.deviceIdOf(Integer.valueOf(loginId.toString()));
+                if (!deviceId.equals(expected)) {
                     return reject(response, "登录用户与会话身份不一致", deviceId);
                 }
                 return accept(attributes, deviceId);

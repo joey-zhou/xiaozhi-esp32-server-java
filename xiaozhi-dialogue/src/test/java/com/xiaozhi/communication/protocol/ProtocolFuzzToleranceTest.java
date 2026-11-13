@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -51,6 +52,9 @@ class ProtocolFuzzToleranceTest {
     private static final int VIRTUAL_USER_ID = 7;
 
     private ProtocolTestHarness harness;
+
+    /** 统一开户入口被调过之后，设备表里才查得到绑定好的虚拟设备 */
+    private final AtomicBoolean virtualDeviceRegistered = new AtomicBoolean();
 
     @TempDir
     Path tempDir;
@@ -306,14 +310,9 @@ class ProtocolFuzzToleranceTest {
 
         device.listenText("今天天气怎么样");
 
-        // 自动建档：web 类型、绑定到默认角色
-        AwaitHelper.until("虚拟设备已建档", () -> !harness.deviceWriter().registrations().isEmpty());
-        assertThat(harness.deviceWriter().registrations()).singleElement().satisfies(registered -> {
-            assertThat(registered.deviceId()).isEqualTo(VIRTUAL_DEVICE_ID);
-            assertThat(registered.type()).isEqualTo("web");
-            assertThat(registered.userId()).isEqualTo(VIRTUAL_USER_ID);
-            assertThat(registered.roleId()).isEqualTo(1);
-        });
+        // 自动建档：走与开户同一个入口，绑定到默认角色
+        AwaitHelper.until("虚拟设备已建档", virtualDeviceRegistered::get);
+        verify(harness.deviceService()).registerWebChat(VIRTUAL_USER_ID, 1);
 
         // 绑定后当前这条 listen/text 继续被处理，而不是像验证码分支那样被丢弃
         JsonNode stt = device.transport().awaitJson("stt");
@@ -418,7 +417,7 @@ class ProtocolFuzzToleranceTest {
         return path;
     }
 
-    /** user_chat_ 虚拟设备：建档前查不到角色，register 之后才查得到绑定后的设备 */
+    /** user_chat_ 虚拟设备：建档前查不到角色，registerWebChat 之后才查得到绑定后的设备 */
     private void stubVirtualDeviceBinding() {
         DeviceBO unbound = new DeviceBO();
         unbound.setDeviceId(VIRTUAL_DEVICE_ID);
@@ -426,7 +425,7 @@ class ProtocolFuzzToleranceTest {
 
         DeviceBO bound = new DeviceBO();
         bound.setDeviceId(VIRTUAL_DEVICE_ID);
-        bound.setDeviceName("小助手");
+        bound.setDeviceName("网页聊天");
         bound.setType("web");
         bound.setUserId(VIRTUAL_USER_ID);
         bound.setRoleId(1);
@@ -436,14 +435,13 @@ class ProtocolFuzzToleranceTest {
         defaultRole.setUserId(VIRTUAL_USER_ID);
         defaultRole.setRoleName("协议测试角色");
 
-        doAnswer(invocation -> virtualDeviceRegistered() ? bound : unbound)
+        doAnswer(invocation -> {
+            virtualDeviceRegistered.set(true);
+            return null;
+        }).when(harness.deviceService()).registerWebChat(VIRTUAL_USER_ID, 1);
+        doAnswer(invocation -> virtualDeviceRegistered.get() ? bound : unbound)
                 .when(harness.deviceService()).getBO(VIRTUAL_DEVICE_ID);
         doAnswer(invocation -> defaultRole)
                 .when(harness.roleService()).getDefaultOrFirstBO(VIRTUAL_USER_ID);
-    }
-
-    private boolean virtualDeviceRegistered() {
-        return harness.deviceWriter().registrations().stream()
-                .anyMatch(registered -> VIRTUAL_DEVICE_ID.equals(registered.deviceId()));
     }
 }

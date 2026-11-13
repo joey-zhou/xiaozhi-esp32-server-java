@@ -49,7 +49,7 @@ const selectedRoleId = ref<number | undefined>()
 // 头像
 const userAvatar = computed(() => getAvatarUrl(userStore.userInfo?.avatar))
 
-// 虚拟设备ID，与后端自动创建的格式一致；未登录时为空，此时不允许连接与切换角色
+// 虚拟设备ID，格式以后端 WebChatDevice（xiaozhi-common）为准；未登录时为空，此时不允许连接与切换角色
 const virtualDeviceId = computed(() =>
   userStore.userInfo?.userId ? `user_chat_${userStore.userInfo.userId}` : ''
 )

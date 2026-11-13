@@ -163,6 +163,19 @@ class DeviceAuthHandshakeInterceptorTest {
         assertThat(handshake(request, new MockHttpServletResponse())).isFalse();
     }
 
+    /** 自己的身份换个大小写也不收：同一台设备会以两个会话号并存，重连时清不掉上一条 */
+    @Test
+    void rejectsCaseVariantOfOwnWebChatIdentity() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setQueryString("device-id=User_Chat_7&token=login-token");
+
+        try (MockedStatic<StpUtil> stpUtil = mockStatic(StpUtil.class)) {
+            stpUtil.when(() -> StpUtil.getLoginIdByToken("login-token")).thenReturn("7");
+
+            assertThat(handshake(request, new MockHttpServletResponse())).isFalse();
+        }
+    }
+
     /** 鉴权关闭时 MAC 设备照旧放行，改动不能波及真实设备 */
     @Test
     void macDeviceStillPassesWhenDeviceAuthDisabled() {

@@ -11,6 +11,8 @@ import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
+import com.xiaozhi.device.domain.Device;
+import com.xiaozhi.device.domain.repository.DeviceRepository;
 import com.xiaozhi.device.model.DeviceProjection;
 import com.xiaozhi.support.MybatisPlusTestHelper;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
@@ -71,8 +73,25 @@ class DeviceServiceImplTest {
     @Mock
     private Cache cache;
 
+    @Mock
+    private DeviceRepository deviceRepository;
+
     @InjectMocks
     private DeviceServiceImpl deviceService;
+
+    /** 注册、手机号与微信自动注册、对话里补建档都走这一处，设备号、名称、类型不能各写各的 */
+    @Test
+    void registerWebChatSavesTheUsersVirtualDevice() {
+        deviceService.registerWebChat(7, 11);
+
+        ArgumentCaptor<Device> saved = ArgumentCaptor.forClass(Device.class);
+        verify(deviceRepository).save(saved.capture());
+        assertThat(saved.getValue().getDeviceId()).isEqualTo("user_chat_7");
+        assertThat(saved.getValue().getDeviceName()).isEqualTo("网页聊天");
+        assertThat(saved.getValue().getType()).isEqualTo("web");
+        assertThat(saved.getValue().getUserId()).isEqualTo(7);
+        assertThat(saved.getValue().getRoleId()).isEqualTo(11);
+    }
 
     @Test
     void pageReturnsProjectionRecordsUntouched() {

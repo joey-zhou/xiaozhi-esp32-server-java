@@ -13,6 +13,4 @@ public interface DeviceWriter {
 
     /** 设备不存在时静默跳过 */
     void bindRole(String deviceId, Integer roleId);
-
-    void register(String deviceId, String deviceName, String type, Integer userId, Integer roleId);
 }

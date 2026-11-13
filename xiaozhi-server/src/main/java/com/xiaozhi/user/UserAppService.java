@@ -16,7 +16,6 @@ import com.xiaozhi.common.model.resp.LoginResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.PermissionTreeResp;
 import com.xiaozhi.common.model.resp.UserResp;
-import com.xiaozhi.common.port.DeviceWriter;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.permission.convert.PermissionConvert;
 import com.xiaozhi.permission.service.PermissionService;
@@ -69,8 +68,6 @@ public class UserAppService {
     @Resource
     private DeviceService deviceService;
 
-    @Resource
-    private DeviceWriter deviceWriter;
 
     @Resource
     private AuthenticationService authenticationService;
@@ -135,7 +132,7 @@ public class UserAppService {
 
         Integer defaultRoleId = roleService.copyDefaultRole(ADMIN_TEMPLATE_OWNER_ID, userId);
         templateService.copyTemplates(ADMIN_TEMPLATE_OWNER_ID, userId);
-        deviceWriter.register("user_chat_" + userId, "网页聊天", "web", userId, defaultRoleId);
+        deviceService.registerWebChat(userId, defaultRoleId);
 
         return created;
     }

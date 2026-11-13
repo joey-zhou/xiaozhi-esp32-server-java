@@ -9,6 +9,7 @@ import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.exception.OperationFailedException;
+import com.xiaozhi.communication.WebChatDevice;
 import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
@@ -192,8 +193,9 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
     @Override
-    public void register(String deviceId, String deviceName, String type, Integer userId, Integer roleId) {
-        deviceRepository.save(Device.newDevice(deviceId, deviceName, type, userId, roleId));
+    public void registerWebChat(Integer userId, Integer roleId) {
+        deviceRepository.save(Device.newDevice(WebChatDevice.deviceIdOf(userId),
+            WebChatDevice.DEVICE_NAME, WebChatDevice.DEVICE_TYPE, userId, roleId));
     }
 
 }

@@ -25,6 +25,9 @@ public interface DeviceService extends DeviceWriter {
 
     List<DeviceBO> listByStateAndType(String state, String type);
 
+    /** 建或补齐用户的网页聊天虚拟设备并绑定角色：开户时建，对话里发现没绑角色时补 */
+    void registerWebChat(Integer userId, Integer roleId);
+
     // ===================== 验证码操作（独立表，非 Device 聚合） =====================
 
     VerifyCodeBO generateCode(String deviceId, String sessionId, String type);

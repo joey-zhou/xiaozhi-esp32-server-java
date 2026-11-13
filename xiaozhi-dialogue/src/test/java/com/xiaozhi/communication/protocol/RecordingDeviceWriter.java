@@ -14,9 +14,6 @@ class RecordingDeviceWriter implements DeviceWriter {
     record StateUpdate(String deviceId, String state) {
     }
 
-    record Registration(String deviceId, String deviceName, String type, Integer userId, Integer roleId) {
-    }
-
     record RoleBinding(String deviceId, Integer roleId) {
     }
 
@@ -24,7 +21,6 @@ class RecordingDeviceWriter implements DeviceWriter {
     }
 
     private final List<StateUpdate> stateUpdates = new CopyOnWriteArrayList<>();
-    private final List<Registration> registrations = new CopyOnWriteArrayList<>();
     private final List<RoleBinding> roleBindings = new CopyOnWriteArrayList<>();
     private final List<McpListUpdate> mcpListUpdates = new CopyOnWriteArrayList<>();
 
@@ -49,17 +45,8 @@ class RecordingDeviceWriter implements DeviceWriter {
         roleBindings.add(new RoleBinding(deviceId, roleId));
     }
 
-    @Override
-    public void register(String deviceId, String deviceName, String type, Integer userId, Integer roleId) {
-        registrations.add(new Registration(deviceId, deviceName, type, userId, roleId));
-    }
-
     List<StateUpdate> stateUpdates() {
         return List.copyOf(stateUpdates);
-    }
-
-    List<Registration> registrations() {
-        return List.copyOf(registrations);
     }
 
     List<RoleBinding> roleBindings() {
