@@ -17,8 +17,10 @@ import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
 import com.xiaozhi.user.model.UserProjection;
 import com.xiaozhi.user.service.UserService;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -36,6 +38,11 @@ public class UserServiceImpl implements UserService {
 
     @Resource
     private CacheManager cacheManager;
+
+    // 自注入以走 getBO 的缓存：Sa-Token 每次权限判定都要问一次是不是管理员
+    @Lazy
+    @Autowired
+    private UserService self;
 
     @Override
     public PageResult<UserProjection> page(int pageNo, int pageSize, String name, String email,
@@ -58,6 +65,15 @@ public class UserServiceImpl implements UserService {
             return null;
         }
         return userConvert.toBO(userMapper.selectById(userId));
+    }
+
+    @Override
+    public boolean isAdmin(Integer userId) {
+        if (userId == null) {
+            return false;
+        }
+        UserBO user = self.getBO(userId);
+        return user != null && UserBO.ADMIN_YES.equals(user.getIsAdmin());
     }
 
     @Override

@@ -3,7 +3,6 @@ package com.xiaozhi.server.web.chat;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.bo.RoleBO;
-import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.security.ownership.OwnershipAspect;
 import com.xiaozhi.security.ownership.OwnershipConfig;
@@ -52,7 +51,6 @@ class WebChatControllerOwnershipTest {
     @Test
     void openRejectsAnotherUsersRole() throws Exception {
         when(roleService.getBO(ROLE_ID)).thenReturn(role(OWNER_USER_ID));
-        when(userService.getBO(OTHER_USER_ID)).thenReturn(normalUser());
         when(joinPoint.getSignature()).thenReturn(methodSignature);
         when(methodSignature.getMethod()).thenReturn(openEndpoint());
         when(joinPoint.getArgs()).thenReturn(new Object[]{ROLE_ID, null});
@@ -71,7 +69,6 @@ class WebChatControllerOwnershipTest {
     @Test
     void openAcceptsOwnRole() throws Exception {
         when(roleService.getBO(ROLE_ID)).thenReturn(role(OWNER_USER_ID));
-        when(userService.getBO(OWNER_USER_ID)).thenReturn(normalUser());
         when(joinPoint.getSignature()).thenReturn(methodSignature);
         when(methodSignature.getMethod()).thenReturn(openEndpoint());
         when(joinPoint.getArgs()).thenReturn(new Object[]{ROLE_ID, "session-1"});
@@ -100,11 +97,5 @@ class WebChatControllerOwnershipTest {
         role.setRoleId(ROLE_ID);
         role.setUserId(userId);
         return role;
-    }
-
-    private static UserBO normalUser() {
-        UserBO user = new UserBO();
-        user.setIsAdmin("0");
-        return user;
     }
 }

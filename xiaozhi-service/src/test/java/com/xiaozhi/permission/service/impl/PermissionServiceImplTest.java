@@ -23,6 +23,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -132,6 +133,40 @@ class PermissionServiceImplTest {
         List<String> result = permissionService.listKeysByUserId(1);
 
         assertThat(result).containsExactly("system:user:list", "system:user:detail");
+    }
+
+    /** 管理员全权在后端给出：不看后台角色分到了哪些，新加的权限没分给管理员角色也照样有 */
+    @Test
+    void adminGetsEveryEnabledPermissionKeyWhateverTheRoleGrants() {
+        when(userService.isAdmin(1)).thenReturn(true);
+        when(self.listAllKeys()).thenReturn(List.of("system:user:list", "system:device:delete"));
+
+        assertThat(permissionService.listKeysByUserId(1)).containsExactly("system:user:list", "system:device:delete");
+        verify(self, never()).listKeysByAuthRoleId(any());
+    }
+
+    /** 前端按这份树建菜单和判按钮，管理员也拿到全量，前端不再需要按身份放行 */
+    @Test
+    void adminPermissionListIsEveryEnabledPermission() {
+        PermissionDO first = permissionDO(10, "system:user:list");
+        PermissionDO second = permissionDO(20, "system:device:delete");
+        PermissionBO firstBO = permission(10, 0, "system:user:list");
+        PermissionBO secondBO = permission(20, 0, "system:device:delete");
+        when(userService.isAdmin(1)).thenReturn(true);
+        when(permissionMapper.selectList(any())).thenReturn(List.of(first, second));
+        when(permissionConvert.toBO(first)).thenReturn(firstBO);
+        when(permissionConvert.toBO(second)).thenReturn(secondBO);
+
+        assertThat(permissionService.listByUserId(1)).containsExactly(firstBO, secondBO);
+        verify(self, never()).listByAuthRoleId(any());
+    }
+
+    @Test
+    void listAllKeysReadsEveryEnabledKeyAndSkipsBlankOnes() {
+        when(permissionMapper.selectList(any())).thenReturn(List.of(
+            permissionDO(10, "system:user:list"), permissionDO(20, " "), permissionDO(30, "system:device:delete")));
+
+        assertThat(permissionService.listAllKeys()).containsExactly("system:user:list", "system:device:delete");
     }
 
     @Test

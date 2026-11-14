@@ -106,10 +106,15 @@ describe('useUserStore', () => {
     ]
 
     describe('hasPermission', () => {
-      it('管理员拥有所有权限', () => {
+      // 管理员的全权由后端给出（下发全部权限键），前端不再按身份放行，按钮显隐与接口鉴权同一口径
+      it('管理员也只按下发的权限键判定', () => {
         store.setUserInfo({ userId: 1, isAdmin: '1' })
-        expect(store.hasPermission('any:permission')).toBe(true)
-        expect(store.hasPermission('nonexistent')).toBe(true)
+        store.setPermissions(mockPermissions)
+
+        expect(store.hasPermission('device:add')).toBe(true)
+        expect(store.hasPermission('nonexistent')).toBe(false)
+        expect(store.hasAnyPermission(['nonexistent', 'other'])).toBe(false)
+        expect(store.hasAllPermissions(['device:list', 'nonexistent'])).toBe(false)
       })
 
       it('普通用户检查具体权限', () => {
@@ -192,11 +197,6 @@ describe('useUserStore', () => {
     })
 
     describe('hasAnyPermission', () => {
-      it('管理员始终返回 true', () => {
-        store.setUserInfo({ userId: 1, isAdmin: '1' })
-        expect(store.hasAnyPermission(['nonexistent'])).toBe(true)
-      })
-
       it('有任一权限即返回 true', () => {
         store.setUserInfo({ userId: 2, isAdmin: '0' })
         store.setPermissions(mockPermissions)
@@ -207,11 +207,6 @@ describe('useUserStore', () => {
     })
 
     describe('hasAllPermissions', () => {
-      it('管理员始终返回 true', () => {
-        store.setUserInfo({ userId: 1, isAdmin: '1' })
-        expect(store.hasAllPermissions(['a', 'b', 'c'])).toBe(true)
-      })
-
       it('需全部具备才返回 true', () => {
         store.setUserInfo({ userId: 2, isAdmin: '0' })
         store.setPermissions(mockPermissions)

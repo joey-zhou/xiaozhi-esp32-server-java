@@ -46,11 +46,12 @@ public class StpInterfaceImpl implements StpInterface {
     public List<String> getRoleList(Object loginId, String loginType) {
         List<String> roleKeys = new ArrayList<>();
         try {
-            UserBO user = userService.getBO(parseUserId(loginId));
+            Integer userId = parseUserId(loginId);
+            UserBO user = userService.getBO(userId);
             if (user == null) {
                 return roleKeys;
             }
-            if (UserBO.ADMIN_YES.equals(user.getIsAdmin())) {
+            if (userService.isAdmin(userId)) {
                 roleKeys.add(ADMIN_ROLE_KEY);
             }
             String roleKey = authRoleService.getRoleKey(user.getAuthRoleId());

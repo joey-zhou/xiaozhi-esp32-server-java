@@ -129,27 +129,14 @@ export const useUserStore = defineStore('user', () => {
     return keys
   })
 
-  const hasPermission = (permissionKey: string): boolean => {
-    // 管理员拥有所有权限
-    if (isAdmin.value) {
-      return true
-    }
-    return permissionKeySet.value.has(permissionKey)
-  }
+  // 管理员的全权由后端给出（下发全部权限键），这里不按身份放行，与接口鉴权同一口径
+  const hasPermission = (permissionKey: string): boolean => permissionKeySet.value.has(permissionKey)
 
-  const hasAnyPermission = (permissionKeys: string[]): boolean => {
-    if (isAdmin.value) {
-      return true
-    }
-    return permissionKeys.some(key => hasPermission(key))
-  }
+  const hasAnyPermission = (permissionKeys: string[]): boolean =>
+    permissionKeys.some(key => hasPermission(key))
 
-  const hasAllPermissions = (permissionKeys: string[]): boolean => {
-    if (isAdmin.value) {
-      return true
-    }
-    return permissionKeys.every(key => hasPermission(key))
-  }
+  const hasAllPermissions = (permissionKeys: string[]): boolean =>
+    permissionKeys.every(key => hasPermission(key))
 
   const updateWsConfig = (config: Partial<WebSocketConfig>) => {
     wsConfig.value = { ...wsConfig.value, ...config }

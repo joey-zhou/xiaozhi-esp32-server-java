@@ -1,7 +1,6 @@
 package com.xiaozhi.config;
 
 import cn.dev33.satoken.stp.StpUtil;
-import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.req.ConfigTestReq;
 import com.xiaozhi.security.ownership.OwnershipAspect;
 import com.xiaozhi.security.ownership.OwnershipChecker;
@@ -48,7 +47,6 @@ class ConfigControllerOwnershipTest {
     @Test
     void configTestEndpointChecksConfigOwnership() throws Exception {
         when(ownershipChecker.getResource()).thenReturn("config");
-        when(userService.getBO(CURRENT_USER_ID)).thenReturn(normalUser());
         when(joinPoint.getSignature()).thenReturn(methodSignature);
         when(methodSignature.getMethod()).thenReturn(testEndpoint());
         when(joinPoint.getArgs()).thenReturn(new Object[]{request(7)});
@@ -65,7 +63,6 @@ class ConfigControllerOwnershipTest {
     @Test
     void configTestEndpointSkipsCheckForUnsavedForm() throws Exception {
         when(ownershipChecker.getResource()).thenReturn("config");
-        when(userService.getBO(CURRENT_USER_ID)).thenReturn(normalUser());
         when(joinPoint.getSignature()).thenReturn(methodSignature);
         when(methodSignature.getMethod()).thenReturn(testEndpoint());
         when(joinPoint.getArgs()).thenReturn(new Object[]{request(null)});
@@ -96,11 +93,5 @@ class ConfigControllerOwnershipTest {
         req.setConfigName("测试配置");
         req.setProvider("openai");
         return req;
-    }
-
-    private static UserBO normalUser() {
-        UserBO user = new UserBO();
-        user.setIsAdmin("0");
-        return user;
     }
 }

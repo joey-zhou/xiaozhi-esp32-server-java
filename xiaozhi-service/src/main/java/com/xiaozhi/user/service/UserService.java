@@ -11,6 +11,9 @@ public interface UserService {
 
     UserBO getBO(Integer userId);
 
+    /** 管理员只有这一种定义：sys_user.isAdmin，与 userId 是几无关 */
+    boolean isAdmin(Integer userId);
+
     UserBO getByUsername(String username);
 
     UserBO getByEmail(String email);

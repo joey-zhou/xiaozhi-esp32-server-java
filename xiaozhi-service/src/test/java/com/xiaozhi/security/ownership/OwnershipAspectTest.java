@@ -119,7 +119,7 @@ class OwnershipAspectTest {
         when(joinPoint.getSignature()).thenReturn(methodSignature);
         when(methodSignature.getMethod()).thenReturn(method);
         when(joinPoint.getArgs()).thenReturn(new Object[]{123});
-        when(userService.getBO(7)).thenReturn(admin());
+        when(userService.isAdmin(7)).thenReturn(true);
 
         try (MockedStatic<StpUtil> stpUtil = mockStatic(StpUtil.class)) {
             stpUtil.when(StpUtil::getLoginId).thenReturn("7");

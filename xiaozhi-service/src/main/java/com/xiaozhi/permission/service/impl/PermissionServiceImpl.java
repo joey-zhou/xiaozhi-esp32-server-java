@@ -51,13 +51,29 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     public List<PermissionBO> listTree() {
-        List<PermissionBO> permissions = permissionMapper.selectList(new LambdaQueryWrapper<PermissionDO>()
+        return buildTree(listEnabled());
+    }
+
+    private List<PermissionBO> listEnabled() {
+        return permissionMapper.selectList(new LambdaQueryWrapper<PermissionDO>()
                 .eq(PermissionDO::getStatus, ENABLED)
                 .orderByAsc(PermissionDO::getSort, PermissionDO::getPermissionId))
             .stream()
             .map(permissionConvert::toBO)
-            .toList();
-        return buildTree(permissions);
+            .collect(Collectors.toCollection(ArrayList::new));
+    }
+
+    @Override
+    @Cacheable(value = CacheNames.PERMISSION, key = "'all:keys'")
+    public List<String> listAllKeys() {
+        return permissionMapper.selectList(new LambdaQueryWrapper<PermissionDO>()
+                .select(PermissionDO::getPermissionKey)
+                .eq(PermissionDO::getStatus, ENABLED))
+            .stream()
+            .map(PermissionDO::getPermissionKey)
+            .filter(StringUtils::hasText)
+            // 缓存值走 GenericJackson2JsonRedisSerializer，理由同 listKeysByAuthRoleId
+            .collect(Collectors.toCollection(ArrayList::new));
     }
 
     @Override
@@ -133,6 +149,9 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     public List<PermissionBO> listByUserId(Integer userId) {
+        if (userService.isAdmin(userId)) {
+            return listEnabled();
+        }
         Integer authRoleId = resolveAuthRoleId(userId);
         if (authRoleId == null) {
             return new ArrayList<>();
@@ -147,6 +166,9 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     public List<String> listKeysByUserId(Integer userId) {
+        if (userService.isAdmin(userId)) {
+            return self.listAllKeys();
+        }
         Integer authRoleId = resolveAuthRoleId(userId);
         if (authRoleId == null) {
             return new ArrayList<>();

@@ -49,7 +49,8 @@ import java.util.UUID;
 @Service
 public class UserAppService {
 
-    private static final Integer ADMIN_TEMPLATE_OWNER_ID = 1;
+    /** 新用户的默认角色与模板从这个用户名下复制，即 V1 初始化的那个管理员；只是种子来源，判定管理员走 UserService.isAdmin */
+    private static final Integer SEED_OWNER_USER_ID = 1;
     private static final String PLATFORM_WECHAT = "wechat";
     private static final int TOKEN_EXPIRE_SECONDS = 2592000;
 
@@ -130,8 +131,8 @@ public class UserAppService {
         UserBO created = userService.create(user);
         Integer userId = created.getUserId();
 
-        Integer defaultRoleId = roleService.copyDefaultRole(ADMIN_TEMPLATE_OWNER_ID, userId);
-        templateService.copyTemplates(ADMIN_TEMPLATE_OWNER_ID, userId);
+        Integer defaultRoleId = roleService.copyDefaultRole(SEED_OWNER_USER_ID, userId);
+        templateService.copyTemplates(SEED_OWNER_USER_ID, userId);
         deviceService.registerWebChat(userId, defaultRoleId);
 
         return created;

@@ -3,7 +3,6 @@ package com.xiaozhi.security.ownership;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.exception.UnauthorizedException;
-import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.user.service.UserService;
 import jakarta.annotation.Resource;
 import org.aspectj.lang.JoinPoint;
@@ -77,7 +76,7 @@ public class OwnershipAspect {
         for (CheckOwner annotation : annotations) {
             if (annotation.adminBypass()) {
                 if (isAdminCache == null) {
-                    isAdminCache = isAdmin(userId);
+                    isAdminCache = userService.isAdmin(userId);
                 }
                 if (isAdminCache) {
                     continue;
@@ -155,11 +154,6 @@ public class OwnershipAspect {
         } catch (NumberFormatException | ArithmeticException e) {
             throw new UnauthorizedException("无法获取当前登录用户");
         }
-    }
-
-    private boolean isAdmin(Integer userId) {
-        UserBO user = userService.getBO(userId);
-        return user != null && UserBO.ADMIN_YES.equals(user.getIsAdmin());
     }
 
     private List<Object> resolveIds(Object resourceId) {

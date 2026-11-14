@@ -12,6 +12,7 @@ import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.dal.mysql.dataobject.UserDO;
 import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
 import com.xiaozhi.user.model.UserProjection;
+import com.xiaozhi.user.service.UserService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,9 +20,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.CacheManager;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -197,4 +200,23 @@ class UserServiceImplTest {
         userService.requireEnabled(enabled);
         userService.requireEnabled(null);
     }
+
+    /** 管理员只认 sys_user.isAdmin，与 userId 是几无关 */
+    @Test
+    void isAdminReadsTheIsAdminColumnThroughTheCachedLookup() {
+        UserService self = mock(UserService.class);
+        ReflectionTestUtils.setField(userService, "self", self);
+        UserBO admin = new UserBO();
+        admin.setIsAdmin(UserBO.ADMIN_YES);
+        UserBO plain = new UserBO();
+        plain.setIsAdmin("0");
+        when(self.getBO(5)).thenReturn(admin);
+        when(self.getBO(1)).thenReturn(plain);
+
+        assertThat(userService.isAdmin(5)).isTrue();
+        assertThat(userService.isAdmin(1)).isFalse();
+        assertThat(userService.isAdmin(9)).isFalse();
+        assertThat(userService.isAdmin(null)).isFalse();
+    }
+
 }

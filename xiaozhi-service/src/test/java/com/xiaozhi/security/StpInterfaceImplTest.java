@@ -53,6 +53,7 @@ class StpInterfaceImplTest {
     @Test
     void getRoleListKeepsAdminWhenAuthRoleDeleted() {
         when(userService.getBO(1)).thenReturn(user(UserBO.ADMIN_YES, 9));
+        when(userService.isAdmin(1)).thenReturn(true);
         when(authRoleService.getRoleKey(9)).thenReturn(null);
 
         assertThat(stpInterface.getRoleList("1", "login")).containsExactly("admin");
@@ -61,6 +62,7 @@ class StpInterfaceImplTest {
     @Test
     void getRoleListKeepsAdminWhenAuthRoleIdMissing() {
         when(userService.getBO(1)).thenReturn(user(UserBO.ADMIN_YES, null));
+        when(userService.isAdmin(1)).thenReturn(true);
 
         assertThat(stpInterface.getRoleList("1", "login")).containsExactly("admin");
     }
@@ -68,6 +70,7 @@ class StpInterfaceImplTest {
     @Test
     void getRoleListKeepsAdminWhenRoleKeyLookupFails() {
         when(userService.getBO(1)).thenReturn(user(UserBO.ADMIN_YES, 9));
+        when(userService.isAdmin(1)).thenReturn(true);
         when(authRoleService.getRoleKey(9)).thenThrow(new IllegalStateException("db down"));
 
         assertThat(stpInterface.getRoleList("1", "login")).containsExactly("admin");
@@ -76,6 +79,7 @@ class StpInterfaceImplTest {
     @Test
     void getRoleListReturnsAdminAndRoleKeyForAdminUser() {
         when(userService.getBO(1)).thenReturn(user(UserBO.ADMIN_YES, 9));
+        when(userService.isAdmin(1)).thenReturn(true);
         when(authRoleService.getRoleKey(9)).thenReturn("manager");
 
         assertThat(stpInterface.getRoleList(1, "login")).containsExactly("admin", "manager");
