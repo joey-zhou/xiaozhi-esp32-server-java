@@ -1,7 +1,6 @@
 package com.xiaozhi.server.web.chat;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.ChatStreamReq;
 import com.xiaozhi.common.web.ApiResponse;
@@ -9,6 +8,7 @@ import com.xiaozhi.common.model.resp.ChatSessionClosedResp;
 import com.xiaozhi.common.model.resp.ChatSessionOpenedResp;
 import com.xiaozhi.common.model.resp.ChatTokenResp;
 import com.xiaozhi.server.web.chat.convert.WebChatConvert;
+import com.xiaozhi.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -47,7 +47,7 @@ public class WebChatController {
     @Operation(summary = "开启聊天会话", description = "创建或续接 Web 聊天会话并返回 sessionId")
     public ApiResponse<ChatSessionOpenedResp> open(@RequestParam Integer roleId,
                                      @RequestParam(required = false) String sessionId) {
-        Integer userId = StpUtil.getLoginIdAsInt();
+        Integer userId = CurrentUser.id();
         return ApiResponse.success(ChatSessionOpenedResp.of(webChatAppService.openSession(userId, roleId, sessionId)));
     }
 
@@ -62,7 +62,7 @@ public class WebChatController {
     @SaCheckPermission("system:chat:api:stream")
     @Operation(summary = "流式聊天", description = "通过 SSE 返回 AI 回复 Token 流，包含 thinking 和 content 两种类型")
     public Flux<ChatTokenResp> stream(@Valid @RequestBody ChatStreamReq req) {
-        Integer userId = StpUtil.getLoginIdAsInt();
+        Integer userId = CurrentUser.id();
         return webChatAppService.chatStream(req.getSessionId(), req.getText(), userId).map(webChatConvert::toResp);
     }
 
@@ -73,7 +73,7 @@ public class WebChatController {
     @SaCheckPermission("system:chat:api:close")
     @Operation(summary = "关闭聊天会话", description = "关闭 Web 聊天会话并释放资源")
     public ApiResponse<ChatSessionClosedResp> close(@RequestParam String sessionId) {
-        Integer userId = StpUtil.getLoginIdAsInt();
+        Integer userId = CurrentUser.id();
         webChatAppService.closeSession(sessionId, userId);
         return ApiResponse.success(ChatSessionClosedResp.closed());
     }

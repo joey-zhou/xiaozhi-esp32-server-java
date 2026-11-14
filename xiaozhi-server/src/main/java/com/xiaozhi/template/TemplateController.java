@@ -3,7 +3,6 @@ package com.xiaozhi.template;
 import com.xiaozhi.server.web.BaseController;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.TemplateCreateReq;
@@ -14,6 +13,7 @@ import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.template.convert.TemplateConvert;
 import com.xiaozhi.template.service.TemplateService;
+import com.xiaozhi.security.CurrentUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,7 +44,7 @@ public class TemplateController extends BaseController {
     @Operation(summary = "根据条件查询角色模板", description = "返回模板列表")
     public ApiResponse<PageResult<TemplateResp>> list(@Valid TemplatePageReq req) {
         return ApiResponse.success(templateService
-            .page(req.getPageNo(), req.getPageSize(), req.getTemplateName(), req.getCategory(), StpUtil.getLoginIdAsInt())
+            .page(req.getPageNo(), req.getPageSize(), req.getTemplateName(), req.getCategory(), CurrentUser.id())
             .map(templateConvert::toResp));
     }
 
@@ -58,7 +58,7 @@ public class TemplateController extends BaseController {
     @Operation(summary = "添加角色模板", description = "添加新的提示词模板")
     public ApiResponse<TemplateResp> create(@Valid @RequestBody TemplateCreateReq req) {
         return ApiResponse.success(
-            templateConvert.toResp(templateService.create(StpUtil.getLoginIdAsInt(), templateConvert.toBO(req))));
+            templateConvert.toResp(templateService.create(CurrentUser.id(), templateConvert.toBO(req))));
     }
 
     /**

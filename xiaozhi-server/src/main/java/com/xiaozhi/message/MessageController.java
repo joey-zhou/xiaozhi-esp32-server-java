@@ -4,7 +4,6 @@ import com.xiaozhi.server.web.BaseController;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaMode;
-import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.ConversationPageReq;
@@ -15,6 +14,7 @@ import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.message.convert.MessageConvert;
 import com.xiaozhi.message.service.MessageService;
+import com.xiaozhi.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -48,7 +48,7 @@ public class MessageController extends BaseController {
         return ApiResponse.success(messageService
             .page(req.getPageNo(), req.getPageSize(), req.getDeviceId(), req.getDeviceName(),
                 req.getSender(), req.getMessageType(), req.getRoleId(), req.getStartTime(), req.getEndTime(),
-                StpUtil.getLoginIdAsInt(), req.getSessionId(), req.getSource())
+                CurrentUser.id(), req.getSessionId(), req.getSource())
             .map(messageConvert::toResp));
     }
 

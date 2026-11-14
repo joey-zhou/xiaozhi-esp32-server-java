@@ -3,7 +3,6 @@ package com.xiaozhi.memory;
 import com.xiaozhi.server.web.BaseController;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.PageResult;
@@ -11,6 +10,7 @@ import com.xiaozhi.common.model.resp.SummaryResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.summary.convert.SummaryConvert;
 import com.xiaozhi.summary.service.SummaryService;
+import com.xiaozhi.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -49,7 +49,7 @@ public class MemoryController extends BaseController {
                                                              @RequestParam(defaultValue = "10") Integer pageSize) {
         pageSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
         // 指定设备时归属已由 @CheckOwner 校验；不指定时按当前用户名下的设备查
-        return ApiResponse.success(summaryService.page(deviceId, StpUtil.getLoginIdAsInt(), roleId, pageNo, pageSize)
+        return ApiResponse.success(summaryService.page(deviceId, CurrentUser.id(), roleId, pageNo, pageSize)
             .map(summaryConvert::toResp));
     }
 

@@ -3,6 +3,7 @@ package com.xiaozhi.communication.server.websocket;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.communication.WebChatDevice;
 import com.xiaozhi.communication.auth.DeviceAuthService;
+import com.xiaozhi.security.CurrentUser;
 import com.xiaozhi.utils.CommonUtils;
 import jakarta.annotation.Resource;
 import org.springframework.http.HttpStatus;
@@ -84,8 +85,8 @@ public class DeviceAuthHandshakeInterceptor implements HandshakeInterceptor {
         try {
             Object loginId = StpUtil.getLoginIdByToken(token);
             if (loginId != null) {
-                // 登录 ID 就是用户 ID；逐字比较，大小写变形的身份也拒绝
-                String expected = WebChatDevice.deviceIdOf(Integer.valueOf(loginId.toString()));
+                // 逐字比较，大小写变形的身份也拒绝
+                String expected = WebChatDevice.deviceIdOf(CurrentUser.parse(loginId));
                 if (!deviceId.equals(expected)) {
                     return reject(response, "登录用户与会话身份不一致", deviceId);
                 }

@@ -3,7 +3,6 @@ package com.xiaozhi.config;
 import com.xiaozhi.server.web.BaseController;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.bo.ConfigProbeResultBO;
@@ -14,6 +13,7 @@ import com.xiaozhi.common.model.req.ConfigUpdateReq;
 import com.xiaozhi.common.model.resp.ConfigResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.security.CurrentUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -51,7 +51,7 @@ public class ConfigController extends BaseController {
     @SaCheckPermission("system:config:api:list")
     @Operation(summary = "根据条件查询配置", description = "返回配置信息列表")
     public ApiResponse<PageResult<ConfigResp>> list(@Valid ConfigPageReq req) {
-        return ApiResponse.success(configAppService.page(req, StpUtil.getLoginIdAsInt()));
+        return ApiResponse.success(configAppService.page(req, CurrentUser.id()));
     }
 
     /**
@@ -89,7 +89,7 @@ public class ConfigController extends BaseController {
         + "带 confirmStorageSwitch=true 重发才执行")
     public ApiResponse<ConfigResp> create(@Valid @RequestBody ConfigCreateReq req,
                                           @RequestParam(defaultValue = "false") boolean confirmStorageSwitch) {
-        return ApiResponse.success(configAppService.create(req, StpUtil.getLoginIdAsInt(), confirmStorageSwitch));
+        return ApiResponse.success(configAppService.create(req, CurrentUser.id(), confirmStorageSwitch));
     }
 
     /**
@@ -104,7 +104,7 @@ public class ConfigController extends BaseController {
     @CheckOwner(resource = "config", id = "#req.configId")
     @Operation(summary = "测试配置", description = "使用当前表单参数测试模型配置是否可用")
     public ApiResponse<Void> test(@Valid @RequestBody ConfigTestReq req) {
-        ConfigProbeResultBO result = configTestAppService.test(req, StpUtil.getLoginIdAsInt());
+        ConfigProbeResultBO result = configTestAppService.test(req, CurrentUser.id());
         return result.success() ? ApiResponse.success(result.message()) : ApiResponse.error(result.message());
     }
 

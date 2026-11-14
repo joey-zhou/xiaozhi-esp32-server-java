@@ -10,7 +10,6 @@ import java.util.Map;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaIgnore;
-import cn.dev33.satoken.stp.StpUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -32,6 +31,7 @@ import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.utils.JsonUtil;
+import com.xiaozhi.security.CurrentUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -69,7 +69,7 @@ public class DeviceController extends BaseController {
     @SaCheckPermission("system:device:api:list")
     @Operation(summary = "根据条件查询设备", description = "返回设备信息列表")
     public ApiResponse<PageResult<DeviceResp>> list(@Valid DevicePageReq req) {
-        return ApiResponse.success(deviceAppService.page(req, StpUtil.getLoginIdAsInt()));
+        return ApiResponse.success(deviceAppService.page(req, CurrentUser.id()));
     }
 
     /**
@@ -96,7 +96,7 @@ public class DeviceController extends BaseController {
     @AuditLog(module = "设备管理", operation = "创建设备")
     @Operation(summary = "添加设备", description = "使用设备验证码添加设备到当前用户账户")
     public ApiResponse<DeviceResp> create(@Valid @RequestBody DeviceCreateReq param) {
-        return ApiResponse.success(deviceAppService.create(param, StpUtil.getLoginIdAsInt()));
+        return ApiResponse.success(deviceAppService.create(param, CurrentUser.id()));
     }
 
     /**
@@ -108,7 +108,7 @@ public class DeviceController extends BaseController {
     @AuditLog(module = "设备管理", operation = "扫码绑定设备")
     @Operation(summary = "扫码绑定设备", description = "使用设备二维码中的设备ID（MAC地址）绑定设备到当前用户账户，要求设备近期在线")
     public ApiResponse<DeviceResp> scanBind(@Valid @RequestBody DeviceScanBindReq param) {
-        return ApiResponse.success(deviceAppService.scanBind(param, StpUtil.getLoginIdAsInt()));
+        return ApiResponse.success(deviceAppService.scanBind(param, CurrentUser.id()));
     }
 
     /**

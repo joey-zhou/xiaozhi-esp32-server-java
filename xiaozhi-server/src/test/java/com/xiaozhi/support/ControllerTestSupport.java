@@ -49,7 +49,6 @@ public abstract class ControllerTestSupport {
         stpUtil.when(StpUtil::isLogin).thenReturn(true);
         stpUtil.when(StpUtil::checkLogin).thenAnswer(invocation -> null);
         stpUtil.when(StpUtil::getLoginId).thenReturn(String.valueOf(userId));
-        stpUtil.when(StpUtil::getLoginIdAsInt).thenReturn(userId);
         stpUtil.when(StpUtil::getTokenValue).thenReturn("token-" + userId);
         return stpUtil;
     }
@@ -57,8 +56,8 @@ public abstract class ControllerTestSupport {
     protected MockedStatic<StpUtil> mockNoLoginUser() {
         MockedStatic<StpUtil> stpUtil = mockStatic(StpUtil.class);
         stpUtil.when(StpUtil::isLogin).thenReturn(false);
-        stpUtil.when(StpUtil::getLoginId).thenReturn(null);
-        stpUtil.when(StpUtil::getLoginIdAsInt)
+        // 与 Sa-Token 一致：没登录时取登录 ID 抛 NotLoginException，不是返回 null
+        stpUtil.when(StpUtil::getLoginId)
             .thenThrow(new NotLoginException("未提供token", "login", NotLoginException.NOT_TOKEN));
         stpUtil.when(StpUtil::getTokenValue).thenReturn(null);
         return stpUtil;

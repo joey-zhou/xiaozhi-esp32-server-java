@@ -3,13 +3,13 @@ package com.xiaozhi.agent;
 import com.xiaozhi.server.web.BaseController;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.agent.convert.AgentConvert;
 import com.xiaozhi.agent.service.AgentService;
 import com.xiaozhi.common.model.req.AgentPageReq;
 import com.xiaozhi.common.model.resp.AgentResp;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -47,7 +47,7 @@ public class AgentController extends BaseController {
     @Operation(summary = "根据条件查询智能体", description = "返回智能体列表信息，会自动查询平台当前存在的智能体并同步本地配置")
     public ApiResponse<PageResult<AgentResp>> list(@Valid AgentPageReq req) {
         return ApiResponse.success(agentService
-            .page(req.getPageNo(), req.getPageSize(), req.getProvider(), req.getAgentName(), StpUtil.getLoginIdAsInt())
+            .page(req.getPageNo(), req.getPageSize(), req.getProvider(), req.getAgentName(), CurrentUser.id())
             .map(agentConvert::toResp));
     }
 }

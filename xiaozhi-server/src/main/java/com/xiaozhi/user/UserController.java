@@ -27,6 +27,7 @@ import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.user.service.WxLoginService;
 import com.xiaozhi.verifycode.VerifyCodeAppService;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
+import com.xiaozhi.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -63,7 +64,7 @@ public class UserController extends BaseController {
     @GetMapping("/check-token")
     @Operation(summary = "检查Token有效性", description = "验证当前Token是否有效，有效则返回用户信息")
     public ApiResponse<LoginResp> checkToken() {
-        Integer userId = StpUtil.getLoginIdAsInt();
+        Integer userId = CurrentUser.id();
         LoginResp response = userAppService.buildLoginResp(userId, StpUtil.getTokenValue(), false);
         if (response == null) {
             return ApiResponse.unauthorized("用户不存在");
@@ -164,7 +165,7 @@ public class UserController extends BaseController {
     @AuditLog(module = "用户管理", operation = "启用禁用账号")
     @Operation(summary = "启用/禁用账号", description = "state 取 1-正常、0-禁用；禁用后该账号已签发的 Token 立即失效")
     public ApiResponse<UserResp> updateState(@PathVariable Integer userId, @RequestParam String state) {
-        if (UserBO.STATE_DISABLED.equals(state) && StpUtil.getLoginIdAsInt() == userId.intValue()) {
+        if (UserBO.STATE_DISABLED.equals(state) && CurrentUser.id() == userId.intValue()) {
             throw new IllegalArgumentException("不能禁用当前登录账号");
         }
         UserResp updated = userAppService.updateState(userId, state);

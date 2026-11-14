@@ -2,7 +2,7 @@ package com.xiaozhi.security.ownership;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.CheckOwner;
-import com.xiaozhi.common.exception.UnauthorizedException;
+import com.xiaozhi.security.CurrentUser;
 import com.xiaozhi.user.service.UserService;
 import jakarta.annotation.Resource;
 import org.aspectj.lang.JoinPoint;
@@ -67,7 +67,7 @@ public class OwnershipAspect {
         validatedMethods.computeIfAbsent(method, m -> requireResolvableVariables(m, annotations));
 
         StpUtil.checkLogin();
-        Integer userId = resolveCurrentUserId();
+        Integer userId = CurrentUser.id();
 
         MethodBasedEvaluationContext context =
             new MethodBasedEvaluationContext(null, method, joinPoint.getArgs(), parameterNameDiscoverer);
@@ -130,30 +130,6 @@ public class OwnershipAspect {
             }
         }
         return true;
-    }
-
-    private Integer resolveCurrentUserId() {
-        Object loginId;
-        try {
-            loginId = StpUtil.getLoginId();
-        } catch (Exception e) {
-            throw new UnauthorizedException("无法获取当前登录用户");
-        }
-        if (loginId == null) {
-            throw new UnauthorizedException("无法获取当前登录用户");
-        }
-        try {
-            if (loginId instanceof Number number) {
-                return Math.toIntExact(number.longValue());
-            }
-            String text = loginId.toString().trim();
-            if (text.isEmpty()) {
-                throw new NumberFormatException("blank login id");
-            }
-            return Integer.valueOf(text);
-        } catch (NumberFormatException | ArithmeticException e) {
-            throw new UnauthorizedException("无法获取当前登录用户");
-        }
     }
 
     private List<Object> resolveIds(Object resourceId) {
