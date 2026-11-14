@@ -77,10 +77,10 @@ public class ConfigServiceImpl implements ConfigService {
         if (configId == null || configId <= 0) {
             return null;
         }
-        String cacheKey = String.valueOf(configId);
+        String cacheKey = ConfigCacheKeys.of(configId);
         Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
         return cacheHelper.getWithLock(
-            "config:" + cacheKey,
+            ConfigCacheKeys.lockOf(cacheKey),
             () -> cache == null ? null : cache.get(cacheKey, ConfigBO.class),
             () -> {
                 ConfigBO result = configConvert.toBO(configMapper.selectById(configId));
@@ -110,7 +110,7 @@ public class ConfigServiceImpl implements ConfigService {
             return null;
         }
         return cacheHelper.getWithLock(
-            "config:default:" + cacheKey,
+            ConfigCacheKeys.lockOf(cacheKey),
             () -> cache == null ? null : cache.get(cacheKey, ConfigBO.class),
             () -> {
                 ConfigDO configDO = configMapper.selectOne(buildQuery(

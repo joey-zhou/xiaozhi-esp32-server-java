@@ -2,6 +2,7 @@ package com.xiaozhi.mcptoolexclude.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.mcptoolexclude.dal.mysql.dataobject.McpToolExcludeDO;
 import com.xiaozhi.mcptoolexclude.dal.mysql.mapper.McpToolExcludeMapper;
@@ -14,6 +15,8 @@ import org.mockito.ArgumentMatcher;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 
 import java.util.Collection;
 import java.util.List;
@@ -41,6 +44,12 @@ class McpToolExcludeServiceImplTest {
 
     @Mock
     private McpToolExcludeMapper mcpToolExcludeMapper;
+
+    @Mock
+    private CacheManager cacheManager;
+
+    @Mock
+    private Cache cache;
 
     @InjectMocks
     private McpToolExcludeServiceImpl mcpToolExcludeService;
@@ -76,6 +85,7 @@ class McpToolExcludeServiceImplTest {
 
     @Test
     void toggleGlobalToolStatusCreatesConfigWhenDisablingNewTool() {
+        when(cacheManager.getCache(CacheNames.MCP_TOOL_EXCLUDE)).thenReturn(cache);
         when(mcpToolExcludeMapper.selectOne(any())).thenReturn(null);
         when(mcpToolExcludeMapper.insert(any(McpToolExcludeDO.class))).thenReturn(1);
 
@@ -85,10 +95,13 @@ class McpToolExcludeServiceImplTest {
         verify(mcpToolExcludeMapper).insert(captor.capture());
         assertThat(captor.getValue().getExcludeTools()).contains("tool-a");
         assertThat(captor.getValue().getBindKey()).isEqualTo("0");
+        // 全局排除影响所有角色，整份立刻清空
+        verify(cache).invalidate();
     }
 
     @Test
     void toggleRoleToolStatusDeletesConfigWhenNoToolLeft() {
+        when(cacheManager.getCache(CacheNames.MCP_TOOL_EXCLUDE)).thenReturn(cache);
         McpToolExcludeDO config = new McpToolExcludeDO();
         config.setId(1L);
         config.setExcludeTools("[\"tool-a\"]");
@@ -97,6 +110,7 @@ class McpToolExcludeServiceImplTest {
         mcpToolExcludeService.toggleRoleToolStatus(2, "tool-a", "server-a", true);
 
         verify(mcpToolExcludeMapper).deleteById(1L);
+        verify(cache).invalidate();
     }
 
     @Test

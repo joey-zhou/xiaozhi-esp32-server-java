@@ -8,4 +8,9 @@ public final class RoleCacheKeys {
     public static String of(Integer roleId) {
         return String.valueOf(roleId);
     }
+
+    /** 缓存未命中时回源查库的分布式锁 */
+    public static String lockOf(Integer roleId) {
+        return "role:" + of(roleId);
+    }
 }

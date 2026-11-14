@@ -136,7 +136,7 @@ public class ConfigRepositoryImpl implements ConfigRepository {
 
         Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
         if (cache != null) {
-            downgradedIds.forEach(id -> CacheHelper.evictNow(cache, String.valueOf(id)));
+            downgradedIds.forEach(id -> CacheHelper.evictNow(cache, ConfigCacheKeys.of(id)));
         }
     }
 
@@ -144,7 +144,7 @@ public class ConfigRepositoryImpl implements ConfigRepository {
     private void evictCache(AiConfig config) {
         Cache cache = cacheManager.getCache(CacheNames.SYS_CONFIG);
         if (config.getConfigId() != null) {
-            CacheHelper.evictNow(cache, String.valueOf(config.getConfigId()));
+            CacheHelper.evictNow(cache, ConfigCacheKeys.of(config.getConfigId()));
         }
         if (!StringUtils.hasText(config.getConfigType())) {
             return;

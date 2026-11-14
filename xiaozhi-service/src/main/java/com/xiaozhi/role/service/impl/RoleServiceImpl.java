@@ -62,7 +62,7 @@ public class RoleServiceImpl implements RoleService {
         String cacheKey = RoleCacheKeys.of(roleId);
         Cache cache = cacheManager.getCache(CacheNames.ROLE);
         return cacheHelper.getWithLock(
-            "role:" + cacheKey,
+            RoleCacheKeys.lockOf(roleId),
             () -> cache == null ? null : cache.get(cacheKey, RoleBO.class),
             () -> {
                 RoleDO roleDO = getRole(roleId);

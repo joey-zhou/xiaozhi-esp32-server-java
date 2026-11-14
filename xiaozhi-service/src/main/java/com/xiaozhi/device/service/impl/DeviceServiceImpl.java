@@ -78,7 +78,7 @@ public class DeviceServiceImpl implements DeviceService {
         String cacheKey = DeviceCacheKeys.of(deviceId);
         Cache cache = cacheManager.getCache(CacheNames.DEVICE);
         return cacheHelper.getWithLock(
-            "device:" + cacheKey,
+            DeviceCacheKeys.lockOf(deviceId),
             () -> cache == null ? null : cache.get(cacheKey, DeviceBO.class),
             () -> {
                 DeviceBO result = deviceConvert.toBO(deviceMapper.selectOne(

@@ -5,7 +5,6 @@ import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
-import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
 import com.xiaozhi.device.domain.Device;
@@ -18,7 +17,6 @@ import com.xiaozhi.event.DeviceSessionClosedEvent;
 import com.xiaozhi.event.DeviceUpdatedEvent;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
-import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
@@ -48,9 +46,6 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     private DeviceConverter deviceConverter;
 
     @Resource
-    private DeviceConvert deviceConvert;
-
-    @Resource
     private VerifyCodeService verifyCodeService;
 
     @Resource
@@ -59,32 +54,11 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     @Resource
     private CacheManager cacheManager;
 
-    @Resource
-    private CacheHelper cacheHelper;
-
+    /** 直接读库重建聚合根：缓存里的快照可能是别的写路径淘汰前回填的旧值，拿它改完再存会把别人的改动盖掉 */
     @Override
     public Optional<Device> findById(String deviceId) {
         if (deviceId == null || deviceId.isBlank()) return Optional.empty();
-        String cacheKey = DeviceCacheKeys.of(deviceId);
-        Cache cache = cacheManager.getCache(CacheNames.DEVICE);
-        DeviceBO cached = cacheHelper.getWithLock(
-                "device:" + cacheKey,
-                () -> cache == null ? null : cache.get(cacheKey, DeviceBO.class),
-                () -> {
-                    DeviceDO dataObject = deviceMapper.selectById(deviceId);
-                    if (dataObject == null) {
-                        return null;
-                    }
-                    DeviceBO bo = deviceConvert.toBO(dataObject);
-                    if (cache != null) {
-                        cache.put(cacheKey, bo);
-                    }
-                    return bo;
-                }
-        );
-        return Optional.ofNullable(cached)
-                .map(this::toDeviceDO)
-                .map(deviceConverter::toDomain);
+        return Optional.ofNullable(deviceMapper.selectById(deviceId)).map(deviceConverter::toDomain);
     }
 
     @Override
@@ -166,29 +140,7 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     }
 
     private void evictCache(String deviceId) {
-        Cache cache = cacheManager.getCache(CacheNames.DEVICE);
-        if (cache != null) {
-            cache.evict(DeviceCacheKeys.of(deviceId));
-        }
+        CacheHelper.evictNow(cacheManager.getCache(CacheNames.DEVICE), DeviceCacheKeys.of(deviceId));
     }
 
-    /** BO 快照 → DO（重建聚合根用） */
-    private DeviceDO toDeviceDO(DeviceBO bo) {
-        DeviceDO d = new DeviceDO();
-        d.setDeviceId(bo.getDeviceId());
-        d.setDeviceName(bo.getDeviceName());
-        d.setUserId(bo.getUserId());
-        d.setRoleId(bo.getRoleId());
-        d.setMcpList(bo.getMcpList());
-        d.setIp(bo.getIp());
-        d.setLocation(bo.getLocation());
-        d.setWifiName(bo.getWifiName());
-        d.setChipModelName(bo.getChipModelName());
-        d.setType(bo.getType());
-        d.setVersion(bo.getVersion());
-        d.setState(bo.getState());
-        d.setCreateTime(bo.getCreateTime());
-        d.setUpdateTime(bo.getUpdateTime());
-        return d;
-    }
 }

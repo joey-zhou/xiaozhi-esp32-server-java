@@ -3,6 +3,7 @@ package com.xiaozhi.permission.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.xiaozhi.authrolepermission.dal.mysql.dataobject.AuthRolePermissionDO;
 import com.xiaozhi.authrolepermission.dal.mysql.mapper.AuthRolePermissionMapper;
+import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.model.bo.PermissionBO;
 import com.xiaozhi.common.model.bo.UserBO;
@@ -10,12 +11,13 @@ import com.xiaozhi.permission.convert.PermissionConvert;
 import com.xiaozhi.permission.dal.mysql.dataobject.PermissionDO;
 import com.xiaozhi.permission.dal.mysql.mapper.PermissionMapper;
 import com.xiaozhi.permission.service.PermissionService;
+import com.xiaozhi.permission.support.PermissionCacheKeys;
 import com.xiaozhi.user.service.UserService;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -44,6 +46,9 @@ public class PermissionServiceImpl implements PermissionService {
     @Resource
     private PermissionConvert permissionConvert;
 
+    @Resource
+    private CacheManager cacheManager;
+
     // 自注入以解决Spring AOP自调用缓存失效问题
     @Lazy
     @Autowired
@@ -64,7 +69,7 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
-    @Cacheable(value = CacheNames.PERMISSION, key = "'all:keys'")
+    @Cacheable(value = CacheNames.PERMISSION, key = "T(com.xiaozhi.permission.support.PermissionCacheKeys).ALL_KEYS")
     public List<String> listAllKeys() {
         return permissionMapper.selectList(new LambdaQueryWrapper<PermissionDO>()
                 .select(PermissionDO::getPermissionKey)
@@ -77,7 +82,7 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
-    @Cacheable(value = CacheNames.PERMISSION, key = "'authRole:list:' + #authRoleId", condition = "#authRoleId != null")
+    @Cacheable(value = CacheNames.PERMISSION, key = "T(com.xiaozhi.permission.support.PermissionCacheKeys).authRoleList(#authRoleId)", condition = "#authRoleId != null")
     public List<PermissionBO> listByAuthRoleId(Integer authRoleId) {
         if (authRoleId == null) {
             return new ArrayList<>();
@@ -98,7 +103,7 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
-    @Cacheable(value = CacheNames.PERMISSION, key = "'authRole:ids:' + #authRoleId", condition = "#authRoleId != null")
+    @Cacheable(value = CacheNames.PERMISSION, key = "T(com.xiaozhi.permission.support.PermissionCacheKeys).authRoleIds(#authRoleId)", condition = "#authRoleId != null")
     public List<Integer> listIdsByAuthRoleId(Integer authRoleId) {
         if (authRoleId == null) {
             return new ArrayList<>();
@@ -113,7 +118,7 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
-    @Cacheable(value = CacheNames.PERMISSION, key = "'authRole:keys:' + #authRoleId", condition = "#authRoleId != null")
+    @Cacheable(value = CacheNames.PERMISSION, key = "T(com.xiaozhi.permission.support.PermissionCacheKeys).authRoleKeys(#authRoleId)", condition = "#authRoleId != null")
     public List<String> listKeysByAuthRoleId(Integer authRoleId) {
         if (authRoleId == null) {
             return new ArrayList<>();
@@ -139,12 +144,11 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
-    @Caching(evict = {
-        @CacheEvict(value = CacheNames.PERMISSION, key = "'authRole:list:' + #authRoleId"),
-        @CacheEvict(value = CacheNames.PERMISSION, key = "'authRole:ids:' + #authRoleId"),
-        @CacheEvict(value = CacheNames.PERMISSION, key = "'authRole:keys:' + #authRoleId")
-    })
     public void clearAuthRoleCache(Integer authRoleId) {
+        Cache cache = cacheManager.getCache(CacheNames.PERMISSION);
+        CacheHelper.evictNow(cache, PermissionCacheKeys.authRoleList(authRoleId));
+        CacheHelper.evictNow(cache, PermissionCacheKeys.authRoleIds(authRoleId));
+        CacheHelper.evictNow(cache, PermissionCacheKeys.authRoleKeys(authRoleId));
     }
 
     @Override

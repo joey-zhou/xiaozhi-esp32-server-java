@@ -7,6 +7,15 @@ public final class ConfigCacheKeys {
 
     private ConfigCacheKeys() {}
 
+    public static String of(Integer configId) {
+        return String.valueOf(configId);
+    }
+
+    /** 缓存未命中时回源查库的分布式锁，按 id 的键与默认键都用它 */
+    public static String lockOf(String cacheKey) {
+        return "config:" + cacheKey;
+    }
+
     public static String defaultKey(String configType, String modelType) {
         return StringUtils.hasText(modelType) ? "default:" + configType + ":" + modelType : "default:" + configType;
     }

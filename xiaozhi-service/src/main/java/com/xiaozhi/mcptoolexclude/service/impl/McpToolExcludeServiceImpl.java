@@ -3,13 +3,14 @@ package com.xiaozhi.mcptoolexclude.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.mcptoolexclude.dal.mysql.dataobject.McpToolExcludeDO;
 import com.xiaozhi.mcptoolexclude.dal.mysql.mapper.McpToolExcludeMapper;
 import com.xiaozhi.mcptoolexclude.service.McpToolExcludeService;
 import jakarta.annotation.Resource;
-import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,10 +36,13 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
     @Resource
     private McpToolExcludeMapper mcpToolExcludeMapper;
 
+    @Resource
+    private CacheManager cacheManager;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "'excluded_tools:' + #roleId")
+    @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "T(com.xiaozhi.mcptoolexclude.support.McpToolExcludeCacheKeys).excludedTools(#roleId)")
     public Set<String> getExcludedTools(Integer roleId) {
         Set<String> excludedTools = new LinkedHashSet<>(loadGlobalDisabledTools());
         if (roleId != null) {
@@ -49,26 +53,26 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
 
     @Override
     @Transactional
-    @CacheEvict(value = CacheNames.MCP_TOOL_EXCLUDE, allEntries = true)
     public void toggleRoleToolStatus(Integer roleId, String toolName, String serverName, boolean enabled) {
         toggleToolStatus(EXCLUDE_TYPE_ROLE, serverName, String.valueOf(roleId), toolName, enabled);
+        clearCache();
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = CacheNames.MCP_TOOL_EXCLUDE, allEntries = true)
     public void toggleGlobalToolStatus(String toolName, String serverName, boolean enabled) {
         toggleToolStatus(EXCLUDE_TYPE_GLOBAL, serverName, GLOBAL_BIND_KEY, toolName, enabled);
+        clearCache();
     }
 
     @Override
-    @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "'role_disabled:' + #roleId")
+    @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "T(com.xiaozhi.mcptoolexclude.support.McpToolExcludeCacheKeys).roleDisabled(#roleId)")
     public List<String> getRoleDisabledTools(Integer roleId) {
         return loadRoleDisabledTools(roleId);
     }
 
     @Override
-    @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "'global_disabled'")
+    @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "T(com.xiaozhi.mcptoolexclude.support.McpToolExcludeCacheKeys).GLOBAL_DISABLED")
     public List<String> getGlobalDisabledTools() {
         return loadGlobalDisabledTools();
     }
@@ -102,7 +106,6 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
 
     @Override
     @Transactional
-    @CacheEvict(value = CacheNames.MCP_TOOL_EXCLUDE, allEntries = true)
     public void batchSetRoleExcludeTools(Integer roleId, List<String> excludeTools, String serverName) {
         if (roleId == null) {
             return;
@@ -113,9 +116,15 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
             if (config != null && config.getId() != null) {
                 mcpToolExcludeMapper.deleteById(config.getId());
             }
-            return;
+        } else {
+            saveConfig(config, EXCLUDE_TYPE_ROLE, bindCode, String.valueOf(roleId), excludeTools);
         }
-        saveConfig(config, EXCLUDE_TYPE_ROLE, bindCode, String.valueOf(roleId), excludeTools);
+        clearCache();
+    }
+
+    /** 全局排除会影响所有角色的结果，按角色挑着淘汰不划算，整份清空 */
+    private void clearCache() {
+        CacheHelper.clearNow(cacheManager.getCache(CacheNames.MCP_TOOL_EXCLUDE));
     }
 
     private void toggleToolStatus(String excludeType, String serverName, String bindKey, String toolName, boolean enabled) {

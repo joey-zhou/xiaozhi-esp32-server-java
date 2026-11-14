@@ -8,4 +8,9 @@ public final class DeviceCacheKeys {
     public static String of(String deviceId) {
         return deviceId.replace(":", "-");
     }
+
+    /** 缓存未命中时回源查库的分布式锁 */
+    public static String lockOf(String deviceId) {
+        return "device:" + of(deviceId);
+    }
 }

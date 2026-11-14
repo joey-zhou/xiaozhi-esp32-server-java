@@ -102,4 +102,13 @@ public class CacheHelper {
         cache.evict(key);
     }
 
+    /** 整份清空，时机同 {@link #evictNow}：立刻清一次，再登记一次事务提交后的清空 */
+    public static void clearNow(Cache cache) {
+        if (cache == null) {
+            return;
+        }
+        cache.invalidate();
+        cache.clear();
+    }
+
 }

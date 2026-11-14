@@ -16,6 +16,7 @@ import com.xiaozhi.user.dal.mysql.dataobject.UserDO;
 import com.xiaozhi.user.dal.mysql.mapper.UserMapper;
 import com.xiaozhi.user.model.UserProjection;
 import com.xiaozhi.user.service.UserService;
+import com.xiaozhi.user.support.UserCacheKeys;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
@@ -58,7 +59,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Cacheable(value = CacheNames.USER, key = "'bo:' + #userId", condition = "#userId != null",
+    @Cacheable(value = CacheNames.USER, key = "T(com.xiaozhi.user.support.UserCacheKeys).of(#userId)", condition = "#userId != null",
         unless = "#result == null")
     public UserBO getBO(Integer userId) {
         if (userId == null) {
@@ -181,7 +182,7 @@ public class UserServiceImpl implements UserService {
         }
         // 不用 @CacheEvict：缓存是事务感知的，注解那次淘汰要等提交后才生效，
         // 同一个事务里写完紧接着 getBO 会读到旧值，接口返回给前端的就是改动前的资料
-        CacheHelper.evictNow(cacheManager.getCache(CacheNames.USER), "bo:" + user.getUserId());
+        CacheHelper.evictNow(cacheManager.getCache(CacheNames.USER), UserCacheKeys.of(user.getUserId()));
         // existing 是「库里那行 + 本次改动」，updateTime 也已由自动填充写回，
         // 直接转成 BO 返回，调用方拿完整资料不必再查一次用户表
         return userConvert.toBO(existing);
@@ -193,7 +194,7 @@ public class UserServiceImpl implements UserService {
             .set(UserDO::getLoginTime, DateUtils.now())
             .set(UserDO::getLoginIp, loginIp)
             .eq(UserDO::getUserId, userId));
-        CacheHelper.evictNow(cacheManager.getCache(CacheNames.USER), "bo:" + userId);
+        CacheHelper.evictNow(cacheManager.getCache(CacheNames.USER), UserCacheKeys.of(userId));
     }
 
     @Override
