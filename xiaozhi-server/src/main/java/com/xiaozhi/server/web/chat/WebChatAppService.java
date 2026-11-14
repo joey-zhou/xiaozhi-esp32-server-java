@@ -107,12 +107,12 @@ public class WebChatAppService {
         String sessionId;
         if (resume) {
             // 另一个标签页已经开着这个会话时直接复用：再建一份会让两个 Conversation 各压缩一遍同一段历史
-            WebChatSession opened = sessions.get(resumeSessionId);
-            if (opened != null && Objects.equals(opened.userId, userId)) {
+            WebChatSession opened = openedSession(resumeSessionId, userId);
+            if (opened != null) {
                 opened.touch();
                 return resumeSessionId;
             }
-            assertSessionOwnedByUser(resumeSessionId, userId);
+            conversationService.checkAccess(resumeSessionId, userId);
             sessionId = resumeSessionId;
         } else {
             sessionId = UUID.randomUUID().toString();
@@ -144,17 +144,15 @@ public class WebChatAppService {
     }
 
     /**
-     * 校验待续接的 sessionId 是当前用户的 Web 会话。
-     * 存在不匹配时抛出 IllegalArgumentException。
+     * 进程里开着的会话，没开着返回 null。开着的会话可能还没落库，归属按开它的用户判；
+     * 落了库的按 {@link ConversationService#checkAccess} 判，两处结论一致。
      */
-    private void assertSessionOwnedByUser(String sessionId, Integer userId) {
-        ConversationBO conversation = conversationService.get(sessionId);
-        if (conversation == null) {
-            throw new IllegalArgumentException("会话不存在或已清除: " + sessionId);
+    private WebChatSession openedSession(String sessionId, Integer userId) {
+        WebChatSession session = sessions.get(sessionId);
+        if (session != null && !Objects.equals(session.userId, userId)) {
+            throw new UnauthorizedException("会话不属于当前用户: " + sessionId);
         }
-        if (!userId.equals(conversation.getUserId())) {
-            throw new IllegalArgumentException("会话不属于当前用户: " + sessionId);
-        }
+        return session;
     }
 
     /**
@@ -227,20 +225,12 @@ public class WebChatAppService {
      * 只有还没落库的新会话（open 后一句没说就被回收或重启）才会真的找不到，这时无从得知角色，只能报错。
      */
     private WebChatSession resolveSession(String sessionId, Integer userId) {
-        WebChatSession cached = sessions.get(sessionId);
+        WebChatSession cached = openedSession(sessionId, userId);
         if (cached != null) {
-            if (!Objects.equals(cached.userId, userId)) {
-                throw new UnauthorizedException("会话不属于当前用户: " + sessionId);
-            }
             return cached;
         }
+        conversationService.checkAccess(sessionId, userId);
         ConversationBO saved = conversationService.get(sessionId);
-        if (saved == null) {
-            throw new IllegalArgumentException("会话不存在或已删除: " + sessionId);
-        }
-        if (!userId.equals(saved.getUserId())) {
-            throw new UnauthorizedException("会话不属于当前用户: " + sessionId);
-        }
         RoleBO role = roleService.getBO(saved.getRoleId());
         if (role == null) {
             throw new IllegalArgumentException("角色不存在: " + saved.getRoleId());
@@ -276,12 +266,9 @@ public class WebChatAppService {
      * userId 须与会话创建者一致，防止跨用户关闭他人会话（拒绝服务）。
      */
     public void closeSession(String sessionId, Integer userId) {
-        WebChatSession session = sessions.get(sessionId);
+        WebChatSession session = openedSession(sessionId, userId);
         if (session == null) {
             return;
-        }
-        if (!Objects.equals(session.userId, userId)) {
-            throw new UnauthorizedException("会话不属于当前用户: " + sessionId);
         }
         sessions.remove(sessionId);
         // 剩下的对话压成摘要，否则没触发过压缩的短会话永远进不了摘要

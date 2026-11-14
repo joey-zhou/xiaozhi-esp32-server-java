@@ -162,6 +162,7 @@ public class UserController extends BaseController {
 
     @PutMapping("/{userId}/state")
     @SaCheckPermission("system:user:api:update")
+    @CheckOwner(resource = "user", id = "#userId")
     @AuditLog(module = "用户管理", operation = "启用禁用账号")
     @Operation(summary = "启用/禁用账号", description = "state 取 1-正常、0-禁用；禁用后该账号已签发的 Token 立即失效")
     public ApiResponse<UserResp> updateState(@PathVariable Integer userId, @RequestParam String state) {

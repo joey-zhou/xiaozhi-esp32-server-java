@@ -414,6 +414,21 @@ class DeviceAppServiceTest {
     }
 
     @Test
+    void batchUpdateRejectsWhenAnyDeviceBelongsToAnotherUserThanTheRole() {
+        Device foreign = new Device("11:22:33:44:55:66", "别人的音箱", 8, 3, null, null, null,
+                null, null, null, null, "1", CREATED_AT, CREATED_AT);
+        when(roleService.getBO(9)).thenReturn(role(9, "管家"));
+        when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.of(storedDevice()));
+        when(deviceRepository.findById("11:22:33:44:55:66")).thenReturn(Optional.of(foreign));
+
+        // 管理员能越过接口上的归属校验，设备与角色同属一个用户这条仍要守住，且整批一台都不改
+        assertThatThrownBy(() -> deviceAppService.batchUpdate(batchUpdateReq(DEVICE_ID + ",11:22:33:44:55:66", 9)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("角色不属于设备所属用户");
+        verify(deviceRepository, never()).save(any());
+    }
+
+    @Test
     void batchUpdateRejectsWhenNoDeviceMatched() {
         when(roleService.getBO(9)).thenReturn(role(9, "管家"));
         when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());

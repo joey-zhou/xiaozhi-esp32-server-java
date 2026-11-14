@@ -3,6 +3,7 @@ package com.xiaozhi.message.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
+import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.ConversationBO;
 import com.xiaozhi.message.convert.MessageConvertImpl;
@@ -24,6 +25,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -129,12 +131,27 @@ class ConversationServiceImplTest {
         verifyNoInteractions(messageService, summaryService);
     }
 
-    @SuppressWarnings("unchecked")
+    /** 会话归属只在 checkAccess 一处判定：续接、聊天、改名同一口径，不存在 404、不归属 403 */
     @Test
-    void renamingAConversationThatIsNotOwnedIsNotFound() {
-        when(conversationMapper.update(any(), any())).thenReturn(0);
+    void checkAccessTellsMissingFromNotOwned() {
+        when(conversationMapper.selectById("s-1")).thenReturn(conversation("s-1"));
+        when(conversationMapper.selectById("ghost")).thenReturn(null);
 
-        assertThatThrownBy(() -> service.rename(7, "s-1", "周末计划"))
-            .isInstanceOf(ResourceNotFoundException.class);
+        assertThatCode(() -> service.checkAccess("s-1", 7)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> service.checkAccess("s-1", 8))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessageContaining("不属于当前用户");
+        assertThatThrownBy(() -> service.checkAccess("ghost", 7))
+            .isInstanceOf(ResourceNotFoundException.class)
+            .hasMessageContaining("会话不存在或已删除");
+    }
+
+    @Test
+    void renamingAnotherUsersConversationIsForbidden() {
+        when(conversationMapper.selectById("s-1")).thenReturn(conversation("s-1"));
+
+        assertThatThrownBy(() -> service.rename(8, "s-1", "周末计划"))
+            .isInstanceOf(UnauthorizedException.class);
+        verify(conversationMapper, never()).update(any(), any());
     }
 }

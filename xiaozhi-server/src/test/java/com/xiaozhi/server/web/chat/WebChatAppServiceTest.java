@@ -2,6 +2,7 @@ package com.xiaozhi.server.web.chat;
 
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.service.TextChatService;
+import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.common.model.bo.ConversationBO;
@@ -32,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -153,10 +155,10 @@ class WebChatAppServiceTest {
     /** 会话表里也没有的 sessionId 才是真的不存在。 */
     @Test
     void chatStreamOnUnknownSessionFails() {
-        when(conversationService.get("ghost")).thenReturn(null);
+        doThrow(new ResourceNotFoundException("会话不存在或已删除: ghost")).when(conversationService).checkAccess("ghost", 9);
 
         assertThatThrownBy(() -> webChatAppService.chatStream("ghost", "在吗", 9).blockFirst())
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(ResourceNotFoundException.class)
             .hasMessageContaining("会话不存在或已删除");
         assertThat(webChatAppService.hasSession("ghost")).isFalse();
     }
@@ -164,7 +166,7 @@ class WebChatAppServiceTest {
     /** 重建路径同样按会话表校验归属，拿别人的 sessionId 不能把别人的会话建到自己名下。 */
     @Test
     void chatStreamDoesNotRebuildAnotherUsersSession() {
-        when(conversationService.get("s-8")).thenReturn(savedConversation("s-8", 8));
+        doThrow(new UnauthorizedException("会话不属于当前用户: s-8")).when(conversationService).checkAccess("s-8", 9);
 
         assertThatThrownBy(() -> webChatAppService.chatStream("s-8", "在吗", 9).blockFirst())
             .isInstanceOf(UnauthorizedException.class);
@@ -285,7 +287,6 @@ class WebChatAppServiceTest {
     /** 续接按会话表校验归属，续接的会话已经建过档，不再重复创建。 */
     @Test
     void resumedSessionIsNotCreatedAgain() {
-        when(conversationService.get("s-1")).thenReturn(savedConversation("s-1", 9));
         when(roleService.getBO(1)).thenReturn(role());
         when(textChatService.openConversation(eq("web:9"), eq(9), any(RoleBO.class), eq("s-1")))
             .thenReturn(mock(Conversation.class));
@@ -296,17 +297,19 @@ class WebChatAppServiceTest {
         webChatAppService.openSession(9, 1, "s-1");
         webChatAppService.chatStream("s-1", "接着聊", 9).collectList().block();
 
+        verify(conversationService).checkAccess("s-1", 9);
         verify(conversationService, never()).create(anyString(), any(), any(), anyString());
     }
 
     @Test
     void resumingAnotherUsersConversationIsRejected() {
         when(roleService.getBO(1)).thenReturn(role());
-        when(conversationService.get("s-1")).thenReturn(savedConversation("s-1", 8));
+        doThrow(new UnauthorizedException("会话不属于当前用户: s-1")).when(conversationService).checkAccess("s-1", 9);
 
         assertThatThrownBy(() -> webChatAppService.openSession(9, 1, "s-1"))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(UnauthorizedException.class)
             .hasMessageContaining("不属于当前用户");
+        verify(textChatService, never()).openConversation(anyString(), any(), any(), anyString());
     }
 
     /** 删除会话时进程里开着的会话一并移除，不再压缩出挂在已删除会话上的摘要。 */

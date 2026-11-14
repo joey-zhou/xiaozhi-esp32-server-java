@@ -34,7 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -186,10 +186,8 @@ public class DeviceAppService {
 
         RoleBO role = null;
         if (req.getRoleId() != null) {
-            role = roleService.getBO(req.getRoleId());
-            if (role == null) throw new IllegalArgumentException("角色不存在或无权访问");
-            if (!Objects.equals(role.getUserId(), device.getUserId()))
-                throw new IllegalArgumentException("角色不属于设备所属用户");
+            role = requireRole(req.getRoleId());
+            requireSameOwner(role, device);
         }
 
         device.update(req.getDeviceName(), req.getRoleId(), req.getLocation());
@@ -214,33 +212,44 @@ public class DeviceAppService {
         if (!StringUtils.hasText(req.getDeviceIds()) || req.getRoleId() == null) {
             throw new IllegalArgumentException("更新失败，请检查设备ID是否正确");
         }
-        if (roleService.getBO(req.getRoleId()) == null) {
-            throw new IllegalArgumentException("角色不存在或无权访问");
-        }
+        RoleBO role = requireRole(req.getRoleId());
 
-        int successCount = 0;
         int totalCount = 0;
-        for (String rawDeviceId : Arrays.asList(req.getDeviceIds().split(","))) {
+        // 设备不存在时不能算进成功数，否则前端提示的成功条数比实际改动的多
+        List<Device> devices = new ArrayList<>();
+        for (String rawDeviceId : req.getDeviceIds().split(",")) {
             String deviceId = rawDeviceId.trim();
             if (!StringUtils.hasText(deviceId)) {
                 continue;
             }
             totalCount++;
-            // 设备不存在时不能算进成功数，否则前端提示的成功条数比实际改动的多
-            boolean updated = deviceRepository.findById(deviceId).map(device -> {
-                device.bindRole(req.getRoleId());
-                deviceRepository.save(device);
-                return true;
-            }).orElse(false);
-            if (updated) {
-                successCount++;
-            }
+            deviceRepository.findById(deviceId).ifPresent(devices::add);
         }
-        if (successCount <= 0) {
+        if (devices.isEmpty()) {
             throw new IllegalArgumentException("更新失败，请检查设备ID是否正确");
         }
+        // 先全部校验再落库，有一台不合规整批不改
+        devices.forEach(device -> requireSameOwner(role, device));
+        for (Device device : devices) {
+            device.bindRole(role.getRoleId());
+            deviceRepository.save(device);
+        }
+        return new DeviceBatchUpdateResp(devices.size(), totalCount);
+    }
 
-        return new DeviceBatchUpdateResp(successCount, totalCount);
+    private RoleBO requireRole(Integer roleId) {
+        RoleBO role = roleService.getBO(roleId);
+        if (role == null) {
+            throw new IllegalArgumentException("角色不存在或无权访问");
+        }
+        return role;
+    }
+
+    /** 设备只能绑它所属用户的角色：管理员越得过接口上的归属校验，这条不能跟着放开 */
+    private static void requireSameOwner(RoleBO role, Device device) {
+        if (!Objects.equals(role.getUserId(), device.getUserId())) {
+            throw new IllegalArgumentException("角色不属于设备所属用户");
+        }
     }
 
     public DeviceResp generateCode(String deviceId, String sessionId, String type) {

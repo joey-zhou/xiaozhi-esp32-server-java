@@ -1,5 +1,6 @@
 package com.xiaozhi.architecture;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -12,14 +13,21 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.ParameterNameDiscoverer;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -45,6 +53,16 @@ class CheckOwnerContractArchTest {
     private static final Set<String> BUILTIN_VARIABLES = Set.of("root", "this");
 
     private static final ParameterNameDiscoverer PARAMETER_NAME_DISCOVERER = new DefaultParameterNameDiscoverer();
+
+    /** 参数名以 Id 或 Ids 结尾的算资源 id */
+    private static final Pattern RESOURCE_ID = Pattern.compile(".*Ids?");
+
+    /** 归属不走 @CheckOwner 的端点 → 由谁判定、或为什么不需要 */
+    private static final Map<String, String> OWNERSHIP_SELF_CHECKED = Map.ofEntries(
+        Map.entry("AuthRoleController#assignPermissions", "后台权限角色是全局资源，只按权限键"),
+        Map.entry("AuthRoleController#getPermissionConfig", "后台权限角色是全局资源，只按权限键"),
+        Map.entry("ConversationController#rename", "ConversationService.checkAccess"),
+        Map.entry("WebChatController#close", "WebChatAppService.closeSession（进程内会话按开它的用户判）"));
 
     private static JavaClasses xiaozhiClasses;
 
@@ -103,6 +121,59 @@ class CheckOwnerContractArchTest {
 
         assertThat(used).isNotEmpty();
         assertThat(used).isSubsetOf(registered);
+    }
+
+    /**
+     * Controller 以路径变量或查询参数接收资源 id 的方法，要么带 @CheckOwner，
+     * 要么登记在 {@link #OWNERSHIP_SELF_CHECKED}，写明由哪个 Service 方法判定。集合相等：判定挪走了名单也要跟着删。
+     */
+    @Test
+    void endpointsTakingAResourceIdCheckOwnership() {
+        Set<String> unchecked = new TreeSet<>();
+        for (Method method : endpointMethods()) {
+            if (method.isAnnotationPresent(CheckOwner.class) || method.isAnnotationPresent(CheckOwners.class)) {
+                continue;
+            }
+            if (takesResourceId(method)) {
+                unchecked.add(method.getDeclaringClass().getSimpleName() + "#" + method.getName());
+            }
+        }
+
+        assertThat(unchecked)
+            .as("带资源 id 的端点加 @CheckOwner；归属由 Service 自己判定的登记进 OWNERSHIP_SELF_CHECKED 并写明方法")
+            .isEqualTo(OWNERSHIP_SELF_CHECKED.keySet());
+    }
+
+    private static boolean takesResourceId(Method method) {
+        String[] names = PARAMETER_NAME_DISCOVERER.getParameterNames(method);
+        Parameter[] parameters = method.getParameters();
+        for (int i = 0; i < parameters.length; i++) {
+            Parameter parameter = parameters[i];
+            if (!parameter.isAnnotationPresent(PathVariable.class) && !parameter.isAnnotationPresent(RequestParam.class)) {
+                continue;
+            }
+            String name = names == null ? parameter.getName() : names[i];
+            if (RESOURCE_ID.matcher(name).matches()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Method> endpointMethods() {
+        List<Method> methods = new ArrayList<>();
+        for (JavaClass controller : xiaozhiClasses) {
+            if (!controller.isAnnotatedWith(RestController.class) && !controller.isAnnotatedWith(Controller.class)) {
+                continue;
+            }
+            for (JavaMethod javaMethod : controller.getMethods()) {
+                if (javaMethod.isAnnotatedWith(RequestMapping.class) || javaMethod.getAnnotations().stream()
+                    .anyMatch(annotation -> annotation.getRawType().isAnnotatedWith(RequestMapping.class))) {
+                    methods.add(javaMethod.reflect());
+                }
+            }
+        }
+        return methods;
     }
 
     /** 全仓所有带 @CheckOwner / @CheckOwners 的方法 */
