@@ -1,5 +1,7 @@
 package com.xiaozhi.communication.common;
 
+import com.xiaozhi.common.model.bo.ConfigChangeBO;
+import com.xiaozhi.common.model.bo.SessionCloseBO;
 import com.xiaozhi.event.AiConfigChangedEvent;
 import com.xiaozhi.event.ConversationHistoryClearedEvent;
 import com.xiaozhi.event.DeviceRoleChangedEvent;
@@ -12,9 +14,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-
-import java.util.HashMap;
-import java.util.Map;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -93,10 +92,7 @@ public class RedisBroadcast {
      * 接收方命中该 sessionId 时跳过，避免新连接建立过程中收到自己发出的广播而误关自己
      */
     public void closeDeviceSession(String deviceId, String excludeSessionId) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("deviceId", deviceId);
-        payload.put("excludeSessionId", excludeSessionId);
-        publish(CHANNEL_CLOSE_SESSION, JsonUtil.toJson(payload));
+        publish(CHANNEL_CLOSE_SESSION, JsonUtil.toJson(new SessionCloseBO(deviceId, excludeSessionId)));
     }
 
     public void roleUpdated(Integer roleId) {
@@ -108,8 +104,7 @@ public class RedisBroadcast {
     }
 
     public void configChanged(String configType, Integer configId) {
-        String payload = JsonUtil.toJson(Map.of("configType", configType, "configId", configId));
-        publish(CHANNEL_CONFIG_CHANGED, payload);
+        publish(CHANNEL_CONFIG_CHANGED, JsonUtil.toJson(new ConfigChangeBO(configType, configId)));
     }
 
     private void publish(String channel, String message) {

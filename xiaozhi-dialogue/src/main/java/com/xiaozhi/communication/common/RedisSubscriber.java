@@ -1,6 +1,5 @@
 package com.xiaozhi.communication.common;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.monitoring.CountingRejectionHandler;
@@ -13,6 +12,8 @@ import com.xiaozhi.ai.stt.SttServiceFactory;
 import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
+import com.xiaozhi.common.model.bo.ConfigChangeBO;
+import com.xiaozhi.common.model.bo.SessionCloseBO;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.agent.AgentProviders;
 import com.xiaozhi.config.service.ConfigService;
@@ -35,8 +36,6 @@ import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import lombok.extern.slf4j.Slf4j;
@@ -227,24 +226,14 @@ public class RedisSubscriber {
      * 幽灵会话清理广播，此时本地还查不到设备；若时序不巧晚到，得靠这个字段而不是查询时序来避免误关新连接
      */
     public void onCloseSession(String message) {
-        String deviceId = message;
-        String excludeSessionId = null;
-        try {
-            Map<String, Object> payload = JsonUtil.fromJson(message, new TypeReference<>() {});
-            if (payload != null && payload.containsKey("deviceId")) {
-                deviceId = (String) payload.get("deviceId");
-                excludeSessionId = (String) payload.get("excludeSessionId");
-            }
-        } catch (Exception e) {
-            // 兼容旧格式：payload 直接就是 deviceId 字符串
-        }
-        if (deviceId == null) {
+        SessionCloseBO payload = JsonUtil.fromJson(message, SessionCloseBO.class);
+        if (payload == null || payload.deviceId() == null) {
             return;
         }
-        ChatSession session = sessionManager.getSessionByDeviceId(deviceId);
-        if (session != null && !session.getSessionId().equals(excludeSessionId)) {
+        ChatSession session = sessionManager.getSessionByDeviceId(payload.deviceId());
+        if (session != null && !session.getSessionId().equals(payload.excludeSessionId())) {
             sessionManager.closeSession(session);
-            log.info("已关闭设备会话（来自跨实例广播） - deviceId: {}", deviceId);
+            log.info("已关闭设备会话（来自跨实例广播） - deviceId: {}", payload.deviceId());
         }
     }
 
@@ -268,9 +257,12 @@ public class RedisSubscriber {
      */
     public void onConfigChanged(String message) {
         try {
-            Map<String, Object> payload = JsonUtil.fromJson(message, new TypeReference<>() {});
-            String configType = (String) payload.get("configType");
-            Integer configId = (Integer) payload.get("configId");
+            ConfigChangeBO payload = JsonUtil.fromJson(message, ConfigChangeBO.class);
+            if (payload == null) {
+                return;
+            }
+            String configType = payload.configType();
+            Integer configId = payload.configId();
 
             // OSS 默认配置切换：清空存储工厂缓存，下次按最新配置重建（不依赖 configId 对应记录是否存在）
             if ("oss".equals(configType)) {
