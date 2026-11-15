@@ -1,7 +1,6 @@
 package com.xiaozhi.device.domain.repository;
 
 import com.xiaozhi.device.domain.Device;
-import com.xiaozhi.device.domain.vo.VerifyCode;
 
 import java.util.Optional;
 import java.util.Set;
@@ -13,15 +12,6 @@ public interface DeviceRepository {
 
     /** 按设备 ID 加载聚合根 */
     Optional<Device> findById(String deviceId);
-
-    /** 按验证码查询（设备激活场景） */
-    Optional<VerifyCode> findVerifyCode(String code, String deviceId, String sessionId);
-
-    /** 只凭验证码定位设备（绑定场景），命中多于一条时返回空 */
-    Optional<VerifyCode> findVerifyCodeByCode(String code);
-
-    /** 作废设备的全部验证码（绑定成功后调用，避免残留） */
-    void invalidateVerifyCodes(String deviceId);
 
     /**
      * 持久化聚合根（新建或更新）。

@@ -17,13 +17,13 @@ import com.xiaozhi.communication.registry.DialogueServerRegistry;
 import com.xiaozhi.device.convert.DeviceConvert;
 import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
-import com.xiaozhi.device.domain.vo.VerifyCode;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.summary.service.SummaryService;
 import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.IpLocationClient;
+import com.xiaozhi.verifycode.service.VerifyCodeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,6 +76,8 @@ class DeviceAppServiceTest {
     @Mock
     private DeviceAuthService deviceAuthService;
     @Mock
+    private VerifyCodeService verifyCodeService;
+    @Mock
     private MessageService messageService;
     @Mock
     private SummaryService summaryService;
@@ -92,6 +94,7 @@ class DeviceAppServiceTest {
         ReflectionTestUtils.setField(deviceAppService, "serverAddressProvider", serverAddressProvider);
         ReflectionTestUtils.setField(deviceAppService, "dialogueServerRegistry", dialogueServerRegistry);
         ReflectionTestUtils.setField(deviceAppService, "deviceAuthService", deviceAuthService);
+        ReflectionTestUtils.setField(deviceAppService, "verifyCodeService", verifyCodeService);
         ReflectionTestUtils.setField(deviceAppService, "messageService", messageService);
         ReflectionTestUtils.setField(deviceAppService, "summaryService", summaryService);
         DeviceBO boundDevice = new DeviceBO();
@@ -185,7 +188,7 @@ class DeviceAppServiceTest {
 
     @Test
     void createBindsDeviceLocatedByCodeAndInvalidatesRemainingCodes() {
-        when(deviceRepository.findVerifyCodeByCode("123456")).thenReturn(Optional.of(verifyCode("toy-v1")));
+        when(verifyCodeService.findValidByCode("123456")).thenReturn(verifyCode("toy-v1"));
         when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
         when(roleService.getDefaultOrFirstBO(7)).thenReturn(role(3, "小智"));
 
@@ -197,25 +200,24 @@ class DeviceAppServiceTest {
         assertThat(captor.getValue().getUserId()).isEqualTo(7);
         assertThat(captor.getValue().getRoleId()).isEqualTo(3);
         // 绑定用掉的码必须立即失效，否则同一个 6 位码在有效期内还能被继续试
-        verify(deviceRepository).invalidateVerifyCodes(DEVICE_ID);
+        verify(verifyCodeService).deleteByDeviceId(DEVICE_ID);
     }
 
     @Test
     void createRejectsWhenCodeLocatesNoSingleDevice() {
-        when(deviceRepository.findVerifyCodeByCode("123456")).thenReturn(Optional.empty());
+        when(verifyCodeService.findValidByCode("123456")).thenReturn(null);
 
         assertThatThrownBy(() -> deviceAppService.create(createReq("123456"), 7))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("无效验证码");
         verify(deviceRepository, never()).save(any());
-        verify(deviceRepository, never()).invalidateVerifyCodes(any());
+        verify(verifyCodeService, never()).deleteByDeviceId(any());
     }
 
     @Test
     void scanBindCreatesDeviceWhenUnboundAndRecentlyOnline() {
         when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
-        when(deviceRepository.findVerifyCode(null, DEVICE_ID, null))
-                .thenReturn(Optional.of(verifyCode("toy-v1")));
+        when(verifyCodeService.findValid(null, DEVICE_ID, null)).thenReturn(verifyCode("toy-v1"));
         when(roleService.getDefaultOrFirstBO(7)).thenReturn(role(3, "小智"));
 
         // 贴纸上是大写 '-' 分隔的 MAC，应归一化为设备上报的小写冒号格式
@@ -229,7 +231,7 @@ class DeviceAppServiceTest {
         assertThat(captor.getValue().getUserId()).isEqualTo(7);
         assertThat(captor.getValue().getRoleId()).isEqualTo(3);
         assertThat(captor.getValue().getDeviceName()).isEqualTo("toy-v1");
-        verify(deviceRepository).invalidateVerifyCodes(DEVICE_ID);
+        verify(verifyCodeService).deleteByDeviceId(DEVICE_ID);
     }
 
     @Test
@@ -260,7 +262,7 @@ class DeviceAppServiceTest {
     @Test
     void scanBindRejectsWhenDeviceNotRecentlyOnline() {
         when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
-        when(deviceRepository.findVerifyCode(null, DEVICE_ID, null)).thenReturn(Optional.empty());
+        when(verifyCodeService.findValid(null, DEVICE_ID, null)).thenReturn(null);
 
         assertThatThrownBy(() -> deviceAppService.scanBind(scanBindReq(DEVICE_ID), 7))
                 .isInstanceOf(IllegalStateException.class)
@@ -277,7 +279,7 @@ class DeviceAppServiceTest {
 
     @Test
     void createReturnsEveryResponseFieldFromTheAggregate() {
-        when(deviceRepository.findVerifyCodeByCode("123456")).thenReturn(Optional.of(verifyCode("toy-v1")));
+        when(verifyCodeService.findValidByCode("123456")).thenReturn(verifyCode("toy-v1"));
         when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
         when(roleService.getDefaultOrFirstBO(7)).thenReturn(role(3, "小智"));
         stampOnSave(CREATED_AT, CREATED_AT);
@@ -310,8 +312,7 @@ class DeviceAppServiceTest {
     @Test
     void scanBindReturnsEveryResponseFieldFromTheAggregate() {
         when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
-        when(deviceRepository.findVerifyCode(null, DEVICE_ID, null))
-                .thenReturn(Optional.of(verifyCode("toy-v1")));
+        when(verifyCodeService.findValid(null, DEVICE_ID, null)).thenReturn(verifyCode("toy-v1"));
         when(roleService.getDefaultOrFirstBO(7)).thenReturn(role(3, "小智"));
         stampOnSave(CREATED_AT, CREATED_AT);
 
@@ -386,6 +387,21 @@ class DeviceAppServiceTest {
 
         assertThat(result.getRoleId()).isEqualTo(3);
         assertThat(result.getRoleName()).isEqualTo("小智");
+    }
+
+    @Test
+    void deleteCleansUpRelatedDataAcrossOtherAggregates() {
+        when(deviceRepository.findById(DEVICE_ID))
+                .thenReturn(Optional.of(Device.newDevice(DEVICE_ID, "客厅音箱", "dual-board", 7, 3)));
+
+        deviceAppService.delete(DEVICE_ID);
+
+        verify(deviceRepository).delete(DEVICE_ID);
+        // 设备本身之外，验证码、历史消息、对话摘要都要跟着清，
+        // 否则会变成再也无法通过正常业务路径清理的孤儿数据
+        verify(verifyCodeService).deleteByDeviceId(DEVICE_ID);
+        verify(messageService).deleteByDeviceId(DEVICE_ID);
+        verify(summaryService).deleteByDeviceId(DEVICE_ID);
     }
 
     @Test
@@ -503,8 +519,13 @@ class DeviceAppServiceTest {
         return req;
     }
 
-    private VerifyCode verifyCode(String type) {
-        return new VerifyCode("123456", DEVICE_ID, null, type, null, LocalDateTime.now());
+    private VerifyCodeBO verifyCode(String type) {
+        VerifyCodeBO code = new VerifyCodeBO();
+        code.setCode("123456");
+        code.setDeviceId(DEVICE_ID);
+        code.setType(type);
+        code.setCreateTime(DateUtils.now());
+        return code;
     }
 
     private OtaReq otaRequest() {

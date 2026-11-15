@@ -1,10 +1,8 @@
 package com.xiaozhi.device.infrastructure.convert;
 
 import com.xiaozhi.common.model.bo.DeviceBO;
-import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.domain.Device;
-import com.xiaozhi.device.domain.vo.VerifyCode;
 import org.springframework.stereotype.Component;
 
 /**
@@ -72,17 +70,5 @@ public class DeviceConverter {
         bo.setCreateTime(device.getCreateTime());
         bo.setUpdateTime(device.getUpdateTime());
         return bo;
-    }
-
-    /** VerifyCodeBO → VerifyCode 值对象 */
-    public VerifyCode toVerifyCode(VerifyCodeBO bo) {
-        return new VerifyCode(
-                bo.getCode(),
-                bo.getDeviceId(),
-                bo.getSessionId(),
-                bo.getType(),
-                bo.getAudioPath(),
-                bo.getCreateTime()
-        );
     }
 }

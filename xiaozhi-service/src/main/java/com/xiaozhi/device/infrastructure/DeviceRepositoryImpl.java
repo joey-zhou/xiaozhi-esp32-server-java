@@ -4,18 +4,15 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.config.CacheNames;
 import com.xiaozhi.common.model.bo.DeviceBO;
-import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.device.dal.mysql.dataobject.DeviceDO;
 import com.xiaozhi.device.dal.mysql.mapper.DeviceMapper;
 import com.xiaozhi.device.domain.Device;
 import com.xiaozhi.device.domain.repository.DeviceRepository;
-import com.xiaozhi.device.domain.vo.VerifyCode;
 import com.xiaozhi.device.infrastructure.convert.DeviceConverter;
 import com.xiaozhi.device.support.DeviceCacheKeys;
 import com.xiaozhi.event.DeviceRoleChangedEvent;
 import com.xiaozhi.event.DeviceSessionClosedEvent;
 import com.xiaozhi.event.DeviceUpdatedEvent;
-import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
@@ -46,9 +43,6 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     private DeviceConverter deviceConverter;
 
     @Resource
-    private VerifyCodeService verifyCodeService;
-
-    @Resource
     private ApplicationEventPublisher eventPublisher;
 
     @Resource
@@ -59,24 +53,6 @@ public class DeviceRepositoryImpl implements DeviceRepository {
     public Optional<Device> findById(String deviceId) {
         if (deviceId == null || deviceId.isBlank()) return Optional.empty();
         return Optional.ofNullable(deviceMapper.selectById(deviceId)).map(deviceConverter::toDomain);
-    }
-
-    @Override
-    public Optional<VerifyCode> findVerifyCode(String code, String deviceId, String sessionId) {
-        VerifyCodeBO bo = verifyCodeService.findValid(code, deviceId, sessionId);
-        return Optional.ofNullable(bo).map(deviceConverter::toVerifyCode);
-    }
-
-    @Override
-    public Optional<VerifyCode> findVerifyCodeByCode(String code) {
-        VerifyCodeBO bo = verifyCodeService.findValidByCode(code);
-        return Optional.ofNullable(bo).map(deviceConverter::toVerifyCode);
-    }
-
-    @Override
-    public void invalidateVerifyCodes(String deviceId) {
-        if (deviceId == null || deviceId.isBlank()) return;
-        verifyCodeService.deleteByDeviceId(deviceId);
     }
 
     @Override
