@@ -1,7 +1,6 @@
 package com.xiaozhi.config;
 
 import com.xiaozhi.common.exception.ConfirmRequiredException;
-import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.req.ConfigCreateReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
@@ -49,7 +48,7 @@ public class ConfigChangePolicy {
         if (isLlm(current.getConfigType()) && !isEmbedding(current.getModelType())) {
             long boundRoles = roleService.countByModelId(current.getConfigId());
             if (boundRoles > 0) {
-                throw new OperationFailedException("该模型仍被 " + boundRoles + " 个角色使用，请先将这些角色改绑到其他模型");
+                throw new IllegalStateException("该模型仍被 " + boundRoles + " 个角色使用，请先将这些角色改绑到其他模型");
             }
         }
         // 删掉当前默认的那条 oss 配置，等于把存储切回本地，历史云地址一样解析不出来，

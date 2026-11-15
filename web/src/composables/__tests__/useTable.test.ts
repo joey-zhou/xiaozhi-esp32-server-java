@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const requestMock = vi.hoisted(() => ({
   shouldIgnoreRequestError: vi.fn(() => false),
   isForbiddenError: vi.fn(() => false),
+  takeOverFailure: vi.fn((error: unknown) => (error as { apiResponse?: unknown }).apiResponse),
 }))
 
 vi.mock('vue-i18n', () => ({
@@ -173,6 +174,20 @@ describe('useTable loadData', () => {
       content: 'common.loadDataFailed',
       key: 'request-error',
     })
+  })
+
+  // 非 2xx 但带后端原文（如 400 参数不对）时拦截器没弹，这里弹原文而不是笼统的加载失败
+  it('非 2xx 带后端原文时弹原文', async () => {
+    const table = useTable<Row>()
+    const failure = Object.assign(new Error('Request failed with status code 400'), {
+      apiResponse: { code: 400, message: '分页参数不合法', data: null },
+    })
+    const fetchFn = vi.fn().mockRejectedValue(failure)
+
+    await table.loadData(fetchFn)
+
+    expect(message.error).toHaveBeenCalledWith({ content: '分页参数不合法', key: 'request-error' })
+    expect(table.loadError.value).toBe('分页参数不合法')
   })
 
   it('被忽略的请求错误不报 message', async () => {

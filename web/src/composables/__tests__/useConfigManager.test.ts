@@ -23,6 +23,7 @@ vi.mock('@/store/loading', () => ({
 vi.mock('@/services/request', () => ({
   shouldIgnoreRequestError: vi.fn(() => false),
   isForbiddenError: vi.fn(() => false),
+  takeOverFailure: vi.fn((error: unknown) => (error as { apiResponse?: unknown }).apiResponse),
 }))
 
 vi.mock('@/services/config', () => ({

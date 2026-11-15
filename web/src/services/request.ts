@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios'
 import { message } from 'ant-design-vue'
 import qs from 'qs'
-import { REQUEST_TIMEOUT } from '@/constants/api'
+import { CODE_UNEXPECTED_ERROR, REQUEST_TIMEOUT } from '@/constants/api'
 import { useUserStore } from '@/store/user'
 import { ROUTES } from '@/router/routes'
 import { i18n } from '@/locales'
@@ -22,6 +22,10 @@ export interface RequestError extends Error {
   isForbidden?: boolean
   /** 拦截器已经弹过一条提示，全局的兜底错误处理器不用再弹第二条 */
   isToasted?: boolean
+  /** 非 2xx 但带着后端写给用户的原文：执行器据此按业务码接管或原样展示 */
+  apiResponse?: ApiResponse
+  /** 撤掉拦截器排在下一轮的那条提示，执行器接管时调 */
+  cancelToast?: () => void
 }
 
 /** 接口前缀，全站唯一来源；SSE / keepalive fetch 这类绕开 axios 的链路也从这里取 */
@@ -79,6 +83,37 @@ export function isAuthExpiredError(error: unknown): boolean {
 
 export function isForbiddenError(error: unknown): boolean {
   return error instanceof Error && (error as RequestError).isForbidden === true
+}
+
+/**
+ * 非 2xx 的响应体是不是后端写给用户的原文。未知异常的兜底文案带独立业务码，不算；
+ * 网关错误页、纯文本这类不是统一信封的也不算
+ */
+export function serverFailureOf(body: unknown): ApiResponse | undefined {
+  if (typeof body !== 'object' || body === null) {
+    return undefined
+  }
+  const candidate = body as Partial<ApiResponse>
+  if (typeof candidate.code !== 'number' || typeof candidate.message !== 'string' || !candidate.message) {
+    return undefined
+  }
+  return candidate.code === CODE_UNEXPECTED_ERROR ? undefined : (candidate as ApiResponse)
+}
+
+/**
+ * 执行器接管一条非 2xx 的业务失败：撤掉拦截器排在下一轮的提示，拿到后端原文响应体；
+ * 不是这类失败返回 undefined、什么都不动
+ */
+export function takeOverFailure(error: unknown): ApiResponse | undefined {
+  if (!(error instanceof Error)) {
+    return undefined
+  }
+  const requestError = error as RequestError
+  if (!requestError.apiResponse) {
+    return undefined
+  }
+  requestError.cancelToast?.()
+  return requestError.apiResponse
 }
 
 export function shouldIgnoreRequestError(error: unknown): boolean {
@@ -215,13 +250,23 @@ request.interceptors.response.use(
         requestError.isForbidden = true
         requestError.isToasted = true
         return Promise.reject(requestError)
-      } else {
-        message.error({
-          content: error.response.data?.message || `${i18n.global.t('error.serverError')} (${status})`,
-          key: 'request-error',
-        })
-        error.isToasted = true
       }
+      const failure = serverFailureOf(error.response.data)
+      if (failure) {
+        // 后端写给用户的原文不当场弹：执行器在同一轮里接住，按业务码处理（如 409 仍被引用）或弹原文；
+        // 自己 try/catch 的调用点接不住，下一轮照样弹原文
+        const toast = setTimeout(() => message.error({ content: failure.message, key: 'request-error' }), 0)
+        const requestError = toRequestError(error, failure.message)
+        requestError.apiResponse = failure
+        requestError.cancelToast = () => clearTimeout(toast)
+        requestError.isToasted = true
+        return Promise.reject(requestError)
+      }
+      message.error({
+        content: error.response.data?.message || `${i18n.global.t('error.serverError')} (${status})`,
+        key: 'request-error',
+      })
+      error.isToasted = true
     } else if (error.request) {
       message.error({
         content: i18n.global.t('error.networkError'),

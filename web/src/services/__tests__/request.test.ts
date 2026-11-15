@@ -9,9 +9,12 @@ import {
   isAuthExpiredError,
   isForbiddenError,
   isRequestCanceledError,
+  serverFailureOf,
   shouldIgnoreRequestError,
+  takeOverFailure,
   type RequestError,
 } from '../request'
+import { CODE_UNEXPECTED_ERROR } from '@/constants/api'
 
 function makeError(message: string, extras: Partial<RequestError> = {}): RequestError {
   return Object.assign(new Error(message), extras) as RequestError
@@ -46,5 +49,39 @@ describe('请求错误判定', () => {
     expect(shouldIgnoreRequestError(makeError('boom', { isSilent: true }))).toBe(true)
     expect(shouldIgnoreRequestError(makeError('boom', { isForbidden: true }))).toBe(false)
     expect(shouldIgnoreRequestError(makeError('Request failed with status code 500'))).toBe(false)
+  })
+})
+
+// 后端写给用户的原文与兜底文案要分得开，拦截器据此决定先不弹、交给执行器
+describe('非 2xx 响应体的判定', () => {
+  it('带业务码与文案的响应体是后端原文', () => {
+    const body = { code: 409, message: '该模型仍被 2 个角色使用，请先将这些角色改绑到其他模型', data: null }
+    expect(serverFailureOf(body)).toEqual(body)
+  })
+
+  it('未知异常的兜底带独立业务码，不算后端原文', () => {
+    expect(serverFailureOf({ code: CODE_UNEXPECTED_ERROR, message: '服务器错误，请联系管理员', data: null })).toBeUndefined()
+  })
+
+  it('不是统一信封的响应体（网关页、纯文本）不算', () => {
+    expect(serverFailureOf('<html>502 Bad Gateway</html>')).toBeUndefined()
+    expect(serverFailureOf({ error: 'Bad Gateway' })).toBeUndefined()
+    expect(serverFailureOf(undefined)).toBeUndefined()
+  })
+})
+
+describe('执行器接管非 2xx 的业务失败', () => {
+  it('拿到后端原文，并撤掉拦截器排在下一轮的提示', () => {
+    const cancelToast = vi.fn()
+    const body = { code: 409, message: '该模型仍被 2 个角色使用', data: null }
+    const error = makeError('Request failed with status code 409', { apiResponse: body, cancelToast })
+
+    expect(takeOverFailure(error)).toEqual(body)
+    expect(cancelToast).toHaveBeenCalledTimes(1)
+  })
+
+  it('不是这类失败时什么都不动', () => {
+    expect(takeOverFailure(makeError('Network Error'))).toBeUndefined()
+    expect(takeOverFailure('boom')).toBeUndefined()
   })
 })

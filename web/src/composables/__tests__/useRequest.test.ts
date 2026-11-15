@@ -156,6 +156,45 @@ describe('useRequest', () => {
     })
   })
 
+  // 非 2xx 但带着后端写给用户的原文：拦截器不先弹，执行器和业务码失败走同一条路
+  describe('execute - 非 2xx 带后端原文', () => {
+    function httpFailure(body: ApiResponse<null>) {
+      return Object.assign(new Error(`Request failed with status code ${body.code}`), { apiResponse: body })
+    }
+
+    it('按业务码交给 onFailure 接管，接管了就不弹', async () => {
+      const { executeOk } = useRequest()
+      const onFailure = vi.fn(() => true)
+      const body = fail('该模型仍被 2 个角色使用，请先将这些角色改绑到其他模型', 409)
+
+      const ok = await executeOk(vi.fn().mockRejectedValue(httpFailure(body)), { errorText: '删除失败', onFailure })
+
+      expect(ok).toBe(false)
+      expect(onFailure).toHaveBeenCalledWith(body)
+      expect(message.error).not.toHaveBeenCalled()
+    })
+
+    it('没人接管时弹后端原文，不用调用方的 errorText 盖掉', async () => {
+      const { executeOk } = useRequest()
+      const body = fail('该模型仍被 2 个角色使用，请先将这些角色改绑到其他模型', 409)
+
+      await executeOk(vi.fn().mockRejectedValue(httpFailure(body)), { errorText: '删除失败' })
+
+      expect(message.error).toHaveBeenCalledWith({ content: body.message, key: 'request-error' })
+    })
+
+    it('showError=false 时不弹但仍触发 onError', async () => {
+      const { executeOk } = useRequest()
+      const onError = vi.fn()
+      const failure = httpFailure(fail('名称重复', 409))
+
+      await executeOk(vi.fn().mockRejectedValue(failure), { showError: false, onError })
+
+      expect(message.error).not.toHaveBeenCalled()
+      expect(onError).toHaveBeenCalledWith(failure)
+    })
+  })
+
   describe('execute - loading', () => {
     it('请求过程中 loading 为 true，结束后归 false', async () => {
       const { execute, loading } = useRequest()

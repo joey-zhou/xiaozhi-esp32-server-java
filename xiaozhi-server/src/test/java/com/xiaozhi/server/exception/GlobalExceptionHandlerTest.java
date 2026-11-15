@@ -79,10 +79,22 @@ class GlobalExceptionHandlerTest extends ControllerTestSupport {
             Arguments.of(new DuplicateKeyException("Duplicate entry '1:llm:chat' for key 'sys_config.uk_config_default'"),
                 409, "数据重复，操作未生效"),
             Arguments.of(new OperationFailedException("保存MCP工具排除配置失败"), 500, "保存MCP工具排除配置失败"),
-            Arguments.of(new OperationFailedException(""), 500, "操作失败，请稍后重试"),
-            // 未单独映射的运行时异常统一兜底，内部细节不外泄
-            Arguments.of(new RuntimeException("不该外泄的内部细节"), 500, "服务器错误，请联系管理员")
+            Arguments.of(new OperationFailedException(""), 500, "操作失败，请稍后重试")
         );
+    }
+
+    /**
+     * 未单独映射的异常统一兜底，内部细节不外泄；业务码与 500 分开，
+     * 前端据此认出这是兜底文案而不是写给用户的原文，改用调用方自己的失败提示
+     */
+    @Test
+    void unexpectedExceptionCarriesItsOwnCodeSoTheClientKnowsItIsTheFallback() throws Exception {
+        controller.toThrow = new RuntimeException("不该外泄的内部细节");
+
+        mockMvc.perform(get("/probe/throw"))
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.code").value(ResultStatus.UNEXPECTED_ERROR))
+            .andExpect(jsonPath("$.message").value("服务器错误，请联系管理员"));
     }
 
     /** 待确认不是失败：走 HTTP 200 前端才不会既弹错误提示又弹确认框 */

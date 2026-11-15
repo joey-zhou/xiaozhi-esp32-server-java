@@ -6,7 +6,7 @@ import { computed, onScopeDispose, ref, type Ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { useLoadingStore } from '@/store/loading'
-import { shouldIgnoreRequestError } from '@/services/request'
+import { shouldIgnoreRequestError, takeOverFailure } from '@/services/request'
 import type { ApiResponse } from '@/types/api'
 
 export interface RequestOptions<T = unknown> {
@@ -38,7 +38,7 @@ export interface RequestOptions<T = unknown> {
    */
   onSuccess?: (data: T, response: ApiResponse<T>) => void | Promise<void>
   /**
-   * 业务码失败时的自定义处理，入参是完整响应体。
+   * 业务码失败时的自定义处理，入参是完整响应体；非 2xx 但带着后端原文的失败（如 409 仍被引用）同样走这里。
    * 返回 true 表示这条失败已被接管，不再弹默认错误提示（按 code 分支、失败也要走确认框的场景用它）
    */
   onFailure?: (response: ApiResponse<T>) => boolean | Promise<boolean>
@@ -148,6 +148,18 @@ export function useRequest() {
       return { ok: true, data: res.data }
     } catch (error: unknown) {
       if (shouldIgnoreRequestError(error)) {
+        onError?.(error)
+        return { ok: false }
+      }
+
+      // 非 2xx 但带着后端写给用户的原文（409 仍被引用、400 参数不对……）：和业务码失败走同一条路，
+      // 接管后拦截器那条就不弹了，这里弹后端原文，不拿调用方的 errorText 盖掉
+      const failure = takeOverFailure(error)
+      if (failure) {
+        const handled = onFailure ? await onFailure(failure as ApiResponse<T>) : false
+        if (!handled && showError) {
+          message.error({ content: failure.message, key: 'request-error' })
+        }
         onError?.(error)
         return { ok: false }
       }

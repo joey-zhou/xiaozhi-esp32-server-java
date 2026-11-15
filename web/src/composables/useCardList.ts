@@ -1,7 +1,7 @@
 import { shallowRef, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
-import { shouldIgnoreRequestError } from '@/services/request'
+import { shouldIgnoreRequestError, takeOverFailure } from '@/services/request'
 
 /**
  * 卡片列表管理 Composable
@@ -102,9 +102,8 @@ export function useCardList<T extends object>(options: UseCardListOptions<T>) {
         return
       }
       console.error('加载数据失败:', error)
-      const errorMessage = error instanceof Error
-        ? error.message
-        : t('common.loadDataFailed')
+      // 后端写给用户的原文照原样给；传输层错误的 message 是 axios 的英文原文，换成本地化文案
+      const errorMessage = takeOverFailure(error)?.message ?? t('common.loadDataFailed')
       // 传输层错误由 request.ts 的拦截器统一弹提示，这里用同一个 key 覆盖，不叠第二条
       message.error({ content: errorMessage, key: 'request-error' })
 

@@ -1,7 +1,6 @@
 package com.xiaozhi.config;
 
 import com.xiaozhi.common.exception.ConfirmRequiredException;
-import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.req.ConfigCreateReq;
 import com.xiaozhi.common.model.req.ConfigUpdateReq;
@@ -137,7 +136,7 @@ class ConfigChangePolicyTest {
         when(roleService.countByModelId(CONFIG_ID)).thenReturn(3L);
 
         assertThatThrownBy(() -> policy.checkDelete(existing, true))
-                .isInstanceOf(OperationFailedException.class)
+                .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("3 个角色");
     }
 

@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useDebounceFn } from '@vueuse/core'
 import type { TablePaginationConfig } from 'ant-design-vue'
 import type { PageResponse } from '@/types/api'
-import { isForbiddenError, shouldIgnoreRequestError } from '@/services/request'
+import { isForbiddenError, shouldIgnoreRequestError, takeOverFailure } from '@/services/request'
 import { DEBOUNCE_DELAY } from '@/constants/api'
 import { usePagination } from './usePagination'
 
@@ -109,6 +109,16 @@ export function useTable<T = unknown, Q extends object = object>(
       // 403 的「权限不足」由 request.ts 弹出，这里再覆盖就只剩一句笼统的加载失败
       if (isForbiddenError(error)) {
         loadError.value = t('error.forbidden')
+        onError?.(error)
+        return
+      }
+      // 非 2xx 但带着后端写给用户的原文：接管后拦截器那条就不弹了，这里弹原文
+      const failure = takeOverFailure(error)
+      if (failure) {
+        loadError.value = failure.message
+        if (showError) {
+          message.error({ content: failure.message, key: 'request-error' })
+        }
         onError?.(error)
         return
       }

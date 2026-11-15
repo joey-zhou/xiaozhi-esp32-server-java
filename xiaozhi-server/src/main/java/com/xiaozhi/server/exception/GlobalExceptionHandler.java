@@ -200,7 +200,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleRuntimeException(RuntimeException e, WebRequest request) {
         log.error("业务异常: {}", e.getMessage(), e);
-        return ApiResponse.serverError("服务器错误，请联系管理员");
+        return unexpected();
     }
 
     @ExceptionHandler(DuplicateKeyException.class)
@@ -214,7 +214,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleException(Exception e, WebRequest request) {
         log.error("系统异常: {}", e.getMessage(), e);
-        return ApiResponse.serverError("服务器错误，请联系管理员");
+        return unexpected();
+    }
+
+    /** 内部细节不外泄；带独立业务码，前端据此换成调用方自己的失败提示 */
+    private static ApiResponse<Void> unexpected() {
+        return ApiResponse.error(ResultStatus.UNEXPECTED_ERROR, "服务器错误，请联系管理员");
     }
 
     private String extractBindingMessage(BindingResult bindingResult, String fallback) {

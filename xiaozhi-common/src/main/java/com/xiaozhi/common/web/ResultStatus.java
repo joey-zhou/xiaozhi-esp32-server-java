@@ -88,6 +88,12 @@ public class ResultStatus {
      * 系统内部错误
      */
     public static final int ERROR = 500;
+    /**
+     * 未单独映射的异常走的兜底，文案固定、不是写给用户的原文。
+     * <p>
+     * 是 {@link #ERROR} 的细分：前端靠它区分「显示后端原文」和「换成调用方自己的失败提示」。
+     */
+    public static final int UNEXPECTED_ERROR = 5000;
 
     /**
      * 接口未实现

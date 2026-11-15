@@ -8,7 +8,10 @@ const userServiceMock = vi.hoisted(() => ({
 
 vi.mock('@/services/user', () => userServiceMock)
 // 真实的 request.ts 会把 axios / router / store 一起拖进来，这里只给用到的导出
-vi.mock('@/services/request', () => ({ shouldIgnoreRequestError: () => false }))
+vi.mock('@/services/request', () => ({
+  shouldIgnoreRequestError: () => false,
+  takeOverFailure: (error: unknown) => (error as { apiResponse?: unknown }).apiResponse,
+}))
 
 import { message } from 'ant-design-vue'
 

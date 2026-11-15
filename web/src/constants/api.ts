@@ -15,6 +15,12 @@ export const REQUEST_TIMEOUT = 30000
 export const CODE_CONFIRM_REQUIRED = 4090
 
 /**
+ * 后端未单独映射的异常走的兜底业务码（HTTP 500），文案固定、不是写给用户的原文
+ * 真源 ResultStatus.java UNEXPECTED_ERROR；前端遇到它改用调用方自己的失败提示
+ */
+export const CODE_UNEXPECTED_ERROR = 5000
+
+/**
  * 分页默认配置
  * 对应 composables/useTable.ts 的分页初值
  */
