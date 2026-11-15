@@ -3,6 +3,7 @@ package com.xiaozhi.summary.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.model.bo.SummaryBO;
+import com.xiaozhi.event.MemoryDeletedEvent;
 import com.xiaozhi.summary.convert.SummaryConvert;
 import com.xiaozhi.summary.dal.mysql.dataobject.SummaryDO;
 import com.xiaozhi.summary.dal.mysql.mapper.SummaryMapper;
@@ -15,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Instant;
@@ -47,6 +49,9 @@ class SummaryServiceImplTest {
 
     @Mock
     private SummaryConvert summaryConvert;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private SummaryServiceImpl summaryService;
@@ -167,6 +172,28 @@ class SummaryServiceImplTest {
         verify(summaryMapper).delete(captor.capture());
         assertThat(captor.getValue().getTargetSql()).doesNotContain("createTime");
         assertThat(captor.getValue().getParamNameValuePairs().values()).containsExactlyInAnyOrder(1, "device-1");
+    }
+
+    /** 在线会话开会话时装进提示词的摘要是快照：删了要发事件，让对话侧丢掉重建 */
+    @Test
+    void deletingSummariesTellsTheLiveSessions() {
+        when(summaryMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(2);
+
+        summaryService.delete(1, "device-1", null);
+
+        ArgumentCaptor<MemoryDeletedEvent> event = ArgumentCaptor.forClass(MemoryDeletedEvent.class);
+        verify(eventPublisher).publishEvent(event.capture());
+        assertThat(event.getValue().getOwnerId()).isEqualTo("device-1");
+        assertThat(event.getValue().getRoleId()).isEqualTo(1);
+    }
+
+    @Test
+    void nothingDeletedNothingToTell() {
+        when(summaryMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(0);
+
+        summaryService.delete(1, "device-1", null);
+
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test

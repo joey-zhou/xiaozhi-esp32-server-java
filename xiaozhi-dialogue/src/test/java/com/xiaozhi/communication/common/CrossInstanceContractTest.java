@@ -1,5 +1,6 @@
 package com.xiaozhi.communication.common;
 
+import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -104,6 +105,22 @@ class CrossInstanceContractTest {
         subscriber.onConfigChanged(message);
 
         verify(configService).getBO(34);
+    }
+
+    @Test
+    void memoryDeletedReachesTheSessionOfThatDeviceAndRole() {
+        broadcast.memoryDeleted("dev-1", 7);
+        String message = publishedOn(RedisBroadcast.CHANNEL_MEMORY_DELETED);
+
+        ChatSession session = session("session-1");
+        DeviceBO device = new DeviceBO();
+        device.setRoleId(7);
+        session.setDevice(device);
+        when(sessionManager.getSessionByDeviceId("dev-1")).thenReturn(session);
+        subscriber.onMemoryDeleted(message);
+
+        // 会话还没装 Persona，没有快照可丢；走到这里说明归属和角色都对上了
+        verify(sessionManager).getSessionByDeviceId("dev-1");
     }
 
     private static ChatSession session(String sessionId) {

@@ -13,6 +13,7 @@ import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.ConfigChangeBO;
+import com.xiaozhi.common.model.bo.MemoryScopeBO;
 import com.xiaozhi.common.model.bo.SessionCloseBO;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.agent.AgentProviders;
@@ -36,6 +37,7 @@ import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
+import java.util.Objects;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import lombok.extern.slf4j.Slf4j;
@@ -140,6 +142,7 @@ public class RedisSubscriber {
         addListener(container, "onCloseSession", RedisBroadcast.CHANNEL_CLOSE_SESSION);
         addListener(container, "onRoleUpdated", RedisBroadcast.CHANNEL_ROLE_UPDATED);
         addListener(container, "onDeviceUpdated", RedisBroadcast.CHANNEL_DEVICE_UPDATED);
+        addListener(container, "onMemoryDeleted", RedisBroadcast.CHANNEL_MEMORY_DELETED);
 
         return container;
     }
@@ -234,6 +237,28 @@ public class RedisSubscriber {
         if (session != null && !session.getSessionId().equals(payload.excludeSessionId())) {
             sessionManager.closeSession(session);
             log.info("已关闭设备会话（来自跨实例广播） - deviceId: {}", payload.deviceId());
+        }
+    }
+
+    /**
+     * 摘要删了：该设备正在用这个角色的话，丢掉会话手里的记忆快照，下一轮从库里重建。
+     * 用 discard 不用 flush：flush 会把带着已删内容的上下文再压成摘要写回去
+     */
+    public void onMemoryDeleted(String message) {
+        MemoryScopeBO scope = JsonUtil.fromJson(message, MemoryScopeBO.class);
+        if (scope == null || scope.ownerId() == null) {
+            return;
+        }
+        ChatSession session = sessionManager.getSessionByDeviceId(scope.ownerId());
+        DeviceBO device = session == null ? null : session.getDevice();
+        if (device == null || !Objects.equals(device.getRoleId(), scope.roleId())) {
+            return;
+        }
+        Persona persona = session.getPersona();
+        if (persona != null) {
+            persona.getConversation().discard();
+            session.setPersona(null);
+            log.info("记忆已删，丢弃在线会话的记忆快照 - deviceId: {}, roleId: {}", scope.ownerId(), scope.roleId());
         }
     }
 

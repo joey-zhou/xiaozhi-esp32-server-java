@@ -8,6 +8,7 @@ import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.common.model.bo.ConversationBO;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.RoleBO;
+import com.xiaozhi.event.MemoryDeletedEvent;
 import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
@@ -132,6 +133,40 @@ class WebChatAppServiceTest {
         webChatAppService.closeSession(sessionId, 9);
 
         verify(conversation).flush();
+    }
+
+    /**
+     * 记忆管理里删了网页聊天的摘要：开着的会话丢掉手里的记忆快照（不压缩、不回写），按库里现状重开一份。
+     * 不能直接移出会话表：还没说过话的新会话没落库，移掉之后下一句就找不到了。
+     */
+    @Test
+    void deletedMemoryRebuildsTheOpenSessionsOfThatRole() {
+        Conversation stale = mock(Conversation.class);
+        Conversation fresh = mock(Conversation.class);
+        when(roleService.getBO(1)).thenReturn(role());
+        when(textChatService.openConversation(eq("web:9"), eq(9), any(RoleBO.class), anyString()))
+            .thenReturn(stale, fresh);
+        String sessionId = webChatAppService.openSession(9, 1);
+
+        webChatAppService.onMemoryDeleted(new MemoryDeletedEvent(this, "web:9", 1));
+
+        verify(stale).discard();
+        verify(stale, never()).flush();
+        verify(textChatService, times(2)).openConversation(eq("web:9"), eq(9), any(RoleBO.class), eq(sessionId));
+        assertThat(webChatAppService.hasSession(sessionId)).isTrue();
+    }
+
+    @Test
+    void deletedMemoryOfAnotherOwnerOrRoleLeavesTheSessionAlone() {
+        Conversation conversation = mock(Conversation.class);
+        when(roleService.getBO(1)).thenReturn(role());
+        when(textChatService.openConversation(eq("web:9"), eq(9), any(RoleBO.class), anyString())).thenReturn(conversation);
+        webChatAppService.openSession(9, 1);
+
+        webChatAppService.onMemoryDeleted(new MemoryDeletedEvent(this, "web:8", 1));
+        webChatAppService.onMemoryDeleted(new MemoryDeletedEvent(this, "web:9", 2));
+
+        verify(conversation, never()).discard();
     }
 
     /** 进程内会话只是缓存：被回收或重启后拿同一个 sessionId 再聊，按会话表重建，不要求前端重新 open。 */

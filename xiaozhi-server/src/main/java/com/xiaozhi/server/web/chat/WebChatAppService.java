@@ -8,6 +8,7 @@ import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.common.model.bo.ConversationBO;
 import com.xiaozhi.common.model.bo.RoleBO;
+import com.xiaozhi.event.MemoryDeletedEvent;
 import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
@@ -17,6 +18,8 @@ import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
@@ -294,6 +297,27 @@ public class WebChatAppService {
         List<String> deleted = conversationService.delete(userId, sessionIds);
         log.info("Web 聊天会话已删除: userId={}, sessionIds={}", userId, deleted);
         return deleted.size();
+    }
+
+    /**
+     * 记忆管理里删了网页聊天的摘要：开着的会话丢掉手里的记忆快照，按库里现状重开一份。
+     * 删除接口就在本进程，本地监听即可；不直接移出会话表，还没落库的新会话移掉之后下一句就找不到了
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onMemoryDeleted(MemoryDeletedEvent event) {
+        sessions.replaceAll((sessionId, session) -> {
+            if (!ownerId(session.userId).equals(event.getOwnerId()) || !Objects.equals(session.roleId, event.getRoleId())) {
+                return session;
+            }
+            RoleBO role = roleService.getBO(session.roleId);
+            if (role == null) {
+                return session;
+            }
+            session.conversation.discard();
+            log.info("记忆已删，重开网页聊天会话: sessionId={}", sessionId);
+            return new WebChatSession(textChatService.openConversation(event.getOwnerId(), session.userId, role, sessionId),
+                    session.userId, session.roleId, session.saved);
+        });
     }
 
     /**

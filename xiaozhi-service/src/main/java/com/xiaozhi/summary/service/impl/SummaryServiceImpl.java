@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.SummaryBO;
+import com.xiaozhi.event.MemoryDeletedEvent;
 import com.xiaozhi.summary.convert.SummaryConvert;
 import com.xiaozhi.summary.dal.mysql.dataobject.SummaryDO;
 import com.xiaozhi.summary.dal.mysql.mapper.SummaryMapper;
@@ -13,6 +14,7 @@ import com.xiaozhi.summary.service.SummaryService;
 import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,9 @@ public class SummaryServiceImpl implements SummaryService {
 
     @Resource
     private SummaryConvert summaryConvert;
+
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
 
     @Override
     public PageResult<SummaryBO> page(String deviceId, Integer userId, Integer roleId, int pageNo, int pageSize) {
@@ -64,7 +69,11 @@ public class SummaryServiceImpl implements SummaryService {
         if (summaryId != null) {
             queryWrapper.eq(SummaryDO::getCreateTime, toLocalDateTime(Instant.ofEpochMilli(summaryId)));
         }
-        return summaryMapper.delete(queryWrapper);
+        int deleted = summaryMapper.delete(queryWrapper);
+        if (deleted > 0) {
+            eventPublisher.publishEvent(new MemoryDeletedEvent(this, deviceId, roleId));
+        }
+        return deleted;
     }
 
     @Override
