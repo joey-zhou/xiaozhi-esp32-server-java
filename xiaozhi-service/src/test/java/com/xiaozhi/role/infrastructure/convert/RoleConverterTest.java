@@ -1,5 +1,6 @@
 package com.xiaozhi.role.infrastructure.convert;
 
+import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
 import com.xiaozhi.role.domain.Role;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class RoleConverterTest {
     void defaultsInactiveTimeoutForLegacyRoleData() {
         Role role = converter.toDomain(roleDataObject(null));
 
-        assertThat(role.getInactiveTimeoutSeconds()).isEqualTo(Role.DEFAULT_INACTIVE_TIMEOUT_SECONDS);
+        assertThat(role.getInactiveTimeoutSeconds()).isEqualTo(RoleBO.DEFAULT_INACTIVE_TIMEOUT_SECONDS);
     }
 
     private RoleDO roleDataObject(Integer inactiveTimeoutSeconds) {

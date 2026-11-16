@@ -1,5 +1,6 @@
 package com.xiaozhi.role.domain;
 
+import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.role.domain.vo.VoiceConfig;
 import org.junit.jupiter.api.Test;
 
@@ -65,6 +66,6 @@ class VoiceConfigMergeTest {
         assertThat(local.ttsId()).isNull();
         assertThat(local.sttId()).isNull();
         assertThat(local.withDefaults().sttId()).isNull();
-        assertThat(local.withDefaults().ttsPitch()).isEqualTo(VoiceConfig.DEFAULT_TTS_PITCH);
+        assertThat(local.withDefaults().ttsPitch()).isEqualTo(RoleBO.DEFAULT_TTS_PITCH);
     }
 }

@@ -19,15 +19,23 @@ public interface RoleConvert {
      * 两边各存一个数字迟早会对不上。
      */
     @Mapping(target = "ttsPitch", source = "ttsPitch",
-        defaultExpression = "java(com.xiaozhi.role.domain.vo.VoiceConfig.DEFAULT_TTS_PITCH)")
+        defaultExpression = "java(com.xiaozhi.common.model.bo.RoleBO.DEFAULT_TTS_PITCH)")
     @Mapping(target = "ttsSpeed", source = "ttsSpeed",
-        defaultExpression = "java(com.xiaozhi.role.domain.vo.VoiceConfig.DEFAULT_TTS_SPEED)")
+        defaultExpression = "java(com.xiaozhi.common.model.bo.RoleBO.DEFAULT_TTS_SPEED)")
     @Mapping(target = "temperature", source = "temperature",
-        defaultExpression = "java(com.xiaozhi.role.domain.vo.LlmConfig.DEFAULT_TEMPERATURE)")
+        defaultExpression = "java(com.xiaozhi.common.model.bo.RoleBO.DEFAULT_TEMPERATURE)")
     @Mapping(target = "topP", source = "topP",
-        defaultExpression = "java(com.xiaozhi.role.domain.vo.LlmConfig.DEFAULT_TOP_P)")
+        defaultExpression = "java(com.xiaozhi.common.model.bo.RoleBO.DEFAULT_TOP_P)")
     @Mapping(target = "inactiveTimeoutSeconds", source = "inactiveTimeoutSeconds",
-        defaultExpression = "java(Integer.valueOf(com.xiaozhi.role.domain.Role.DEFAULT_INACTIVE_TIMEOUT_SECONDS))")
+        defaultExpression = "java(com.xiaozhi.common.model.bo.RoleBO.DEFAULT_INACTIVE_TIMEOUT_SECONDS)")
+    @Mapping(target = "vadSpeechTh", source = "vadSpeechTh",
+        defaultExpression = "java(com.xiaozhi.common.model.bo.RoleBO.DEFAULT_VAD_SPEECH_TH)")
+    @Mapping(target = "vadSilenceTh", source = "vadSilenceTh",
+        defaultExpression = "java(com.xiaozhi.common.model.bo.RoleBO.DEFAULT_VAD_SILENCE_TH)")
+    @Mapping(target = "vadEnergyTh", source = "vadEnergyTh",
+        defaultExpression = "java(com.xiaozhi.common.model.bo.RoleBO.DEFAULT_VAD_ENERGY_TH)")
+    @Mapping(target = "vadSilenceMs", source = "vadSilenceMs",
+        defaultExpression = "java(com.xiaozhi.common.model.bo.RoleBO.DEFAULT_VAD_SILENCE_MS)")
     RoleBO toBO(RoleDO roleDO);
 
     /**

@@ -1,5 +1,6 @@
 package com.xiaozhi.role;
 
+import com.xiaozhi.common.model.resp.RoleDefaultsResp;
 import com.xiaozhi.server.web.BaseController;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
@@ -79,6 +80,14 @@ public class RoleController extends BaseController {
     @Operation(summary = "根据条件查询角色信息", description = "返回角色信息列表")
     public ApiResponse<PageResult<RoleResp>> list(@Valid RolePageReq req) {
         return ApiResponse.success(roleAppService.page(req, CurrentUser.id()));
+    }
+
+    @GetMapping("/defaults")
+    @ResponseBody
+    @SaCheckPermission("system:role:api:list")
+    @Operation(summary = "角色参数默认值", description = "新建表单展示用；没改过的参数不必提交，后端按同一份默认补齐")
+    public ApiResponse<RoleDefaultsResp> defaults() {
+        return ApiResponse.success(RoleDefaultsResp.current());
     }
 
     /**

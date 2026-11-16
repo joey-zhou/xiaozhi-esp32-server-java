@@ -2,6 +2,7 @@ package com.xiaozhi.role;
 
 import com.xiaozhi.ai.tts.SherpaVoiceProbe;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
+import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.req.RoleCreateReq;
 import com.xiaozhi.common.model.req.RolePageReq;
 import com.xiaozhi.common.model.req.RoleUpdateReq;
@@ -58,6 +59,27 @@ class RoleControllerTest extends ControllerTestSupport {
         ReflectionTestUtils.setField(roleController, "roleAppService", roleAppService);
         ReflectionTestUtils.setField(roleController, "sherpaVoiceProbe", sherpaVoiceProbe);
         mockMvc = buildMockMvc(roleController);
+    }
+
+    /** 前端表单展示的默认值从这里取，不自带第二份 */
+    @Test
+    void defaultsComeFromTheOneDefinition() throws Exception {
+        mockMvc.perform(get("/api/role/defaults"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.temperature").value(RoleBO.DEFAULT_TEMPERATURE))
+            .andExpect(jsonPath("$.data.topP").value(RoleBO.DEFAULT_TOP_P))
+            .andExpect(jsonPath("$.data.vadSpeechTh").value(asJson(RoleBO.DEFAULT_VAD_SPEECH_TH)))
+            .andExpect(jsonPath("$.data.vadSilenceTh").value(asJson(RoleBO.DEFAULT_VAD_SILENCE_TH)))
+            .andExpect(jsonPath("$.data.vadEnergyTh").value(asJson(RoleBO.DEFAULT_VAD_ENERGY_TH)))
+            .andExpect(jsonPath("$.data.vadSilenceMs").value(RoleBO.DEFAULT_VAD_SILENCE_MS))
+            .andExpect(jsonPath("$.data.inactiveTimeoutSeconds").value(RoleBO.DEFAULT_INACTIVE_TIMEOUT_SECONDS))
+            .andExpect(jsonPath("$.data.ttsPitch").value(RoleBO.DEFAULT_TTS_PITCH))
+            .andExpect(jsonPath("$.data.ttsSpeed").value(RoleBO.DEFAULT_TTS_SPEED));
+    }
+
+    /** JSON 里的 float 按十进制最短写法输出（0.3），不是按 double 展开的 0.30000001… */
+    private static double asJson(float value) {
+        return Double.parseDouble(Float.toString(value));
     }
 
     @Test

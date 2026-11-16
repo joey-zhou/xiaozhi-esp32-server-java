@@ -21,11 +21,11 @@ import { useRequest } from '@/composables/useRequest'
 import { useUserStore } from '@/store/user'
 import { ROUTES } from '@/router/routes'
 import { shouldIgnoreRequestError } from '@/services/request'
-import { queryRoles, addRole, updateRole, deleteRole, updateToolsStatus } from '@/services/role'
+import { queryRoles, addRole, updateRole, deleteRole, updateToolsStatus, getRoleDefaults } from '@/services/role'
 import { queryTemplates } from '@/services/template'
 import { useAvatar } from '@/composables/useAvatar'
 import { useAvatarUpload } from '@/composables/useAvatarUpload'
-import type { ModelOption, PromptTemplate, Role, RoleFormData } from '@/types/role'
+import type { ModelOption, PromptTemplate, Role, RoleDefaults, RoleFormData } from '@/types/role'
 import type { TableColumnsType } from 'ant-design-vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
 import TableEmptyState from '@/components/TableEmptyState.vue'
@@ -88,33 +88,58 @@ const formData = reactive<RoleFormData>({
   isDefault: false,
   modelType: 'llm',
   modelId: undefined,
-  temperature: 0.7,
-  topP: 0.9,
+  temperature: undefined,
+  topP: undefined,
   sttId: undefined,
   sttHotwords: '',
-  vadSpeechTh: 0.5,
-  vadSilenceTh: 0.3,
-  vadEnergyTh: 0.01,
-  vadSilenceMs: 1200,
-  inactiveTimeoutSeconds: 60,
+  vadSpeechTh: undefined,
+  vadSilenceTh: undefined,
+  vadEnergyTh: undefined,
+  vadSilenceMs: undefined,
+  inactiveTimeoutSeconds: undefined,
   voiceName: undefined,
   ttsId: undefined,
   gender: '',
-  ttsPitch: 1.0,
-  ttsSpeed: 1.0,
+  ttsPitch: undefined,
+  ttsSpeed: undefined,
 })
+
+/**
+ * 采样、VAD、会话、音调语速这几项的默认值由后端给，表单打开时记下基线，
+ * 用户没改过的不提交：新建时后端按同一份默认补齐，编辑时保留原值
+ */
+const TUNED_FIELDS = [
+  'temperature', 'topP', 'vadSpeechTh', 'vadSilenceTh', 'vadEnergyTh', 'vadSilenceMs',
+  'inactiveTimeoutSeconds', 'ttsPitch', 'ttsSpeed',
+] as const satisfies readonly (keyof RoleDefaults & keyof RoleFormData)[]
+type TunedField = typeof TUNED_FIELDS[number]
+const roleDefaults = ref<RoleDefaults>()
+const tunedBaseline = ref<Partial<Record<TunedField, number>>>({})
+
+const snapshotTuned = () => {
+  tunedBaseline.value = Object.fromEntries(TUNED_FIELDS.map(field => [field, formData[field]]))
+}
+
+/** 新建表单用默认值；默认值还没到时留空，到了再补 */
+const applyTunedDefaults = () => {
+  for (const field of TUNED_FIELDS) {
+    formData[field] = roleDefaults.value?.[field]
+  }
+  lastInactiveTimeoutSeconds.value = roleDefaults.value?.inactiveTimeoutSeconds ?? 0
+  snapshotTuned()
+}
 
 // 编辑状态
 const editingRoleId = ref<number>()
 const submitLoading = ref(false)
-const lastInactiveTimeoutSeconds = ref(60)
+const lastInactiveTimeoutSeconds = ref(0)
 const inactiveTimeoutEnabled = computed({
-  get: () => formData.inactiveTimeoutSeconds > 0,
+  get: () => (formData.inactiveTimeoutSeconds ?? 0) > 0,
   set: (enabled: boolean) => {
     if (enabled) {
-      formData.inactiveTimeoutSeconds = lastInactiveTimeoutSeconds.value
+      formData.inactiveTimeoutSeconds = lastInactiveTimeoutSeconds.value || roleDefaults.value?.inactiveTimeoutSeconds
     } else {
-      lastInactiveTimeoutSeconds.value = formData.inactiveTimeoutSeconds || 60
+      lastInactiveTimeoutSeconds.value = formData.inactiveTimeoutSeconds || roleDefaults.value?.inactiveTimeoutSeconds || 0
       formData.inactiveTimeoutSeconds = 0
     }
   }
@@ -266,24 +291,25 @@ const handleEdit = (record: Role) => {
       isDefault: record.isDefault === '1',
       modelType: modelInfo?.type || 'llm',
       modelId: record.modelId,
-      temperature: record.temperature ?? 0.7,
-      topP: record.topP ?? 0.9,
+      temperature: record.temperature ?? roleDefaults.value?.temperature,
+      topP: record.topP ?? roleDefaults.value?.topP,
       sttId: record.sttId ?? (localSttAvailable.value ? -1 : undefined),
       sttHotwords: record.sttHotwords || '',
-      vadSpeechTh: record.vadSpeechTh ?? 0.5,
-      vadSilenceTh: record.vadSilenceTh ?? 0.3,
-      vadEnergyTh: record.vadEnergyTh ?? 0.01,
-      vadSilenceMs: record.vadSilenceMs ?? 1200,
-      inactiveTimeoutSeconds: record.inactiveTimeoutSeconds ?? 60,
+      vadSpeechTh: record.vadSpeechTh ?? roleDefaults.value?.vadSpeechTh,
+      vadSilenceTh: record.vadSilenceTh ?? roleDefaults.value?.vadSilenceTh,
+      vadEnergyTh: record.vadEnergyTh ?? roleDefaults.value?.vadEnergyTh,
+      vadSilenceMs: record.vadSilenceMs ?? roleDefaults.value?.vadSilenceMs,
+      inactiveTimeoutSeconds: record.inactiveTimeoutSeconds ?? roleDefaults.value?.inactiveTimeoutSeconds,
       voiceName: record.voiceName || '',
       ttsId: voiceInfo?.ttsId,
       gender: voiceInfo?.gender || '',
-      ttsPitch: record.ttsPitch ?? 1.0,
-      ttsSpeed: record.ttsSpeed ?? 1.0,
+      ttsPitch: record.ttsPitch ?? roleDefaults.value?.ttsPitch,
+      ttsSpeed: record.ttsSpeed ?? roleDefaults.value?.ttsSpeed,
     })
     lastInactiveTimeoutSeconds.value = record.inactiveTimeoutSeconds && record.inactiveTimeoutSeconds > 0
       ? record.inactiveTimeoutSeconds
-      : 60
+      : roleDefaults.value?.inactiveTimeoutSeconds ?? 0
+    snapshotTuned()
 
     // 加载 MCP 工具列表
     loadTools(editingRoleId.value)
@@ -341,6 +367,11 @@ const handleSubmit = async () => {
       ttsId: ttsId,
       // 识别服务不支持热词时不提交该字段，后端按「本次没改」处理，已配的热词原样保留
       sttHotwords: sttSupportsHotwords(formData.sttId) ? (formData.sttHotwords || '') : undefined,
+    }
+    for (const field of TUNED_FIELDS) {
+      if (formData[field] === tunedBaseline.value[field]) {
+        submitData[field] = undefined
+      }
     }
 
     if (editingRoleId.value) {
@@ -414,23 +445,23 @@ const resetForm = () => {
     isDefault: false,
     modelType: 'llm',
     modelId: undefined,
-    temperature: 0.7,
-    topP: 0.9,
     // 服务端没有本地识别模型时不预选，逼着选一个第三方配置
     sttId: localSttAvailable.value ? -1 : undefined,
     sttHotwords: '',
-    vadSpeechTh: 0.5,
-    vadSilenceTh: 0.3,
-    vadEnergyTh: 0.01,
-    vadSilenceMs: 1200,
-    inactiveTimeoutSeconds: 60,
     voiceName: undefined,
     ttsId: undefined,
     gender: '',
-    ttsPitch: 1.0,
-    ttsSpeed: 1.0,
   })
-  lastInactiveTimeoutSeconds.value = 60
+  applyTunedDefaults()
+}
+
+const { execute: executeRoleDefaults } = useRequest()
+const loadRoleDefaults = async () => {
+  roleDefaults.value = await executeRoleDefaults(() => getRoleDefaults(), { showError: false })
+  // 默认值晚于表单到达：新建状态下补上，编辑状态不动用户正在看的值
+  if (!editingRoleId.value) {
+    applyTunedDefaults()
+  }
 }
 
 // 模型类型变化
@@ -604,6 +635,7 @@ const handleProviderChange = () => {
 
 // 初始化：并行加载所有数据（非阻塞式）
 Promise.all([
+  loadRoleDefaults(),
   loadAllModels(),
   loadAllVoices(),
   loadSttOptions(),

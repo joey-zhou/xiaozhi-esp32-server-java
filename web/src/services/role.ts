@@ -1,6 +1,6 @@
 import { http } from './request'
 import api from './api'
-import type { Role, RoleQueryParams, RoleFormData, TestVoiceParams, TestVoiceResult, LocalStt } from '@/types/role'
+import type { Role, RoleDefaults, RoleQueryParams, RoleFormData, TestVoiceParams, TestVoiceResult, LocalStt } from '@/types/role'
 import type { SystemGlobalToolSummary } from '@/types/mcpTool'
 
 /**
@@ -19,6 +19,13 @@ function assertRoleId(roleId: number): void {
  */
 export function queryRoles(params: Partial<RoleQueryParams>) {
   return http.getPage<Role>(api.role.root, params)
+}
+
+/**
+ * 角色参数默认值：新建表单展示用，没改过的参数不必提交，后端按同一份默认补齐
+ */
+export function getRoleDefaults() {
+  return http.get<RoleDefaults>(`${api.role.root}/defaults`)
 }
 
 /**

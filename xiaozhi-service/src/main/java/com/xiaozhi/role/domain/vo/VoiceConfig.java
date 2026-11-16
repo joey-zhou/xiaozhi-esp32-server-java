@@ -1,5 +1,7 @@
 package com.xiaozhi.role.domain.vo;
 
+import com.xiaozhi.common.model.bo.RoleBO;
+
 /**
  * 语音合成 / 识别配置值对象。
  * <p>音调与语速的默认值由本值对象持有：新建角色没填、库里该列为 NULL 的历史行，两条路径都经
@@ -13,14 +15,8 @@ package com.xiaozhi.role.domain.vo;
 public record VoiceConfig(Integer ttsId, Integer sttId, String voiceName,
                            Double ttsPitch, Double ttsSpeed, String sttHotwords) {
 
-    /** 语音音调默认值 */
-    public static final Double DEFAULT_TTS_PITCH = 1.0;
-
-    /** 语音语速默认值 */
-    public static final Double DEFAULT_TTS_SPEED = 1.0;
-
     public static VoiceConfig defaults() {
-        return new VoiceConfig(null, null, null, DEFAULT_TTS_PITCH, DEFAULT_TTS_SPEED, null);
+        return new VoiceConfig(null, null, null, RoleBO.DEFAULT_TTS_PITCH, RoleBO.DEFAULT_TTS_SPEED, null);
     }
 
     /** 非正数表示本地能力，读作 null */
@@ -37,8 +33,8 @@ public record VoiceConfig(Integer ttsId, Integer sttId, String voiceName,
     /** 补齐没给值的音调与语速 */
     public VoiceConfig withDefaults() {
         return new VoiceConfig(ttsId(), sttId(), voiceName,
-                ttsPitch != null ? ttsPitch : DEFAULT_TTS_PITCH,
-                ttsSpeed != null ? ttsSpeed : DEFAULT_TTS_SPEED, sttHotwords);
+                ttsPitch != null ? ttsPitch : RoleBO.DEFAULT_TTS_PITCH,
+                ttsSpeed != null ? ttsSpeed : RoleBO.DEFAULT_TTS_SPEED, sttHotwords);
     }
 
     /**

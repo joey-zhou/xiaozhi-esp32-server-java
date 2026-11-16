@@ -98,7 +98,7 @@ public class PersonaFactory {
         Assert.notNull(role, "role cannot be null");
 
         session.setInactiveTimeoutSeconds(role.getInactiveTimeoutSeconds() != null
-                ? role.getInactiveTimeoutSeconds() : 60);
+                ? role.getInactiveTimeoutSeconds() : RoleBO.DEFAULT_INACTIVE_TIMEOUT_SECONDS);
 
         // 幂等保护：Persona 已存在则跳过重建
         if (session.getPersona() != null) {

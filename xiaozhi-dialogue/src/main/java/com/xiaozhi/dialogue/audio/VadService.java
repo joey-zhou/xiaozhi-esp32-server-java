@@ -56,17 +56,11 @@ public class VadService {
     // 16kHz、16bit、单声道
     private static final int PCM_BYTES_PER_MS = 32;
 
-    // 角色未配置时的 VAD 阈值默认值
-    private static final float DEFAULT_SPEECH_THRESHOLD = 0.4f;
-    private static final float DEFAULT_SILENCE_THRESHOLD = 0.3f;
-    private static final float DEFAULT_ENERGY_THRESHOLD = 0.001f;
-    private static final int DEFAULT_SILENCE_TIMEOUT_MS = 800;
-
-    /** 一次会话内使用的角色 VAD 阈值 */
+    /** 一次会话内使用的角色 VAD 阈值；没有角色或角色没配时用 RoleBO 里的默认值 */
     private record RoleThresholds(float speech, float silence, float energy, int silenceMs) {
         private static final RoleThresholds DEFAULTS = new RoleThresholds(
-                DEFAULT_SPEECH_THRESHOLD, DEFAULT_SILENCE_THRESHOLD,
-                DEFAULT_ENERGY_THRESHOLD, DEFAULT_SILENCE_TIMEOUT_MS);
+                RoleBO.DEFAULT_VAD_SPEECH_TH, RoleBO.DEFAULT_VAD_SILENCE_TH,
+                RoleBO.DEFAULT_VAD_ENERGY_TH, RoleBO.DEFAULT_VAD_SILENCE_MS);
     }
 
     @Autowired
@@ -276,10 +270,10 @@ public class VadService {
             return RoleThresholds.DEFAULTS;
         }
         return new RoleThresholds(
-                Optional.ofNullable(role.getVadSpeechTh()).orElse(DEFAULT_SPEECH_THRESHOLD),
-                Optional.ofNullable(role.getVadSilenceTh()).orElse(DEFAULT_SILENCE_THRESHOLD),
-                Optional.ofNullable(role.getVadEnergyTh()).orElse(DEFAULT_ENERGY_THRESHOLD),
-                Optional.ofNullable(role.getVadSilenceMs()).orElse(DEFAULT_SILENCE_TIMEOUT_MS));
+                Optional.ofNullable(role.getVadSpeechTh()).orElse(RoleBO.DEFAULT_VAD_SPEECH_TH),
+                Optional.ofNullable(role.getVadSilenceTh()).orElse(RoleBO.DEFAULT_VAD_SILENCE_TH),
+                Optional.ofNullable(role.getVadEnergyTh()).orElse(RoleBO.DEFAULT_VAD_ENERGY_TH),
+                Optional.ofNullable(role.getVadSilenceMs()).orElse(RoleBO.DEFAULT_VAD_SILENCE_MS));
     }
 
     /**

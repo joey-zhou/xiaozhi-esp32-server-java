@@ -1,5 +1,6 @@
 package com.xiaozhi.communication.common;
 
+import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.communication.domain.AudioParams;
 import com.xiaozhi.communication.domain.iot.IotDescriptor;
 import com.xiaozhi.communication.server.websocket.BinaryProtocolCodec;
@@ -122,7 +123,7 @@ public abstract class ChatSession {
     protected volatile Instant lastActivityTime;
 
     /** 当前角色的会话空闲超时；0 表示不自动结束。 */
-    private volatile int inactiveTimeoutSeconds = 60;
+    private volatile int inactiveTimeoutSeconds = RoleBO.DEFAULT_INACTIVE_TIMEOUT_SECONDS;
 
     /** 防止高频扫描重复触发告别语和关闭流程。 */
     private final AtomicBoolean inactivityClosing = new AtomicBoolean(false);

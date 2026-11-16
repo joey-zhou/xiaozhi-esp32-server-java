@@ -177,7 +177,7 @@ public class RedisSubscriber {
                 RoleBO role = roleService.getBO(freshDevice.getRoleId());
                 if (role != null) {
                     session.setInactiveTimeoutSeconds(role.getInactiveTimeoutSeconds() != null
-                            ? role.getInactiveTimeoutSeconds() : 60);
+                            ? role.getInactiveTimeoutSeconds() : RoleBO.DEFAULT_INACTIVE_TIMEOUT_SECONDS);
                 }
             }
             Persona persona = session.getPersona();
@@ -204,7 +204,7 @@ public class RedisSubscriber {
                 if (device != null && roleId.equals(device.getRoleId())) {
                     if (updatedRole != null) {
                         session.setInactiveTimeoutSeconds(updatedRole.getInactiveTimeoutSeconds() != null
-                                ? updatedRole.getInactiveTimeoutSeconds() : 60);
+                                ? updatedRole.getInactiveTimeoutSeconds() : RoleBO.DEFAULT_INACTIVE_TIMEOUT_SECONDS);
                     }
                     Persona persona = session.getPersona();
                     if (persona != null) {

@@ -1,5 +1,7 @@
 package com.xiaozhi.role.domain;
 
+import com.xiaozhi.common.model.bo.RoleBO;
+
 import com.xiaozhi.role.domain.vo.AudioConfig;
 import com.xiaozhi.role.domain.vo.LlmConfig;
 import com.xiaozhi.role.domain.vo.VoiceConfig;
@@ -20,8 +22,6 @@ import java.util.stream.Collectors;
  */
 @Getter
 public class Role {
-
-    public static final int DEFAULT_INACTIVE_TIMEOUT_SECONDS = 60;
 
     /** 启用，与 sys_role.state 列取值一致 */
     public static final String STATE_ENABLED = "1";
@@ -68,11 +68,11 @@ public class Role {
         this.state = state;
         this.isDefault = isDefault;
         this.inactiveTimeoutSeconds = inactiveTimeoutSeconds != null
-                ? inactiveTimeoutSeconds : DEFAULT_INACTIVE_TIMEOUT_SECONDS;
-        // 采样参数与音调语速没给值就补默认：入参没填与库里该列为 NULL 的历史行走的是同一份默认
+                ? inactiveTimeoutSeconds : RoleBO.DEFAULT_INACTIVE_TIMEOUT_SECONDS;
+        // 采样参数、音调语速、VAD 阈值没给值就补默认：入参没填与库里该列为 NULL 的历史行走的是同一份默认
         this.llmConfig = llmConfig != null ? llmConfig.withDefaults() : LlmConfig.defaults();
         this.voiceConfig = voiceConfig != null ? voiceConfig.withDefaults() : VoiceConfig.defaults();
-        this.audioConfig = audioConfig != null ? audioConfig : AudioConfig.defaults();
+        this.audioConfig = audioConfig != null ? audioConfig.withDefaults() : AudioConfig.defaults();
         this.createTime = createTime;
         this.updateTime = updateTime;
     }

@@ -3,9 +3,6 @@ package com.xiaozhi.role.convert;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.resp.RoleResp;
 import com.xiaozhi.role.dal.mysql.dataobject.RoleDO;
-import com.xiaozhi.role.domain.Role;
-import com.xiaozhi.role.domain.vo.LlmConfig;
-import com.xiaozhi.role.domain.vo.VoiceConfig;
 import com.xiaozhi.role.model.RoleProjection;
 import org.junit.jupiter.api.Test;
 
@@ -63,12 +60,17 @@ class RoleConvertTest {
 
         RoleBO bo = convert.toBO(roleDO);
 
-        // 五个默认值只有领域模型一份，读路径引用它，不再自带字面量
-        assertThat(bo.getTemperature()).isEqualTo(LlmConfig.DEFAULT_TEMPERATURE);
-        assertThat(bo.getTopP()).isEqualTo(LlmConfig.DEFAULT_TOP_P);
-        assertThat(bo.getTtsPitch()).isEqualTo(VoiceConfig.DEFAULT_TTS_PITCH);
-        assertThat(bo.getTtsSpeed()).isEqualTo(VoiceConfig.DEFAULT_TTS_SPEED);
-        assertThat(bo.getInactiveTimeoutSeconds()).isEqualTo(Role.DEFAULT_INACTIVE_TIMEOUT_SECONDS);
+        // 默认值只在 RoleBO 一处，读路径补 NULL 列时引用它，不再自带字面量
+        assertThat(bo.getTemperature()).isEqualTo(RoleBO.DEFAULT_TEMPERATURE);
+        assertThat(bo.getTopP()).isEqualTo(RoleBO.DEFAULT_TOP_P);
+        assertThat(bo.getTtsPitch()).isEqualTo(RoleBO.DEFAULT_TTS_PITCH);
+        assertThat(bo.getTtsSpeed()).isEqualTo(RoleBO.DEFAULT_TTS_SPEED);
+        assertThat(bo.getInactiveTimeoutSeconds()).isEqualTo(RoleBO.DEFAULT_INACTIVE_TIMEOUT_SECONDS);
+        // VAD 阈值 NULL 时对话侧原先兜底 0.4/0.001，与库表默认 0.5/0.01 不一致，现在读路径就给同一份
+        assertThat(bo.getVadSpeechTh()).isEqualTo(RoleBO.DEFAULT_VAD_SPEECH_TH);
+        assertThat(bo.getVadSilenceTh()).isEqualTo(RoleBO.DEFAULT_VAD_SILENCE_TH);
+        assertThat(bo.getVadEnergyTh()).isEqualTo(RoleBO.DEFAULT_VAD_ENERGY_TH);
+        assertThat(bo.getVadSilenceMs()).isEqualTo(RoleBO.DEFAULT_VAD_SILENCE_MS);
     }
 
     @Test

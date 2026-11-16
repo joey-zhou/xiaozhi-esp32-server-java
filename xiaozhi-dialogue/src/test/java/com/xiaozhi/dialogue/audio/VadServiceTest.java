@@ -204,10 +204,10 @@ class VadServiceTest {
         when(roleService.getBO(ROLE_ID)).thenReturn(new RoleBO());
         vadService.initSession(SESSION_ID);
 
-        // 0.35 低于默认起播阈值 0.4，连喂两帧也不起播
-        assertThat(feed(0.35f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
-        assertThat(feed(0.35f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
-        assertThat(feed(0.45f).getStatus()).isEqualTo(VadStatus.SPEECH_START);
+        // 起播阈值取 RoleBO 的默认值（与库表列默认一致），低于它连喂两帧也不起播
+        assertThat(feed(RoleBO.DEFAULT_VAD_SPEECH_TH - 0.05f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
+        assertThat(feed(RoleBO.DEFAULT_VAD_SPEECH_TH - 0.05f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
+        assertThat(feed(RoleBO.DEFAULT_VAD_SPEECH_TH + 0.05f).getStatus()).isEqualTo(VadStatus.SPEECH_START);
     }
 
     @Test
@@ -216,9 +216,9 @@ class VadServiceTest {
         when(sessionManager.getSession(SESSION_ID)).thenReturn(bare);
         vadService.initSession(SESSION_ID);
 
-        assertThat(feed(0.35f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
-        assertThat(feed(0.35f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
-        assertThat(feed(0.45f).getStatus()).isEqualTo(VadStatus.SPEECH_START);
+        assertThat(feed(RoleBO.DEFAULT_VAD_SPEECH_TH - 0.05f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
+        assertThat(feed(RoleBO.DEFAULT_VAD_SPEECH_TH - 0.05f).getStatus()).isEqualTo(VadStatus.NO_SPEECH);
+        assertThat(feed(RoleBO.DEFAULT_VAD_SPEECH_TH + 0.05f).getStatus()).isEqualTo(VadStatus.SPEECH_START);
     }
 
     @Test
