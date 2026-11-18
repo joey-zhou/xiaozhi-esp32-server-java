@@ -9,6 +9,7 @@ import com.xiaozhi.common.model.bo.ConversationBO;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.event.MemoryDeletedEvent;
+import com.xiaozhi.event.RoleUpdatedEvent;
 import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
@@ -166,6 +167,36 @@ class WebChatAppServiceTest {
         webChatAppService.onMemoryDeleted(new MemoryDeletedEvent(this, "web:8", 1));
         webChatAppService.onMemoryDeleted(new MemoryDeletedEvent(this, "web:9", 2));
 
+        verify(conversation, never()).discard();
+    }
+
+    /** 角色删了，它的会话记录已跟着删：开着的会话丢掉、不再压缩写回，否则下一句会把消息写到已删的会话上 */
+    @Test
+    void deletedRoleDropsItsOpenSessionsWithoutFlushing() {
+        Conversation conversation = mock(Conversation.class);
+        when(roleService.getBO(1)).thenReturn(role(), (RoleBO) null);
+        when(textChatService.openConversation(eq("web:9"), eq(9), any(RoleBO.class), anyString())).thenReturn(conversation);
+        String sessionId = webChatAppService.openSession(9, 1);
+
+        webChatAppService.onRoleUpdated(new RoleUpdatedEvent(this, 1));
+
+        assertThat(webChatAppService.hasSession(sessionId)).isFalse();
+        verify(conversation).discard();
+        verify(conversation, never()).flush();
+    }
+
+    /** 只是改了角色：会话留着，下一轮按新角色参数聊 */
+    @Test
+    void updatedRoleLeavesItsOpenSessionsAlone() {
+        Conversation conversation = mock(Conversation.class);
+        when(roleService.getBO(1)).thenReturn(role());
+        when(textChatService.openConversation(eq("web:9"), eq(9), any(RoleBO.class), anyString())).thenReturn(conversation);
+        String sessionId = webChatAppService.openSession(9, 1);
+
+        webChatAppService.onRoleUpdated(new RoleUpdatedEvent(this, 1));
+        webChatAppService.onRoleUpdated(new RoleUpdatedEvent(this, 2));
+
+        assertThat(webChatAppService.hasSession(sessionId)).isTrue();
         verify(conversation, never()).discard();
     }
 

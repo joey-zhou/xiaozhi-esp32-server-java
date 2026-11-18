@@ -7,6 +7,7 @@ import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.resp.RoleResp;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.device.service.DeviceService;
+import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.role.convert.RoleConvert;
 import com.xiaozhi.role.domain.Role;
 import com.xiaozhi.role.domain.repository.RoleRepository;
@@ -45,6 +46,9 @@ public class RoleAppService {
 
     @Resource
     private SummaryService summaryService;
+
+    @Resource
+    private ConversationService conversationService;
 
     public PageResult<RoleResp> page(RolePageReq req, Integer userId) {
         RolePageReq r = req == null ? new RolePageReq() : req;
@@ -94,6 +98,7 @@ public class RoleAppService {
      * 因此仍有设备绑定时拒绝删除。
      * <p>
      * 改绑到别的角色的设备在这个角色下还留着对话摘要，换回来时接着用；角色删了就再也换不回来，一并删掉。
+     * 网页聊天会话没有角色就续不上，连同会话消息一并删；设备消息是设备的历史，保留。
      */
     @Transactional
     public void delete(Integer roleId) {
@@ -103,6 +108,7 @@ public class RoleAppService {
         }
         roleRepository.delete(roleId);
         summaryService.deleteByRoleId(roleId);
+        conversationService.deleteByRole(roleId);
     }
 
     private long countBoundDevices(Integer roleId) {

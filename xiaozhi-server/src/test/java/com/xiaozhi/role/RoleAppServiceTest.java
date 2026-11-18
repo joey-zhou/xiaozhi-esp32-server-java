@@ -5,6 +5,7 @@ import com.xiaozhi.common.model.req.RoleCreateReq;
 import com.xiaozhi.common.model.req.RoleUpdateReq;
 import com.xiaozhi.common.model.resp.RoleResp;
 import com.xiaozhi.device.service.DeviceService;
+import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.role.convert.RoleConvert;
 import org.mapstruct.factory.Mappers;
 import com.xiaozhi.role.domain.Role;
@@ -59,6 +60,9 @@ class RoleAppServiceTest {
     @Mock
     private SummaryService summaryService;
 
+    @Mock
+    private ConversationService conversationService;
+
     private RoleAppService roleAppService;
 
     @BeforeEach
@@ -69,6 +73,7 @@ class RoleAppServiceTest {
         ReflectionTestUtils.setField(roleAppService, "roleConvert", roleConvert);
         ReflectionTestUtils.setField(roleAppService, "deviceService", deviceService);
         ReflectionTestUtils.setField(roleAppService, "summaryService", summaryService);
+        ReflectionTestUtils.setField(roleAppService, "conversationService", conversationService);
     }
 
     @Test
@@ -81,6 +86,8 @@ class RoleAppServiceTest {
         verify(roleRepository).delete(ROLE_ID);
         // 改绑走的设备在这个角色下留着摘要，角色删了就再也换不回来
         verify(summaryService).deleteByRoleId(ROLE_ID);
+        // 网页会话没有角色就续不上，一并删；设备消息是设备的历史，保留。
+        verify(conversationService).deleteByRole(ROLE_ID);
     }
 
     @Test
@@ -92,6 +99,7 @@ class RoleAppServiceTest {
 
         verify(roleRepository, never()).delete(any());
         verify(summaryService, never()).deleteByRoleId(any());
+        verify(conversationService, never()).deleteByRole(any());
     }
 
     @Test

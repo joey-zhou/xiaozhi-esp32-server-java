@@ -33,4 +33,7 @@ public interface ConversationService {
 
     /** 删除当前用户名下的这些会话及其聊天记录与摘要，不归属的跳过，返回实际删掉的会话 ID */
     List<String> delete(Integer userId, Collection<String> sessionIds);
+
+    /** 删除这个角色的全部会话及其聊天记录与摘要，返回删掉的会话 ID；设备消息不在会话表里，不受影响 */
+    List<String> deleteByRole(Integer roleId);
 }

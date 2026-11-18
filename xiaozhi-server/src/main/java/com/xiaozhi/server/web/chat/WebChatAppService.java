@@ -9,6 +9,7 @@ import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.common.model.bo.ConversationBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.event.MemoryDeletedEvent;
+import com.xiaozhi.event.RoleUpdatedEvent;
 import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.role.service.RoleService;
@@ -318,6 +319,27 @@ public class WebChatAppService {
             return new WebChatSession(textChatService.openConversation(event.getOwnerId(), session.userId, role, sessionId),
                     session.userId, session.roleId, session.saved);
         });
+    }
+
+    /**
+     * 角色删了：它的会话记录已随角色删掉，开着的会话丢掉、不压缩写回，否则下一句会把消息写到已删的会话上。
+     * 只是改了角色时什么都不做，下一轮会重新取角色
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onRoleUpdated(RoleUpdatedEvent event) {
+        if (roleService.getBO(event.getRoleId()) != null) {
+            return;
+        }
+        for (String sessionId : sessions.keySet()) {
+            sessions.computeIfPresent(sessionId, (id, session) -> {
+                if (!Objects.equals(session.roleId, event.getRoleId())) {
+                    return session;
+                }
+                session.conversation.discard();
+                log.info("角色已删，移除网页聊天会话: sessionId={}", id);
+                return null;
+            });
+        }
     }
 
     /**

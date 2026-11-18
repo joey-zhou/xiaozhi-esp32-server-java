@@ -131,6 +131,29 @@ class ConversationServiceImplTest {
         verifyNoInteractions(messageService, summaryService);
     }
 
+    /** 角色删了，它的网页会话续不上，连同聊天记录与摘要一并删；设备消息不在会话表里，不受影响 */
+    @Test
+    void deletingARoleRemovesItsConversationsWithTheirMessagesAndSummaries() {
+        when(conversationMapper.selectList(any(LambdaQueryWrapper.class)))
+            .thenReturn(List.of(conversation("s-1"), conversation("s-2")));
+
+        assertThat(service.deleteByRole(3)).containsExactly("s-1", "s-2");
+
+        verify(conversationMapper).delete(any(LambdaQueryWrapper.class));
+        verify(messageService).deleteBySessionIds(List.of("s-1", "s-2"));
+        verify(summaryService).deleteBySessionIds(List.of("s-1", "s-2"));
+    }
+
+    @Test
+    void deletingARoleWithoutConversationsTouchesNothing() {
+        when(conversationMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+
+        assertThat(service.deleteByRole(3)).isEmpty();
+
+        verify(conversationMapper, never()).delete(any(LambdaQueryWrapper.class));
+        verifyNoInteractions(messageService, summaryService);
+    }
+
     /** 会话归属只在 checkAccess 一处判定：续接、聊天、改名同一口径，不存在 404、不归属 403 */
     @Test
     void checkAccessTellsMissingFromNotOwned() {

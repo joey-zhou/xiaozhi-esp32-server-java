@@ -119,13 +119,31 @@ public class ConversationServiceImpl implements ConversationService {
             .stream()
             .map(ConversationDO::getSessionId)
             .toList();
-        if (owned.isEmpty()) {
+        return deleteAll(owned);
+    }
+
+    @Override
+    @Transactional
+    public List<String> deleteByRole(Integer roleId) {
+        if (roleId == null) {
             return List.of();
         }
-        conversationMapper.delete(new LambdaQueryWrapper<ConversationDO>().in(ConversationDO::getSessionId, owned));
-        messageService.deleteBySessionIds(owned);
-        summaryService.deleteBySessionIds(owned);
-        return owned;
+        return deleteAll(conversationMapper.selectList(new LambdaQueryWrapper<ConversationDO>()
+                .select(ConversationDO::getSessionId)
+                .eq(ConversationDO::getRoleId, roleId))
+            .stream()
+            .map(ConversationDO::getSessionId)
+            .toList());
+    }
+
+    private List<String> deleteAll(List<String> sessionIds) {
+        if (sessionIds.isEmpty()) {
+            return List.of();
+        }
+        conversationMapper.delete(new LambdaQueryWrapper<ConversationDO>().in(ConversationDO::getSessionId, sessionIds));
+        messageService.deleteBySessionIds(sessionIds);
+        summaryService.deleteBySessionIds(sessionIds);
+        return sessionIds;
     }
 
     /** 第一句话去掉换行和多余空白后取开头 */
