@@ -8,7 +8,6 @@ import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
-import com.xiaozhi.common.exception.UsernameNotFoundException;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.ResultStatus;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,18 +38,12 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler(UsernameNotFoundException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiResponse<Void> handleUsernameNotFoundException(UsernameNotFoundException e, WebRequest request) {
-        log.warn("用户名不存在异常: {}", e.getMessage(), e);
-        return ApiResponse.badRequest("用户名不存在");
-    }
 
     @ExceptionHandler(UserPasswordNotMatchException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleUserPasswordNotMatchException(UserPasswordNotMatchException e, WebRequest request) {
         log.warn("用户密码不匹配异常: {}", e.getMessage(), e);
-        return ApiResponse.badRequest("用户密码不正确");
+        return ApiResponse.badRequest(defaultMessage(e.getMessage(), "账号或密码错误"));
     }
 
     @ExceptionHandler(UnauthorizedException.class)
@@ -165,7 +158,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleIllegalArgumentException(IllegalArgumentException e, WebRequest request) {
-        // 本仓把这个异常当业务异常用，message 是有意写给用户看的（"不支持的文件扩展名: .html"、"该邮箱未注册" 等），
+        // 本仓把这个异常当业务异常用，message 是有意写给用户看的（"不支持的文件扩展名: .html"、"验证码错误或已过期" 等），
         // 必须透传。改成一律回显兜底文案会让至少 7 个端点丢掉可操作的提示；
         // 真要杜绝框架内部 message 外泄，得先把这些抛出点换成专门的业务异常类，那是另一件事。
         log.warn("参数错误: {}", e.getMessage(), e);

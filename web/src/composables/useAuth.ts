@@ -173,15 +173,6 @@ export function useAuth() {
         loadingRef: loading,
         errorText: t('auth.loginFailed'),
         networkErrorText: null,
-        // 201 是「手机号未注册」，不是错误，引导去注册页而不是弹红字
-        onFailure: (res) => {
-          if (res.code !== 201) {
-            return false
-          }
-          message.warning(res.message)
-          router.push(ROUTES.REGISTER)
-          return true
-        },
       },
     )
 

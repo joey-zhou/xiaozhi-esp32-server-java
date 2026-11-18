@@ -230,6 +230,7 @@ export default {
     enterEmailFirst: '请先输入邮箱地址！',
     enterValidEmail: '请输入正确的邮箱格式！',
     verificationCodeSent: '验证码已发送！',
+    verificationCodeSentIfExists: '如果该账号存在，验证码已发送',
     // 手机号登录相关
     mobilePhone: '手机号',
     enterMobilePhone: '请输入手机号',

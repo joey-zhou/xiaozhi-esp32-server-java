@@ -8,7 +8,6 @@ import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
-import com.xiaozhi.common.exception.UsernameNotFoundException;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.support.ControllerTestSupport;
@@ -64,8 +63,9 @@ class GlobalExceptionHandlerTest extends ControllerTestSupport {
 
     private static Stream<Arguments> exceptionMappings() {
         return Stream.of(
-            Arguments.of(new UsernameNotFoundException("alice"), 400, "用户名不存在"),
-            Arguments.of(new UserPasswordNotMatchException("bad"), 400, "用户密码不正确"),
+            // 登录失败不区分账号不存在与密码不对，文案由抛出方给；没给时兜底同一句
+            Arguments.of(new UserPasswordNotMatchException("账号或密码错误"), 400, "账号或密码错误"),
+            Arguments.of(new UserPasswordNotMatchException(), 400, "账号或密码错误"),
             Arguments.of(new UnauthorizedException("无权访问该配置"), 403, "无权访问该配置"),
             Arguments.of(new NotLoginException("未提供token", "login", NotLoginException.NOT_TOKEN),
                 401, "登录已过期，请重新登录"),

@@ -148,14 +148,6 @@ describe('useAuth', () => {
     expect(message.error).not.toHaveBeenCalled()
   })
 
-  it('手机号未注册时跳注册页', async () => {
-    userApiMock.telLogin.mockResolvedValue({ code: 201, message: '手机号未注册' })
-
-    const { telLogin } = useAuth()
-    expect(await telLogin({ tel: '13800000000', code: '123456' })).toBe(false)
-    expect(routerMock.push).toHaveBeenCalledWith('/register')
-  })
-
   it('账号密码登录与手机号登录写入同一套会话状态', async () => {
     userApiMock.login.mockResolvedValue(loginResponse('1'))
     userApiMock.telLogin.mockResolvedValue(loginResponse('1'))

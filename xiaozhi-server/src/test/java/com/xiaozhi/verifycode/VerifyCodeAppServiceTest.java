@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -70,22 +71,33 @@ class VerifyCodeAppServiceTest {
 
     // ==================== 邮箱验证码 ====================
 
+    /** 找回密码不暴露账号是否存在：不存在也照常返回，只是什么都不发 */
     @Test
-    void sendEmailCaptchaRejectsUnknownEmailOnForgetFlowWithoutGeneratingCode() {
+    void forgetFlowAnswersTheSameForAnUnknownEmailWithoutSendingAnything() {
         when(userService.getByEmail("nobody@example.com")).thenReturn(null);
 
-        assertThatThrownBy(() -> verifyCodeAppService.sendEmailCaptcha(emailReq("nobody@example.com", "forget")))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("该邮箱未注册");
+        verifyCodeAppService.sendEmailCaptcha(emailReq("nobody@example.com", "forget"));
 
         verify(verifyCodeService, never()).generateForAccount(anyString());
         verifyNoInteractions(smtpEmailSender);
     }
 
+    /** 发送失败的提示同样会暴露账号存在，找回流程在后台发、失败只记日志 */
+    @Test
+    void forgetFlowDoesNotReportASendFailure() {
+        when(userService.getByEmail("alice@example.com")).thenReturn(new UserBO());
+        when(verifyCodeService.generateForAccount("alice@example.com")).thenReturn("123456");
+        when(smtpEmailSender.send(anyString(), anyString(), anyString(), anyString())).thenReturn(false);
+
+        verifyCodeAppService.sendEmailCaptcha(emailReq("alice@example.com", "forget"));
+
+        verify(smtpEmailSender, timeout(2000)).send(anyString(), anyString(), anyString(), anyString());
+    }
+
     @Test
     void sendEmailCaptchaRejectsInvalidEmailFormatWithoutGeneratingCode() {
         assertThatThrownBy(() -> verifyCodeAppService.sendEmailCaptcha(emailReq("not-an-email", "register")))
-            .isInstanceOf(OperationFailedException.class)
+            .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("邮箱格式不正确");
 
         verify(verifyCodeService, never()).generateForAccount(anyString());
@@ -103,7 +115,7 @@ class VerifyCodeAppServiceTest {
 
         ArgumentCaptor<String> subjectCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
-        verify(smtpEmailSender).send(eq("alice@example.com"), subjectCaptor.capture(), contentCaptor.capture(),
+        verify(smtpEmailSender, timeout(2000)).send(eq("alice@example.com"), subjectCaptor.capture(), contentCaptor.capture(),
             eq("小智物联网管理平台"));
         assertThat(subjectCaptor.getValue()).isEqualTo("小智ESP32-智能物联网管理平台");
         assertThat(contentCaptor.getValue()).contains("123456");
@@ -133,12 +145,10 @@ class VerifyCodeAppServiceTest {
     // ==================== 短信验证码 ====================
 
     @Test
-    void sendSmsCaptchaRejectsUnknownTelOnForgetFlowWithoutGeneratingCode() {
+    void forgetFlowAnswersTheSameForAnUnknownTelWithoutSendingAnything() {
         when(userService.getByTel("13800138000")).thenReturn(null);
 
-        assertThatThrownBy(() -> verifyCodeAppService.sendSmsCaptcha(telReq("13800138000", "forget")))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("该手机号未注册");
+        verifyCodeAppService.sendSmsCaptcha(telReq("13800138000", "forget"));
 
         verify(verifyCodeService, never()).generateForAccount(anyString());
         verifyNoInteractions(aliyunSmsSender);
@@ -147,7 +157,7 @@ class VerifyCodeAppServiceTest {
     @Test
     void sendSmsCaptchaRejectsInvalidTelFormatWithoutGeneratingCode() {
         assertThatThrownBy(() -> verifyCodeAppService.sendSmsCaptcha(telReq("12345", "register")))
-            .isInstanceOf(OperationFailedException.class)
+            .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("手机号格式不正确");
 
         verify(verifyCodeService, never()).generateForAccount(anyString());
@@ -162,7 +172,7 @@ class VerifyCodeAppServiceTest {
 
         verifyCodeAppService.sendSmsCaptcha(telReq("13800138000", "forget"));
 
-        verify(aliyunSmsSender).sendVerificationCode("13800138000", "654321");
+        verify(aliyunSmsSender, timeout(2000)).sendVerificationCode("13800138000", "654321");
     }
 
     @Test

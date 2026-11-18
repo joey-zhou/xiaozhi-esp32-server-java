@@ -230,6 +230,7 @@ export default {
     enterEmailFirst: 'Please enter email address first!',
     enterValidEmail: 'Please enter a valid email format!',
     verificationCodeSent: 'Verification code has been sent!',
+    verificationCodeSentIfExists: 'If the account exists, a verification code has been sent',
     // Mobile phone login related
     mobilePhone: 'Mobile Phone',
     enterMobilePhone: 'Please enter phone number',

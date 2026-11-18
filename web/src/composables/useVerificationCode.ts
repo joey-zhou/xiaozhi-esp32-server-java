@@ -89,9 +89,10 @@ export function useVerificationCode() {
     sendCodeLoading.value = true
 
     try {
+      // 后端不透露账号是否存在，提示也不能说死「已发送」
       return await executeOk(() => sendEmailCaptcha({ email, type: 'forget' }), {
         showSuccess: true,
-        successText: t('auth.verificationCodeSent'),
+        successText: t('auth.verificationCodeSentIfExists'),
         onSuccess: () => startCountdown(),
       })
     } finally {

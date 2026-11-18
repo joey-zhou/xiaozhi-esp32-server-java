@@ -120,18 +120,19 @@ describe('useVerificationCode', () => {
       expect(await api.sendForgetCode('a@b.com')).toBe(true)
 
       expect(userServiceMock.sendEmailCaptcha).toHaveBeenCalledWith({ email: 'a@b.com', type: 'forget' })
-      expect(message.success).toHaveBeenCalledWith('auth.verificationCodeSent')
+      // 后端对不存在的账号同样回成功，提示不能说死已发送
+      expect(message.success).toHaveBeenCalledWith('auth.verificationCodeSentIfExists')
       expect(api.countdown.value).toBe(60)
       expect(api.sendCodeLoading.value).toBe(false)
     })
 
     it('业务码失败时弹后端文案并返回 false', async () => {
-      userServiceMock.sendEmailCaptcha.mockResolvedValue(fail('邮箱未注册'))
+      userServiceMock.sendEmailCaptcha.mockResolvedValue(fail('验证码发送过于频繁'))
       const api = createCode()
 
       expect(await api.sendForgetCode('a@b.com')).toBe(false)
 
-      expect(message.error).toHaveBeenCalledWith('邮箱未注册')
+      expect(message.error).toHaveBeenCalledWith('验证码发送过于频繁')
       expect(api.countdown.value).toBe(0)
       expect(api.sendCodeLoading.value).toBe(false)
     })

@@ -19,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class VerifyCodeAppService {
 
+    private static final String FORGET = "forget";
+
     @Resource
     private UserService userService;
 
@@ -34,24 +36,25 @@ public class VerifyCodeAppService {
     /**
      * 发送邮箱验证码
      * <p>
-     * 格式校验放在生成验证码之前，避免为非法地址生成验证码。
+     * 格式校验放在生成验证码之前，避免为非法地址生成验证码。找回密码不暴露账号是否存在：
+     * 账号不存在也照常返回、什么都不发；存在的放到后台发，发送耗时与失败提示都不会让两种情况看起来不一样。
      */
     public void sendEmailCaptcha(UserSendCaptchaReq req) {
         String email = req.getEmail();
-        if ("forget".equals(req.getType()) && userService.getByEmail(email) == null) {
-            throw new IllegalArgumentException("该邮箱未注册");
-        }
         if (!isValidEmail(email)) {
-            throw new OperationFailedException("邮箱格式不正确");
+            throw new IllegalArgumentException("邮箱格式不正确");
         }
-
-        String code = verifyCodeService.generateForAccount(email);
-        // 验证码格式不对也不能把验证码原文打进日志
-        if (!isValidCode(code)) {
-            log.warn("验证码格式不正确");
-            throw new OperationFailedException("验证码格式不正确");
+        if (FORGET.equals(req.getType())) {
+            if (userService.getByEmail(email) != null) {
+                String code = newCode(email);
+                Thread.startVirtualThread(() -> quietly(() -> deliverEmail(email, code)));
+            }
+            return;
         }
+        deliverEmail(email, newCode(email));
+    }
 
+    private void deliverEmail(String email, String code) {
         try {
             String subject = "小智ESP32-智能物联网管理平台";
             String content = "尊敬的用户您好!您的验证码为:<h3>" + code + "</h3>如不是您操作,请忽略此邮件.(有效期10分钟)";
@@ -72,24 +75,24 @@ public class VerifyCodeAppService {
     /**
      * 发送短信验证码
      * <p>
-     * 格式校验放在生成验证码之前，避免为非法号码生成验证码。
+     * 格式校验放在生成验证码之前，避免为非法号码生成验证码。找回密码的处理同 {@link #sendEmailCaptcha}。
      */
     public void sendSmsCaptcha(UserSendCaptchaReq req) {
         String tel = req.getTel();
-        if ("forget".equals(req.getType()) && userService.getByTel(tel) == null) {
-            throw new IllegalArgumentException("该手机号未注册");
-        }
         if (!isValidPhoneNumber(tel)) {
-            throw new OperationFailedException("手机号格式不正确");
+            throw new IllegalArgumentException("手机号格式不正确");
         }
-
-        String code = verifyCodeService.generateForAccount(tel);
-        // 验证码格式不对也不能把验证码原文打进日志
-        if (!isValidCode(code)) {
-            log.warn("验证码格式不正确");
-            throw new OperationFailedException("验证码格式不正确");
+        if (FORGET.equals(req.getType())) {
+            if (userService.getByTel(tel) != null) {
+                String code = newCode(tel);
+                Thread.startVirtualThread(() -> quietly(() -> deliverSms(tel, code)));
+            }
+            return;
         }
+        deliverSms(tel, newCode(tel));
+    }
 
+    private void deliverSms(String tel, String code) {
         try {
             boolean success = aliyunSmsSender.sendVerificationCode(tel, code);
             if (!success) {
@@ -102,6 +105,25 @@ public class VerifyCodeAppService {
         } catch (Exception e) {
             log.error("发送短信验证码异常: {}", e.getMessage(), e);
             throw new OperationFailedException("短信发送失败，请联系管理员");
+        }
+    }
+
+    private String newCode(String account) {
+        String code = verifyCodeService.generateForAccount(account);
+        // 验证码格式不对也不能把验证码原文打进日志
+        if (!isValidCode(code)) {
+            log.warn("验证码格式不正确");
+            throw new OperationFailedException("验证码格式不正确");
+        }
+        return code;
+    }
+
+    /** 后台发送的失败只记日志：回给调用方就等于告诉他这个账号存在 */
+    private static void quietly(Runnable delivery) {
+        try {
+            delivery.run();
+        } catch (RuntimeException e) {
+            log.warn("找回密码验证码后台发送失败: {}", e.getMessage());
         }
     }
 

@@ -122,7 +122,7 @@ class UserControllerTest extends ControllerTestSupport {
 
     @Test
     void sendEmailCaptchaPropagatesAppServiceRejection() throws Exception {
-        doThrow(new IllegalArgumentException("该邮箱未注册"))
+        doThrow(new IllegalArgumentException("邮箱格式不正确"))
             .when(verifyCodeAppService).sendEmailCaptcha(any(UserSendCaptchaReq.class));
 
         mockMvc.perform(post("/api/user/sendEmailCaptcha")
@@ -131,7 +131,7 @@ class UserControllerTest extends ControllerTestSupport {
                     {"email":"nobody@example.com","type":"forget"}
                     """))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("该邮箱未注册"));
+            .andExpect(jsonPath("$.message").value("邮箱格式不正确"));
     }
 
     @Test
@@ -151,7 +151,7 @@ class UserControllerTest extends ControllerTestSupport {
 
     @Test
     void sendSmsCaptchaPropagatesAppServiceRejection() throws Exception {
-        doThrow(new IllegalArgumentException("该手机号未注册"))
+        doThrow(new IllegalArgumentException("手机号格式不正确"))
             .when(verifyCodeAppService).sendSmsCaptcha(any(UserSendCaptchaReq.class));
 
         mockMvc.perform(post("/api/user/sendSmsCaptcha")
@@ -160,7 +160,7 @@ class UserControllerTest extends ControllerTestSupport {
                     {"tel":"13800138000","type":"forget"}
                     """))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("该手机号未注册"));
+            .andExpect(jsonPath("$.message").value("手机号格式不正确"));
     }
 
     /** 提示不区分字段，否则这个匿名端点就是逐字段确认注册状态的预言机 */

@@ -2,14 +2,17 @@ package com.xiaozhi.user;
 
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
+import com.xiaozhi.common.exception.UserPasswordNotMatchException;
 import com.xiaozhi.common.model.bo.UserAuthBO;
 import com.xiaozhi.common.model.bo.UserBO;
+import com.xiaozhi.common.model.req.UserResetPasswordReq;
 import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.security.service.AuthenticationService;
 import com.xiaozhi.template.service.TemplateService;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.userauth.service.UserAuthService;
+import com.xiaozhi.verifycode.service.VerifyCodeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,8 +23,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -51,6 +56,8 @@ class UserAppServiceLoginTest {
     private AuthenticationService authenticationService;
     @Mock
     private UserAuthService userAuthService;
+    @Mock
+    private VerifyCodeService verifyCodeService;
 
     private UserAppService userAppService;
 
@@ -63,6 +70,7 @@ class UserAppServiceLoginTest {
         ReflectionTestUtils.setField(userAppService, "deviceService", deviceService);
         ReflectionTestUtils.setField(userAppService, "authenticationService", authenticationService);
         ReflectionTestUtils.setField(userAppService, "userAuthService", userAuthService);
+        ReflectionTestUtils.setField(userAppService, "verifyCodeService", verifyCodeService);
         lenient().when(authenticationService.encryptPassword(anyString())).thenReturn("encrypted");
     }
 
@@ -71,6 +79,52 @@ class UserAppServiceLoginTest {
         created.setUserId(userId);
         when(userService.create(any(UserBO.class))).thenReturn(created);
         when(roleService.copyDefaultRole(1, userId)).thenReturn(11);
+    }
+
+    // ==================== 账号密码 ====================
+
+    /** 登录口不暴露账号是否存在：两种失败同一句话，不存在时也照样跑一次密码校验，耗时差不多 */
+    @Test
+    void unknownAccountLooksExactlyLikeAWrongPassword() {
+        UserPasswordNotMatchException unknown = catchThrowableOfType(UserPasswordNotMatchException.class,
+            () -> userAppService.login("nobody", "secret"));
+
+        UserBO existing = new UserBO();
+        existing.setPassword("hash");
+        when(userService.getByUsername("alice")).thenReturn(existing);
+        when(authenticationService.isPasswordValid("wrong", "hash")).thenReturn(false);
+        UserPasswordNotMatchException wrong = catchThrowableOfType(UserPasswordNotMatchException.class,
+            () -> userAppService.login("alice", "wrong"));
+
+        assertThat(unknown).hasMessage("账号或密码错误");
+        assertThat(wrong).hasMessage(unknown.getMessage());
+        verify(authenticationService).isPasswordValid(eq("secret"), anyString());
+    }
+
+    /** 账号被禁用只告诉拿对了密码的人，否则「账号已被禁用」本身就说明这个账号存在 */
+    @Test
+    void aDisabledAccountIsOnlyRevealedToTheRightPassword() {
+        UserBO disabled = new UserBO();
+        disabled.setPassword("hash");
+        when(userService.getByUsername("alice")).thenReturn(disabled);
+        when(authenticationService.isPasswordValid("wrong", "hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> userAppService.login("alice", "wrong"))
+            .isInstanceOf(UserPasswordNotMatchException.class);
+        verify(userService, never()).requireEnabled(any());
+    }
+
+    @Test
+    void resettingThePasswordOfAnUnknownEmailLooksLikeABadCode() {
+        when(verifyCodeService.consumeByAccount("nobody@example.com", "123456")).thenReturn(true);
+        UserResetPasswordReq req = new UserResetPasswordReq();
+        req.setEmail("nobody@example.com");
+        req.setCode("123456");
+        req.setPassword("new-secret");
+
+        assertThatThrownBy(() -> userAppService.resetPassword(req))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("验证码错误或已过期");
     }
 
     // ==================== 手机号 ====================
