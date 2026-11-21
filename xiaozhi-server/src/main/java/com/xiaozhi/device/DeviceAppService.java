@@ -109,17 +109,29 @@ public class DeviceAppService {
             throw new IllegalArgumentException("无效验证码");
         }
 
-        // 设备已存在：幂等返回（同一用户）或抛出冲突
+        // 选了角色就一次绑上，不再让前端先建再改绑：验证码建完就作废，第二步失败只能停在默认角色上
+        RoleBO chosenRole = null;
+        if (req.getRoleId() != null) {
+            chosenRole = requireRole(req.getRoleId());
+            requireOwnedBy(chosenRole, userId);
+        }
+
+        // 设备已存在：幂等返回（同一用户，选了角色就照选的改绑）或抛出冲突
         Optional<Device> existingDevice = deviceRepository.findById(verifyCode.getDeviceId());
         if (existingDevice.isPresent()) {
             Device d = existingDevice.get();
             if (userId != null && userId.equals(d.getUserId())) {
-                return deviceConvert.toResp(d, roleNameOf(d.getRoleId()));
+                if (chosenRole == null) {
+                    return deviceConvert.toResp(d, roleNameOf(d.getRoleId()));
+                }
+                d.bindRole(chosenRole.getRoleId());
+                deviceRepository.save(d);
+                return deviceConvert.toResp(d, chosenRole.getRoleName());
             }
             throw new IllegalStateException("设备已被其他用户绑定");
         }
 
-        RoleBO selectedRole = roleService.getDefaultOrFirstBO(userId);
+        RoleBO selectedRole = chosenRole != null ? chosenRole : roleService.getDefaultOrFirstBO(userId);
         if (selectedRole == null) {
             throw new IllegalStateException("没有配置角色");
         }
@@ -250,7 +262,11 @@ public class DeviceAppService {
 
     /** 设备只能绑它所属用户的角色：管理员越得过接口上的归属校验，这条不能跟着放开 */
     private static void requireSameOwner(RoleBO role, Device device) {
-        if (!Objects.equals(role.getUserId(), device.getUserId())) {
+        requireOwnedBy(role, device.getUserId());
+    }
+
+    private static void requireOwnedBy(RoleBO role, Integer deviceOwnerId) {
+        if (!Objects.equals(role.getUserId(), deviceOwnerId)) {
             throw new IllegalArgumentException("角色不属于设备所属用户");
         }
     }

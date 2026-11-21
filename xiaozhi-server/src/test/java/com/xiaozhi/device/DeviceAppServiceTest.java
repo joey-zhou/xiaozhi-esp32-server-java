@@ -203,6 +203,64 @@ class DeviceAppServiceTest {
         verify(verifyCodeService).deleteByDeviceId(DEVICE_ID);
     }
 
+    /** 添加设备时选了智能体就一次绑上：分两步时验证码第一步就作废了，第二步失败只能停在默认角色上 */
+    @Test
+    void createBindsTheChosenRoleInOneStep() {
+        when(verifyCodeService.findValidByCode("123456")).thenReturn(verifyCode("toy-v1"));
+        when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.empty());
+        when(roleService.getBO(9)).thenReturn(role(9, "管家"));
+
+        DeviceResp result = deviceAppService.create(createReq("123456", 9), 7);
+
+        ArgumentCaptor<Device> captor = ArgumentCaptor.forClass(Device.class);
+        verify(deviceRepository).save(captor.capture());
+        assertThat(captor.getValue().getRoleId()).isEqualTo(9);
+        assertThat(result.getRoleName()).isEqualTo("管家");
+        verify(roleService, never()).getDefaultOrFirstBO(any());
+        verify(verifyCodeService).deleteByDeviceId(DEVICE_ID);
+    }
+
+    /** 管理员越得过接口上的归属校验，设备只能绑它所属用户的角色这条不能跟着放开 */
+    @Test
+    void createRejectsARoleOfAnotherUserWithoutUsingTheCode() {
+        when(verifyCodeService.findValidByCode("123456")).thenReturn(verifyCode("toy-v1"));
+        RoleBO othersRole = role(9, "管家");
+        othersRole.setUserId(8);
+        when(roleService.getBO(9)).thenReturn(othersRole);
+
+        assertThatThrownBy(() -> deviceAppService.create(createReq("123456", 9), 7))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("角色不属于设备所属用户");
+        verify(deviceRepository, never()).save(any());
+        verify(verifyCodeService, never()).deleteByDeviceId(any());
+    }
+
+    @Test
+    void createRejectsAMissingRole() {
+        when(verifyCodeService.findValidByCode("123456")).thenReturn(verifyCode("toy-v1"));
+        when(roleService.getBO(9)).thenReturn(null);
+
+        assertThatThrownBy(() -> deviceAppService.create(createReq("123456", 9), 7))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("角色不存在或无权访问");
+        verify(deviceRepository, never()).save(any());
+    }
+
+    /** 设备已经在自己名下：再添加一次时照所选智能体改绑，与原来「添加后再改绑」的结果一致 */
+    @Test
+    void createOfADeviceAlreadyAddedAppliesTheChosenRole() {
+        when(verifyCodeService.findValidByCode("123456")).thenReturn(verifyCode("toy-v1"));
+        Device existing = Device.newDevice(DEVICE_ID, "小智", null, 7, 3);
+        when(deviceRepository.findById(DEVICE_ID)).thenReturn(Optional.of(existing));
+        when(roleService.getBO(9)).thenReturn(role(9, "管家"));
+
+        DeviceResp result = deviceAppService.create(createReq("123456", 9), 7);
+
+        assertThat(existing.getRoleId()).isEqualTo(9);
+        verify(deviceRepository).save(existing);
+        assertThat(result.getRoleName()).isEqualTo("管家");
+    }
+
     @Test
     void createRejectsWhenCodeLocatesNoSingleDevice() {
         when(verifyCodeService.findValidByCode("123456")).thenReturn(null);
@@ -514,8 +572,13 @@ class DeviceAppServiceTest {
     }
 
     private DeviceCreateReq createReq(String code) {
+        return createReq(code, null);
+    }
+
+    private DeviceCreateReq createReq(String code, Integer roleId) {
         DeviceCreateReq req = new DeviceCreateReq();
         req.setCode(code);
+        req.setRoleId(roleId);
         return req;
     }
 

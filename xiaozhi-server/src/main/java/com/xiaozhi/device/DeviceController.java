@@ -93,6 +93,7 @@ public class DeviceController extends BaseController {
     @PostMapping("")
     @ResponseBody
     @SaCheckPermission("system:device:api:create")
+    @CheckOwner(resource = "role", id = "#param.roleId")
     @AuditLog(module = "设备管理", operation = "创建设备")
     @Operation(summary = "添加设备", description = "使用设备验证码添加设备到当前用户账户")
     public ApiResponse<DeviceResp> create(@Valid @RequestBody DeviceCreateReq param) {
