@@ -91,7 +91,7 @@ public class StorageSharingSelfCheck {
             return;
         }
 
-        probeId = instanceIdHolder.getInstanceId() + "#" + ProcessHandle.current().pid();
+        probeId = instanceIdHolder.getInstanceId();
         // 先写探针再判定：判定在前会让先启动的实例永远看不到后启动实例的探针
         Path probe = writeProbe(probeId);
         if (probe == null || !registerProbe(probeId, probe)) {

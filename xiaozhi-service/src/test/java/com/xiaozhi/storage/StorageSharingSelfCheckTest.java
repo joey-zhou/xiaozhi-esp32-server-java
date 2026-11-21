@@ -78,7 +78,7 @@ class StorageSharingSelfCheckTest {
         ReflectionTestUtils.setField(selfCheck, "enabled", true);
         ReflectionTestUtils.setField(selfCheck, "storageServiceFactory", storageServiceFactory);
         ReflectionTestUtils.setField(selfCheck, "runtimePathConfig", runtimePathConfig);
-        ReflectionTestUtils.setField(selfCheck, "instanceIdHolder", new InstanceIdHolder(SELF_ID));
+        ReflectionTestUtils.setField(selfCheck, "instanceIdHolder", new InstanceIdHolder(SELF_ID, "8091"));
         ReflectionTestUtils.setField(selfCheck, "stringRedisTemplate", stringRedisTemplate);
     }
 
@@ -196,9 +196,9 @@ class StorageSharingSelfCheckTest {
         when(valueOperations.multiGet(List.of(HEARTBEAT_KEY_PREFIX + PEER_ID))).thenReturn(List.of("1"));
     }
 
-    /** 登记身份带进程号，同机同 hostname 的两个进程才区分得开 */
+    /** 登记身份就是实例标识，同机两个进程的标识已经靠端口区分开 */
     private static String selfProbeId() {
-        return SELF_ID + "#" + ProcessHandle.current().pid();
+        return SELF_ID;
     }
 
     private Path selfProbe() {

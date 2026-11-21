@@ -112,7 +112,7 @@ class ProtocolTestHarness {
             return true;
         }
     };
-    private final InstanceIdHolder instanceIdHolder = new InstanceIdHolder(INSTANCE_ID);
+    private final InstanceIdHolder instanceIdHolder = new InstanceIdHolder(INSTANCE_ID, "8092");
     private final GoodbyeMessageSupplier goodbyeMessages = new GoodbyeMessageSupplier() {
         @Override
         public String get() {
