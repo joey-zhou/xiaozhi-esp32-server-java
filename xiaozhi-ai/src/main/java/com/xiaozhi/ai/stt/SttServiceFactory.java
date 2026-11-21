@@ -6,6 +6,8 @@ import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.ai.stt.providers.*;
 import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.common.model.bo.ConfigBO;
+import com.xiaozhi.common.model.bo.RoleBO;
+import com.xiaozhi.config.service.ConfigService;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Resource;
@@ -31,6 +33,8 @@ public class SttServiceFactory {
     @Resource
     private RuntimePathConfig runtimePathConfig;
 
+    @Resource
+    private ConfigService configService;
     /** SenseVoice 单次解码用的 onnxruntime 线程数；解码并发路数由分到的核预算除以它得到，调大它并发路数随之减少 */
     @Value("${xiaozhi.stt.sense-voice.num-threads:2}")
     private int senseVoiceNumThreads = 2;
@@ -120,17 +124,43 @@ public class SttServiceFactory {
      * 获取默认STT服务
      */
     public SttService getDefaultSttService() {
-        return getSttService(null);
+        // 启动时两个模型都没加载成功时留空，交给 localDefaultOrThrow 再试一次并把两个原因一起报出来
+        String provider = localDefaultProvider != null ? localDefaultProvider : "";
+        return getSttService(new ConfigBO().setProvider(provider).setConfigId(-1));
     }
 
     /**
-     * 根据配置获取STT服务
+     * 角色用的识别服务。没绑配置用本地识别；绑定的配置停用或已不存在时回退默认识别，与模型、合成一致。
+     * 建不起来返回 null：只降级成这一轮识别不了，不能把整条连接拖垮
+     */
+    public SttService getSttService(RoleBO role) {
+        Integer sttId = role.getSttId();
+        ConfigBO sttConfig = null;
+        if (sttId != null && sttId > 0) {
+            sttConfig = configService.getBO(sttId);
+            if (sttConfig == null || ConfigBO.STATE_DISABLED.equals(sttConfig.getState())) {
+                log.warn("STT服务配置已停用或不存在，回退默认识别 - Role: {}, Id: {}", role.getRoleName(), sttId);
+                sttConfig = null;
+            }
+        }
+        try {
+            if (sttConfig == null) {
+                log.info("角色使用本地语音识别 - Role: {}, 引擎: {}", role.getRoleName(), localDefaultProvider);
+                return getDefaultSttService();
+            }
+            return getSttService(sttConfig);
+        } catch (RuntimeException e) {
+            log.error("无法获取STT服务 - Role: {}", role.getRoleName(), e);
+            return null;
+        }
+    }
+
+    /**
+     * 根据配置获取STT服务，config 为空时取默认识别
      */
     public SttService getSttService(ConfigBO config) {
         if (config == null) {
-            // 启动时两个模型都没加载成功时留空，交给 localDefaultOrThrow 再试一次并把两个原因一起报出来
-            String provider = localDefaultProvider != null ? localDefaultProvider : "";
-            config = new ConfigBO().setProvider(provider).setConfigId(-1);
+            return getDefaultSttService();
         }
 
         // 对于API服务，使用"provider:configId"作为缓存键，确保每个配置使用独立的服务实例

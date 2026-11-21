@@ -6,6 +6,8 @@ import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.ai.tts.providers.*;
 import com.xiaozhi.common.model.bo.ConfigBO;
+import com.xiaozhi.common.model.bo.RoleBO;
+import com.xiaozhi.config.service.ConfigService;
 
 import jakarta.annotation.Resource;
 import org.springframework.transaction.event.TransactionPhase;
@@ -49,6 +51,8 @@ public class TtsServiceFactory {
     @Resource
     private RuntimePathConfig runtimePathConfig;
 
+    @Resource
+    private ConfigService configService;
     // 默认服务提供商名称
     private static final String DEFAULT_PROVIDER = "edge";
 
@@ -61,6 +65,24 @@ public class TtsServiceFactory {
     public TtsService getDefaultTtsService() {
         var config = new ConfigBO().setProvider(DEFAULT_PROVIDER);
         return getTtsService(config, TtsServiceFactory.DEFAULT_VOICE, 1.0, 1.0);
+    }
+
+    /**
+     * 角色用的合成服务。没绑配置时用 Edge，角色选的音色本来就是 Edge 的音色，照常带上；
+     * 绑定的配置停用或已不存在时回退默认 Edge，但<b>不能带角色原来的音色名</b>：
+     * 那是别家厂商的音色（如阿里的 longxiaochun），Edge 不认识就合成不出声音，回退等于没回退
+     */
+    public TtsService getTtsService(RoleBO role) {
+        Integer ttsId = role.getTtsId();
+        if (ttsId == null || ttsId <= 0) {
+            return getTtsService(null, role.getVoiceName(), role.getTtsPitch(), role.getTtsSpeed());
+        }
+        ConfigBO ttsConfig = configService.getBO(ttsId);
+        if (ttsConfig == null || ConfigBO.STATE_DISABLED.equals(ttsConfig.getState())) {
+            log.warn("TTS服务配置已停用或不存在，回退默认TTS与默认音色 - Id: {}", ttsId);
+            return getDefaultTtsService();
+        }
+        return getTtsService(ttsConfig, role.getVoiceName(), role.getTtsPitch(), role.getTtsSpeed());
     }
 
     // 创建缓存键（包含pitch和speed）

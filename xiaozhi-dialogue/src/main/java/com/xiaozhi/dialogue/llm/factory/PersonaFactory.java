@@ -20,13 +20,11 @@ import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.ai.stt.SttServiceFactory;
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
-import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.ai.tool.ToolRegistrationService;
 import com.xiaozhi.ai.tool.ToolCallActivityRegistry;
 import com.xiaozhi.dialogue.adapter.ChatSessionToolAdapter;
-import com.xiaozhi.config.service.ConfigService;
 import com.xiaozhi.dialogue.llm.handler.DialogueListener;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
@@ -52,8 +50,6 @@ public class PersonaFactory {
     private long llmIdleTimeoutSeconds = 90;
     @Resource
     private MessageService chatMessageService;
-    @Resource
-    private ConfigService configService;
     @Resource
     private ChatModelFactory chatModelFactory;
     @Resource
@@ -113,7 +109,7 @@ public class PersonaFactory {
         Conversation conversation = conversationFactory.initConversation(ownerId, userId, role, session.getSessionId());
 
         // 获取STT服务
-        SttService sttService = initSttService(role);
+        SttService sttService = sttFactory.getSttService(role);
 
         // 初始化语音合成器
         Synthesizer synthesizer = initSynthesizer(session,player,role);
@@ -195,72 +191,13 @@ public class PersonaFactory {
     }
 
     /**
-     * 初始化STT服务，将重要信息记录日志
-     * @param role
-     * @return
-     */
-    private SttService initSttService(RoleBO role){
-        Assert.notNull(role, "role cannot be null");
-        var sttId = role.getSttId();
-        if (sttId == null || sttId <= 0) {
-            log.warn("角色没有配置STT服务 - Role: {},默认使用vosk", role.getRoleName());
-            try {
-                return sttFactory.getSttService(null);
-            } catch (RuntimeException e) {
-                // STT 建不起来只降级成这轮识别不了，不能把整条连接拖垮
-                log.error("无法获取STT服务 - Role: {}", role.getRoleName(), e);
-                return null;
-            }
-        }
-        var sttConfig = configService.getBO(sttId);
-        if(sttConfig == null){
-            log.error("无法获取STT服务配置 - Id: {}", sttId);
-            return null;
-        }
-        if (ConfigBO.STATE_DISABLED.equals(sttConfig.getState())) {
-            log.error("STT服务配置已停用，无法使用 - Id: {}", sttId);
-            return null;
-        }
-        SttService sttService;
-        try {
-            sttService = sttFactory.getSttService(sttConfig);
-        } catch (RuntimeException e) {
-            log.error("无法获取STT服务 - Provider: {}", sttConfig.getProvider(), e);
-            return null;
-        }
-        if (sttService == null) {
-            log.error("无法获取STT服务 - Provider: {}", sttConfig.getProvider());
-        }
-        return sttService;
-    }
-
-    /**
      * 初始化对话状态
      */
     public Synthesizer initSynthesizer(ChatSession session, Player player, RoleBO role) {
-        TtsService ttsService = resolveTtsService(role);
+        TtsService ttsService = ttsFactory.getTtsService(role);
         // 角色的音色说不出来时改用默认音色；角色本来就用默认音色时没有另一个可换，别让同一个服务失败两次
         TtsService fallbackTts = ttsFactory.getDefaultTtsService();
         return SynthesizerFactory.create(session, ttsService, player,
                 fallbackTts == ttsService ? null : fallbackTts);
     }
-
-    /**
-     * 角色没绑 TTS 配置时用 Edge，此时角色选的音色本来就是 Edge 的音色，照常带上。
-     * 绑定的配置停用或已不存在时回退默认 Edge，但<b>不能带角色原来的音色名</b>：
-     * 那是别家厂商的音色（如阿里的 longxiaochun），Edge 不认识就合成不出声音，回退等于没回退
-     */
-    TtsService resolveTtsService(RoleBO role) {
-        Integer ttsId = role.getTtsId();
-        if (ttsId == null || ttsId <= 0) {
-            return ttsFactory.getTtsService(null, role.getVoiceName(), role.getTtsPitch(), role.getTtsSpeed());
-        }
-        ConfigBO ttsConfig = configService.getBO(ttsId);
-        if (ttsConfig == null || ConfigBO.STATE_DISABLED.equals(ttsConfig.getState())) {
-            log.warn("TTS服务配置已停用或不存在，回退默认TTS与默认音色 - Id: {}", ttsId);
-            return ttsFactory.getDefaultTtsService();
-        }
-        return ttsFactory.getTtsService(ttsConfig, role.getVoiceName(), role.getTtsPitch(), role.getTtsSpeed());
-    }
-
 }
