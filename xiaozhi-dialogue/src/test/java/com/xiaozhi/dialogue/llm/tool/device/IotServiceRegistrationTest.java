@@ -53,6 +53,25 @@ class IotServiceRegistrationTest {
         assertThat(schema).contains("response_success");
     }
 
+    /** 设备上报的名字带空格时生成的函数名要合法，否则模型接口会把整轮请求判成 400 */
+    @Test
+    void namesWithSpacesBecomeValidFunctionNames() {
+        IotDescriptor descriptor = new IotDescriptor();
+        descriptor.setName("Living Room");
+        descriptor.setDescription("客厅");
+        IotMethod method = new IotMethod();
+        method.setDescription("开灯");
+        Map<String, IotMethod> methods = new LinkedHashMap<>();
+        methods.put("Turn On", method);
+        descriptor.setMethods(methods);
+
+        ToolsSessionHolder holder = new ToolsSessionHolder("s1", null, null);
+        invokeRegister("registerMethodFunctionTools", holder, descriptor);
+
+        assertThat(holder.getFunction("iot_living_room_turn_on")).isNotNull();
+        assertThat(holder.getFunction("iot_living_room_turn_on").getToolDefinition().name()).isEqualTo("iot_living_room_turn_on");
+    }
+
     @Test
     void multiParamMethodSchemaKeepsAllParameters() {
         IotDescriptor descriptor = new IotDescriptor();

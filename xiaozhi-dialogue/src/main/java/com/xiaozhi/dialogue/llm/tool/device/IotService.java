@@ -9,6 +9,7 @@ import com.xiaozhi.communication.domain.iot.IotMethodParameter;
 import com.xiaozhi.communication.domain.iot.IotProperty;
 import com.xiaozhi.communication.domain.iot.IotState;
 import com.xiaozhi.ai.llm.tool.ToolCallStringResultConverter;
+import com.xiaozhi.ai.tool.ToolNames;
 import com.xiaozhi.ai.tool.ToolsSessionHolder;
 import com.xiaozhi.utils.JsonUtil;
 import jakarta.annotation.Resource;
@@ -213,7 +214,7 @@ public class IotService {
             var propName = entry.getKey();
             var propInfo = entry.getValue();
             // 创建函数名称，格式：iot_get_{IoTName}_{PropName}
-            var funcName = "iot_get_" + iotName.toLowerCase() + "_" + propName.toLowerCase();
+            var funcName = ToolNames.of("iot_get_" + iotName.toLowerCase() + "_" + propName.toLowerCase());
             var toolCallback = FunctionToolCallback
                     .builder(funcName, (Map<String, String> params, ToolContext toolContext) -> {
                         Object value = getIotStatus(sessionId, iotName, propName);
@@ -276,7 +277,7 @@ public class IotService {
             var methodName = entry.getKey();
             var method = entry.getValue();
             // 创建函数名称，格式：iot_{iotname}_{methodname}
-            var funcName = "iot_" + iotName.toLowerCase() + "_" + methodName.toLowerCase();
+            var funcName = ToolNames.of("iot_" + iotName.toLowerCase() + "_" + methodName.toLowerCase());
 
             String inputSchema = buildMethodInputSchema(method.getParameters());
 
