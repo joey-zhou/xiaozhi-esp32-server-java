@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/store/user'
 import { useAvatar } from '@/composables/useAvatar'
 import { useWebSocket } from '@/composables/useWebSocket'
+import { resolveWsUrl } from '@/services/websocket'
 import { useScroll } from '@/composables/useScroll'
 import { queryRoles } from '@/services/role'
 import { updateDevice } from '@/services/device'
@@ -54,9 +55,8 @@ const virtualDeviceId = computed(() =>
   userStore.userInfo?.userId ? `user_chat_${userStore.userInfo.userId}` : ''
 )
 
-// WebSocket 配置（从 store 获取）
 const wsConfig = computed(() => ({
-  url: userStore.wsConfig.url,
+  url: resolveWsUrl(),
   deviceId: virtualDeviceId.value,
   token: userStore.token
 }))

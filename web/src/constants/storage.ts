@@ -23,8 +23,3 @@ export const STORAGE_THEME_MODE = 'theme-mode'
  * 语言相关
  */
 export const STORAGE_LOCALE = 'locale'
-
-/**
- * WebSocket 相关
- */
-export const STORAGE_WS_CONFIG = 'wsConfig'

@@ -12,6 +12,29 @@ export interface WebSocketConfig {
   token?: string
 }
 
+// 设备 WebSocket 由对话进程（xiaozhi-dialogue）提供，端口与 API 进程不同；
+// 路径尾斜杠是后端 AntPathMatcher 的硬要求，连接前还会再补一次
+const WS_PATH = '/ws/xiaozhi/v1/'
+
+/**
+ * 网页聊天连的 WebSocket 地址，每次推导、不持久化。
+ * 没配 VITE_WS_URL 时按当前页面地址推导，由前置的 nginx/vite 代理转给 dialogue，
+ * 同一份构建产物因此能在任意 IP、域名、端口下直接用；页面是 https 时用 wss，否则浏览器会以 Mixed Content 拦截
+ */
+export function resolveWsUrl(
+  location: Pick<Location, 'protocol' | 'host'> | undefined = typeof window === 'undefined' ? undefined : window.location,
+): string {
+  const configured = import.meta.env.VITE_WS_URL
+  if (configured) {
+    return configured
+  }
+  if (!location) {
+    return `ws://localhost:8092${WS_PATH}`
+  }
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${location.host}${WS_PATH}`
+}
+
 export interface WebSocketMessage {
   type: 'stt' | 'tts' | 'llm' | 'iot' | 'listen' | 'audio' | 'system'
   state?: 'start' | 'stop' | 'text' | 'sentence_start'

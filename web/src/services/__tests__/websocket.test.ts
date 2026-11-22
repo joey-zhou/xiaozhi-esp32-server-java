@@ -5,6 +5,7 @@ import {
   getLogs,
   log,
   registerBinaryHandler,
+  resolveWsUrl,
   setLogLevel,
   unregisterBinaryHandler,
 } from '../websocket'
@@ -75,5 +76,37 @@ describe('二进制处理函数注册', () => {
     expect(unregisterBinaryHandler(other)).toBe(false)
     expect(unregisterBinaryHandler(handler)).toBe(true)
     expect(unregisterBinaryHandler(handler)).toBe(false)
+  })
+})
+
+/**
+ * 地址每次按环境变量或当前页面推导、不持久化：原来存进 localStorage 后永远读回旧值，
+ * 早期默认值曾是 API 进程地址，访问过旧版的浏览器会一直连错
+ */
+describe('resolveWsUrl', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('配了 VITE_WS_URL 就用它', () => {
+    vi.stubEnv('VITE_WS_URL', 'ws://10.0.0.2:8092/ws/xiaozhi/v1')
+
+    expect(resolveWsUrl({ protocol: 'https:', host: 'chat.example.com' })).toBe('ws://10.0.0.2:8092/ws/xiaozhi/v1')
+  })
+
+  it('没配时按当前页面推导，https 页面用 wss', () => {
+    vi.stubEnv('VITE_WS_URL', '')
+
+    expect(resolveWsUrl({ protocol: 'https:', host: 'chat.example.com' })).toBe('wss://chat.example.com/ws/xiaozhi/v1/')
+    expect(resolveWsUrl({ protocol: 'http:', host: '192.168.1.5:8084' })).toBe('ws://192.168.1.5:8084/ws/xiaozhi/v1/')
+  })
+
+  it('不往浏览器存储里写', () => {
+    vi.stubEnv('VITE_WS_URL', '')
+    localStorage.clear()
+
+    resolveWsUrl()
+
+    expect(localStorage.length).toBe(0)
   })
 })

@@ -235,12 +235,9 @@ describe('useUserStore', () => {
     })
   })
 
-  describe('WebSocket 配置', () => {
-    it('更新 WebSocket 配置', () => {
-      store.updateWsConfig({ deviceName: 'test-device' })
-      expect(store.wsConfig.deviceName).toBe('test-device')
-      // url 应保留默认值
-      expect(store.wsConfig.url).toBeTruthy()
-    })
+  // WebSocket 地址是派生值，不进 store、不持久化
+  it('不再往 localStorage 写 WebSocket 配置', () => {
+    expect(localStorage.getItem('wsConfig')).toBeNull()
+    expect('wsConfig' in store).toBe(false)
   })
 })

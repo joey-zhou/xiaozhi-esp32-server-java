@@ -7,12 +7,11 @@ import * as storageKeys from '../storage'
  * composables/useLocale.ts、composables/useAntdTheme.ts
  */
 describe('存储键名登记表', () => {
-  it('登记 store/user.ts 里全部 5 个键', () => {
+  it('登记 store/user.ts 里全部 4 个键', () => {
     expect(storageKeys.STORAGE_USER_INFO).toBe('userInfo')
     expect(storageKeys.STORAGE_PERMISSIONS).toBe('permissions')
     expect(storageKeys.STORAGE_AUTH_ROLE).toBe('authRole')
     expect(storageKeys.STORAGE_USER_TOKEN).toBe('token')
-    expect(storageKeys.STORAGE_WS_CONFIG).toBe('wsConfig')
   })
 
   it('登记 useAuth / useLocale / useAntdTheme 的键', () => {
@@ -32,7 +31,6 @@ describe('存储键名登记表', () => {
       'STORAGE_USERNAME',
       'STORAGE_USER_INFO',
       'STORAGE_USER_TOKEN',
-      'STORAGE_WS_CONFIG',
     ])
   })
 
