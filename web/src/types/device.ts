@@ -25,6 +25,12 @@ export interface Device {
   editable?: boolean // 表格编辑状态
 }
 
+/** 批量改智能体的结果，对应后端 DeviceBatchUpdateResp */
+export interface DeviceBatchUpdateResult {
+  successCount: number
+  totalCount: number
+}
+
 /**
  * 设备查询参数
  */

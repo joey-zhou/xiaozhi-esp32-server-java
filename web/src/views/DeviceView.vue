@@ -7,14 +7,14 @@ import { useTable } from '@/composables/useTable'
 import { useInlineEdit } from '@/composables/useInlineEdit'
 import { useRequest } from '@/composables/useRequest'
 import { useMemoryView } from '@/composables/useMemoryView'
-import { queryDevices, addDevice, updateDevice, deleteDevice, clearDeviceMemory } from '@/services/device'
+import { queryDevices, addDevice, updateDevice, deleteDevice, clearDeviceMemory, batchUpdateDeviceRole } from '@/services/device'
 import { queryRoles } from '@/services/role'
 import DeviceEditDialog from '@/components/DeviceEditDialog.vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
 import TableEmptyState from '@/components/TableEmptyState.vue'
 import type { Device, DeviceQueryParams } from '@/types/device'
 import type { Role } from '@/types/role'
-import type { TableColumnsType } from 'ant-design-vue'
+import type { TableColumnsType, TableProps } from 'ant-design-vue'
 
 const { t } = useI18n()
 const { navigateToMemory } = useMemoryView()
@@ -25,6 +25,7 @@ const { executeOk: executeInlineUpdate } = useRequest()
 const { loading: clearingMemory, executeOk: executeClearMemory } = useRequest()
 const { execute: executeQueryRoles } = useRequest()
 const { executeOk: executeDeleteDevice } = useRequest()
+const { loading: batchRoleSaving, execute: executeBatchRole } = useRequest()
 const { executeOk: executeUpdateDevice } = useRequest()
 
 // 表格和分页：分页参数由 useTable 注入，查询条件从 queryForm 现取
@@ -109,6 +110,48 @@ const currentDevice = ref<Device | null>(null)
 // 添加设备输入框
 const addDeviceCode = ref('')
 
+// 行勾选与批量改智能体
+const selectedRowKeys = ref<string[]>([])
+const batchRoleModalOpen = ref(false)
+const batchRoleId = ref<number>()
+
+const rowSelection = computed<TableProps<Device>['rowSelection']>(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys) => {
+    selectedRowKeys.value = keys.map(String)
+  },
+}))
+
+function clearSelection() {
+  selectedRowKeys.value = []
+}
+
+function handleBatchRole() {
+  if (selectedRowKeys.value.length === 0) {
+    message.warning(t('device.selectDevicesFirst'))
+    return
+  }
+  batchRoleId.value = undefined
+  batchRoleModalOpen.value = true
+}
+
+async function handleBatchRoleConfirm() {
+  const roleId = batchRoleId.value
+  if (roleId === undefined || selectedRowKeys.value.length === 0) {
+    return
+  }
+  const result = await executeBatchRole(
+    () => batchUpdateDeviceRole({ deviceIds: selectedRowKeys.value, roleId }),
+    { errorText: t('common.updateFailed') },
+  )
+  if (!result) {
+    return
+  }
+  message.success(t('device.batchRoleUpdated', { count: result.successCount }))
+  batchRoleModalOpen.value = false
+  clearSelection()
+  await fetchData()
+}
 // 表格列配置
 const columns = computed<TableColumnsType>(() => [
   {
@@ -389,15 +432,24 @@ fetchData()
       </template>
 
       <template #extra>
-        <a-input-search
-          v-model:value="addDeviceCode"
-          v-permission="'system:device:create'"
-          :loading="addingDevice"
-          :enter-button="t('device.addDevice')"
-          :placeholder="t('device.enterDeviceCode')"
-          style="width: 300px"
-          @search="handleAddDevice"
-        />
+        <a-space wrap>
+          <a-button
+            v-permission="'system:device:update'"
+            :disabled="selectedRowKeys.length === 0"
+            @click="handleBatchRole"
+          >
+            {{ t('device.batchRole') }}
+          </a-button>
+          <a-input-search
+            v-model:value="addDeviceCode"
+            v-permission="'system:device:create'"
+            :loading="addingDevice"
+            :enter-button="t('device.addDevice')"
+            :placeholder="t('device.enterDeviceCode')"
+            style="width: 300px"
+            @search="handleAddDevice"
+          />
+        </a-space>
       </template>
 
       <a-table
@@ -405,6 +457,7 @@ fetchData()
         row-key="deviceId"
         :columns="columns"
         :data-source="data"
+        :row-selection="rowSelection"
         :loading="loading"
         :pagination="pagination"
         :scroll="{ x: 1200 }"
@@ -566,6 +619,23 @@ fetchData()
       @submit="handleUpdate"
       @clear-memory="handleClearMemory"
     />
+
+    <!-- 批量改智能体 -->
+    <a-modal
+      v-model:open="batchRoleModalOpen"
+      :title="t('device.batchRole')"
+      :confirm-loading="batchRoleSaving"
+      :ok-button-props="{ disabled: batchRoleId === undefined }"
+      @ok="handleBatchRoleConfirm"
+    >
+      <p>{{ t('device.batchRoleHint', { count: selectedRowKeys.length }) }}</p>
+      <a-select
+        v-model:value="batchRoleId"
+        style="width: 100%"
+        :placeholder="t('device.selectAgent')"
+        :options="roleItems.map((role) => ({ label: role.roleName, value: role.roleId }))"
+      />
+    </a-modal>
 
     <!-- 回到顶部 -->
     <a-back-top />

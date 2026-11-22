@@ -1,6 +1,6 @@
 import { http } from './request'
 import api from './api'
-import type { Device, DeviceQueryParams } from '@/types/device'
+import type { Device, DeviceBatchUpdateResult, DeviceQueryParams } from '@/types/device'
 
 /**
  * 查询设备列表
@@ -14,6 +14,16 @@ export function queryDevices(params: Partial<DeviceQueryParams>) {
  */
 export function addDevice(code: string, roleId?: number) {
   return http.post<Partial<Device>>(api.device, { code, roleId })
+}
+
+/**
+ * 把选中的设备一次改到同一个智能体；设备与智能体的归属、智能体须属于设备所属用户由后端判
+ */
+export function batchUpdateDeviceRole(data: { deviceIds: string[]; roleId: number }) {
+  return http.post<DeviceBatchUpdateResult>(`${api.device}/batchUpdate`, {
+    deviceIds: data.deviceIds.join(','),
+    roleId: data.roleId,
+  })
 }
 
 /**

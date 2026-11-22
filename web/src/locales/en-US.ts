@@ -299,6 +299,11 @@ export default {
     enterDeviceCode: 'Enter device code',
     confirmDelete: 'Are you sure to delete this device?',
     configureDefaultRole: 'Please configure default role first',
+    selectAgent: 'Select Agent',
+    selectDevicesFirst: 'Please select devices first',
+    batchRole: 'Change Agent',
+    batchRoleHint: 'Move the {count} selected devices to one agent',
+    batchRoleUpdated: '{count} devices updated',
     version: 'Version',
     activeTime: 'Active Time',
     // Device details dialog related

@@ -299,6 +299,11 @@ export default {
     enterDeviceCode: '请输入设备码',
     confirmDelete: '确定要删除此设备吗？',
     configureDefaultRole: '请先配置默认角色',
+    selectAgent: '选择智能体',
+    selectDevicesFirst: '请先选择设备',
+    batchRole: '批量改智能体',
+    batchRoleHint: '把选中的 {count} 台设备都改到同一个智能体',
+    batchRoleUpdated: '已更新 {count} 台设备',
     version: '版本号',
     activeTime: '活跃时间',
     // 设备详情弹窗相关
