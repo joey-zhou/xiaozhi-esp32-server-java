@@ -47,6 +47,8 @@ public class ConfigResp {
     private Boolean enableThinking;
     /** 模型上下文长度(token)，对话按它做压缩预算 */
     private Integer contextLength;
+    @Schema(description = "模型能否直接看图")
+    private Boolean imageInput;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "创建时间")

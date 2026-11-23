@@ -148,6 +148,6 @@ class ConfigAppServiceWriteRespTest {
     private static AiConfig storedAggregate() {
         return AiConfig.reconstitute(CONFIG_ID, 7, "llm", "aliyun", "通义千问", "对话模型", "chat",
             "app-1", "key", "secret", null, null, "https://api.test/v1", true, null,
-            AiConfig.STATE_ENABLED, false, CREATED_AT, LocalDateTime.of(2026, 2, 1, 8, 0));
+            null, AiConfig.STATE_ENABLED, false, CREATED_AT, LocalDateTime.of(2026, 2, 1, 8, 0));
     }
 }

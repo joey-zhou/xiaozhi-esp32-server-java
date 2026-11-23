@@ -12,6 +12,7 @@ import TableEmptyState from '@/components/TableEmptyState.vue'
 import type { ConfigType, Config, ConfigField, LLMModel, LlmModelOption } from '@/types/config'
 import { addConfig, updateConfig, testConfig } from '@/services/config'
 import { CODE_CONFIRM_REQUIRED } from '@/constants/api'
+import { acceptsImageInput } from '@/config/providerConfig'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -335,6 +336,7 @@ async function handleSubmit() {
       const isValid = knownModel !== undefined
       // 上下文长度用户不用关心：清单里查得到就静默带给后端，查不到留空由后端按默认值处理
       submitData.contextLength = knownModel?.max_tokens
+      submitData.imageInput = acceptsImageInput(submitData.modelType, knownModel)
       
       // 模型名称不在已知列表里时问一句，取消则中断提交
       if (!isValid && validModels.length > 0) {

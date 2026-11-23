@@ -31,6 +31,7 @@ export interface Config {
   enableThinking?: boolean
   // 提交时按模型清单静默带上，页面不展示不可编辑
   contextLength?: number
+  imageInput?: boolean
   // 表单字段由 config/providerConfig.ts 的 ConfigField.name 驱动，动态下标取值靠这条索引签名。
   // 类型是上面全部具名字段的并集，TS 要求具名属性必须可赋给索引签名
   [key: string]: string | number | boolean | undefined

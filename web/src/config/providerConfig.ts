@@ -6,7 +6,7 @@
  * 非品牌名的才写 key（config.field.*），渲染方按 config. 前缀决定是否翻译
  */
 
-import type { ConfigField, ConfigTypeInfo } from '@/types/config'
+import type { ConfigField, ConfigTypeInfo, LLMModel } from '@/types/config'
 
 /**
  * S3 兼容对象存储的通用字段。
@@ -1357,3 +1357,9 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
     }
   }
 };
+
+/** 模型能否直接看图，真源 llm_factories.json 的 IMAGE2TEXT 标记（视觉类型一律算能看） */
+export function acceptsImageInput(modelType: string | undefined, knownModel: LLMModel | undefined): boolean {
+  if (modelType === 'vision') return true
+  return (knownModel?.tags ?? '').split(',').some((tag) => tag.trim() === 'IMAGE2TEXT')
+}

@@ -21,7 +21,7 @@ public class ConfigConverter {
                 d.getConfigName(), d.getConfigDesc(), d.getModelType(),
                 d.getAppId(), d.getApiKey(), d.getApiSecret(),
                 d.getAk(), d.getSk(), d.getApiUrl(),
-                d.getEnableThinking(), d.getContextLength(),
+                d.getEnableThinking(), d.getContextLength(), d.getImageInput(),
                 d.getState(), "1".equals(d.getIsDefault()),
                 d.getCreateTime(), d.getUpdateTime());
     }
@@ -46,6 +46,7 @@ public class ConfigConverter {
         d.setIsDefault(c.isDefault() ? "1" : "0");
         d.setEnableThinking(c.getEnableThinking());
         d.setContextLength(c.getContextLength());
+        d.setImageInput(c.getImageInput());
         return d;
     }
 
@@ -70,6 +71,7 @@ public class ConfigConverter {
         bo.setIsDefault(c.isDefault() ? "1" : "0");
         bo.setEnableThinking(c.getEnableThinking());
         bo.setContextLength(c.getContextLength());
+        bo.setImageInput(c.getImageInput());
         bo.setCreateTime(c.getCreateTime());
         bo.setUpdateTime(c.getUpdateTime());
         return bo;

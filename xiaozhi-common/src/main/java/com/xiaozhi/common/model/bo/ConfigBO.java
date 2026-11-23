@@ -49,6 +49,8 @@ public class ConfigBO {
     private Boolean enableThinking;
     /** 模型上下文长度(token)，对话按它做压缩预算 */
     private Integer contextLength;
+    /** 模型能直接看图，前端按模型清单带出 */
+    private Boolean imageInput;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

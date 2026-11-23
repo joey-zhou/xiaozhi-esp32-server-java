@@ -184,12 +184,27 @@ class AiConfigPatchTest {
         assertThat(config.pullSignals()).containsExactly(AiConfig.DomainSignal.UPDATED);
     }
 
+    /** 看图能力同样按 null 表示未提供来合并 */
+    @Test
+    void imageInputMergesLikeTheOtherCapabilities() {
+        AiConfig config = savedConfig(false);
+
+        assertThat(config.mergePatch(new ConfigBO()).getImageInput()).isTrue();
+        assertThat(config.mergePatch(new ConfigBO().setImageInput(false)).getImageInput()).isFalse();
+
+        config.update(new ConfigBO().setConfigName("form-name"));
+        assertThat(config.getImageInput()).isTrue();
+        config.update(new ConfigBO().setImageInput(false));
+        assertThat(config.getImageInput()).isFalse();
+        assertThat(AiConfig.newConfig(9, new ConfigBO().setConfigType("llm").setImageInput(true)).getImageInput()).isTrue();
+    }
+
     private static AiConfig disabledDefaultConfig() {
         return AiConfig.reconstitute(7, 9, "llm", "aliyun",
                 "我的模型", "备注", "chat",
                 "saved-app", "saved-key", "saved-secret",
                 "saved-ak", "saved-sk", "https://saved.example.com",
-                true, null, AiConfig.STATE_DISABLED, true,
+                true, null, null, AiConfig.STATE_DISABLED, true,
                 CREATE_TIME, UPDATE_TIME);
     }
 
@@ -198,7 +213,7 @@ class AiConfigPatchTest {
                 "我的模型", "备注", "chat",
                 "saved-app", "saved-key", "saved-secret",
                 "saved-ak", "saved-sk", "https://saved.example.com",
-                false, null, AiConfig.STATE_ENABLED, isDefault,
+                false, null, true, AiConfig.STATE_ENABLED, isDefault,
                 CREATE_TIME, UPDATE_TIME);
     }
 }
