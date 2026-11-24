@@ -51,6 +51,7 @@ export default {
   chat: {
     open: '/chat/open',
     stream: '/chat/stream',
+    attachments: '/chat/attachments',
     close: '/chat/close',
   },
 }

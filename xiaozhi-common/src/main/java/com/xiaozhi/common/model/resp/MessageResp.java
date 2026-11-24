@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Schema(description = "消息信息")
@@ -30,6 +31,9 @@ public class MessageResp {
     @Schema(description = "语音文件路径")
     @SignedFileUrl
     private String audioPath;
+
+    @Schema(description = "随消息发来的附件")
+    private List<MessageAttachmentResp> attachments;
 
     @Schema(description = "消息状态")
     private String state;

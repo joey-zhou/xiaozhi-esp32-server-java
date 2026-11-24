@@ -53,4 +53,9 @@ public class ConfigBO {
     private Boolean imageInput;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    /** 模型能否直接看图 */
+    public boolean acceptsImages() {
+        return Boolean.TRUE.equals(imageInput);
+    }
 }

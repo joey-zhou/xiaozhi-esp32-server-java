@@ -196,6 +196,42 @@ describe('useChatSession', () => {
     await pending
   })
 
+  it('带图发送：请求带上附件 ID，气泡里显示本地预览', async () => {
+    chatMock.chatStream.mockImplementation(streamOf({ type: 'content', text: '是月季' }))
+    const session = mountSession()
+
+    await session.sendMessage('这是什么花', 1, undefined, [
+      { localId: 1, name: '花.png', previewUrl: 'blob:1', status: 'ready', attachmentId: 'a-1' },
+    ])
+
+    expect(chatMock.chatStream).toHaveBeenCalledWith('s-1', '这是什么花', ['a-1'], expect.anything())
+    expect(session.messages.value[0]?.attachments).toEqual([{ kind: 'image', name: '花.png', url: 'blob:1' }])
+  })
+
+  it('打开历史会话时图片照样显示', async () => {
+    messageServiceMock.queryMessages.mockResolvedValue({
+      code: 200,
+      data: {
+        list: [
+          {
+            sender: 'user',
+            message: '这是什么花',
+            createTime: '2026-01-01 00:00:01',
+            attachments: [{ kind: 'image', name: '花.png', url: 'uploads/chat/a.png?sig=1' }],
+          },
+        ],
+        total: 1,
+      },
+      message: '',
+    })
+    const session = mountSession()
+
+    await session.selectConversation(otherConversation)
+
+    expect(session.messages.value[0]?.attachments).toEqual([
+      { kind: 'image', name: '花.png', url: '/uploads/chat/a.png?sig=1' },
+    ])
+  })
   describe('会话管理', () => {
     it('删掉当前会话时从列表移除并清空对话区，服务端已移除的会话不再调 close', async () => {
       chatMock.chatStream.mockImplementation(streamOf({ type: 'content', text: 'ok' }))

@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.ChatStreamReq;
 import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.common.model.resp.ChatAttachmentResp;
 import com.xiaozhi.common.model.resp.ChatSessionClosedResp;
 import com.xiaozhi.common.model.resp.ChatSessionOpenedResp;
 import com.xiaozhi.common.model.resp.ChatTokenResp;
@@ -15,7 +16,10 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
+
+import java.util.List;
 
 /**
  * Web 聊天 API：通过 SSE 提供流式文本对话。
@@ -30,6 +34,9 @@ public class WebChatController {
 
     @Resource
     private WebChatConvert webChatConvert;
+
+    @Resource
+    private WebChatAttachmentService webChatAttachmentService;
 
     /**
      * 开启聊天会话。
@@ -63,7 +70,18 @@ public class WebChatController {
     @Operation(summary = "流式聊天", description = "通过 SSE 返回 AI 回复 Token 流，包含 thinking 和 content 两种类型")
     public Flux<ChatTokenResp> stream(@Valid @RequestBody ChatStreamReq req) {
         Integer userId = CurrentUser.id();
-        return webChatAppService.chatStream(req.getSessionId(), req.getText(), userId).map(webChatConvert::toResp);
+        List<String> attachmentIds = req.getAttachmentIds() == null ? List.of() : req.getAttachmentIds();
+        return webChatAppService.chatStream(req.getSessionId(), req.getText(), attachmentIds, userId)
+                .map(webChatConvert::toResp);
+    }
+
+    /** 上传聊天附件（目前只收图），发消息时带上返回的 ID；与发消息同一个权限 */
+    @PostMapping(value = "/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @SaCheckPermission("system:chat:api:stream")
+    @Operation(summary = "上传聊天附件", description = "收下一张 JPG 或 PNG 图片，返回发消息时要带上的附件 ID")
+    public ApiResponse<ChatAttachmentResp> attach(@RequestParam("file") MultipartFile file) {
+        WebChatAttachmentService.Pending held = webChatAttachmentService.hold(CurrentUser.id(), file);
+        return ApiResponse.success(ChatAttachmentResp.of(held.id(), held.kind(), held.name()));
     }
 
     /**

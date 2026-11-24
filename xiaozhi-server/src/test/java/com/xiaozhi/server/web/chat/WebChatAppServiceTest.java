@@ -5,7 +5,9 @@ import com.xiaozhi.ai.llm.service.TextChatService;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.ChatToken;
+import com.xiaozhi.common.model.bo.ChatImageBO;
 import com.xiaozhi.common.model.bo.ConversationBO;
+import com.xiaozhi.common.model.bo.MessageAttachmentBO;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.event.MemoryDeletedEvent;
@@ -28,13 +30,15 @@ import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -62,6 +66,9 @@ class WebChatAppServiceTest {
     @Mock
     private TextChatService textChatService;
 
+    @Mock
+    private WebChatAttachmentService webChatAttachmentService;
+
     @InjectMocks
     private WebChatAppService webChatAppService;
 
@@ -88,8 +95,9 @@ class WebChatAppServiceTest {
     /** streamTurn 的替身：像真实现一样在流结束前回调一轮完成 */
     private static Answer<Flux<ChatToken>> completedTurn(String reply, LocalDateTime assistantCreatedAt) {
         return invocation -> {
-            BiConsumer<String, LocalDateTime> callback = invocation.getArgument(4);
-            return Flux.just(ChatToken.content(reply)).doOnComplete(() -> callback.accept(reply, assistantCreatedAt));
+            Consumer<TextChatService.CompletedTurn> callback = invocation.getArgument(5);
+            return Flux.just(ChatToken.content(reply))
+                .doOnComplete(() -> callback.accept(new TextChatService.CompletedTurn(reply, assistantCreatedAt, List.of())));
         };
     }
 
@@ -207,11 +215,11 @@ class WebChatAppServiceTest {
         webChatAppService.closeSession(sessionId, 9);
         assertThat(webChatAppService.hasSession(sessionId)).isFalse();
         when(conversationService.get(sessionId)).thenReturn(savedConversation(sessionId, 9));
-        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), anyString(),
+        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), anyString(), anyList(),
                 any(LocalDateTime.class), any()))
             .thenReturn(Flux.empty());
 
-        webChatAppService.chatStream(sessionId, "在吗", 9).collectList().block();
+        webChatAppService.chatStream(sessionId, "在吗", List.of(), 9).collectList().block();
 
         assertThat(webChatAppService.hasSession(sessionId)).isTrue();
         verify(textChatService, times(2)).openConversation(eq("web:9"), eq(9), any(RoleBO.class), eq(sessionId));
@@ -223,7 +231,7 @@ class WebChatAppServiceTest {
     void chatStreamOnUnknownSessionFails() {
         doThrow(new ResourceNotFoundException("会话不存在或已删除: ghost")).when(conversationService).checkAccess("ghost", 9);
 
-        assertThatThrownBy(() -> webChatAppService.chatStream("ghost", "在吗", 9).blockFirst())
+        assertThatThrownBy(() -> webChatAppService.chatStream("ghost", "在吗", List.of(), 9).blockFirst())
             .isInstanceOf(ResourceNotFoundException.class)
             .hasMessageContaining("会话不存在或已删除");
         assertThat(webChatAppService.hasSession("ghost")).isFalse();
@@ -234,7 +242,7 @@ class WebChatAppServiceTest {
     void chatStreamDoesNotRebuildAnotherUsersSession() {
         doThrow(new UnauthorizedException("会话不属于当前用户: s-8")).when(conversationService).checkAccess("s-8", 9);
 
-        assertThatThrownBy(() -> webChatAppService.chatStream("s-8", "在吗", 9).blockFirst())
+        assertThatThrownBy(() -> webChatAppService.chatStream("s-8", "在吗", List.of(), 9).blockFirst())
             .isInstanceOf(UnauthorizedException.class);
         assertThat(webChatAppService.hasSession("s-8")).isFalse();
         verify(textChatService, never()).openConversation(anyString(), any(), any(), anyString());
@@ -245,7 +253,7 @@ class WebChatAppServiceTest {
     void chatStreamRejectsMismatchedUser() {
         String sessionId = openSession();
 
-        assertThatThrownBy(() -> webChatAppService.chatStream(sessionId, "在吗", 999).blockFirst())
+        assertThatThrownBy(() -> webChatAppService.chatStream(sessionId, "在吗", List.of(), 999).blockFirst())
             .isInstanceOf(UnauthorizedException.class);
         assertThat(webChatAppService.hasSession(sessionId)).isTrue();
     }
@@ -265,11 +273,11 @@ class WebChatAppServiceTest {
     void completedTurnPersistsUserAndAssistantMessages() {
         String sessionId = openSession();
         LocalDateTime assistantCreatedAt = LocalDateTime.of(2026, 9, 15, 7, 33, 2, 424_000_000);
-        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), eq("在吗"),
+        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), eq("在吗"), anyList(),
                 any(LocalDateTime.class), any()))
             .thenAnswer(completedTurn("在的", assistantCreatedAt));
 
-        webChatAppService.chatStream(sessionId, "在吗", 9).collectList().block();
+        webChatAppService.chatStream(sessionId, "在吗", List.of(), 9).collectList().block();
 
         ArgumentCaptor<List<MessageBO>> saved = ArgumentCaptor.forClass(List.class);
         verify(messageService, timeout(2000)).saveAll(saved.capture());
@@ -295,7 +303,7 @@ class WebChatAppServiceTest {
         String sessionId = openSession();
         when(roleService.getBO(1)).thenReturn(null);
 
-        assertThatThrownBy(() -> webChatAppService.chatStream(sessionId, "在吗", 9).blockFirst())
+        assertThatThrownBy(() -> webChatAppService.chatStream(sessionId, "在吗", List.of(), 9).blockFirst())
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("角色不存在");
     }
@@ -304,16 +312,16 @@ class WebChatAppServiceTest {
     @Test
     void eachTurnReloadsRole() {
         String sessionId = openSession();
-        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), anyString(),
+        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), anyString(), anyList(),
                 any(LocalDateTime.class), any()))
             .thenAnswer(completedTurn("好的", LocalDateTime.now()));
 
-        webChatAppService.chatStream(sessionId, "第一轮", 9).collectList().block();
-        webChatAppService.chatStream(sessionId, "第二轮", 9).collectList().block();
+        webChatAppService.chatStream(sessionId, "第一轮", List.of(), 9).collectList().block();
+        webChatAppService.chatStream(sessionId, "第二轮", List.of(), 9).collectList().block();
 
         // openSession 一次 + 两轮各一次
         verify(roleService, times(3)).getBO(1);
-        verify(textChatService, times(2)).streamTurn(any(Conversation.class), any(RoleBO.class), anyString(),
+        verify(textChatService, times(2)).streamTurn(any(Conversation.class), any(RoleBO.class), anyString(), anyList(),
             any(LocalDateTime.class), any());
         verify(conversationService, timeout(2000)).create(sessionId, 9, 1, "第一轮");
         verify(messageService, timeout(2000).times(2)).saveAll(any());
@@ -324,16 +332,16 @@ class WebChatAppServiceTest {
     @Test
     void failedFirstTurnDiscardsTheEmptyConversationAndCreatesItAgainNextTime() {
         String sessionId = openSession();
-        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), anyString(),
+        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), anyString(), anyList(),
                 any(LocalDateTime.class), any()))
             .thenReturn(Flux.just(ChatToken.error("模型不可用")))
             .thenAnswer(completedTurn("在的", LocalDateTime.now()));
 
-        webChatAppService.chatStream(sessionId, "你好", 9).collectList().block();
+        webChatAppService.chatStream(sessionId, "你好", List.of(), 9).collectList().block();
         verify(conversationService, timeout(2000)).create(sessionId, 9, 1, "你好");
         verify(conversationService, timeout(2000)).delete(9, List.of(sessionId));
 
-        webChatAppService.chatStream(sessionId, "再试一次", 9).collectList().block();
+        webChatAppService.chatStream(sessionId, "再试一次", List.of(), 9).collectList().block();
         verify(conversationService, timeout(2000)).create(sessionId, 9, 1, "再试一次");
         verify(messageService, timeout(2000)).saveAll(any());
         verify(conversationService, times(1)).delete(any(), any());
@@ -356,12 +364,12 @@ class WebChatAppServiceTest {
         when(roleService.getBO(1)).thenReturn(role());
         when(textChatService.openConversation(eq("web:9"), eq(9), any(RoleBO.class), eq("s-1")))
             .thenReturn(mock(Conversation.class));
-        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), anyString(),
+        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), anyString(), anyList(),
                 any(LocalDateTime.class), any()))
             .thenReturn(Flux.empty());
 
         webChatAppService.openSession(9, 1, "s-1");
-        webChatAppService.chatStream("s-1", "接着聊", 9).collectList().block();
+        webChatAppService.chatStream("s-1", "接着聊", List.of(), 9).collectList().block();
 
         verify(conversationService).checkAccess("s-1", 9);
         verify(conversationService, never()).create(anyString(), any(), any(), anyString());
@@ -403,5 +411,65 @@ class WebChatAppServiceTest {
         assertThat(webChatAppService.deleteConversations(999, List.of(sessionId))).isZero();
 
         assertThat(webChatAppService.hasSession(sessionId)).isTrue();
+    }
+
+    /** 附件读出交给这一轮，完成后记在用户消息上 */
+    @Test
+    @SuppressWarnings("unchecked")
+    void attachedImagesAreLookedAtAndKeptWithTheUserMessage() {
+        String sessionId = openSession();
+        WebChatAttachmentService.Pending photo = new WebChatAttachmentService.Pending(
+            "a-1", 9, MessageAttachmentBO.KIND_IMAGE, "花.png", "image/png", "uploads/chat/a.png");
+        byte[] content = {1, 2, 3};
+        when(webChatAttachmentService.take(9, List.of("a-1"))).thenReturn(List.of(photo));
+        when(webChatAttachmentService.read(photo)).thenReturn(content);
+        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), eq("这是什么花"), anyList(),
+                any(LocalDateTime.class), any()))
+            .thenAnswer(completedTurn("是月季", LocalDateTime.now()));
+
+        webChatAppService.chatStream(sessionId, "这是什么花", List.of("a-1"), 9).collectList().block();
+
+        ArgumentCaptor<List<ChatImageBO>> images = ArgumentCaptor.forClass(List.class);
+        verify(textChatService).streamTurn(any(Conversation.class), any(RoleBO.class), eq("这是什么花"), images.capture(),
+            any(LocalDateTime.class), any());
+        assertThat(images.getValue()).singleElement().satisfies(image -> {
+            assertThat(image.mimeType()).isEqualTo("image/png");
+            assertThat(image.content()).isSameAs(content);
+        });
+        ArgumentCaptor<List<MessageBO>> saved = ArgumentCaptor.forClass(List.class);
+        verify(messageService, timeout(2000)).saveAll(saved.capture());
+        assertThat(saved.getValue().getFirst().getMetadata().getAttachments()).containsExactly(
+            new MessageAttachmentBO(MessageAttachmentBO.KIND_IMAGE, "花.png", "uploads/chat/a.png"));
+        verify(webChatAttachmentService, never()).discard(any());
+    }
+
+    /** 这一轮没聊成，附件文件删掉 */
+    @Test
+    void aFailedTurnDiscardsItsAttachments() {
+        String sessionId = openSession();
+        WebChatAttachmentService.Pending photo = new WebChatAttachmentService.Pending(
+            "a-1", 9, MessageAttachmentBO.KIND_IMAGE, "花.png", "image/png", "uploads/chat/a.png");
+        when(webChatAttachmentService.take(9, List.of("a-1"))).thenReturn(List.of(photo));
+        when(webChatAttachmentService.read(photo)).thenReturn(new byte[]{1});
+        when(textChatService.streamTurn(any(Conversation.class), any(RoleBO.class), anyString(), anyList(),
+                any(LocalDateTime.class), any()))
+            .thenReturn(Flux.just(ChatToken.error("没有可用的视觉模型")));
+
+        webChatAppService.chatStream(sessionId, "这是什么花", List.of("a-1"), 9).collectList().block();
+
+        verify(webChatAttachmentService).discard(List.of(photo));
+        verify(messageService, after(200).never()).saveAll(any());
+    }
+
+    /** 附件不在时开流前就报错 */
+    @Test
+    void missingAttachmentsFailBeforeTheTurnStarts() {
+        String sessionId = openSession();
+        when(webChatAttachmentService.take(9, List.of("gone"))).thenThrow(new ResourceNotFoundException("附件已过期或不存在，请重新添加"));
+
+        assertThatThrownBy(() -> webChatAppService.chatStream(sessionId, "这是什么花", List.of("gone"), 9).blockFirst())
+            .isInstanceOf(ResourceNotFoundException.class);
+        verify(textChatService, never()).streamTurn(any(), any(), anyString(), anyList(), any(), any());
+        verify(conversationService, never()).create(anyString(), any(), any(), anyString());
     }
 }

@@ -5,7 +5,10 @@ import com.xiaozhi.ai.llm.memory.ChatMemory;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.memory.ConversationFactory;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
+import com.xiaozhi.ai.llm.memory.ToolChainPair;
 import com.xiaozhi.common.model.ChatToken;
+import com.xiaozhi.common.model.bo.ChatImageBO;
+import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,10 +39,13 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,6 +66,9 @@ class TextChatServiceTest {
 
     @Mock
     private ChatModel chatModel;
+
+    @Mock
+    private VisionService visionService;
 
     @InjectMocks
     private TextChatService textChatService;
@@ -95,14 +104,16 @@ class TextChatServiceTest {
         return new ChatResponse(List.of(new Generation(message)));
     }
 
-    private static final class RecordingCallback implements BiConsumer<String, LocalDateTime> {
+    private static final class RecordingCallback implements Consumer<TextChatService.CompletedTurn> {
         private final List<String> replies = new ArrayList<>();
         private final List<LocalDateTime> assistantCreatedAts = new ArrayList<>();
+        private final List<List<ToolChainPair>> toolChains = new ArrayList<>();
 
         @Override
-        public void accept(String reply, LocalDateTime assistantCreatedAt) {
-            replies.add(reply);
-            assistantCreatedAts.add(assistantCreatedAt);
+        public void accept(TextChatService.CompletedTurn turn) {
+            replies.add(turn.reply());
+            assistantCreatedAts.add(turn.assistantCreatedAt());
+            toolChains.add(turn.toolChains());
         }
     }
 
@@ -122,7 +133,7 @@ class TextChatServiceTest {
         RecordingCallback callback = new RecordingCallback();
 
         List<ChatToken> tokens = textChatService
-                .streamTurn(conversation, role, "在吗", LocalDateTime.now(), callback)
+                .streamTurn(conversation, role, "在吗", List.of(), LocalDateTime.now(), callback)
                 .collectList().block();
 
         assertThat(tokens).containsExactly(
@@ -136,6 +147,76 @@ class TextChatServiceTest {
         assertThat(messages.get(1).getText()).isEqualTo("你好");
     }
 
+    /** 角色模型能看图就直接给它，对话里只留文字 */
+    @Test
+    void imagesGoStraightToAModelThatCanSeeThem() {
+        Conversation conversation = openConversation();
+        ChatImageBO photo = new ChatImageBO("image/png", new byte[]{1, 2, 3});
+        when(chatModelFactory.resolveConfig(role)).thenReturn(new ConfigBO().setImageInput(true));
+        when(chatModelFactory.getChatModel(role)).thenReturn(chatModel);
+        when(chatModel.stream(any(Prompt.class))).thenAnswer(invocation -> {
+            List<Message> sent = invocation.<Prompt>getArgument(0).getInstructions();
+            UserMessage asked = (UserMessage) sent.getLast();
+            assertThat(asked.getText()).endsWith("这是什么花");
+            assertThat(asked.getMedia()).singleElement()
+                    .satisfies(media -> assertThat(media.getMimeType().toString()).isEqualTo("image/png"));
+            return Flux.just(content("是月季"));
+        });
+        RecordingCallback callback = new RecordingCallback();
+
+        List<ChatToken> tokens = textChatService
+                .streamTurn(conversation, role, "这是什么花", List.of(photo), LocalDateTime.now(), callback)
+                .collectList().block();
+
+        assertThat(tokens).containsExactly(ChatToken.content("是月季"));
+        verify(visionService, never()).describe(any(), any());
+        assertThat(callback.toolChains.getFirst()).isEmpty();
+        assertThat(conversation.rawMessages()).hasSize(2);
+        assertThat(((UserMessage) conversation.rawMessages().getFirst()).getMedia()).isEmpty();
+    }
+
+    /** 角色模型看不了图时由视觉模型先看，结果作为调用链放进对话 */
+    @Test
+    void imagesAreLookedAtByTheVisionModelBeforeAnswering() {
+        Conversation conversation = openConversation();
+        ChatImageBO photo = new ChatImageBO("image/png", new byte[]{1, 2, 3});
+        when(chatModelFactory.resolveConfig(role)).thenReturn(new ConfigBO());
+        when(visionService.describe(eq(List.of(photo)), contains("这是什么花"))).thenReturn("一朵红色的月季");
+        modelStreams(Flux.just(content("是月季")));
+        RecordingCallback callback = new RecordingCallback();
+
+        List<ChatToken> tokens = textChatService
+                .streamTurn(conversation, role, "这是什么花", List.of(photo), LocalDateTime.now(), callback)
+                .collectList().block();
+
+        assertThat(tokens).containsExactly(ChatToken.activity(ChatToken.ACTIVITY_VISION), ChatToken.content("是月季"));
+        ToolChainPair looked = callback.toolChains.getFirst().getFirst();
+        assertThat(looked.toolResponseMessage().getResponses().getFirst().responseData()).isEqualTo("一朵红色的月季");
+        assertThat(conversation.rawMessages()).hasSize(4);
+        assertThat(conversation.rawMessages().get(2)).isSameAs(looked.toolResponseMessage());
+    }
+
+    /** 看图失败这一轮就失败：原因推给前端，不调主模型 */
+    @Test
+    void aFailedLookFailsTheTurn() {
+        Conversation conversation = openConversation();
+        ChatImageBO photo = new ChatImageBO("image/png", new byte[]{1});
+        when(chatModelFactory.resolveConfig(role)).thenReturn(new ConfigBO());
+        when(chatModelFactory.getChatModel(role)).thenReturn(chatModel);
+        when(visionService.describe(any(), any())).thenThrow(new IllegalStateException("没有可用的视觉模型"));
+        RecordingCallback callback = new RecordingCallback();
+
+        List<ChatToken> tokens = textChatService
+                .streamTurn(conversation, role, "这是什么花", List.of(photo), LocalDateTime.now(), callback)
+                .collectList().block();
+
+        assertThat(tokens).containsExactly(
+                ChatToken.activity(ChatToken.ACTIVITY_VISION), ChatToken.error("没有可用的视觉模型"));
+        assertThat(callback.replies).isEmpty();
+        assertThat(conversation.rawMessages()).isEmpty();
+        verify(chatModel, never()).stream(any(Prompt.class));
+    }
+
     /**
      * 助手消息的时间元数据必须和回调给落库的时间是同一个。
      * 没有时间元数据时摘要会拿「写摘要的时刻」当切点，重载历史时摘要之后到那一刻之间的消息全部丢失。
@@ -146,7 +227,7 @@ class TextChatServiceTest {
         modelStreams(Flux.just(content("好")));
         RecordingCallback callback = new RecordingCallback();
 
-        textChatService.streamTurn(conversation, role, "在吗", LocalDateTime.now(), callback)
+        textChatService.streamTurn(conversation, role, "在吗", List.of(), LocalDateTime.now(), callback)
                 .collectList().block();
 
         Message assistant = conversation.rawMessages().get(1);
@@ -165,7 +246,7 @@ class TextChatServiceTest {
                 .build();
         modelStreams(Flux.just(content("你"), last));
 
-        textChatService.streamTurn(conversation, role, "在吗", LocalDateTime.now(), new RecordingCallback())
+        textChatService.streamTurn(conversation, role, "在吗", List.of(), LocalDateTime.now(), new RecordingCallback())
                 .collectList().block();
 
         Object usage = conversation.rawMessages().get(1).getMetadata().get(ChatMemory.USAGE_KEY);
@@ -183,7 +264,7 @@ class TextChatServiceTest {
         RecordingCallback callback = new RecordingCallback();
 
         List<ChatToken> tokens = textChatService
-                .streamTurn(conversation, role, "在吗", LocalDateTime.now(), callback)
+                .streamTurn(conversation, role, "在吗", List.of(), LocalDateTime.now(), callback)
                 .collectList().block();
 
         assertThat(tokens).containsExactly(ChatToken.error("HTTP 401 {\"error\":\"invalid api key\"}"));
@@ -200,7 +281,7 @@ class TextChatServiceTest {
         RecordingCallback callback = new RecordingCallback();
 
         List<ChatToken> tokens = textChatService
-                .streamTurn(conversation, role, "在吗", LocalDateTime.now(), callback)
+                .streamTurn(conversation, role, "在吗", List.of(), LocalDateTime.now(), callback)
                 .collectList().block();
 
         assertThat(tokens).containsExactly(ChatToken.content("说到一半"), ChatToken.error("连接中断"));
@@ -215,7 +296,7 @@ class TextChatServiceTest {
         RecordingCallback callback = new RecordingCallback();
 
         List<ChatToken> tokens = textChatService
-                .streamTurn(conversation, role, "在吗", LocalDateTime.now(), callback)
+                .streamTurn(conversation, role, "在吗", List.of(), LocalDateTime.now(), callback)
                 .collectList().block();
 
         assertThat(tokens).isEmpty();
@@ -231,7 +312,7 @@ class TextChatServiceTest {
         RecordingCallback callback = new RecordingCallback();
 
         List<ChatToken> tokens = textChatService
-                .streamTurn(conversation, role, "在吗", LocalDateTime.now(), callback)
+                .streamTurn(conversation, role, "在吗", List.of(), LocalDateTime.now(), callback)
                 .take(1)
                 .collectList().block();
 

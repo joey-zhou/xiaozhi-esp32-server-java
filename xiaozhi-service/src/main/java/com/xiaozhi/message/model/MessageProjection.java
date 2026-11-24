@@ -14,6 +14,8 @@ public class MessageProjection {
     private String sender;
     private String message;
     private String audioPath;
+    /** JSON，给前端时只取出附件 */
+    private String metadata;
     private String state;
     private String messageType;
     private String toolCalls;

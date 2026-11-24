@@ -44,6 +44,19 @@ export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'ima
 export const ALLOWED_AUDIO_TYPES = ['audio/mp3', 'audio/wav', 'audio/mpeg']
 
 /**
+ * 网页聊天一句话最多带几个附件
+ * 真源 ChatStreamReq.java MAX_ATTACHMENTS
+ */
+export const CHAT_ATTACHMENT_MAX_COUNT = 4
+
+/**
+ * 网页聊天发图前缩到的最长边，并统一转成 JPEG/PNG，低于后端上限
+ * 真源 ImageUploadPolicy.java MAX_BYTES（5MB）、MAX_DIMENSION（4096）
+ */
+export const CHAT_IMAGE_MAX_EDGE = 2048
+export const CHAT_IMAGE_MAX_BYTES = 5 * 1024 * 1024
+
+/**
  * 防抖延迟（毫秒）
  */
 export const DEBOUNCE_DELAY = 500

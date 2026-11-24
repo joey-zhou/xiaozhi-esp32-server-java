@@ -6,7 +6,9 @@ import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.service.TextChatService;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.ChatToken;
+import com.xiaozhi.common.model.bo.ChatImageBO;
 import com.xiaozhi.common.model.bo.ConversationBO;
+import com.xiaozhi.common.model.bo.MessageAttachmentBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.event.MemoryDeletedEvent;
 import com.xiaozhi.event.RoleUpdatedEvent;
@@ -51,6 +53,8 @@ public class WebChatAppService {
     private TextChatService textChatService;
     @Resource
     private WebChatConvert webChatConvert;
+    @Resource
+    private WebChatAttachmentService webChatAttachmentService;
 
     /**
      * 会话空闲多久后回收。浏览器崩溃、断网、进程被杀时收不到 /chat/close，只能靠空闲回收兜底。
@@ -163,12 +167,13 @@ public class WebChatAppService {
      * 流式聊天：接收用户文本，返回 AI 回复的 ChatToken 流（包含思考过程和正式回复），
      * 并在一轮完整结束时持久化 user/assistant 两条消息。
      *
-     * @param sessionId 会话 ID
-     * @param text      用户输入文本
-     * @param userId    当前登录用户 ID，须与会话创建者一致，防止跨用户会话劫持
+     * @param sessionId     会话 ID
+     * @param text          用户输入文本
+     * @param attachmentIds 已上传的附件 ID，没有给空列表
+     * @param userId        当前登录用户 ID，须与会话创建者一致，防止跨用户会话劫持
      * @return ChatToken 流，前端可根据 type 区分 thinking/content/error
      */
-    public Flux<ChatToken> chatStream(String sessionId, String text, Integer userId) {
+    public Flux<ChatToken> chatStream(String sessionId, String text, List<String> attachmentIds, Integer userId) {
         WebChatSession session;
         try {
             session = resolveSession(sessionId, userId);
@@ -183,6 +188,22 @@ public class WebChatAppService {
             return Flux.error(new IllegalArgumentException("角色不存在: " + session.roleId));
         }
 
+        List<WebChatAttachmentService.Pending> attachments;
+        List<ChatImageBO> images;
+        try {
+            attachments = attachmentIds.isEmpty() ? List.of() : webChatAttachmentService.take(userId, attachmentIds);
+        } catch (RuntimeException e) {
+            return Flux.error(e);
+        }
+        try {
+            images = attachments.stream()
+                    .map(attachment -> new ChatImageBO(attachment.mimeType(), webChatAttachmentService.read(attachment)))
+                    .toList();
+        } catch (RuntimeException e) {
+            webChatAttachmentService.discard(attachments);
+            return Flux.error(e);
+        }
+
         // 回复还没开始就建档，前端这一轮结束刷新列表时新会话已经在里面。
         // 建档、落消息、撤档都排在同一条串行队列上，首轮失败后紧接着重发也不会乱序
         boolean firstTurn = !session.saved;
@@ -193,11 +214,16 @@ public class WebChatAppService {
 
         LocalDateTime userCreatedAt = DateUtils.now();
         AtomicBoolean turnCompleted = new AtomicBoolean();
-        return textChatService.streamTurn(session.conversation, role, text, userCreatedAt, (reply, assistantCreatedAt) -> {
+        List<MessageAttachmentBO> kept = attachments.stream()
+                .map(attachment -> new MessageAttachmentBO(attachment.kind(), attachment.name(), attachment.path()))
+                .toList();
+        return textChatService.streamTurn(session.conversation, role, text, images, userCreatedAt, completed -> {
             turnCompleted.set(true);
-            SerialTaskRegistry.submit(sessionId,
-                    () -> persistTurn(sessionId, session, text, userCreatedAt, reply, assistantCreatedAt));
+            SerialTaskRegistry.submit(sessionId, () -> persistTurn(sessionId, session, text, kept, userCreatedAt, completed));
         }).doFinally(signal -> {
+            if (!turnCompleted.get() && !attachments.isEmpty()) {
+                webChatAttachmentService.discard(attachments);
+            }
             // 首轮没聊成（模型报错、客户端中断、空回复）就撤掉刚建的档，否则侧栏留下一个打开是空的会话；下一轮重新建档
             if (firstTurn && !turnCompleted.get()) {
                 session.saved = false;
@@ -251,14 +277,15 @@ public class WebChatAppService {
     }
 
     /**
-     * 将一轮 Web 对话的 user + assistant 两条消息写入数据库，并刷新会话的最后对话时间。
+     * 将一轮 Web 对话（用户消息及附件、工具调用链、助手回复）写入数据库，并刷新会话的最后对话时间。
      * 阻塞 JDBC，只能由 {@link SerialTaskRegistry} 的虚拟线程执行，不得在 Reactor 事件循环线程上调用。
      */
-    private void persistTurn(String sessionId, WebChatSession session, String userText, LocalDateTime userCreatedAt,
-                             String assistantText, LocalDateTime assistantCreatedAt) {
+    private void persistTurn(String sessionId, WebChatSession session, String userText,
+                             List<MessageAttachmentBO> attachments, LocalDateTime userCreatedAt,
+                             TextChatService.CompletedTurn completed) {
         try {
-            messageService.saveAll(webChatConvert.toMessages(sessionId, session.userId, session.roleId,
-                    userText, userCreatedAt, assistantText, assistantCreatedAt));
+            messageService.saveAll(webChatConvert.toMessages(sessionId, session.userId, session.roleId, userText,
+                    attachments, userCreatedAt, completed.toolChains(), completed.reply(), completed.assistantCreatedAt()));
             conversationService.touch(sessionId);
         } catch (Exception e) {
             log.error("Web 聊天消息持久化失败: sessionId={}", sessionId, e);

@@ -129,6 +129,21 @@ class MessageServiceImplTest {
         assertThat(captor.getValue().getSqlSet()).contains("state");
     }
 
+    /** 存量统计也算上消息附件 */
+    @Test
+    @SuppressWarnings("unchecked")
+    void storedPathsCountIncludesChatAttachments() {
+        when(messageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(7L);
+
+        assertThat(messageService.countStoredPathsWithPrefix("https://bucket.example.com/")).isEqualTo(7L);
+
+        ArgumentCaptor<LambdaQueryWrapper<MessageDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(messageMapper).selectCount(captor.capture());
+        assertThat(captor.getValue().getTargetSql()).contains("audioPath LIKE").contains("OR metadata LIKE");
+        assertThat(captor.getValue().getParamNameValuePairs().values())
+            .contains("https://bucket.example.com/%", "%\"path\":\"https://bucket.example.com/%");
+    }
+
     @Test
     void deleteBySessionIdsWithoutSessionsSkipsTheDatabase() {
         assertThat(messageService.deleteBySessionIds(List.of())).isZero();

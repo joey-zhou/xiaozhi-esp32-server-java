@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const httpMock = vi.hoisted(() => ({
   post: vi.fn(() => Promise.resolve({ code: 200, message: 'success', data: { sessionId: 's-1' } })),
+  postMultipart: vi.fn(() =>
+    Promise.resolve({ code: 200, message: 'success', data: { attachmentId: 'a-1', kind: 'image', name: '花.png' } })
+  ),
 }))
 
 const handleAuthExpiredMock = vi.hoisted(() => vi.fn())
@@ -14,7 +17,7 @@ vi.mock('../request', () => ({
 
 vi.mock('@/store/user', () => ({ useUserStore: () => ({ token: 'tk' }) }))
 
-import { chatStream, closeChatSession, openChatSession } from '../chat'
+import { chatStream, closeChatSession, openChatSession, uploadChatAttachment } from '../chat'
 import type { ChatToken } from '@/types/chat'
 
 /** 一段 SSE 响应体，读一次就结束 */
@@ -91,7 +94,25 @@ describe('chat service', () => {
     expect(JSON.parse(String(capturedInit?.body))).toEqual({
       sessionId: 's-1',
       text: '我的手机号是 13800138000',
+      attachmentIds: [],
     })
+  })
+
+  it('附件先上传拿到 ID，发消息时放进请求体', async () => {
+    const file = new File(['x'], '花.png', { type: 'image/png' })
+
+    const res = await uploadChatAttachment(file)
+
+    expect(res.data).toEqual({ attachmentId: 'a-1', kind: 'image', name: '花.png' })
+    const [url, form] = httpMock.postMultipart.mock.calls[0] as unknown as [string, FormData]
+    expect(url).toBe('/chat/attachments')
+    expect(form.get('file')).toBe(file)
+
+    stubFetch(sseResponse('data: {"type":"content","text":"是月季"}\n\n'))
+    for await (const token of chatStream('s-1', '这是什么花', ['a-1'])) {
+      expect(token.text).toBe('是月季')
+    }
+    expect(JSON.parse(String(capturedInit?.body)).attachmentIds).toEqual(['a-1'])
   })
 
   // SSE 绕开了 axios 拦截器，401 只能在这里自己接

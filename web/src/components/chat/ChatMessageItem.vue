@@ -35,8 +35,17 @@ const { t } = useI18n()
       <a-typography-text type="secondary" :style="{ fontSize: '13px', padding: '0 4px', marginBottom: '4px' }">
         {{ msg.role === 'user' ? t('chat.me') : roleName }}
       </a-typography-text>
+      <div v-if="msg.attachments?.length" class="message-images">
+        <a-image
+          v-for="(image, index) in msg.attachments"
+          :key="index"
+          :src="image.url"
+          :alt="image.name"
+          :width="120"
+        />
+      </div>
       <div class="message-bubble" :class="msg.role">
-        <ThinkingState v-if="msg.streaming && !msg.content && !msg.thinking" />
+        <ThinkingState v-if="msg.streaming && !msg.content && !msg.thinking" :activity="msg.activity" />
         <template v-else>
           <ThinkingBlock
             v-if="msg.thinking"
@@ -76,6 +85,19 @@ const { t } = useI18n()
 
 .message-content.user {
   align-items: flex-end;
+}
+
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.message-images :deep(img) {
+  border-radius: 8px;
+  object-fit: cover;
 }
 
 .message-bubble {

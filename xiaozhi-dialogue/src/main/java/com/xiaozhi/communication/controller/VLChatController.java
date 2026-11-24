@@ -4,6 +4,8 @@ import cn.dev33.satoken.annotation.SaIgnore;
 import com.xiaozhi.communication.auth.DeviceAuthService;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.ai.llm.service.VisionService;
+import com.xiaozhi.common.model.bo.ChatImageBO;
+import com.xiaozhi.storage.ImageUploadPolicy;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -14,6 +16,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.*;
 
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +40,7 @@ public class VLChatController {
     private DeviceAuthService deviceAuthService;
 
     @Resource
-    private ImageValidator imageValidator;
+    private ImageUploadPolicy imageUploadPolicy;
 
     @SaIgnore
     @PostMapping(value = "/chat", produces = "application/json;charset=UTF-8")
@@ -73,13 +76,18 @@ public class VLChatController {
             return failure("设备与会话不匹配");
         }
 
-        String imageError = imageValidator.validate(file);
-        if (imageError != null) {
-            return failure(imageError);
+        ChatImageBO image;
+        try {
+            byte[] content = file.getBytes();
+            image = new ChatImageBO(imageUploadPolicy.mimeTypeOf(content), content);
+        } catch (IllegalArgumentException e) {
+            return failure(e.getMessage());
+        } catch (IOException e) {
+            return failure("图片读取失败");
         }
 
         try {
-            String result = visionService.recognize(file, question);
+            String result = visionService.recognize(tokenDeviceId, image, question);
             return success(result);
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("视觉对话请求失败, sessionId={}, error={}", sessionId, e.getMessage());

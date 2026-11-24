@@ -1,11 +1,24 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+const props = defineProps<{
+  /** 正在进行的准备工作，取值见 ChatToken：vision 在看图；不传就是在思考 */
+  activity?: string
+}>()
+
 const { t } = useI18n()
+
+const label = computed(() => {
+  if (props.activity === 'vision') {
+    return t('chat.activityVision')
+  }
+  return t('chat.thinkingInProgress')
+})
 </script>
 
 <template>
-  <span class="shimmer">{{ t('chat.thinkingInProgress') }}</span>
+  <span class="shimmer">{{ label }}</span>
 </template>
 
 <style scoped>

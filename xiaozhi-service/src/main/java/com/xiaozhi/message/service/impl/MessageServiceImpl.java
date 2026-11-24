@@ -385,8 +385,10 @@ public class MessageServiceImpl implements MessageService {
         if (!StringUtils.hasText(prefix)) {
             return 0;
         }
+        // 网页聊天发的图记在 metadata 的附件 path 里
         return messageMapper.selectCount(new LambdaQueryWrapper<MessageDO>()
             .eq(MessageDO::getState, MessageBO.STATE_ENABLED)
-            .likeRight(MessageDO::getAudioPath, prefix));
+            .and(w -> w.likeRight(MessageDO::getAudioPath, prefix)
+                .or().like(MessageDO::getMetadata, "\"path\":\"" + prefix)));
     }
 }

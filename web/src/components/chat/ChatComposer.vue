@@ -5,37 +5,48 @@ import {
   AppstoreOutlined,
   ArrowUpOutlined,
   CheckOutlined,
+  CloseOutlined,
   FileImageOutlined,
+  LoadingOutlined,
   PaperClipOutlined,
   PlusOutlined,
   RightOutlined,
   RobotOutlined,
   StopOutlined,
 } from '@ant-design/icons-vue'
+import type { ChatDraftAttachment } from '@/types/chat'
 
 const props = defineProps<{
   modelValue: string
   disabled?: boolean
   sending?: boolean
   roleName?: string
+  attachments?: ChatDraftAttachment[]
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
   (e: 'send'): void
   (e: 'stop'): void
+  (e: 'attach', files: File[]): void
+  (e: 'remove-attachment', localId: number): void
 }>()
 
 const { t } = useI18n()
 const editor = ref<HTMLDivElement>()
 const plusWrap = ref<HTMLDivElement>()
+const fileInput = ref<HTMLInputElement>()
 const menuOpen = ref(false)
 const skillsOpen = ref(false)
 const modelHovered = ref(false)
 
 const skills = ['Deep Research', 'Code Review', 'Web Search', 'Summarize']
 const hasText = computed(() => props.modelValue.trim().length > 0)
-const sendActive = computed(() => hasText.value && !props.disabled && !props.sending)
+const uploading = computed(() => (props.attachments ?? []).some((a) => a.status === 'uploading'))
+const hasReady = computed(() => (props.attachments ?? []).some((a) => a.status === 'ready'))
+const sendActive = computed(
+  () => (hasText.value || hasReady.value) && !uploading.value && !props.disabled && !props.sending
+)
 
 // contenteditable 里 Shift+Enter 插入的是 <br>，只有 innerText 会还原成 \n
 function readEditor(): string {
@@ -67,9 +78,14 @@ function onEditorKeydown(event: KeyboardEvent) {
   }
 }
 
-// 粘贴只取纯文本，避免富文本样式与图片节点留在编辑区
+// 粘贴的图片交出去当附件，文字只取纯文本，避免富文本样式与图片节点留在编辑区
 function onEditorPaste(event: ClipboardEvent) {
   event.preventDefault()
+  const images = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'))
+  if (images.length) {
+    emit('attach', images)
+    return
+  }
   const text = event.clipboardData?.getData('text/plain') ?? ''
   if (!text) return
 
@@ -91,6 +107,19 @@ function onEditorPaste(event: ClipboardEvent) {
     writeEditor(readEditor() + text)
   }
   onEditorInput()
+}
+
+function pickImage() {
+  closeMenu()
+  fileInput.value?.click()
+}
+
+function onFilesPicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  // 清空后同一张图可以再选一次
+  input.value = ''
+  if (files.length) emit('attach', files)
 }
 
 function focus() {
@@ -128,6 +157,21 @@ defineExpose({ focus })
 <template>
   <div class="wrap">
     <div class="frame" :class="{ 'is-disabled': disabled }">
+      <div v-if="attachments?.length" class="attachments">
+        <div v-for="item in attachments" :key="item.localId" class="attachment">
+          <img :src="item.previewUrl" :alt="item.name" />
+          <span v-if="item.status === 'uploading'" class="attachment-mask"><LoadingOutlined /></span>
+          <button
+            type="button"
+            class="attachment-remove"
+            :aria-label="t('chat.composer.removeAttachment')"
+            @click="emit('remove-attachment', item.localId)"
+          >
+            <CloseOutlined />
+          </button>
+        </div>
+      </div>
+      <input ref="fileInput" type="file" accept="image/*" multiple hidden @change="onFilesPicked" />
       <div class="editor-wrap">
         <div
           ref="editor"
@@ -163,9 +207,8 @@ defineExpose({ focus })
               type="button"
               role="menuitem"
               class="menu-item"
-              aria-disabled="true"
-              :title="t('chat.composer.comingSoon')"
-              @click.prevent
+              data-action="add-image"
+              @click="pickImage"
             >
               <span class="menu-icon"><FileImageOutlined /></span>
               <span class="menu-name">{{ t('chat.composer.addImage') }}</span>
@@ -295,6 +338,55 @@ defineExpose({ focus })
 
 .editor-wrap {
   position: relative;
+}
+
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.attachment {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 0.5px solid var(--ant-color-border-secondary);
+}
+
+.attachment img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ant-color-bg-mask);
+  color: var(--ant-color-white);
+}
+
+.attachment-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ant-color-bg-mask);
+  color: var(--ant-color-white);
+  font-size: 9px;
+  cursor: pointer;
 }
 
 .field {

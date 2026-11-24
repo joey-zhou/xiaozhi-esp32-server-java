@@ -4,6 +4,7 @@ import com.xiaozhi.ai.llm.service.VisionService;
 import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.communication.auth.DeviceAuthService;
 import com.xiaozhi.communication.common.ChatSession;
+import com.xiaozhi.storage.ImageUploadPolicy;
 import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,7 +22,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -60,7 +64,7 @@ class VLChatControllerTest extends ControllerTestSupport {
         ReflectionTestUtils.setField(controller, "visionService", visionService);
         ReflectionTestUtils.setField(controller, "sessionManager", sessionManager);
         ReflectionTestUtils.setField(controller, "deviceAuthService", deviceAuthService);
-        ReflectionTestUtils.setField(controller, "imageValidator", new ImageValidator());
+        ReflectionTestUtils.setField(controller, "imageUploadPolicy", new ImageUploadPolicy());
         mockMvc = buildMockMvc(controller);
 
         DeviceBO device = new DeviceBO();
@@ -70,7 +74,6 @@ class VLChatControllerTest extends ControllerTestSupport {
     }
 
     private MockMultipartFile jpegFile() {
-        // 最小可解析 JPEG 由 ImageValidatorTest 覆盖；此处用真实编码图
         try {
             BufferedImage image = new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -83,7 +86,7 @@ class VLChatControllerTest extends ControllerTestSupport {
 
     @Test
     void acceptsValidVisionToken() throws Exception {
-        when(visionService.recognize(any(), any())).thenReturn("一只猫");
+        when(visionService.recognize(eq(DEVICE_ID), any(), any())).thenReturn("一只猫");
         String token = deviceAuthService.generateVisionToken("session-1", DEVICE_ID);
 
         mockMvc.perform(multipart("/api/vl/chat")
@@ -93,6 +96,7 @@ class VLChatControllerTest extends ControllerTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.text").value("一只猫"));
+        verify(visionService).recognize(eq(DEVICE_ID), argThat(image -> "image/jpeg".equals(image.mimeType())), eq("这是什么"));
     }
 
     @Test
@@ -118,7 +122,7 @@ class VLChatControllerTest extends ControllerTestSupport {
 
     @Test
     void acceptsTokenWhenSessionIsOnAnotherInstance() throws Exception {
-        when(visionService.recognize(any(), any())).thenReturn("一只猫");
+        when(visionService.recognize(eq(DEVICE_ID), any(), any())).thenReturn("一只猫");
         String token = deviceAuthService.generateVisionToken("gone-session", DEVICE_ID);
 
         mockMvc.perform(multipart("/api/vl/chat")

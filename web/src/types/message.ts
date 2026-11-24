@@ -18,6 +18,8 @@ export interface Message {
   state?: string
   messageType?: string
   toolCalls?: string
+  /** 随消息发来的附件 */
+  attachments?: MessageAttachment[]
   sessionId?: string
   /** 消息来源: 'web' | 'device' */
   source?: string
@@ -43,4 +45,14 @@ export interface MessageQueryParams extends PageQueryParams {
   sessionId?: string
   /** 消息来源过滤: 'web' | 'device' */
   source?: string
+}
+
+/**
+ * 消息附件（对齐后端 MessageAttachmentResp）
+ */
+export interface MessageAttachment {
+  kind: 'image'
+  name: string
+  /** 签过名的访问地址，经 getResourceUrl 拼成完整地址 */
+  url: string
 }

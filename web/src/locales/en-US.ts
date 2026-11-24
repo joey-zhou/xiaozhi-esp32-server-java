@@ -944,6 +944,10 @@ export default {
     openSessionFailed: 'Failed to open session: {error}',
     replyInterrupted: 'Reply interrupted: {error}',
     thinkingInProgress: 'Thinking...',
+    activityVision: 'Looking at the image...',
+    describeImage: 'What is in this image?',
+    attachmentLimit: 'Up to {count} images per message',
+    attachmentUnreadable: 'Could not open {name}, try another image',
     thinkingDone: 'Thought complete',
     thought: 'Thought',
     thoughtDuration: ' for {seconds}s',
@@ -987,6 +991,7 @@ export default {
     composer: {
       addMenu: 'Add content or switch capability',
       addImage: 'Add image',
+      removeAttachment: 'Remove image',
       attachFile: 'Attach file',
       skills: 'Skills',
       model: 'Current role',

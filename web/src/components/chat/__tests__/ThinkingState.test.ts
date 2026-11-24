@@ -9,4 +9,10 @@ describe('ThinkingState', () => {
 
     expect(wrapper.get('.shimmer').text()).toBe('chat.thinkingInProgress')
   })
+
+  // 在看图时换成对应的说法，动效不变
+  it('says what the reply is waiting on', () => {
+    expect(mount(ThinkingState, { props: { activity: 'vision' } }).get('.shimmer').text())
+      .toBe('chat.activityVision')
+  })
 })

@@ -1,6 +1,7 @@
 package com.xiaozhi.server.web.chat;
 
 import com.xiaozhi.common.model.ChatToken;
+import com.xiaozhi.common.model.bo.MessageAttachmentBO;
 import com.xiaozhi.server.web.chat.convert.WebChatConvert;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,15 +11,21 @@ import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import reactor.core.publisher.Flux;
 
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -36,17 +43,21 @@ class WebChatControllerTest extends ControllerTestSupport {
     @Mock
     private WebChatAppService webChatAppService;
 
+    @Mock
+    private WebChatAttachmentService webChatAttachmentService;
+
     @BeforeEach
     void setUp() {
         WebChatController controller = new WebChatController();
         ReflectionTestUtils.setField(controller, "webChatAppService", webChatAppService);
+        ReflectionTestUtils.setField(controller, "webChatAttachmentService", webChatAttachmentService);
         ReflectionTestUtils.setField(controller, "webChatConvert", Mappers.getMapper(WebChatConvert.class));
         mockMvc = buildMockMvc(controller);
     }
 
     @Test
     void streamTakesSessionIdAndTextFromBody() throws Exception {
-        when(webChatAppService.chatStream("s-1", "你好", 9)).thenReturn(Flux.just(ChatToken.content("在的")));
+        when(webChatAppService.chatStream("s-1", "你好", List.of(), 9)).thenReturn(Flux.just(ChatToken.content("在的")));
 
         try (var ignored = mockLoginUser(9)) {
             mockMvc.perform(post("/api/chat/stream")
@@ -56,7 +67,7 @@ class WebChatControllerTest extends ControllerTestSupport {
                         """));
         }
 
-        verify(webChatAppService).chatStream("s-1", "你好", 9);
+        verify(webChatAppService).chatStream("s-1", "你好", List.of(), 9);
     }
 
     /**
@@ -65,7 +76,7 @@ class WebChatControllerTest extends ControllerTestSupport {
      */
     @Test
     void streamFailureBeforeFirstTokenReturnsJsonError() throws Exception {
-        when(webChatAppService.chatStream("s-1", "你好", 9))
+        when(webChatAppService.chatStream("s-1", "你好", List.of(), 9))
             .thenReturn(Flux.error(new IllegalArgumentException("会话不存在或已删除: s-1")));
 
         try (var ignored = mockLoginUser(9)) {
@@ -80,6 +91,37 @@ class WebChatControllerTest extends ControllerTestSupport {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.message").value("会话不存在或已删除: s-1"));
+        }
+    }
+
+    @Test
+    void streamPassesTheAttachmentIds() throws Exception {
+        when(webChatAppService.chatStream("s-1", "这是什么花", List.of("a-1"), 9)).thenReturn(Flux.empty());
+
+        try (var ignored = mockLoginUser(9)) {
+            mockMvc.perform(post("/api/chat/stream")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"sessionId":"s-1","text":"这是什么花","attachmentIds":["a-1"]}
+                        """));
+        }
+
+        verify(webChatAppService).chatStream("s-1", "这是什么花", List.of("a-1"), 9);
+    }
+
+    @Test
+    void attachmentsAreHeldForTheCurrentUser() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "花.png", "image/png", new byte[]{1});
+        when(webChatAttachmentService.hold(eq(9), any())).thenReturn(new WebChatAttachmentService.Pending(
+            "a-1", 9, MessageAttachmentBO.KIND_IMAGE, "花.png", "image/png", "uploads/chat/a.png"));
+
+        try (var ignored = mockLoginUser(9)) {
+            mockMvc.perform(multipart("/api/chat/attachments").file(file))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.attachmentId").value("a-1"))
+                .andExpect(jsonPath("$.data.kind").value("image"))
+                .andExpect(jsonPath("$.data.name").value("花.png"))
+                .andExpect(jsonPath("$.data.path").doesNotExist());
         }
     }
 

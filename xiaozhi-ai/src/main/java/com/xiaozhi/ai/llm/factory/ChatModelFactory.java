@@ -86,7 +86,7 @@ public class ChatModelFactory {
      * 角色这一轮实际要用的模型配置。绑定的配置已停用或不存在时回退默认聊天模型，与合成、识别一致；
      * 连默认都没有才报错：识别建不起来还能降级成这一轮听不清，模型建不起来这一轮就彻底没法回答。
      */
-    ConfigBO resolveConfig(RoleBO role) {
+    public ConfigBO resolveConfig(RoleBO role) {
         Integer modelId = role.getModelId();
         Assert.notNull(modelId, "配置ID不能为空");
         ConfigBO config = configService.getConfig(modelId);
@@ -164,7 +164,7 @@ public class ChatModelFactory {
 
     public ChatModel getVisionModel() {
         ConfigBO config = configService.getDefaultConfig("llm", ConfigBO.ModelType.vision.getValue());
-        Assert.notNull(config, "未配置多模态模型");
+        Assert.notNull(config, "没有可用的视觉模型，请在模型配置里添加一个视觉模型并设为默认");
         // 走同一份缓存，避免每次多模态调用都新建 ChatModel(连带新建 HttpClient)
         String cacheKey = config.getConfigId() + ":vision";
         return chatModelCache.get(cacheKey, k -> createChatModel(config, new RoleBO()));

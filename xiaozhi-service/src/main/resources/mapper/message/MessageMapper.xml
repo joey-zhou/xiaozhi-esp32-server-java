@@ -9,6 +9,7 @@
         m.sender,
         m.message,
         m.audioPath,
+        m.metadata,
         m.state,
         m.messageType,
         m.toolCalls,

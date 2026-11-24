@@ -8,12 +8,13 @@ import { message as antMessage } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { openChatSession, closeChatSession, chatStream } from '@/services/chat'
 import { queryMessages } from '@/services/message'
+import { getResourceUrl } from '@/utils/resource'
 import {
   queryConversations,
   renameConversation as renameConversationApi,
   deleteConversations as deleteConversationsApi,
 } from '@/services/conversation'
-import type { ChatMessage, Conversation } from '@/types/chat'
+import type { ChatDraftAttachment, ChatMessage, Conversation } from '@/types/chat'
 import type { Message } from '@/types/message'
 
 /** 把任意异常转成可展示的文本 */
@@ -93,6 +94,7 @@ export function useChatSession() {
         pageNo: 1,
         pageSize: 100,
         sessionId: conv.sessionId,
+        messageType: 'NORMAL',
       })
 
       // 接口返回是倒序的(ORDER BY createTime DESC)，我们需要正序显示
@@ -100,6 +102,7 @@ export function useChatSession() {
         id: ++messageIdCounter.value,
         role: m.sender === 'user' ? 'user' : 'assistant',
         content: m.message,
+        attachments: m.attachments?.map((a) => ({ ...a, url: getResourceUrl(a.url) ?? '' })),
         timestamp: m.createTime ? new Date(m.createTime) : new Date(),
       }))
 
@@ -198,12 +201,14 @@ export function useChatSession() {
    * @param text 用户输入文本
    * @param roleId 当前选中的角色
    * @param onScroll 每收到新内容时的回调（通常用于滚动到底部）
+   * @param attachments 已上传好的附件
    * @returns 本轮是否新开/续接了会话（若是，调用者可刷新历史列表）
    */
   async function sendMessage(
     text: string,
     roleId: number,
-    onScroll?: () => void
+    onScroll?: () => void,
+    attachments: ChatDraftAttachment[] = []
   ): Promise<{ openedNow: boolean; success: boolean }> {
     if (!text || sending.value) return { openedNow: false, success: false }
 
@@ -230,6 +235,9 @@ export function useChatSession() {
       role: 'user',
       content: text,
       timestamp: new Date(),
+      attachments: attachments.length
+        ? attachments.map((a) => ({ kind: 'image' as const, name: a.name, url: a.previewUrl }))
+        : undefined,
     })
     onScroll?.()
 
@@ -305,10 +313,18 @@ export function useChatSession() {
     cancelPendingFlush = cancelScheduledFlush
 
     try {
-      for await (const token of chatStream(sessionId.value, text, currentAbort.signal)) {
+      const attachmentIds = attachments.flatMap((a) => (a.attachmentId ? [a.attachmentId] : []))
+      for await (const token of chatStream(sessionId.value, text, attachmentIds, currentAbort.signal)) {
         if (token.type === 'error') {
           // 后端把模型调用失败的原因推过来后就结束流，按中断处理并展示原因
           throw new Error(token.text)
+        }
+        if (token.type === 'activity') {
+          assistantMsg.activity = token.text
+          continue
+        }
+        if (assistantMsg.activity) {
+          assistantMsg.activity = undefined
         }
         if (token.type === 'thinking') {
           if (thinkingStartedAt === undefined) thinkingStartedAt = Date.now()
@@ -339,6 +355,7 @@ export function useChatSession() {
         // 中断提示要接在已刷入的正文之后
         assistantMsg.content += '\n\n' + t('chat.replyInterrupted', { error: errorText(lastError) })
       }
+      assistantMsg.activity = undefined
       assistantMsg.streaming = false
       sending.value = false
       currentAbort = null

@@ -37,9 +37,33 @@ class MessageConvertTest {
         MessageResp resp = convert.toResp(projection);
 
         assertThat(resp).usingRecursiveComparison()
-            .ignoringFields("messageId")
+            .ignoringFields("messageId", "attachments")
             .isEqualTo(projection);
         assertThat(resp.getMessageId()).isEqualTo(123456L);
+    }
+
+    /** metadata 里的附件拆出给前端 */
+    @Test
+    void attachmentsInTheMetadataReachTheResp() {
+        MessageProjection projection = new MessageProjection();
+        projection.setMetadata("{\"attachments\":[{\"kind\":\"image\",\"name\":\"花.png\",\"path\":\"uploads/chat/a.png\"}]}");
+
+        MessageResp resp = convert.toResp(projection);
+
+        assertThat(resp.getAttachments()).singleElement().satisfies(attachment -> {
+            assertThat(attachment.getKind()).isEqualTo("image");
+            assertThat(attachment.getName()).isEqualTo("花.png");
+            assertThat(attachment.getUrl()).isEqualTo("uploads/chat/a.png");
+        });
+    }
+
+    @Test
+    void messagesWithoutAttachmentsHaveNone() {
+        MessageProjection projection = new MessageProjection();
+        projection.setMetadata("{\"speaker\":\"小明\"}");
+
+        assertThat(convert.toResp(projection).getAttachments()).isNull();
+        assertThat(convert.toResp(new MessageProjection()).getAttachments()).isNull();
     }
 
     // 会话表的列经 BO 带到 Resp；角色名不在会话表里，留给接口层补

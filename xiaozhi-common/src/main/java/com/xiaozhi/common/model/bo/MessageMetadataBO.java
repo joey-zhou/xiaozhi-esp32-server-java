@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * UserMessage 附加元数据，结构化存储于 sys_message.metadata (JSON 列)。
  *
@@ -49,4 +51,7 @@ public class MessageMetadataBO {
      * 情绪强度（弱/中/强 等），仅情感识别时有值。
      */
     private String emotionDegree;
+
+    /** 网页聊天随话发的附件 */
+    private List<MessageAttachmentBO> attachments;
 }

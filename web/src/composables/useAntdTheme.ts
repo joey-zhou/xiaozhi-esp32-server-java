@@ -76,6 +76,7 @@ function injectCssVariables(isDark: boolean) {
   root.style.setProperty('--ant-color-warning-bg', isDark ? '#2b2111' : '#fffbe6')
   root.style.setProperty('--ant-color-text-inverse', '#ffffff')
   root.style.setProperty('--ant-color-white', '#ffffff')
+  root.style.setProperty('--ant-color-bg-mask', 'rgba(0, 0, 0, 0.45)')
   root.style.setProperty('--ant-color-text-placeholder', isDark ? '#595959' : '#bfbfbf')
   root.style.setProperty('--ant-box-shadow', isDark 
     ? '0 3px 6px -4px rgba(0, 0, 0, 0.48), 0 6px 16px 0 rgba(0, 0, 0, 0.32), 0 9px 28px 8px rgba(0, 0, 0, 0.20)'

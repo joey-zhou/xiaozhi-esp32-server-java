@@ -942,6 +942,10 @@ export default {
     openSessionFailed: '打开会话失败：{error}',
     replyInterrupted: '回复中断：{error}',
     thinkingInProgress: '思考中...',
+    activityVision: '正在看图...',
+    describeImage: '看看这张图',
+    attachmentLimit: '一次最多发 {count} 张图',
+    attachmentUnreadable: '{name} 打不开，换一张试试',
     thinkingDone: '已完成思考',
     thought: '思考',
     thoughtDuration: '了 {seconds} 秒',
@@ -985,6 +989,7 @@ export default {
     composer: {
       addMenu: '添加内容或切换能力',
       addImage: '添加图片',
+      removeAttachment: '移除图片',
       attachFile: '添加文件',
       skills: '技能',
       model: '当前角色',

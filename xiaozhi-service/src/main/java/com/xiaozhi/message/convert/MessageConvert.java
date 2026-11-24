@@ -4,6 +4,7 @@ import com.xiaozhi.common.model.bo.ConversationBO;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.common.model.bo.MessageMetadataBO;
 import com.xiaozhi.common.model.resp.ConversationResp;
+import com.xiaozhi.common.model.resp.MessageAttachmentResp;
 import com.xiaozhi.common.model.resp.MessageResp;
 import com.xiaozhi.message.dal.mysql.dataobject.ConversationDO;
 import com.xiaozhi.message.dal.mysql.dataobject.MessageDO;
@@ -13,6 +14,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.util.StringUtils;
 
+import java.util.List;
+
 @Mapper(componentModel = "spring")
 public interface MessageConvert {
 
@@ -20,6 +23,7 @@ public interface MessageConvert {
 
     MessageDO toDO(MessageBO messageBO);
 
+    @Mapping(target = "attachments", source = "metadata")
     MessageResp toResp(MessageProjection projection);
 
     /** 角色名只在分页 SQL 里关联出来，单表读不带 */
@@ -37,6 +41,21 @@ public interface MessageConvert {
             return null;
         }
         return JsonUtil.fromJson(json, MessageMetadataBO.class);
+    }
+
+    /** metadata 里的附件，没有为 null */
+    default List<MessageAttachmentResp> jsonToAttachments(String json) {
+        MessageMetadataBO metadata = jsonToMetadata(json);
+        if (metadata == null || metadata.getAttachments() == null) {
+            return null;
+        }
+        return metadata.getAttachments().stream().map(attachment -> {
+            MessageAttachmentResp resp = new MessageAttachmentResp();
+            resp.setKind(attachment.getKind());
+            resp.setName(attachment.getName());
+            resp.setUrl(attachment.getPath());
+            return resp;
+        }).toList();
     }
 
     /**

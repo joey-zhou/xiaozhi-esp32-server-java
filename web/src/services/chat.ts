@@ -1,7 +1,7 @@
 import { API_BASE_URL, handleAuthExpired, http } from './request'
 import api from './api'
 import { useUserStore } from '@/store/user'
-import type { ChatToken } from '@/types/chat'
+import type { ChatAttachment, ChatToken } from '@/types/chat'
 
 export type { ChatToken }
 
@@ -40,6 +40,15 @@ export function closeChatSession(sessionId: string): Promise<ChatSessionClosed> 
 }
 
 /**
+ * 上传一个聊天附件（目前只收图），发消息时带上返回的 attachmentId
+ */
+export function uploadChatAttachment(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return http.postMultipart<ChatAttachment>(api.chat.attachments, formData)
+}
+
+/**
  * 关标签页时关闭会话。
  * pagehide 阶段浏览器会掐掉普通 XHR，必须走 keepalive；sendBeacon 带不了 Authorization 头会 401。
  */
@@ -66,6 +75,7 @@ export function closeChatSessionOnUnload(sessionId: string): void {
 export async function* chatStream(
   sessionId: string,
   text: string,
+  attachmentIds: string[] = [],
   signal?: AbortSignal
 ): AsyncGenerator<ChatToken> {
   const userStore = useUserStore()
@@ -98,7 +108,7 @@ export async function* chatStream(
         Authorization: userStore.token ? `Bearer ${userStore.token}` : '',
       },
       credentials: 'include',
-      body: JSON.stringify({ sessionId, text }),
+      body: JSON.stringify({ sessionId, text, attachmentIds }),
       signal: controller.signal,
     })
 

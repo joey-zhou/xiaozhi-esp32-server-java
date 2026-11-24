@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons-vue'
 import { useSelectLoadMore } from '@/composables/useSelectLoadMore'
 import { useChatSession } from '@/composables/useChatSession'
+import { useChatAttachments } from '@/composables/useChatAttachments'
 import { queryRoles } from '@/services/role'
 import { formatShortDateTime } from '@/utils/date'
 import type { Conversation } from '@/types/chat'
@@ -40,6 +41,16 @@ const {
   stopGeneration,
   toggleThinking,
 } = useChatSession()
+
+// 输入框里的附件
+const {
+  attachments,
+  uploading: attachmentsUploading,
+  hasReady: hasReadyAttachments,
+  add: addAttachments,
+  remove: removeAttachment,
+  takeReady: takeReadyAttachments,
+} = useChatAttachments()
 
 // 角色选择
 const {
@@ -252,14 +263,22 @@ function selectRole(role: Role) {
 
 async function sendMessage() {
   const text = inputText.value.trim()
-  if (!text || sending.value || !selectedRoleId.value) return
+  if ((!text && !hasReadyAttachments.value) || attachmentsUploading.value || sending.value || !selectedRoleId.value) {
+    return
+  }
+  const images = takeReadyAttachments()
 
   // 立即清空输入框并重新聚焦
   inputText.value = ''
   focusInput()
   forceScrollToBottom()
 
-  const { openedNow, success } = await sendMessageToSession(text, selectedRoleId.value, scrollToBottom)
+  const { openedNow, success } = await sendMessageToSession(
+    text || t('chat.describeImage'),
+    selectedRoleId.value,
+    scrollToBottom,
+    images
+  )
   focusInput()
   // 新开/续接会话发送完一轮后，刷新列表（新会话入列表，续接会话上浮）
   if (success && openedNow) {
@@ -351,8 +370,11 @@ async function sendMessage() {
           :disabled="!selectedRoleId"
           :sending="sending"
           :role-name="selectedRoleName"
+          :attachments="attachments"
           @send="sendMessage"
           @stop="stopGeneration"
+          @attach="addAttachments"
+          @remove-attachment="removeAttachment"
         />
         <a-typography-text type="secondary" :style="{ display: 'block', textAlign: 'center', marginTop: '12px', fontSize: '12px' }">
           {{ t('chat.disclaimer') }}
