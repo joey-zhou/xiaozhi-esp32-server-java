@@ -23,19 +23,17 @@ import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.ai.tool.ToolRegistrationService;
-import com.xiaozhi.ai.tool.ToolCallActivityRegistry;
+import com.xiaozhi.ai.llm.service.ModelTimeoutPolicy;
 import com.xiaozhi.dialogue.adapter.ChatSessionToolAdapter;
 import com.xiaozhi.dialogue.llm.handler.DialogueListener;
 import com.xiaozhi.message.service.MessageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import jakarta.annotation.Resource;
-import org.springframework.beans.factory.annotation.Value;
 
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.util.Assert;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -44,10 +42,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 public class PersonaFactory {
-    @Value("${xiaozhi.llm.first-token-timeout-seconds:30}")
-    private long llmFirstTokenTimeoutSeconds = 30;
-    @Value("${xiaozhi.llm.idle-timeout-seconds:90}")
-    private long llmIdleTimeoutSeconds = 90;
     @Resource
     private MessageService chatMessageService;
     @Resource
@@ -74,7 +68,7 @@ public class PersonaFactory {
     @Resource
     private StorageServiceFactory storageServiceFactory;
     @Resource
-    private ToolCallActivityRegistry toolCallActivity;
+    private ModelTimeoutPolicy modelTimeoutPolicy;
     @Resource
     private FaultNotifier faultNotifier;
 
@@ -127,9 +121,7 @@ public class PersonaFactory {
                 .sttService(sttService)
                 .sttHotwords(Hotword.parse(role.getSttHotwords()))
                 .chatModel(chatModel)
-                .firstTokenTimeout(Duration.ofSeconds(llmFirstTokenTimeoutSeconds))
-                .idleTimeout(Duration.ofSeconds(llmIdleTimeoutSeconds))
-                .toolCallActivity(toolCallActivity)
+                .modelTimeouts(modelTimeoutPolicy)
                 .faultNotifier(faultNotifier)
                 .synthesizer(synthesizer)
                 .player(session.getPlayer())

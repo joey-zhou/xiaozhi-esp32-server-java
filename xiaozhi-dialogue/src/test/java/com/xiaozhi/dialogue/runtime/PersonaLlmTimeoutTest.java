@@ -1,6 +1,7 @@
 package com.xiaozhi.dialogue.runtime;
 
 import com.xiaozhi.ai.llm.memory.Conversation;
+import com.xiaozhi.ai.llm.service.ModelTimeoutPolicy;
 import com.xiaozhi.ai.tool.ToolCallActivityRegistry;
 import com.xiaozhi.ai.tool.ToolsSessionHolder;
 import com.xiaozhi.common.Speech;
@@ -87,9 +88,7 @@ class PersonaLlmTimeoutTest {
                 .synthesizer(synthesizer)
                 .player(player)
                 .conversation(Conversation.of("device", 1, "s1", "role", 1))
-                .firstTokenTimeout(FIRST_TOKEN)
-                .idleTimeout(IDLE)
-                .toolCallActivity(activity)
+                .modelTimeouts(new ModelTimeoutPolicy(FIRST_TOKEN, IDLE, activity))
                 .faultNotifier(faultNotifier)
                 .build();
         session.setPersona(persona);

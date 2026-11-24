@@ -85,7 +85,7 @@ public class XiaoZhiToolCallingManager implements ToolCallingManager, Applicatio
      * 单次工具执行的等待上限。工具自身的超时（设备 MCP 30s、远端 MCP 60s）应当先于它触发，
      * 这里只兜住「工具压根不返回」的情况，保证调用线程一定能被释放。
      */
-    private static final Duration TOOL_CALL_TIMEOUT = Duration.ofSeconds(120);
+    public static final Duration TOOL_CALL_TIMEOUT = Duration.ofSeconds(120);
 
     /** 全进程同时在执行的工具数上限，防止工具阻塞时压垮设备通道与数据库连接池 */
     private static final int MAX_CONCURRENT_TOOL_CALLS = 128;

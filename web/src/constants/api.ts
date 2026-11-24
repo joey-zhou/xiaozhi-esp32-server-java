@@ -57,6 +57,12 @@ export const CHAT_IMAGE_MAX_EDGE = 2048
 export const CHAT_IMAGE_MAX_BYTES = 5 * 1024 * 1024
 
 /**
+ * 网页聊天流两次数据之间的最长间隔，超时中断整条流；须大于后端工具执行上限加模型静默超时
+ * 真源 XiaoZhiToolCallingManager.java TOOL_CALL_TIMEOUT（120s）、application-common.yml xiaozhi.llm.idle-timeout-seconds（90s）
+ */
+export const CHAT_STREAM_IDLE_TIMEOUT_MS = 240000
+
+/**
  * 防抖延迟（毫秒）
  */
 export const DEBOUNCE_DELAY = 500

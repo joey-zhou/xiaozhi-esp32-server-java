@@ -7,6 +7,7 @@ import com.xiaozhi.ai.llm.memory.ConversationContext;
 import com.xiaozhi.ai.llm.memory.ConversationFactory;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.ai.llm.memory.ToolChainPair;
+import com.xiaozhi.ai.tool.ToolCallActivityRegistry;
 import com.xiaozhi.common.model.ChatToken;
 import com.xiaozhi.common.model.bo.ChatImageBO;
 import com.xiaozhi.common.model.bo.RoleBO;
@@ -37,6 +38,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -61,6 +63,8 @@ public class TextChatService {
     private ConversationFactory conversationFactory;
     @Resource
     private VisionService visionService;
+    @Resource
+    private ModelTimeoutPolicy modelTimeoutPolicy;
 
     /**
      * 建立按 sessionId 加载历史与摘要的对话（新会话为空，续接会拉到历史）。
@@ -126,7 +130,9 @@ public class TextChatService {
                         addToolChain(conversation, pair, userInstant);
                     }
                     Prompt prompt = promptOf(conversation, direct);
-                    return toChatTokens(chatModel.stream(prompt).doOnNext(response -> {
+                    Flux<ChatResponse> responses = modelTimeoutPolicy.guard(chatModel.stream(prompt),
+                            ToolCallActivityRegistry.key(conversation.getOwnerId(), userInstant.toEpochMilli()));
+                    return toChatTokens(responses.doOnNext(response -> {
                         // 流式用量一般只在最后一块返回，只留带输入 token 的那块
                         Usage chunkUsage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
                         if (chunkUsage != null && chunkUsage.getPromptTokens() != null && chunkUsage.getPromptTokens() > 0) {
@@ -264,6 +270,9 @@ public class TextChatService {
     static String describeFailure(Throwable error) {
         String deepestMessage = null;
         for (Throwable t = error; t != null; t = t.getCause()) {
+            if (t instanceof TimeoutException) {
+                return "模型长时间没有响应，请稍后再试";
+            }
             if (t instanceof WebClientResponseException webError) {
                 return truncateFailureReason(
                         "HTTP " + webError.getStatusCode().value() + " " + webError.getResponseBodyAsString());

@@ -4,7 +4,6 @@ import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.bo.SummaryBO;
-import com.xiaozhi.common.port.ConfigLookup;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
@@ -44,14 +43,12 @@ public class DefaultConversationFactory implements ConversationFactory {
 
     private final ChatMemory chatMemory;
     private final ChatModelFactory chatModelFactory;
-    private final ConfigLookup configLookup;
     private final PromptTemplate initSummarizerTemplate = template("/prompts/init_summarizer.md");
     private final PromptTemplate againSummarizerTemplate = template("/prompts/again_summarizer.md");
 
-    public DefaultConversationFactory(ChatMemory chatMemory, ChatModelFactory chatModelFactory, ConfigLookup configLookup) {
+    public DefaultConversationFactory(ChatMemory chatMemory, ChatModelFactory chatModelFactory) {
         this.chatMemory = chatMemory;
         this.chatModelFactory = chatModelFactory;
-        this.configLookup = configLookup;
     }
 
     @Override
@@ -91,12 +88,12 @@ public class DefaultConversationFactory implements ConversationFactory {
                 .build();
     }
 
-    /** 角色所用模型配置里的上下文长度乘预算比例，没填按默认上下文长度算 */
+    /** 角色实际用的模型配置（停用时回退默认）的上下文长度乘预算比例，没填按默认上下文长度算 */
     int tokenBudget(RoleBO role) {
         int contextLength = defaultContextLength;
         if (role.getModelId() != null) {
-            ConfigBO config = configLookup.getConfig(role.getModelId());
-            if (config != null && config.getContextLength() != null && config.getContextLength() > 0) {
+            ConfigBO config = chatModelFactory.resolveConfig(role);
+            if (config.getContextLength() != null && config.getContextLength() > 0) {
                 contextLength = config.getContextLength();
             }
         }

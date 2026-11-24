@@ -32,6 +32,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
+import com.xiaozhi.ai.tool.ToolCallActivityRegistry;
+import org.mockito.Spy;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -40,6 +43,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -69,6 +73,10 @@ class TextChatServiceTest {
 
     @Mock
     private VisionService visionService;
+
+    @Spy
+    private ModelTimeoutPolicy modelTimeoutPolicy =
+            new ModelTimeoutPolicy(Duration.ofSeconds(30), Duration.ofSeconds(90), new ToolCallActivityRegistry());
 
     @InjectMocks
     private TextChatService textChatService;
@@ -217,6 +225,21 @@ class TextChatServiceTest {
         verify(chatModel, never()).stream(any(Prompt.class));
     }
 
+    /** 模型一直不出字就按超时结束，给用户看的是中文原因，这一轮不留在对话里 */
+    @Test
+    void aModelThatNeverAnswersTimesOut() {
+        ReflectionTestUtils.setField(textChatService, "modelTimeoutPolicy",
+                new ModelTimeoutPolicy(Duration.ofMillis(100), Duration.ofMillis(100), new ToolCallActivityRegistry()));
+        Conversation conversation = openConversation();
+        modelStreams(Flux.never());
+
+        List<ChatToken> tokens = textChatService
+                .streamTurn(conversation, role, "在吗", List.of(), LocalDateTime.now(), new RecordingCallback())
+                .collectList().block(Duration.ofSeconds(5));
+
+        assertThat(tokens).containsExactly(ChatToken.error("模型长时间没有响应，请稍后再试"));
+        assertThat(conversation.rawMessages()).isEmpty();
+    }
     /**
      * 助手消息的时间元数据必须和回调给落库的时间是同一个。
      * 没有时间元数据时摘要会拿「写摘要的时刻」当切点，重载历史时摘要之后到那一刻之间的消息全部丢失。

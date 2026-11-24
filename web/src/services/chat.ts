@@ -1,12 +1,10 @@
 import { API_BASE_URL, handleAuthExpired, http } from './request'
 import api from './api'
+import { CHAT_STREAM_IDLE_TIMEOUT_MS } from '@/constants/api'
 import { useUserStore } from '@/store/user'
 import type { ChatAttachment, ChatToken } from '@/types/chat'
 
 export type { ChatToken }
-
-/** 流式响应两次数据之间的最长间隔，超时中断整条流，避免后端挂起时输入框永久禁用 */
-const STREAM_IDLE_TIMEOUT_MS = 60000
 
 export interface ChatSessionOpened {
   sessionId: string
@@ -93,7 +91,7 @@ export async function* chatStream(
     if (idleTimer) clearTimeout(idleTimer)
     idleTimer = setTimeout(
       () => controller.abort(new Error('chat stream idle timeout')),
-      STREAM_IDLE_TIMEOUT_MS
+      CHAT_STREAM_IDLE_TIMEOUT_MS
     )
   }
 

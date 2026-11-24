@@ -4,7 +4,6 @@ import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.common.model.bo.SummaryBO;
-import com.xiaozhi.common.port.ConfigLookup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,8 +37,6 @@ class DefaultConversationFactoryTest {
     @Mock
     private ChatModelFactory chatModelFactory;
     @Mock
-    private ConfigLookup configLookup;
-    @Mock
     private ChatModel chatModel;
 
     private DefaultConversationFactory factory;
@@ -47,7 +44,7 @@ class DefaultConversationFactoryTest {
 
     @BeforeEach
     void setUp() {
-        factory = new DefaultConversationFactory(chatMemory, chatModelFactory, configLookup);
+        factory = new DefaultConversationFactory(chatMemory, chatModelFactory);
         ReflectionTestUtils.setField(factory, "maxMessages", 16);
         ReflectionTestUtils.setField(factory, "keepMessages", 8);
         ReflectionTestUtils.setField(factory, "contextBudgetRatio", 0.7);
@@ -87,14 +84,14 @@ class DefaultConversationFactoryTest {
         verify(chatMemory, never()).find(anyString(), anyInt(), anyInt());
     }
 
-    // 模型配置里填了上下文长度就按它的七成做预算，没填或填 0 按默认上下文长度算
+    // 按角色实际用的模型配置（停用时回退默认）的上下文长度做七成预算，没填或填 0 按默认上下文长度算
     @Test
     void tokenBudgetFollowsTheModelContextLength() {
         role.setModelId(5);
-        when(configLookup.getConfig(5)).thenReturn(new ConfigBO().setContextLength(131072));
+        when(chatModelFactory.resolveConfig(role)).thenReturn(new ConfigBO().setContextLength(131072));
         assertThat(factory.tokenBudget(role)).isEqualTo(91750);
 
-        when(configLookup.getConfig(5)).thenReturn(new ConfigBO());
+        when(chatModelFactory.resolveConfig(role)).thenReturn(new ConfigBO());
         assertThat(factory.tokenBudget(role)).isEqualTo(22938);
 
         role.setModelId(null);

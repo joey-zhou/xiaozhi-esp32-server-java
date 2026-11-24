@@ -15,7 +15,7 @@ import java.util.Map;
 public class ImageUploadPolicy {
 
     public static final long MAX_BYTES = 5 * 1024 * 1024;
-    private static final int MAX_DIMENSION = 4096;
+    public static final int MAX_DIMENSION = 4096;
     private static final long MAX_PIXELS = 4096L * 4096;
 
     private static final Map<String, byte[]> MAGICS = Map.of(

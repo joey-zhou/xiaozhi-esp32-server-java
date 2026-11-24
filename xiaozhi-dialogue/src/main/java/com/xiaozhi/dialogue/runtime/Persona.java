@@ -29,15 +29,14 @@ import org.springframework.ai.chat.model.MessageAggregator;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import com.xiaozhi.ai.llm.service.ModelTimeoutPolicy;
 import com.xiaozhi.ai.tool.ToolCallActivityRegistry;
 import com.xiaozhi.ai.tool.session.ToolSession;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.time.Instant;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -109,16 +108,8 @@ public class Persona {
     private Conversation conversation;
 
 
-    /** 模型迟迟不出第一个字就放弃，走兜底话术 */
-    @Builder.Default
-    private Duration firstTokenTimeout = Duration.ofSeconds(30);
-
-    /** 两次输出之间的最长静默；等工具结果的那段不算，见 {@link #modelSilence} */
-    @Builder.Default
-    private Duration idleTimeout = Duration.ofSeconds(90);
-
-    /** 工具执行进度，首字与静默超时据此把等工具的时间让出去；为 null 时不让 */
-    private ToolCallActivityRegistry toolCallActivity;
+    /** 模型首字与静默超时，超时走失败收尾与兜底话术；为 null 时不计时 */
+    private ModelTimeoutPolicy modelTimeouts;
 
     /** 模型失败时向它要一句提示，为空时不补 */
     private FaultNotifier faultNotifier;
@@ -212,10 +203,11 @@ public class Persona {
 
             // 连接层的读超时管不到「响应头已到、正文半途停吐」，只能在流上对两次输出之间计时；
             // 超时照常走下面的失败收尾与兜底话术，否则上游卡住时设备永远停在「思考中」
-            String activityKey = ToolCallActivityRegistry.key(conversation.getOwnerId(), turn.turnId);
-            Flux<ChatResponse> chatFlux = chatModel.stream(prompt)
-                .timeout(modelSilence(activityKey, firstTokenTimeout),
-                        response -> modelSilence(activityKey, idleTimeout))
+            Flux<ChatResponse> chatFlux = chatModel.stream(prompt);
+            if (modelTimeouts != null) {
+                chatFlux = modelTimeouts.guard(chatFlux, ToolCallActivityRegistry.key(conversation.getOwnerId(), turn.turnId));
+            }
+            chatFlux = chatFlux
                 .doOnError(error -> {
                     listener.onError(error);
                     failTurn(turn);
@@ -238,23 +230,6 @@ public class Persona {
             failTurn(turn);
             return Flux.error(e);
         }
-    }
-
-    /**
-     * 模型沉默满 limit 时发出。等工具结果的那段不算沉默：工具还在执行就整段顺延，
-     * 刚执行完就从结束那一刻重新起算；工具自己有执行上限，顺延是有界的
-     */
-    private Mono<Long> modelSilence(String activityKey, Duration limit) {
-        return modelSilence(activityKey, limit, limit);
-    }
-
-    private Mono<Long> modelSilence(String activityKey, Duration limit, Duration wait) {
-        return Mono.delay(wait).flatMap(tick -> {
-            Duration left = toolCallActivity == null
-                    ? Duration.ZERO
-                    : toolCallActivity.remainingQuiet(activityKey, limit);
-            return left.isZero() ? Mono.just(tick) : modelSilence(activityKey, limit, left);
-        });
     }
 
     /**

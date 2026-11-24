@@ -12,6 +12,7 @@ on:
       - 'repo/**'
       # 契约测试读的前端文件与发布流水线
       - 'web/src/composables/useRoleManager.ts'
+      - 'web/src/constants/api.ts'
       - '.github/workflows/docker.yml'
       - '.github/workflows/backend.yml'
   pull_request:
@@ -21,6 +22,7 @@ on:
       - 'repo/**'
       # 契约测试读的前端文件与发布流水线
       - 'web/src/composables/useRoleManager.ts'
+      - 'web/src/constants/api.ts'
       - '.github/workflows/docker.yml'
       - '.github/workflows/backend.yml'
   workflow_dispatch:
