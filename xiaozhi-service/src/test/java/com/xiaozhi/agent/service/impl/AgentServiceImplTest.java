@@ -4,6 +4,8 @@ import com.xiaozhi.agent.convert.AgentConvert;
 import com.xiaozhi.common.model.bo.AgentBO;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.PageResult;
+import com.xiaozhi.common.model.bo.PlatformAgentBO;
+import com.xiaozhi.common.port.AgentPlatformClient;
 import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.config.service.ConfigService;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +22,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -38,6 +41,9 @@ class AgentServiceImplTest {
 
     @Mock
     private ProviderTokenClient tokenClient;
+
+    @Mock
+    private AgentPlatformClient agentPlatformClient;
 
     @InjectMocks
     private AgentServiceImpl agentService;
@@ -187,5 +193,59 @@ class AgentServiceImplTest {
 
         // 刚配好平台凭据的场景：库里还没有智能体时不受节流限制，否则要等节流窗口过去才看得见
         verify(configService, times(2)).getPlatformCredential(1, "coze");
+    }
+
+    /** coze 平台上新发布的智能体补一条配置，名称与头像只进快照、随列表返回 */
+    @Test
+    void newCozeBotsAreStoredAndShownWithTheirPlatformNames() {
+        ConfigBO stored = new ConfigBO().setConfigId(3).setConfigName("bot-1").setConfigType("llm").setProvider("coze");
+        when(configService.listBO(1, "llm", "coze", null, null, ConfigBO.STATE_ENABLED))
+            .thenReturn(List.of(), List.of(), List.of(stored));
+        ConfigBO credential = new ConfigBO().setApiSecret("space-1");
+        when(configService.getPlatformCredential(1, "coze")).thenReturn(credential);
+        when(tokenClient.getToken(credential)).thenReturn("tk");
+        when(agentPlatformClient.listCozeBots("space-1", "tk")).thenReturn(List.of(
+            new PlatformAgentBO("bot-1", "售后客服", "处理退换货", "https://icon", null)));
+
+        PageResult<AgentBO> result = agentService.page(1, 10, "coze", null, 1);
+
+        verify(configService).saveAgentModel(argThat(model ->
+            "bot-1".equals(model.getConfigName()) && "处理退换货".equals(model.getConfigDesc())));
+        assertThat(result.getList()).singleElement().satisfies(agent -> {
+            assertThat(agent.getAgentName()).isEqualTo("售后客服");
+            assertThat(agent.getIconUrl()).isEqualTo("https://icon");
+        });
+    }
+
+    /** 平台没答复时照常返回库里已有的智能体，不报错 */
+    @Test
+    void anUnreachablePlatformStillListsWhatIsStored() {
+        ConfigBO stored = new ConfigBO().setConfigId(3).setConfigName("bot-1").setConfigType("llm").setProvider("coze");
+        when(configService.listBO(1, "llm", "coze", null, null, ConfigBO.STATE_ENABLED)).thenReturn(List.of(stored));
+        ConfigBO credential = new ConfigBO().setApiSecret("space-1");
+        when(configService.getPlatformCredential(1, "coze")).thenReturn(credential);
+        when(tokenClient.getToken(credential)).thenReturn("tk");
+        when(agentPlatformClient.listCozeBots("space-1", "tk")).thenThrow(new IllegalStateException("HTTP 502"));
+
+        PageResult<AgentBO> result = agentService.page(1, 10, "coze", null, 1);
+
+        assertThat(result.getList()).extracting(AgentBO::getBotId).containsExactly("bot-1");
+        verify(configService, never()).saveAgentModel(any());
+    }
+
+    /** dify 一份凭据一个智能体：按平台给的名称与描述落一条配置 */
+    @Test
+    void aDifyCredentialBecomesAnAgent() {
+        ConfigBO credential = new ConfigBO().setConfigId(7).setConfigType("agent").setProvider("dify")
+            .setApiKey("app-key").setApiUrl("https://dify/v1");
+        when(configService.listBO(1, "llm", "dify", null, null, ConfigBO.STATE_ENABLED)).thenReturn(List.of());
+        when(configService.listBO(1, null, "dify", null, null, ConfigBO.STATE_ENABLED)).thenReturn(List.of(credential));
+        when(agentPlatformClient.difyInfo("https://dify/v1", "app-key"))
+            .thenReturn(new PlatformAgentBO(null, "客服助手", "售后问答", null, null));
+
+        agentService.page(1, 10, "dify", null, 1);
+
+        verify(configService).saveAgentModel(argThat(model -> "客服助手".equals(model.getConfigName())
+            && "售后问答".equals(model.getConfigDesc()) && "app-key".equals(model.getApiKey())));
     }
 }

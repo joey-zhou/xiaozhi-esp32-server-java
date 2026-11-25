@@ -1,27 +1,21 @@
 package com.xiaozhi.agent.service.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaozhi.agent.AgentProviders;
 import com.xiaozhi.agent.convert.AgentConvert;
 import com.xiaozhi.agent.service.AgentService;
 import com.xiaozhi.common.model.bo.AgentBO;
 import com.xiaozhi.common.model.bo.ConfigBO;
+import com.xiaozhi.common.model.bo.PlatformAgentBO;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.config.service.ConfigService;
+import com.xiaozhi.common.port.AgentPlatformClient;
 import com.xiaozhi.common.port.ProviderTokenClient;
 import com.xiaozhi.utils.DateUtils;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -74,9 +68,6 @@ public class AgentServiceImpl implements AgentService {
     /** 列表接口等同步的上限。平台变慢时宁可这一轮少几个平台侧字段，也不能让列表接口跟着卡住 */
     private static final Duration SYNC_WAIT_BUDGET = Duration.ofSeconds(3);
 
-    /** 第三方平台单次请求的整体超时，超时抛 HttpTimeoutException 由各分支降级。 */
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
-
     private static final ExecutorService SYNC_EXECUTOR = Executors.newThreadPerTaskExecutor(
         Thread.ofVirtual().name("agent-sync-", 0).factory());
 
@@ -89,16 +80,14 @@ public class AgentServiceImpl implements AgentService {
     @Resource
     private AgentConvert agentConvert;
 
+    @Resource
+    private AgentPlatformClient agentPlatformClient;
+
     /** userId:provider -> 上次向平台同步的时刻（毫秒） */
     private final Map<String, Long> lastSyncAt = new ConcurrentHashMap<>();
 
     /** userId:provider -> 上一轮同步拿到的平台侧字段，键是 botId(coze) 或 apiKey(dify、xingchen) */
     private final Map<String, Map<String, RemoteAgent>> remoteSnapshots = new ConcurrentHashMap<>();
-
-    private final HttpClient httpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(10))
-        .build();
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** 平台侧才有、sys_config 没有列可存的字段 */
     private record RemoteAgent(String name, String iconUrl, LocalDateTime publishTime) {}
@@ -267,24 +256,25 @@ public class AgentServiceImpl implements AgentService {
         String apiKey = credential.getApiKey();
         String apiUrl = credential.getApiUrl();
         try {
-            JsonNode info = fetchDifyNode(apiUrl, "/info", apiKey);
-            if (info == null) {
-                return;
-            }
+            PlatformAgentBO info = agentPlatformClient.difyInfo(apiUrl, apiKey);
             configService.saveAgentModel(new ConfigBO()
                 .setUserId(userId)
                 .setProvider(PROVIDER_DIFY)
                 .setApiKey(apiKey)
                 .setApiUrl(apiUrl)
-                .setConfigName(info.has("name") ? info.get("name").asText() : DIFY_DEFAULT_NAME)
-                .setConfigDesc(info.has("description") ? info.get("description").asText() : ""));
-
-            String iconUrl = fetchDifyIcon(apiUrl, apiKey);
+                .setConfigName(StringUtils.hasText(info.name()) ? info.name() : DIFY_DEFAULT_NAME)
+                .setConfigDesc(info.description() == null ? "" : info.description()));
+        } catch (RuntimeException e) {
+            log.warn("同步DIFY智能体配置失败，configId={}", credential.getConfigId(), e);
+            return;
+        }
+        try {
+            String iconUrl = agentPlatformClient.difyIcon(apiUrl, apiKey);
             if (StringUtils.hasText(iconUrl)) {
                 snapshot.put(apiKey, new RemoteAgent(null, iconUrl, null));
             }
         } catch (RuntimeException e) {
-            log.warn("同步DIFY智能体配置失败，configId={}", credential.getConfigId(), e);
+            log.warn("查询DIFY智能体头像失败，configId={}", credential.getConfigId(), e);
         }
     }
 
@@ -343,8 +333,11 @@ public class AgentServiceImpl implements AgentService {
             throw new RuntimeException("无法获取Coze平台授权码，请检查您的平台配置是否正确", e);
         }
 
-        JsonNode bots = fetchCozeBots(credential.getApiSecret(), token);
-        if (bots == null) {
+        List<PlatformAgentBO> bots;
+        try {
+            bots = agentPlatformClient.listCozeBots(credential.getApiSecret(), token);
+        } catch (RuntimeException e) {
+            log.error("查询Coze智能体列表失败", e);
             return null;
         }
 
@@ -357,16 +350,13 @@ public class AgentServiceImpl implements AgentService {
         }
 
         Map<String, RemoteAgent> snapshot = new HashMap<>();
-        for (JsonNode botNode : bots) {
-            String botId = botNode.path("bot_id").asText();
+        for (PlatformAgentBO bot : bots) {
+            String botId = bot.id();
             if (!StringUtils.hasText(botId)) {
                 continue;
             }
-            String description = botNode.path("description").asText();
-            snapshot.put(botId, new RemoteAgent(
-                botNode.path("bot_name").asText(),
-                botNode.path("icon_url").asText(),
-                publishTimeOf(botNode)));
+            String description = bot.description();
+            snapshot.put(botId, new RemoteAgent(bot.name(), bot.iconUrl(), bot.publishTime()));
 
             ConfigBO stored = storedByBotId.get(botId);
             try {
@@ -389,89 +379,8 @@ public class AgentServiceImpl implements AgentService {
         return snapshot;
     }
 
-    /** 平台已发布智能体的节点数组，失败返回 null，本轮沿用库里已有的内容 */
-    private JsonNode fetchCozeBots(String spaceId, String token) {
-        try {
-            HttpResponse<String> response = httpClient.send(HttpRequest.newBuilder()
-                    .uri(URI.create("https://api.coze.cn/v1/space/published_bots_list?space_id=" + spaceId))
-                    .header("Authorization", "Bearer " + token)
-                    .header("Content-Type", "application/json")
-                    .timeout(REQUEST_TIMEOUT)
-                    .GET()
-                    .build(),
-                HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                log.error("查询Coze智能体列表失败，HTTP {}", response.statusCode());
-                return null;
-            }
-
-            JsonNode rootNode = objectMapper.readTree(response.body());
-            if (!rootNode.has("code") || rootNode.get("code").asInt() != 0) {
-                log.error("查询Coze智能体列表失败：{}",
-                    rootNode.has("msg") ? rootNode.get("msg").asText() : "未知错误");
-                return null;
-            }
-            return rootNode.path("data").path("space_bots");
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("查询Coze智能体列表异常", e);
-            return null;
-        } catch (IOException e) {
-            log.error("查询Coze智能体列表异常", e);
-            return null;
-        }
-    }
-
-    /** coze 的发布时间是秒级时间戳，缺失或非法时留空，由配置的创建时间兜底 */
-    private static LocalDateTime publishTimeOf(JsonNode botNode) {
-        String publishTime = botNode.path("publish_time").asText();
-        if (!StringUtils.hasText(publishTime)) {
-            return null;
-        }
-        try {
-            return DateUtils.toDateTime(Instant.ofEpochSecond(Long.parseLong(publishTime)));
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
     /** 文本比较，null 与空串视为相同。 */
     private static boolean sameText(String left, String right) {
         return Objects.equals(left == null ? "" : left, right == null ? "" : right);
-    }
-
-    /** dify 的应用信息接口，失败返回 null */
-    private JsonNode fetchDifyNode(String apiUrl, String path, String apiKey) {
-        try {
-            HttpResponse<String> response = httpClient.send(HttpRequest.newBuilder()
-                    .uri(URI.create(apiUrl + path))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("Content-Type", "application/json")
-                    .timeout(REQUEST_TIMEOUT)
-                    .GET()
-                    .build(),
-                HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                log.error("查询DIFY{}失败，HTTP {}", path, response.statusCode());
-                return null;
-            }
-            return objectMapper.readTree(response.body());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("查询DIFY{}异常", path, e);
-            return null;
-        } catch (IOException e) {
-            log.error("查询DIFY{}异常", path, e);
-            return null;
-        }
-    }
-
-    private String fetchDifyIcon(String apiUrl, String apiKey) {
-        JsonNode metaNode = fetchDifyNode(apiUrl, "/meta", apiKey);
-        if (metaNode == null) {
-            return null;
-        }
-        JsonNode apiTool = metaNode.path("tool_icons").path("api_tool");
-        return apiTool.has("content") ? apiTool.get("content").asText() : null;
     }
 }
