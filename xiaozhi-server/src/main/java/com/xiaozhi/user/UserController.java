@@ -7,8 +7,6 @@ import cn.dev33.satoken.annotation.SaIgnore;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
-import com.google.gson.Gson;
-import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.req.UserCheckReq;
 import com.xiaozhi.common.model.req.UserLoginReq;
 import com.xiaozhi.common.model.req.UserPageReq;
@@ -24,19 +22,14 @@ import com.xiaozhi.common.model.resp.UserResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.user.service.UserService;
-import com.xiaozhi.user.service.WxLoginService;
 import com.xiaozhi.verifycode.VerifyCodeAppService;
-import com.xiaozhi.verifycode.service.VerifyCodeService;
 import com.xiaozhi.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user")
@@ -48,12 +41,6 @@ public class UserController extends BaseController {
 
     @Resource
     private UserService userService;
-
-    @Resource
-    private WxLoginService wxLoginService;
-
-    @Resource
-    private VerifyCodeService verifyCodeService;
 
     @Resource
     private VerifyCodeAppService verifyCodeAppService;
@@ -85,12 +72,8 @@ public class UserController extends BaseController {
     @AuditLog(module = "用户管理", operation = "用户登录")
     @Operation(summary = "用户名密码登录", description = "使用用户名/邮箱/手机号和密码进行登录")
     public ApiResponse<LoginResp> login(@Valid @RequestBody UserLoginReq req, HttpServletRequest request) {
-        UserBO user = userAppService.login(req.getUsername(), req.getPassword());
-        userAppService.recordLoginInfo(user.getUserId(), trustedProxyPolicy.resolveClientIp(request));
-
-        int expireSeconds = userAppService.getTokenExpireSeconds();
-        StpUtil.login(user.getUserId(), expireSeconds);
-        return ApiResponse.success(requireLoginResp(user.getUserId(), false));
+        return ApiResponse.success(userAppService.signIn(req.getUsername(), req.getPassword(),
+                trustedProxyPolicy.resolveClientIp(request)));
     }
 
     @SaIgnore
@@ -98,17 +81,8 @@ public class UserController extends BaseController {
     @AuditLog(module = "用户管理", operation = "手机号登录")
     @Operation(summary = "手机号验证码登录", description = "使用手机号和验证码登录，未注册自动注册")
     public ApiResponse<LoginResp> telLogin(@Valid @RequestBody UserTelLoginReq req, HttpServletRequest request) {
-        if (!verifyCodeService.consumeByAccount(req.getTel(), req.getCode())) {
-            throw new IllegalArgumentException("验证码错误或已过期");
-        }
-
-        UserBO user = userAppService.loginByTel(req.getTel());
-
-        userAppService.recordLoginInfo(user.getUserId(), trustedProxyPolicy.resolveClientIp(request));
-
-        int expireSeconds = userAppService.getTokenExpireSeconds();
-        StpUtil.login(user.getUserId(), expireSeconds);
-        return ApiResponse.success(requireLoginResp(user.getUserId(), false));
+        return ApiResponse.success(userAppService.signInByTel(req.getTel(), req.getCode(),
+                trustedProxyPolicy.resolveClientIp(request)));
     }
 
     @SaIgnore
@@ -117,22 +91,7 @@ public class UserController extends BaseController {
     @AuditLog(module = "用户管理", operation = "微信登录")
     @Operation(summary = "微信登录", description = "使用微信 code 登录，未注册自动注册")
     public ApiResponse<LoginResp> wxLogin(@Valid @RequestBody UserWechatLoginReq req, HttpServletRequest request) {
-        Map<String, String> wxLoginInfo = wxLoginService.getWxLoginInfo(req.getCode());
-        String openId = wxLoginInfo.get("openid");
-        String unionId = wxLoginInfo.get("unionid");
-        if (!StringUtils.hasText(openId)) {
-            throw new IllegalStateException("获取微信openid失败");
-        }
-
-        UserAppService.WechatLogin result =
-                userAppService.loginByWechat(openId, unionId, new Gson().toJson(wxLoginInfo));
-        UserBO user = result.user();
-
-        userAppService.recordLoginInfo(user.getUserId(), trustedProxyPolicy.resolveClientIp(request));
-
-        int expireSeconds = userAppService.getTokenExpireSeconds();
-        StpUtil.login(user.getUserId(), expireSeconds);
-        return ApiResponse.success(requireLoginResp(user.getUserId(), result.newUser()));
+        return ApiResponse.success(userAppService.signInByWechat(req.getCode(), trustedProxyPolicy.resolveClientIp(request)));
     }
 
     @SaIgnore
@@ -166,14 +125,7 @@ public class UserController extends BaseController {
     @AuditLog(module = "用户管理", operation = "启用禁用账号")
     @Operation(summary = "启用/禁用账号", description = "state 取 1-正常、0-禁用；禁用后该账号已签发的 Token 立即失效")
     public ApiResponse<UserResp> updateState(@PathVariable Integer userId, @RequestParam String state) {
-        if (UserBO.STATE_DISABLED.equals(state) && CurrentUser.id() == userId.intValue()) {
-            throw new IllegalArgumentException("不能禁用当前登录账号");
-        }
-        UserResp updated = userAppService.updateState(userId, state);
-        if (UserBO.STATE_DISABLED.equals(state)) {
-            StpUtil.logout(userId);
-        }
-        return ApiResponse.success(updated);
+        return ApiResponse.success(userAppService.changeState(CurrentUser.id(), userId, state));
     }
 
     @SaIgnore
@@ -206,22 +158,7 @@ public class UserController extends BaseController {
     @ResponseBody
     @Operation(summary = "检查用户名和手机号是否已存在", description = "返回检查结果")
     public ApiResponse<Void> checkUser(@Valid UserCheckReq req) {
-        // 三个字段共用一句提示：分字段报「手机已注册」「邮箱已注册」「用户名已存在」等于逐字段确认注册状态，
-        // 这个端点匿名可调，会被用来枚举平台已注册的手机号/邮箱/用户名
-        boolean taken = (StringUtils.hasText(req.getTel()) && userService.getByTel(req.getTel()) != null)
-                || (StringUtils.hasText(req.getEmail()) && userService.getByEmail(req.getEmail()) != null)
-                || (StringUtils.hasText(req.getUsername()) && userService.getByUsername(req.getUsername()) != null);
-        if (taken) {
-            throw new IllegalStateException("该手机号、邮箱或用户名已被注册");
-        }
+        userService.requireUnregistered(req.getTel(), req.getEmail(), req.getUsername());
         return ApiResponse.success();
-    }
-
-    private LoginResp requireLoginResp(Integer userId, boolean isNewUser) {
-        LoginResp response = userAppService.buildLoginResp(userId, StpUtil.getTokenValue(), isNewUser);
-        if (response == null) {
-            throw new IllegalStateException("登录成功但用户信息加载失败");
-        }
-        return response;
     }
 }

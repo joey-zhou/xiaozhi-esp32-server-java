@@ -34,6 +34,8 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
 
 /**
  * 钉住建号时的默认值补齐（启用状态、非管理员、后台权限角色）与唯一性校验：
@@ -219,4 +221,15 @@ class UserServiceImplTest {
         assertThat(userService.isAdmin(null)).isFalse();
     }
 
+    /** 匿名可调的注册检查：任一项已注册都说同一句话 */
+    @Test
+    void anyRegisteredFieldIsReportedTheSameWay() {
+        UserServiceImpl service = spy(userService);
+        doReturn(new UserBO()).when(service).getByEmail("a@b.com");
+
+        assertThatThrownBy(() -> service.requireUnregistered(null, "a@b.com", null))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("该手机号、邮箱或用户名已被注册");
+        service.requireUnregistered(null, null, null);
+    }
 }

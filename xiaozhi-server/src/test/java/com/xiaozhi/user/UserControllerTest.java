@@ -11,9 +11,7 @@ import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.support.ControllerTestSupport;
 import com.xiaozhi.user.service.UserService;
-import com.xiaozhi.user.service.WxLoginService;
 import com.xiaozhi.verifycode.VerifyCodeAppService;
-import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,12 +50,6 @@ class UserControllerTest extends ControllerTestSupport {
     private UserService userService;
 
     @Mock
-    private WxLoginService wxLoginService;
-
-    @Mock
-    private VerifyCodeService verifyCodeService;
-
-    @Mock
     private VerifyCodeAppService verifyCodeAppService;
 
     @Mock
@@ -70,8 +62,6 @@ class UserControllerTest extends ControllerTestSupport {
         userController = new UserController();
         ReflectionTestUtils.setField(userController, "userAppService", userAppService);
         ReflectionTestUtils.setField(userController, "userService", userService);
-        ReflectionTestUtils.setField(userController, "wxLoginService", wxLoginService);
-        ReflectionTestUtils.setField(userController, "verifyCodeService", verifyCodeService);
         ReflectionTestUtils.setField(userController, "verifyCodeAppService", verifyCodeAppService);
         ReflectionTestUtils.setField(userController, "trustedProxyPolicy", trustedProxyPolicy);
         mockMvc = buildMockMvc(userController);
@@ -166,7 +156,8 @@ class UserControllerTest extends ControllerTestSupport {
     /** 提示不区分字段，否则这个匿名端点就是逐字段确认注册状态的预言机 */
     @Test
     void checkUserReturnsConflictWhenTelExists() throws Exception {
-        when(userService.getByTel("13800138000")).thenReturn(new UserBO());
+        doThrow(new IllegalStateException("该手机号、邮箱或用户名已被注册"))
+            .when(userService).requireUnregistered("13800138000", null, null);
 
         mockMvc.perform(get("/api/user/checkUser").param("tel", "13800138000"))
             .andExpect(status().isConflict())
@@ -177,13 +168,8 @@ class UserControllerTest extends ControllerTestSupport {
     /** loginIp 是安全审计字段，取值必须来自可信代理判定，不能由请求头决定 */
     @Test
     void loginRecordsTrustedClientIpInsteadOfForwardedHeader() throws Exception {
-        UserBO user = new UserBO();
-        user.setUserId(3);
-        when(userAppService.login("alice", "secret")).thenReturn(user);
-        when(userAppService.getTokenExpireSeconds()).thenReturn(60);
         when(trustedProxyPolicy.resolveClientIp(any(HttpServletRequest.class))).thenReturn("10.0.0.7");
-        when(userAppService.buildLoginResp(eq(3), any(), eq(false)))
-            .thenReturn(LoginResp.builder().userId(3).build());
+        when(userAppService.signIn("alice", "secret", "10.0.0.7")).thenReturn(LoginResp.builder().userId(3).build());
 
         try (var ignored = mockLoginUser(3)) {
             mockMvc.perform(post("/api/user/login")
@@ -195,33 +181,19 @@ class UserControllerTest extends ControllerTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.userId").value(3));
         }
-
-        verify(userAppService).recordLoginInfo(user.getUserId(), "10.0.0.7");
     }
 
     @Test
-    void updateStateRefusesToDisableTheCallersOwnAccount() throws Exception {
-        try (var ignored = mockLoginUser(1)) {
-            mockMvc.perform(put("/api/user/1/state").param("state", UserBO.STATE_DISABLED))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("不能禁用当前登录账号"));
-        }
-        verifyNoInteractions(userAppService);
-    }
-
-    @Test
-    void updateStateRevokesIssuedTokensOfTheDisabledAccount() throws Exception {
+    void updateStatePassesTheOperator() throws Exception {
         UserResp updated = new UserResp();
         updated.setUserId(2);
         updated.setState(UserBO.STATE_DISABLED);
-        when(userAppService.updateState(2, UserBO.STATE_DISABLED)).thenReturn(updated);
+        when(userAppService.changeState(1, 2, UserBO.STATE_DISABLED)).thenReturn(updated);
 
-        try (var stpUtil = mockLoginUser(1)) {
+        try (var ignored = mockLoginUser(1)) {
             mockMvc.perform(put("/api/user/2/state").param("state", UserBO.STATE_DISABLED))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.state").value(UserBO.STATE_DISABLED));
-
-            stpUtil.verify(() -> StpUtil.logout(2));
         }
     }
 

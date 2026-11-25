@@ -203,4 +203,14 @@ public class UserServiceImpl implements UserService {
             throw new UnauthorizedException("账号已被禁用");
         }
     }
+
+    @Override
+    public void requireUnregistered(String tel, String email, String username) {
+        boolean taken = (StringUtils.hasText(tel) && getByTel(tel) != null)
+                || (StringUtils.hasText(email) && getByEmail(email) != null)
+                || (StringUtils.hasText(username) && getByUsername(username) != null);
+        if (taken) {
+            throw new IllegalStateException("该手机号、邮箱或用户名已被注册");
+        }
+    }
 }

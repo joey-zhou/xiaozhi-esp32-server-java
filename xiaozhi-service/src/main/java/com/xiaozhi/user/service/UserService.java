@@ -34,4 +34,9 @@ public interface UserService {
 
     /** 账号 state 为禁用时抛 UnauthorizedException，user 为 null 时不判断。 */
     void requireEnabled(UserBO user);
+
+    /**
+     * 手机号、邮箱、用户名有一项已被注册就抛 IllegalStateException；三项共用一句提示，分开报等于逐项确认注册状态
+     */
+    void requireUnregistered(String tel, String email, String username);
 }

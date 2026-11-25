@@ -1,5 +1,6 @@
 package com.xiaozhi.user;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.authrole.convert.AuthRoleConvert;
 import com.xiaozhi.authrole.service.AuthRoleService;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
@@ -24,14 +25,20 @@ import com.xiaozhi.template.service.TemplateService;
 import com.xiaozhi.user.convert.UserConvert;
 import com.xiaozhi.user.service.UserService;
 import com.xiaozhi.userauth.service.UserAuthService;
+import com.xiaozhi.user.service.WxLoginService;
 import com.xiaozhi.utils.DateUtils;
+import com.xiaozhi.utils.JsonUtil;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -94,6 +101,14 @@ public class UserAppService {
 
     @Resource
     private PermissionConvert permissionConvert;
+
+    @Resource
+    private WxLoginService wxLoginService;
+
+    /** 登录编排里调建号的事务方法要走代理 */
+    @Lazy
+    @Autowired
+    private UserAppService self;
 
     // ==================== 查询 ====================
 
@@ -185,6 +200,41 @@ public class UserAppService {
     }
 
     // ==================== 登录 ====================
+
+    /** 用户名、邮箱或手机号加密码登录 */
+    public LoginResp signIn(String username, String password, String clientIp) {
+        return signIn(login(username, password), false, clientIp);
+    }
+
+    /** 手机号验证码登录，未注册自动建号 */
+    public LoginResp signInByTel(String tel, String code, String clientIp) {
+        if (!verifyCodeService.consumeByAccount(tel, code)) {
+            throw new IllegalArgumentException("验证码错误或已过期");
+        }
+        return signIn(self.loginByTel(tel), false, clientIp);
+    }
+
+    /** 微信登录，未注册自动建号 */
+    public LoginResp signInByWechat(String code, String clientIp) {
+        Map<String, String> info = wxLoginService.getWxLoginInfo(code);
+        String openId = info.get("openid");
+        if (!StringUtils.hasText(openId)) {
+            throw new IllegalStateException("获取微信openid失败");
+        }
+        WechatLogin result = self.loginByWechat(openId, info.get("unionid"), JsonUtil.toJson(info));
+        return signIn(result.user(), result.newUser(), clientIp);
+    }
+
+    /** 记登录信息、签发 token、组装出参 */
+    private LoginResp signIn(UserBO user, boolean newUser, String clientIp) {
+        userService.recordLogin(user.getUserId(), clientIp);
+        StpUtil.login(user.getUserId(), TOKEN_EXPIRE_SECONDS);
+        LoginResp resp = buildLoginResp(user.getUserId(), StpUtil.getTokenValue(), newUser);
+        if (resp == null) {
+            throw new IllegalStateException("登录成功但用户信息加载失败");
+        }
+        return resp;
+    }
 
     /**
      * 登录口不暴露账号是否存在：账号不存在与密码不对说同一句话，不存在时也拿一份假密文跑一次校验，
@@ -282,6 +332,18 @@ public class UserAppService {
     public record WechatLogin(UserBO user, boolean newUser) {
     }
 
+    /** 启用或禁用账号；不能禁用自己，禁用后该账号已签发的 token 立即失效 */
+    public UserResp changeState(Integer operatorId, Integer userId, String state) {
+        if (UserBO.STATE_DISABLED.equals(state) && Objects.equals(operatorId, userId)) {
+            throw new IllegalArgumentException("不能禁用当前登录账号");
+        }
+        UserResp updated = self.updateState(userId, state);
+        if (UserBO.STATE_DISABLED.equals(state)) {
+            StpUtil.logout(userId);
+        }
+        return updated;
+    }
+
     /**
      * 启用或禁用账号，state 取 UserBO.STATE_ENABLED / STATE_DISABLED
      */
@@ -299,10 +361,6 @@ public class UserAppService {
         update.setUserId(userId);
         update.setState(state);
         return userConvert.toResp(userService.update(update));
-    }
-
-    public void recordLoginInfo(Integer userId, String loginIp) {
-        userService.recordLogin(userId, loginIp);
     }
 
     public LoginResp buildLoginResp(Integer userId, String token, boolean isNewUser) {
@@ -325,9 +383,5 @@ public class UserAppService {
             .authRole(authRoleResp)
             .permissions(permissionResp)
             .build();
-    }
-
-    public int getTokenExpireSeconds() {
-        return TOKEN_EXPIRE_SECONDS;
     }
 }
