@@ -3852,6 +3852,57 @@
             ]
         },
         {
+            "name": "WorldRouter",
+            "logo": "",
+            "tags": "LLM,IMAGE2TEXT",
+            "status": "1",
+            "url": "https://inference-api.worldrouter.ai/v1",
+            "llm": [
+                {
+                    "llm_name": "deepseek-v4-flash",
+                    "tags": "LLM,CHAT,1M",
+                    "max_tokens": 1048576,
+                    "model_type": "chat",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "gemini-4-neon",
+                    "tags": "LLM,CHAT,IMAGE2TEXT,1M",
+                    "max_tokens": 1048576,
+                    "model_type": "image2text",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "claude-sonnet-5-5",
+                    "tags": "LLM,CHAT,IMAGE2TEXT,1M",
+                    "max_tokens": 1048576,
+                    "model_type": "image2text",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "claude-haiku-5-5",
+                    "tags": "LLM,CHAT,IMAGE2TEXT,1M",
+                    "max_tokens": 1048576,
+                    "model_type": "image2text",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "gpt-5.4-mini",
+                    "tags": "LLM,CHAT,IMAGE2TEXT,400K",
+                    "max_tokens": 409600,
+                    "model_type": "image2text",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "glm-5.3",
+                    "tags": "LLM,CHAT,1M",
+                    "max_tokens": 1048576,
+                    "model_type": "chat",
+                    "is_tools": true
+                }
+            ]
+        },
+        {
             "name": "Replicate",
             "logo": "",
             "tags": "LLM,TEXT EMBEDDING",
