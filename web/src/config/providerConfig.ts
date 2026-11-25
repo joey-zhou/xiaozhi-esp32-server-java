@@ -661,6 +661,28 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           help: 'config.help.llmRuncrateApiUrl'
         }
       ],
+      // TeamoRouter
+      'TeamoRouter': [
+        {
+          name: 'apiKey',
+          label: 'API Key',
+          required: true,
+          inputType: 'password',
+          placeholder: 'sk-...',
+          span: 12,
+          help: 'config.help.llmTeamoRouterApiKey'
+        },
+        {
+          name: 'apiUrl',
+          label: 'API URL',
+          required: true,
+          inputType: 'text',
+          placeholder: 'https://api.teamorouter.com/v1',
+          span: 12,
+          suffix: '/chat/completions',
+          help: 'config.help.llmTeamoRouterApiUrl'
+        }
+      ],
       // Replicate
       'Replicate': [
         {

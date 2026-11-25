@@ -563,6 +563,8 @@ export default {
       llmReplicateApiUrl: 'Replicate API 接口地址',
       llmRuncrateApiKey: '在 https://www.runcrate.ai/dashboard/api-keys 申请',
       llmRuncrateApiUrl: 'Runcrate API 接口地址',
+      llmTeamoRouterApiKey: '在 https://teamorouter.com/dashboard?tab=api-keys 申请',
+      llmTeamoRouterApiUrl: 'TeamoRouter API 接口地址',
       llmSILICONFLOWApiKey: '在 https://cloud.siliconflow.cn/account/ak 申请',
       llmStepFunApiKey: '在 StepFun 平台申请',
       llmStepFunApiUrl: 'StepFun API 接口地址',

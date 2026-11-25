@@ -563,6 +563,8 @@ export default {
       llmReplicateApiUrl: 'Replicate API endpoint',
       llmRuncrateApiKey: 'Apply at https://www.runcrate.ai/dashboard/api-keys',
       llmRuncrateApiUrl: 'Runcrate API endpoint',
+      llmTeamoRouterApiKey: 'Apply at https://teamorouter.com/dashboard?tab=api-keys',
+      llmTeamoRouterApiUrl: 'TeamoRouter API endpoint',
       llmSILICONFLOWApiKey: 'Apply at https://cloud.siliconflow.cn/account/ak',
       llmStepFunApiKey: 'Apply on the StepFun platform',
       llmStepFunApiUrl: 'StepFun API endpoint',
