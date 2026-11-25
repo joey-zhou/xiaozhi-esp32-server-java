@@ -54,7 +54,7 @@ public class TtsServiceFactory {
     @Resource
     private ConfigService configService;
     // 默认服务提供商名称
-    private static final String DEFAULT_PROVIDER = "edge";
+    public static final String DEFAULT_PROVIDER = "edge";
 
     // 默认 EDGE TTS 服务默认语音名称
     private static final String DEFAULT_VOICE = "zh-CN-XiaoyiNeural";

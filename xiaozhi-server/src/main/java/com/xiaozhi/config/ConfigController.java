@@ -3,6 +3,7 @@ package com.xiaozhi.config;
 import com.xiaozhi.server.web.BaseController;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaMode;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.bo.ConfigProbeResultBO;
@@ -100,7 +101,7 @@ public class ConfigController extends BaseController {
      */
     @PostMapping("/test")
     @ResponseBody
-    @SaCheckPermission("system:config:api:list")
+    @SaCheckPermission(value = {"system:config:api:create", "system:config:api:update"}, mode = SaMode.OR)
     @CheckOwner(resource = "config", id = "#req.configId")
     @Operation(summary = "测试配置", description = "使用当前表单参数测试模型配置是否可用")
     public ApiResponse<Void> test(@Valid @RequestBody ConfigTestReq req) {

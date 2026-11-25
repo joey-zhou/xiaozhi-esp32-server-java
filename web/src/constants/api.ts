@@ -63,6 +63,12 @@ export const CHAT_IMAGE_MAX_BYTES = 5 * 1024 * 1024
 export const CHAT_STREAM_IDLE_TIMEOUT_MS = 240000
 
 /**
+ * 音色试听会调第三方合成（计费），要有角色的新建或修改权限
+ * 真源 RoleController.java testAudio 的 @SaCheckPermission
+ */
+export const VOICE_PREVIEW_PERMISSIONS = ['system:role:api:create', 'system:role:api:update']
+
+/**
  * 防抖延迟（毫秒）
  */
 export const DEBOUNCE_DELAY = 500

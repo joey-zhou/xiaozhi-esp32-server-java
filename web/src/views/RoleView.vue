@@ -29,6 +29,7 @@ import type { ModelOption, PromptTemplate, Role, RoleDefaults, RoleFormData } fr
 import type { TableColumnsType } from 'ant-design-vue'
 import TableActionButtons from '@/components/TableActionButtons.vue'
 import TableEmptyState from '@/components/TableEmptyState.vue'
+import { VOICE_PREVIEW_PERMISSIONS } from '@/constants/api'
 
 const { t } = useI18n()
 const { getAvatarUrl } = useAvatar()
@@ -1179,7 +1180,7 @@ Promise.all([
                         <a-tag color="blue" v-if="voice.model">{{ voice.model }}</a-tag>
                         <span>{{ voice.label }}</span>
                         <a-button
-                          v-permission="'system:role'"
+                          v-permission="VOICE_PREVIEW_PERMISSIONS"
                           type="text"
                           size="small"
                           :loading="loadingVoiceId === voice.value"

@@ -4,10 +4,9 @@ import com.xiaozhi.common.model.resp.RoleDefaultsResp;
 import com.xiaozhi.server.web.BaseController;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaMode;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
-import com.xiaozhi.common.exception.OperationFailedException;
-import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.req.RoleCreateReq;
 import com.xiaozhi.common.model.req.RolePageReq;
 import com.xiaozhi.common.model.req.RoleUpdateReq;
@@ -18,13 +17,6 @@ import com.xiaozhi.common.model.resp.LocalSttResp;
 import com.xiaozhi.common.model.resp.SherpaVoiceResp;
 import com.xiaozhi.common.model.resp.TestVoiceResp;
 import com.xiaozhi.common.web.ApiResponse;
-import com.xiaozhi.ai.stt.SttServiceFactory;
-import com.xiaozhi.ai.tts.SherpaVoiceProbe;
-import com.xiaozhi.ai.tts.TtsServiceFactory;
-import com.xiaozhi.common.model.bo.ConfigBO;
-import com.xiaozhi.config.service.ConfigService;
-import com.xiaozhi.storage.service.StorageService;
-import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.security.CurrentUser;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,7 +26,6 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -54,19 +45,7 @@ public class RoleController extends BaseController {
     private RoleAppService roleAppService;
 
     @Resource
-    private SherpaVoiceProbe sherpaVoiceProbe;
-
-    @Resource
-    private SttServiceFactory sttServiceFactory;
-
-    @Resource
-    private TtsServiceFactory ttsService;
-
-    @Resource
-    private ConfigService configService;
-
-    @Resource
-    private StorageServiceFactory storageServiceFactory;
+    private RoleSpeechAppService roleSpeechAppService;
 
     /**
      * 角色查询
@@ -152,7 +131,7 @@ public class RoleController extends BaseController {
     @SaCheckPermission("system:role:api:list")
     @Operation(summary = "获取本地 sherpa-onnx 音色列表", description = "扫描配置的本地 TTS 模型目录，自动识别模型类型和 speaker")
     public ApiResponse<List<SherpaVoiceResp>> listSherpaVoices() {
-        return ApiResponse.success(sherpaVoiceProbe.listVoices());
+        return ApiResponse.success(roleSpeechAppService.sherpaVoices());
     }
 
     /**
@@ -163,47 +142,15 @@ public class RoleController extends BaseController {
     @SaCheckPermission("system:role:api:list")
     @Operation(summary = "获取本地语音识别状态", description = "返回服务端启动时加载成功的本地 STT provider，模型都未就位时 provider 为空")
     public ApiResponse<LocalSttResp> localStt() {
-        String provider = sttServiceFactory.getLocalDefaultProvider();
-        return ApiResponse.success(new LocalSttResp(provider, provider != null));
+        return ApiResponse.success(roleSpeechAppService.localStt());
     }
 
     @GetMapping("/testVoice")
     @ResponseBody
-    @SaCheckPermission("system:role:api:list")
+    @SaCheckPermission(value = {"system:role:api:create", "system:role:api:update"}, mode = SaMode.OR)
     @CheckOwner(resource = "config", id = "#param.provider != 'edge' ? #param.ttsId : null")
     @Operation(summary = "测试语音合成", description = "测试指定配置的语音合成效果")
     public ApiResponse<TestVoiceResp> testAudio(@Valid TestVoiceReq param) {
-        ConfigBO config = null;
-        if (!param.getProvider().equals("edge")) {
-            if (param.getTtsId() == null) {
-                throw new IllegalArgumentException("非 edge 提供方必须指定语音配置");
-            }
-            config = configService.getBO(param.getTtsId());
-            if (config == null) {
-                throw new ResourceNotFoundException("语音配置不存在或无权访问");
-            }
-        }
-
-        try {
-            Path audioFilePath = ttsService.getTtsService(config, param.getVoiceName(), param.getTtsPitch(), param.getTtsSpeed())
-                    .textToSpeech(param.getMessage());
-
-            if (audioFilePath == null) {
-                throw new OperationFailedException("测试语音合成失败：未生成音频");
-            }
-
-            // 上传到当前生效的存储服务：本地返回相对路径，云存储返回完整 URL 并接管本地文件。
-            // 返回值经 @SignedFileUrl 由响应 Advice 统一签名，故本地/云端配置均生效。
-            StorageService storageService = storageServiceFactory.getStorageService();
-            String storedPath = storageService.upload(audioFilePath, audioFilePath.toString());
-
-            return ApiResponse.success("操作成功", new TestVoiceResp(storedPath));
-        } catch (IndexOutOfBoundsException e) {
-            log.error("请先到语音合成配置页面配置对应Key", e);
-            throw new IllegalStateException("请先到语音合成配置页面配置对应Key", e);
-        } catch (Exception e) {
-            log.error("测试语音合成失败", e);
-            throw new OperationFailedException("测试语音合成失败", e);
-        }
+        return ApiResponse.success(roleSpeechAppService.preview(param));
     }
 }
