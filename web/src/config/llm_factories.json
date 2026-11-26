@@ -3869,28 +3869,28 @@
                     "llm_name": "gemini-4-neon",
                     "tags": "LLM,CHAT,IMAGE2TEXT,1M",
                     "max_tokens": 1048576,
-                    "model_type": "image2text",
+                    "model_type": "chat",
                     "is_tools": true
                 },
                 {
                     "llm_name": "claude-sonnet-5-5",
                     "tags": "LLM,CHAT,IMAGE2TEXT,1M",
                     "max_tokens": 1048576,
-                    "model_type": "image2text",
+                    "model_type": "chat",
                     "is_tools": true
                 },
                 {
                     "llm_name": "claude-haiku-5-5",
                     "tags": "LLM,CHAT,IMAGE2TEXT,1M",
                     "max_tokens": 1048576,
-                    "model_type": "image2text",
+                    "model_type": "chat",
                     "is_tools": true
                 },
                 {
                     "llm_name": "gpt-5.4-mini",
                     "tags": "LLM,CHAT,IMAGE2TEXT,400K",
                     "max_tokens": 409600,
-                    "model_type": "image2text",
+                    "model_type": "chat",
                     "is_tools": true
                 },
                 {
