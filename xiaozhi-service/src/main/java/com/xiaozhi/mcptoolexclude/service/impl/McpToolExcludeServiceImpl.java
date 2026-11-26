@@ -68,7 +68,7 @@ public class McpToolExcludeServiceImpl implements McpToolExcludeService {
     @Override
     @Cacheable(value = CacheNames.MCP_TOOL_EXCLUDE, key = "T(com.xiaozhi.mcptoolexclude.support.McpToolExcludeCacheKeys).roleDisabled(#roleId)")
     public List<String> getRoleDisabledTools(Integer roleId) {
-        return loadRoleDisabledTools(roleId);
+        return roleId == null || roleId <= 0 ? new ArrayList<>() : loadRoleDisabledTools(roleId);
     }
 
     @Override

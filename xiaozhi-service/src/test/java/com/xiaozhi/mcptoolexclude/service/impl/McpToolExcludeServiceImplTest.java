@@ -142,4 +142,12 @@ class McpToolExcludeServiceImplTest {
             return values.contains(excludeType) && values.contains(bindKey);
         };
     }
+
+    /** 还没建好的角色（id 为空或 0）没有自己的禁用项，不查库 */
+    @Test
+    void aRoleNotYetCreatedHasNoDisabledTools() {
+        assertThat(mcpToolExcludeService.getRoleDisabledTools(0)).isEmpty();
+        assertThat(mcpToolExcludeService.getRoleDisabledTools(null)).isEmpty();
+        verifyNoInteractions(mcpToolExcludeMapper);
+    }
 }

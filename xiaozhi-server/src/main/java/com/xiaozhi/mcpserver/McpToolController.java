@@ -64,10 +64,9 @@ public class McpToolController {
     @CheckOwner(resource = "role", id = "#roleId != null && #roleId > 0 ? #roleId : null")
     @Operation(summary = "获取禁用的工具列表", description = "获取指定角色和全局禁用的工具列表")
     public ApiResponse<McpDisabledToolsResp> getDisabledTools(@PathVariable Integer roleId) {
-        List<String> roleDisabled = roleId != null && roleId > 0 ? mcpToolExcludeService.getRoleDisabledTools(roleId) : List.of();
-        List<String> globalDisabled = mcpToolExcludeService.getGlobalDisabledTools();
-
-        return ApiResponse.success(new McpDisabledToolsResp(roleDisabled, globalDisabled));
+        return ApiResponse.success(new McpDisabledToolsResp(
+                mcpToolExcludeService.getRoleDisabledTools(roleId),
+                mcpToolExcludeService.getGlobalDisabledTools()));
     }
 
     @GetMapping("/system-global")

@@ -11,6 +11,7 @@ public interface McpToolExcludeService {
 
     void toggleGlobalToolStatus(String toolName, String serverName, boolean enabled);
 
+    /** 角色还没建好（id 为空或不大于 0）时为空 */
     List<String> getRoleDisabledTools(Integer roleId);
 
     List<String> getGlobalDisabledTools();

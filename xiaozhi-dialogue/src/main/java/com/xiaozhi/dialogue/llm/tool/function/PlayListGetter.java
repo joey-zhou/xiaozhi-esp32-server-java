@@ -3,6 +3,7 @@ package com.xiaozhi.dialogue.llm.tool.function;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tool.session.ToolSession;
+import com.xiaozhi.music.service.MusicFileService;
 import jakarta.annotation.Resource;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
@@ -27,7 +28,7 @@ public class PlayListGetter implements ToolsGlobalRegistry.GlobalFunction {
     @Tool(name = TOOL_NAME, description = "获取可播放的歌曲列表",returnDirect = false)
     public String getPlayList() {
         try {
-            Path playlistPath = Path.of(runtimePathConfig.getMusicDir(), "playlist.txt");
+            Path playlistPath = runtimePathConfig.resolveMusicDir().resolve(MusicFileService.PLAYLIST);
             String playlist = Files.readString(playlistPath);
             // 整份列表会进 LLM 上下文，超长截断
             return playlist.length() > MAX_PLAYLIST_CHARS ? playlist.substring(0, MAX_PLAYLIST_CHARS) : playlist;

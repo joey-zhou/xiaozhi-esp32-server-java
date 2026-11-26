@@ -1,6 +1,7 @@
 package com.xiaozhi.music;
 
 import com.xiaozhi.common.config.RuntimePathConfig;
+import com.xiaozhi.music.service.MusicFileService;
 import com.xiaozhi.support.ControllerTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,10 +18,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * 钉住音乐上传接口的白名单（只收 .mp3 与 playlist.txt）与落盘位置：文件写到 RuntimePathConfig.musicDir 下，
- * 文件名保持原名。用例把 musicDir 指到临时目录，避免真实写进工作目录。
- */
+/** 音乐上传接口的白名单与落盘位置；判型细节见 MusicFileServiceTest */
 class MusicControllerTest extends ControllerTestSupport {
 
     @TempDir
@@ -33,7 +31,7 @@ class MusicControllerTest extends ControllerTestSupport {
         RuntimePathConfig runtimePathConfig = new RuntimePathConfig();
         runtimePathConfig.setMusicDir(musicDir.toString());
         MusicController controller = new MusicController();
-        ReflectionTestUtils.setField(controller, "runtimePathConfig", runtimePathConfig);
+        ReflectionTestUtils.setField(controller, "musicFileService", new MusicFileService(runtimePathConfig));
         mockMvc = buildMockMvc(controller);
     }
 
@@ -55,11 +53,12 @@ class MusicControllerTest extends ControllerTestSupport {
 
     @Test
     void uploadMusicStoresAllowedMp3File() throws Exception {
-        mockMvc.perform(multipart("/api/file/music").file(mp3("song-test.mp3", "abc".getBytes())))
+        byte[] id3 = {'I', 'D', '3', 4, 0, 0};
+        mockMvc.perform(multipart("/api/file/music").file(mp3("song-test.mp3", id3)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data").value("song-test.mp3"));
 
-        assertThat(musicDir.resolve("song-test.mp3")).hasBinaryContent("abc".getBytes());
+        assertThat(musicDir.resolve("song-test.mp3")).hasBinaryContent(id3);
     }
 
     @Test
