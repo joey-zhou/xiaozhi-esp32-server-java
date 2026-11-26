@@ -54,6 +54,7 @@ public class ConversationController extends BaseController {
     @PatchMapping("/{sessionId}")
     @SaCheckPermission("system:chat")
     @Operation(summary = "重命名会话")
+    @AuditLog(module = "Web 聊天", operation = "重命名会话")
     public ApiResponse<Void> rename(@PathVariable String sessionId, @Valid @RequestBody ConversationRenameReq req) {
         conversationService.rename(CurrentUser.id(), sessionId, req.getTitle());
         return ApiResponse.success("重命名成功");

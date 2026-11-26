@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.List;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -75,5 +76,16 @@ class MemoryControllerTest extends ControllerTestSupport {
             .setCompletionTokens(5)
             .setLastMessageTimestamp(Instant.ofEpochMilli(1L))
             .setCreateTime(Instant.ofEpochMilli(1L));
+    }
+
+    /** 分页上限在入参上声明，超出直接 400，不在控制器里悄悄钳住 */
+    @Test
+    void aPageSizeAboveTheLimitIsRejected() throws Exception {
+        try (MockedStatic<StpUtil> ignored = mockLoginUser(7)) {
+            mockMvc.perform(get("/api/memory/summary").param("pageSize", "1001"))
+                .andExpect(status().isBadRequest());
+        }
+
+        verifyNoInteractions(summaryService);
     }
 }

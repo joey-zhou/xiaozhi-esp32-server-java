@@ -1,10 +1,14 @@
 package com.xiaozhi.architecture;
 
+import com.xiaozhi.server.web.chat.WebChatController;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaParameterizedType;
+import com.tngtech.archunit.core.domain.JavaWildcardType;
+import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -15,6 +19,8 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Parameter;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -203,6 +209,26 @@ class ServiceLayerArchTest {
         rule.check(xiaozhiClasses);
     }
 
+    /** 分页入参一律 XxxPageReq extends BasePageReq，裸 pageNo/pageSize 会在控制器里各自钳制上限 */
+    @Test
+    void pagingGoesThroughAPageReq() {
+        Set<String> rawPaging = controllers()
+            .flatMap(controller -> Arrays.stream(controller.reflect().getDeclaredMethods()))
+            .filter(method -> Arrays.stream(method.getParameters())
+                .anyMatch(parameter -> "pageNo".equals(parameter.getName()) || "pageSize".equals(parameter.getName())))
+            .map(method -> method.getDeclaringClass().getName() + "#" + method.getName())
+            .collect(Collectors.toSet());
+
+        assertThat(rawPaging).isEmpty();
+    }
+
+    /** 编译不带 -parameters 时参数名全是 arg0，上面那条会空真通过 */
+    @Test
+    void parameterNamesAreReadable() throws NoSuchMethodException {
+        assertThat(Arrays.stream(WebChatController.class.getMethod("open", Integer.class, String.class).getParameters())
+            .map(Parameter::getName)).containsExactly("roleId", "sessionId");
+    }
+
     @Test
     void controllersAreActuallyScanned() {
         assertThat(controllers().count())
@@ -235,17 +261,38 @@ class ServiceLayerArchTest {
             || method.getModifiers().contains(JavaModifier.SYNTHETIC)) {
             return Set.of();
         }
-        if (DYNAMIC_PAYLOAD_ALLOWLIST.contains(method.getOwner().getName() + "#" + method.getName())) {
+        String key = method.getOwner().getName() + "#" + method.getName();
+        if (DYNAMIC_PAYLOAD_ALLOWLIST.contains(key)) {
             return Set.of();
         }
-        return method.getReturnType().getAllInvolvedRawTypes().stream()
+        return untypedReturnTypes(method);
+    }
+
+    private static Set<String> untypedReturnTypes(JavaMethod method) {
+        Set<String> offending = method.getReturnType().getAllInvolvedRawTypes().stream()
             .filter(type -> !isWebType(type))
             .map(JavaClass::getName)
             .collect(Collectors.toCollection(TreeSet::new));
+        if (hasUnboundedWildcard(method.getReturnType())) {
+            offending.add("?");
+        }
+        return offending;
     }
 
-    /** 出参一旦含 Map，字段契约就退化成裸 key/value，前后端只能靠人工对齐——不属于放行的 java.* 类型。 */
+    /** {@code ResponseEntity<?>} 的 ? 不进 getAllInvolvedRawTypes，要单独找 */
+    private static boolean hasUnboundedWildcard(JavaType type) {
+        if (type instanceof JavaWildcardType wildcard) {
+            return wildcard.getUpperBounds().stream().allMatch(bound -> "java.lang.Object".equals(bound.getName()));
+        }
+        if (type instanceof JavaParameterizedType parameterized) {
+            return parameterized.getActualTypeArguments().stream().anyMatch(ServiceLayerArchTest::hasUnboundedWildcard);
+        }
+        return false;
+    }
+
+    /** 出参一旦含 Map 或 Object，字段契约就退化成裸 key/value，前后端只能靠人工对齐——不属于放行的 java.* 类型。 */
     private static final Set<String> UNTYPED_JAVA_TYPES = Set.of(
+        "java.lang.Object",
         "java.util.Map", "java.util.HashMap", "java.util.LinkedHashMap",
         "java.util.TreeMap", "java.util.SortedMap", "java.util.NavigableMap"
     );

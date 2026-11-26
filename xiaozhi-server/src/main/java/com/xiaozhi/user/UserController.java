@@ -140,6 +140,7 @@ public class UserController extends BaseController {
     @SaIgnore
     @PostMapping("/sendEmailCaptcha")
     @Operation(summary = "发送邮箱验证码", description = "向指定邮箱发送验证码")
+    @AuditLog(module = "用户管理", operation = "发送邮箱验证码")
     public ApiResponse<Void> sendEmailCaptcha(@Valid @RequestBody UserSendCaptchaReq req) {
         verifyCodeAppService.sendEmailCaptcha(req);
         return ApiResponse.success();
@@ -148,6 +149,7 @@ public class UserController extends BaseController {
     @SaIgnore
     @PostMapping("/sendSmsCaptcha")
     @Operation(summary = "发送短信验证码", description = "向指定手机号发送验证码")
+    @AuditLog(module = "用户管理", operation = "发送短信验证码")
     public ApiResponse<Void> sendSmsCaptcha(@Valid @RequestBody UserSendCaptchaReq req) {
         verifyCodeAppService.sendSmsCaptcha(req);
         return ApiResponse.success();

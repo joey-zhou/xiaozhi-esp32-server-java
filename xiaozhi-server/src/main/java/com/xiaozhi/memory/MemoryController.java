@@ -6,6 +6,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.PageResult;
+import com.xiaozhi.common.model.req.SummaryPageReq;
 import com.xiaozhi.common.model.resp.SummaryResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.summary.convert.SummaryConvert;
@@ -14,12 +15,10 @@ import com.xiaozhi.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
-import org.springframework.util.StringUtils;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,7 +29,6 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "记忆管理", description = "管理设备的对话摘要")
 public class MemoryController extends BaseController {
 
-    private static final int MAX_PAGE_SIZE = 1000;
 
     @Resource
     private SummaryService summaryService;
@@ -40,16 +38,13 @@ public class MemoryController extends BaseController {
 
     @GetMapping("/summary")
     @SaCheckPermission("system:role:memory:summary:api:list")
-    @CheckOwner(resource = "device", id = "#deviceId")
-    @CheckOwner(resource = "role", id = "#roleId")
+    @CheckOwner(resource = "device", id = "#req.deviceId")
+    @CheckOwner(resource = "role", id = "#req.roleId")
     @Operation(summary = "查询对话摘要", description = "不传设备时查当前用户全部设备，不传角色时不限角色")
-    public ApiResponse<PageResult<SummaryResp>> querySummary(@RequestParam(required = false) String deviceId,
-                                                             @RequestParam(required = false) Integer roleId,
-                                                             @RequestParam(defaultValue = "1") Integer pageNo,
-                                                             @RequestParam(defaultValue = "10") Integer pageSize) {
-        pageSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
+    public ApiResponse<PageResult<SummaryResp>> querySummary(@Valid SummaryPageReq req) {
         // 指定设备时归属已由 @CheckOwner 校验；不指定时按当前用户名下的设备查
-        return ApiResponse.success(summaryService.page(deviceId, CurrentUser.id(), roleId, pageNo, pageSize)
+        return ApiResponse.success(summaryService
+            .page(req.getDeviceId(), CurrentUser.id(), req.getRoleId(), req.getPageNo(), req.getPageSize())
             .map(summaryConvert::toResp));
     }
 

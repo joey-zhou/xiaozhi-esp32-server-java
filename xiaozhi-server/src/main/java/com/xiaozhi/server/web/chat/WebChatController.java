@@ -1,6 +1,7 @@
 package com.xiaozhi.server.web.chat;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
 import com.xiaozhi.common.model.req.ChatStreamReq;
 import com.xiaozhi.common.web.ApiResponse;
@@ -79,6 +80,7 @@ public class WebChatController {
     @PostMapping(value = "/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @SaCheckPermission("system:chat:api:stream")
     @Operation(summary = "上传聊天附件", description = "收下一张 JPG 或 PNG 图片，返回发消息时要带上的附件 ID")
+    @AuditLog(module = "Web 聊天", operation = "上传聊天附件")
     public ApiResponse<ChatAttachmentResp> attach(@RequestParam("file") MultipartFile file) {
         WebChatAttachmentService.Pending held = webChatAttachmentService.hold(CurrentUser.id(), file);
         return ApiResponse.success(ChatAttachmentResp.of(held.id(), held.kind(), held.name()));
