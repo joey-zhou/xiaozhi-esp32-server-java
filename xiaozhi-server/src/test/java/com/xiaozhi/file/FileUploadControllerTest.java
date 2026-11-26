@@ -1,6 +1,7 @@
 package com.xiaozhi.file;
 
 import com.xiaozhi.communication.ServerAddressProvider;
+import com.xiaozhi.storage.UploadPolicy;
 import com.xiaozhi.storage.service.StorageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.support.ControllerTestSupport;
@@ -33,6 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class FileUploadControllerTest extends ControllerTestSupport {
 
+    private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+
     private MockMvc mockMvc;
 
     @Mock
@@ -48,15 +51,18 @@ class FileUploadControllerTest extends ControllerTestSupport {
 
     @BeforeEach
     void setUp() {
+        FileUploadAppService fileUploadAppService = new FileUploadAppService();
+        ReflectionTestUtils.setField(fileUploadAppService, "storageServiceFactory", storageServiceFactory);
+        ReflectionTestUtils.setField(fileUploadAppService, "serverAddressProvider", serverAddressProvider);
+        ReflectionTestUtils.setField(fileUploadAppService, "uploadPolicy", new UploadPolicy());
         fileUploadController = new FileUploadController();
-        ReflectionTestUtils.setField(fileUploadController, "storageServiceFactory", storageServiceFactory);
-        ReflectionTestUtils.setField(fileUploadController, "serverAddressProvider", serverAddressProvider);
+        ReflectionTestUtils.setField(fileUploadController, "fileUploadAppService", fileUploadAppService);
         mockMvc = buildMockMvc(fileUploadController);
     }
 
     @Test
     void uploadFileReturnsFullUrlForRelativeStoragePath() throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", "png".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", PNG);
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
         when(storageService.upload(any(), anyString(), anyString())).thenReturn("uploads/image/avatar.png");
         when(storageService.getProvider()).thenReturn("local");
@@ -82,7 +88,7 @@ class FileUploadControllerTest extends ControllerTestSupport {
 
     @Test
     void uploadFileRejectsUnsupportedType() throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", "png".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", PNG);
 
         mockMvc.perform(multipart("/api/file/upload").file(file).param("type", "script"))
             .andExpect(status().isBadRequest())
@@ -113,12 +119,22 @@ class FileUploadControllerTest extends ControllerTestSupport {
 
     @Test
     void uploadFileWrapsStorageIOException() throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", "png".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", PNG);
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
         when(storageService.upload(any(), anyString(), anyString())).thenThrow(new IOException("disk full"));
 
         mockMvc.perform(multipart("/api/file/upload").file(file).param("type", "image"))
             .andExpect(status().isInternalServerError())
             .andExpect(jsonPath("$.message").value("文件上传失败，请稍后重试"));
+    }
+
+    /** 判型看文件内容：改个扩展名冒充图片的可执行文件进不来 */
+    @Test
+    void uploadFileRejectsContentThatIsNotWhatTheNameSays() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", new byte[]{'M', 'Z', 0, 0});
+
+        mockMvc.perform(multipart("/api/file/upload").file(file).param("type", "avatar"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("文件内容与扩展名不符: .png"));
     }
 }

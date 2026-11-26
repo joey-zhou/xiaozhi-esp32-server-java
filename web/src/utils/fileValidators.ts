@@ -28,7 +28,8 @@ export interface FileValidator {
   validate: (file: File) => true | string
 }
 
-/** 音频扩展名白名单，与后端 FileUploadController 的允许列表一致 */
+// 扩展名清单真源 UploadPolicy.java Category，UploadLimitsContractTest 读这里核对
+/** 音频扩展名白名单 */
 const AUDIO_EXTENSIONS = ['.wav', '.mp3', '.m4a', '.flac', '.ogg', '.opus', '.aac']
 
 /** 图片扩展名白名单，与 ALLOWED_IMAGE_TYPES 的 MIME 列表一一对应 */

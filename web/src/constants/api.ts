@@ -29,8 +29,8 @@ export const DEFAULT_PAGE_SIZE = 10
 export const PAGE_SIZE_OPTIONS = ['10', '30', '50', '100', '1000']
 
 /**
- * 文件上传大小上限（字节）
- * 对应 utils/fileValidators.ts 里 fileValidators 的四档阈值，取值为不含上界
+ * 文件上传大小上限（字节），取值为不含上界
+ * 真源 UploadPolicy.java Category 的 AVATAR、AUDIO，UploadLimitsContractTest 读这里核对
  */
 export const MAX_IMAGE_SIZE = 2 * 1024 * 1024
 export const MAX_AUDIO_SIZE = 10 * 1024 * 1024

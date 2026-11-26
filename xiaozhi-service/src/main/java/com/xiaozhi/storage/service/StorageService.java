@@ -14,9 +14,6 @@ import java.nio.file.Path;
  */
 public interface StorageService {
 
-    /** 默认文件大小上限：50MB */
-    long DEFAULT_MAX_SIZE = 50 * 1024 * 1024;
-
     /**
      * 上传文件（Web 端）
      *
@@ -98,14 +95,5 @@ public interface StorageService {
      * 本地存储没有这类资源，默认不做任何事。
      */
     default void shutdown() {
-    }
-
-    /**
-     * 检查文件大小
-     */
-    static void assertAllowed(MultipartFile file) {
-        if (file.getSize() > DEFAULT_MAX_SIZE) {
-            throw new IllegalArgumentException("文件大小超过限制，最大允许：" + (DEFAULT_MAX_SIZE / 1024 / 1024) + "MB");
-        }
     }
 }
