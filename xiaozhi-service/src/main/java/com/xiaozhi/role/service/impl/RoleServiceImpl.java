@@ -21,6 +21,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -171,4 +172,11 @@ public class RoleServiceImpl implements RoleService {
         demotedRoleIds.forEach(id -> CacheHelper.evictNow(cache, RoleCacheKeys.of(id)));
     }
 
+    @Override
+    public long countStoredPathsWithPrefix(String prefix) {
+        if (!StringUtils.hasText(prefix)) {
+            return 0;
+        }
+        return roleMapper.selectCount(new LambdaQueryWrapper<RoleDO>().likeRight(RoleDO::getAvatar, prefix));
+    }
 }

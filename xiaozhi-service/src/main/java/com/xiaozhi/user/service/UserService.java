@@ -39,4 +39,7 @@ public interface UserService {
      * 手机号、邮箱、用户名有一项已被注册就抛 IllegalStateException；三项共用一句提示，分开报等于逐项确认注册状态
      */
     void requireUnregistered(String tel, String email, String username);
+
+    /** 头像以 prefix 开头的记录数，换对象存储前数存量用 */
+    long countStoredPathsWithPrefix(String prefix);
 }

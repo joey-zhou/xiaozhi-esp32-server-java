@@ -30,6 +30,7 @@ import com.xiaozhi.dialogue.event.SpeechRecognizedEvent;
 import com.xiaozhi.common.SerialTaskRegistry;
 
 import com.xiaozhi.storage.service.StorageServiceFactory;
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.OpusProcessor;
@@ -102,6 +103,9 @@ public class DialogueService{
 
     @Resource
     private StorageServiceFactory storageServiceFactory;
+
+    @Resource
+    private RuntimePathConfig runtimePathConfig;
 
     /**
      * 处理音频数据
@@ -423,8 +427,7 @@ public class DialogueService{
                 try {
                     // 音频保存：只在这里定路径，落盘与上传异步做，不占首字时间。
                     // 必须排在本轮任何可能触发落库的动作之前入队，落库才读得到回填后的路径
-                    UserSpeechAudio userAudio =
-                            new UserSpeechAudio(session.getAudioPath(MessageBO.SENDER_USER, DateUtils.instant()));
+                    UserSpeechAudio userAudio = new UserSpeechAudio(recordingKey(session, MessageBO.SENDER_USER));
                     session.setUserSpeechAudio(userAudio);
                     saveUserAudio(session, userAudio, turn.collectPcm(vadService.getPcmData(sessionId)));
 
@@ -704,14 +707,20 @@ public class DialogueService{
                 if (pcm.length == 0) {
                     return;
                 }
-                Path path = session.getAudioPath(WAKE_WORD_AUDIO_TAG, DateUtils.instant());
+                String key = recordingKey(session, WAKE_WORD_AUDIO_TAG);
+                Path path = runtimePathConfig.resolveStorageKey(key);
                 AudioUtils.saveAsWav(path, pcm);
-                storageServiceFactory.getStorageService().upload(path, path.toString());
-                log.debug("唤醒词音频已采集: {}", path);
+                storageServiceFactory.getStorageService().upload(path, key);
+                log.debug("唤醒词音频已采集: {}", key);
             } catch (Exception e) {
                 log.warn("采集唤醒词音频失败: {}", e.getMessage());
             }
         });
+    }
+
+    private String recordingKey(ChatSession session, String who) {
+        DeviceBO device = session.getDevice();
+        return runtimePathConfig.recordingKey(device.getDeviceId(), device.getRoleId(), who, DateUtils.instant());
     }
 
     /**
@@ -733,7 +742,7 @@ public class DialogueService{
      */
     void saveUserAudio(ChatSession session, UserSpeechAudio audio, List<byte[]> pcmFrames) {
         SerialTaskRegistry.submit(session.getSessionId(), () -> {
-            Path path = audio.localPath();
+            Path path = runtimePathConfig.resolveStorageKey(audio.key());
             String storedPath = null;
             double duration = -1;
             try {
@@ -746,10 +755,10 @@ public class DialogueService{
                     // 且云端 storedPath（完整 URL）无法当作本地文件读取。
                     duration = AudioUtils.getAudioDuration(path);
 
-                    // 默认持久化路径为本地相对路径；上传成功则替换为云存储返回的 storedPath（可能是完整 URL）。
-                    storedPath = path.toString();
+                    // 默认持久化存储键；上传成功则替换为云存储返回的 storedPath（可能是完整 URL）。
+                    storedPath = audio.key();
                     try {
-                        storedPath = storageServiceFactory.getStorageService().upload(path, path.toString());
+                        storedPath = storageServiceFactory.getStorageService().upload(path, audio.key());
                     } catch (Exception e) {
                         log.warn("上传用户音频失败，保留本地路径: {}", path, e);
                     }

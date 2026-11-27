@@ -1,12 +1,17 @@
 package com.xiaozhi.common.config;
 
-import com.xiaozhi.utils.AudioUtils;
-import jakarta.annotation.PostConstruct;
+import com.xiaozhi.common.model.bo.MessageBO;
+import com.xiaozhi.utils.DateUtils;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 
 /**
  * 运行时模型与原生库目录配置。
@@ -46,14 +51,6 @@ public class RuntimePathConfig {
     /** 音乐文件目录 */
     private String musicDir = "uploads/music";
 
-    /** 头像目录 */
-    private String avatarDir = "avatar";
-
-    @PostConstruct
-    void initStaticPaths() {
-        AudioUtils.AUDIO_PATH = audioDir;
-    }
-
     public Path resolveNativeLibDir() {
         return Path.of(nativeLibDir).toAbsolutePath().normalize();
     }
@@ -89,10 +86,19 @@ public class RuntimePathConfig {
     }
 
     public Path resolveMusicDir() {
-        return Path.of(musicDir).toAbsolutePath().normalize();
+        return resolveStorageKey(musicDir);
     }
 
-    public Path resolveAvatarDir() {
-        return Path.of(avatarDir).toAbsolutePath().normalize();
+    /** 对话录音的存储键：{audioDir}日期/设备/角色/时间-who.扩展名，助手回复是 ogg，其余是 wav */
+    public String recordingKey(String deviceId, Integer roleId, String who, Instant at) {
+        LocalDateTime time = DateUtils.toDateTime(at.truncatedTo(ChronoUnit.SECONDS));
+        String extension = MessageBO.SENDER_ASSISTANT.equals(who) ? "ogg" : "wav";
+        String fileName = "%s-%s.%s".formatted(time.format(DateTimeFormatter.ISO_DATE_TIME).replace(":", ""), who, extension);
+        return recordingDirKey(deviceId, time.toLocalDate()) + "/" + roleId + "/" + fileName;
+    }
+
+    /** 某设备某天的录音目录键 */
+    public String recordingDirKey(String deviceId, LocalDate date) {
+        return audioDir + date.format(DateTimeFormatter.ISO_LOCAL_DATE) + "/" + deviceId.replace(":", "-");
     }
 }

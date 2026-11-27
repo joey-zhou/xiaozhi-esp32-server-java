@@ -2,6 +2,8 @@ package com.xiaozhi.storage;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -31,6 +33,14 @@ class UploadPolicyTest {
         policy.check(UploadPolicy.Category.COMMON, "说明.md", 100, "# 标题".getBytes());
         policy.check(UploadPolicy.Category.AUDIO, "我.wav", 100, WAV);
         policy.check(UploadPolicy.Category.COMMON, "data.bin", 100, EXE);
+    }
+
+    /** 按内容认类型也只用这里的判型规则，与给模型看的图共用 */
+    @Test
+    void contentIsDetectedAmongTheGivenExtensions() {
+        assertThat(UploadPolicy.detectExtension(PNG, List.of(".jpg", ".png"))).isEqualTo(".png");
+        assertThat(UploadPolicy.detectExtension(PNG, List.of(".jpg", ".gif"))).isNull();
+        assertThat(UploadPolicy.detectExtension(EXE, List.of(".jpg", ".png"))).isNull();
     }
 
     @Test

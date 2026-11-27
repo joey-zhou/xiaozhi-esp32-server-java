@@ -130,6 +130,14 @@ public class UploadPolicy {
         }
     }
 
+    /** 按文件头在候选扩展名（带点）里认类型，都不符返回 null */
+    public static String detectExtension(byte[] head, List<String> candidates) {
+        return candidates.stream()
+                .filter(extension -> SIGNATURES.containsKey(extension) && SIGNATURES.get(extension).test(head))
+                .findFirst()
+                .orElse(null);
+    }
+
     /** 小写、带点的扩展名，没有返回 null */
     public static String extensionOf(String fileName) {
         if (fileName == null) {

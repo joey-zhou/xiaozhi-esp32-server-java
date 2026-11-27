@@ -20,8 +20,8 @@ import java.util.concurrent.TimeUnit;
  */
 public final class UserSpeechAudio {
 
-    /** 本地 WAV 文件路径，构造时即确定，不含 I/O */
-    private final Path localPath;
+    /** 录音的存储键，构造时即确定，不含 I/O */
+    private final String key;
 
     /** 持久化路径：本地为相对路径，云存储为完整 URL。落盘未完成或本轮没有音频时为 null。
      *  始终以原始字符串保存，不能经 Path.of 转换——否则 URL 的 "//" 会被规整成 "/" */
@@ -32,12 +32,12 @@ public final class UserSpeechAudio {
 
     private final CompletableFuture<Void> saved = new CompletableFuture<>();
 
-    public UserSpeechAudio(Path localPath) {
-        this.localPath = localPath;
+    public UserSpeechAudio(String key) {
+        this.key = key;
     }
 
-    public Path localPath() {
-        return localPath;
+    public String key() {
+        return key;
     }
 
     public String storedPath() {
@@ -61,7 +61,7 @@ public final class UserSpeechAudio {
     }
 
     /**
-     * 等落盘完成后取持久化路径，超时退回本地路径。
+     * 等落盘完成后取持久化路径，超时退回存储键。
      * 供声纹注册这类只拿它当样本引用的调用方使用——拿不到云地址也好过一直等着拖慢整轮回复。
      */
     public String awaitStoredPath(Duration timeout) {
@@ -71,8 +71,8 @@ public final class UserSpeechAudio {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
-            // 超时或落盘任务异常，下面按本地路径兜底
+            // 超时或落盘任务异常，下面按存储键兜底
         }
-        return localPath != null ? localPath.toString() : null;
+        return key;
     }
 }

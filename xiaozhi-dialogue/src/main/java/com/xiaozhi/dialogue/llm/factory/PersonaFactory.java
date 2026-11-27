@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue.llm.factory;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.ai.stt.Hotword;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.communication.common.SessionManager;
@@ -67,6 +68,8 @@ public class PersonaFactory {
     private DialogueListener dialogueListener;
     @Resource
     private StorageServiceFactory storageServiceFactory;
+    @Resource
+    private RuntimePathConfig runtimePathConfig;
     @Resource
     private ModelTimeoutPolicy modelTimeoutPolicy;
     @Resource
@@ -139,7 +142,8 @@ public class PersonaFactory {
         Player player = session.getPlayer();
         if (player == null) {
             player = new ScheduledPlayer(session, sessionMessageService);
-            player.setOpusRecorder(new OpusRecorder(session, chatMessageService, aecService, storageServiceFactory));
+            player.setOpusRecorder(new OpusRecorder(session, chatMessageService, aecService, storageServiceFactory,
+                    runtimePathConfig));
             session.setPlayer(player);
         }
         return player;

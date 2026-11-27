@@ -10,7 +10,6 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 
-import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -31,7 +30,7 @@ class DialogueTurnConverterTest {
     @Test
     void turnWithoutAssistantPersistsUserOnly() {
         Instant now = Instant.now();
-        UserSpeechAudio audio = new UserSpeechAudio(Path.of("audio/user.wav"));
+        UserSpeechAudio audio = new UserSpeechAudio("audio/user.wav");
         audio.complete("audio/user.wav", 1.25);
         DialogueTurn turn = DialogueTurn.builder()
                 .userMessage(new UserMessage("讲个故事"))
@@ -51,7 +50,7 @@ class DialogueTurnConverterTest {
     /** 音频落盘晚于 DialogueTurn 构建：路径回填后再转换，落库拿到的就是回填值 */
     @Test
     void userAudioPathResolvedAtPersistTime() {
-        UserSpeechAudio audio = new UserSpeechAudio(Path.of("audio/user.wav"));
+        UserSpeechAudio audio = new UserSpeechAudio("audio/user.wav");
         DialogueTurn turn = DialogueTurn.builder()
                 .userMessage(new UserMessage("讲个故事"))
                 .conversation(conversation)

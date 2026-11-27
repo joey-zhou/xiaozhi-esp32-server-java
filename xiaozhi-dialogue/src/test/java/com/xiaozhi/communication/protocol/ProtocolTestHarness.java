@@ -1,5 +1,7 @@
 package com.xiaozhi.communication.protocol;
 
+import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.service.AddresseeClassifier;
@@ -41,6 +43,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.socket.CloseStatus;
 
+import java.io.UncheckedIOException;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -139,6 +143,9 @@ class ProtocolTestHarness {
     private final PersonaFactory personaFactory = mock(PersonaFactory.class);
     private final DeviceMcpService deviceMcpService = mock(DeviceMcpService.class);
     private final StorageServiceFactory storageServiceFactory = mock(StorageServiceFactory.class);
+    /** 录音等运行期文件落在这个临时目录，shutdown 时删掉 */
+    private final Path dataDir = createDataDir();
+    private final RuntimePathConfig runtimePathConfig = new RuntimePathConfig();
     private final MessageService messageService = mock(MessageService.class);
     private final DeviceRegistry deviceRegistry = mock(DeviceRegistry.class);
     private final RedisBroadcast redisBroadcast = mock(RedisBroadcast.class);
@@ -161,6 +168,7 @@ class ProtocolTestHarness {
     }
 
     private void wire() {
+        runtimePathConfig.setDataDir(dataDir.toString());
         inject(sessionManager,
                 "applicationContext", eventBus.applicationContext(),
                 "deviceWriter", deviceWriter,
@@ -181,6 +189,7 @@ class ProtocolTestHarness {
                 "goodbyeMessages", goodbyeMessages,
                 "eventPublisher", eventBus.publisher(),
                 "storageServiceFactory", storageServiceFactory,
+                "runtimePathConfig", runtimePathConfig,
                 "faultNotifier", faultNotifier);
 
         inject(faultNotifier,
@@ -203,7 +212,8 @@ class ProtocolTestHarness {
                 "deviceRegistry", deviceRegistry,
                 "instanceIdHolder", instanceIdHolder,
                 "redisBroadcast", redisBroadcast,
-                "storageServiceFactory", storageServiceFactory);
+                "storageServiceFactory", storageServiceFactory,
+                "runtimePathConfig", runtimePathConfig);
 
         inject(webSocketHandler,
                 "sessionManager", sessionManager,
@@ -240,9 +250,9 @@ class ProtocolTestHarness {
             }
             return session.getPlayer();
         });
-        // 按本地存储的语义读取：相对路径直接当本地文件读，读不到返回 null
+        // 按本地存储的语义读取：存储键落在 data-dir 下，读不到返回 null
         lenient().when(storageServiceFactory.downloadFrom(anyString())).thenAnswer(invocation -> {
-            Path path = Path.of(invocation.<String>getArgument(0));
+            Path path = runtimePathConfig.resolveStorageKey(invocation.getArgument(0));
             return Files.exists(path) ? Files.readAllBytes(path) : null;
         });
         roleProfiles.put(defaultRole().getRoleId(), defaultRole());
@@ -262,7 +272,8 @@ class ProtocolTestHarness {
         Player player = session.getPlayer();
         if (player == null) {
             player = new ScheduledPlayer(session, messageSender);
-            player.setOpusRecorder(new OpusRecorder(session, messageService, aecService, storageServiceFactory));
+            player.setOpusRecorder(new OpusRecorder(session, messageService, aecService, storageServiceFactory,
+                    runtimePathConfig));
             session.setPlayer(player);
         }
         DeviceBO device = session.getDevice();
@@ -463,6 +474,10 @@ class ProtocolTestHarness {
         return storageServiceFactory;
     }
 
+    RuntimePathConfig runtimePathConfig() {
+        return runtimePathConfig;
+    }
+
     /** SessionManager 内部的 deviceId → sessionId 索引，并发用例用它断言没有残留条目 */
     @SuppressWarnings("unchecked")
     Map<String, String> deviceSessionIndex() {
@@ -488,6 +503,15 @@ class ProtocolTestHarness {
             webSocketHandler.afterConnectionClosed(device.transport(), CloseStatus.NORMAL);
         }
         connected.clear();
+        AudioUtils.deleteDirectory(dataDir);
+    }
+
+    private static Path createDataDir() {
+        try {
+            return Files.createTempDirectory("xiaozhi-protocol-");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private static RoleBO defaultRole() {

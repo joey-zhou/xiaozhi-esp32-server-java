@@ -20,14 +20,12 @@ import com.xiaozhi.utils.OpusProcessor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import reactor.core.publisher.Flux;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -68,24 +66,15 @@ class AbortAndResumeProtocolTest {
     private ProtocolTestHarness harness;
     private Conversation conversation;
     private PersonaListener personaListener;
-    private String originalAudioPath;
-
-    @TempDir
-    Path audioDir;
 
     @BeforeEach
     void setUp() {
-        // AUDIO_PATH 由 RuntimePathConfig 在启动时注入，不起容器时为 null，
-        // 而真打断后的新一轮会走到用户音频落盘，必须先给值
-        originalAudioPath = AudioUtils.AUDIO_PATH;
-        AudioUtils.AUDIO_PATH = audioDir.toString();
         harness = ProtocolTestHarness.create();
     }
 
     @AfterEach
     void tearDown() {
         harness.shutdown();
-        AudioUtils.AUDIO_PATH = originalAudioPath;
     }
 
     @Test

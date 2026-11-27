@@ -1,5 +1,7 @@
 package com.xiaozhi.dialogue.playback;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
+import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.dialogue.audio.AecService;
@@ -46,14 +48,19 @@ class OpusRecorderTest {
     private ChatSession session;
     private AecService aecService;
     private OpusRecorder recorder;
+    private final RuntimePathConfig runtimePathConfig = new RuntimePathConfig();
 
     @BeforeEach
     void setUp() {
         session = mock(ChatSession.class);
         aecService = mock(AecService.class);
-        when(session.getAudioPath(any(), any()))
-                .thenAnswer(inv -> tempDir.resolve(((Instant) inv.getArgument(1)).toEpochMilli() + ".ogg"));
-        recorder = new OpusRecorder(session, mock(MessageService.class), aecService, mock(StorageServiceFactory.class));
+        DeviceBO device = new DeviceBO();
+        device.setDeviceId("dev-1");
+        device.setRoleId(1);
+        when(session.getDevice()).thenReturn(device);
+        runtimePathConfig.setDataDir(tempDir.toString());
+        recorder = new OpusRecorder(session, mock(MessageService.class), aecService, mock(StorageServiceFactory.class),
+                runtimePathConfig);
     }
 
     @Test
@@ -67,7 +74,6 @@ class OpusRecorderTest {
 
         long samplesPerFrame = new OpusAudioData(frames.get(0)).getNumberOfSamples();
         assertThat(samplesPerFrame).isPositive();
-        verify(session).getAudioPath(eq(MessageBO.SENDER_ASSISTANT), eq(createdAt));
         assertThat(granulePositions(audioPath(createdAt)))
                 .containsExactly(samplesPerFrame, samplesPerFrame * 2, samplesPerFrame * 3);
     }
@@ -131,7 +137,7 @@ class OpusRecorderTest {
         recorder.onSendOpusFrame(opusFrames(1).get(0), PCM, 1000L);
         recorder.onSendStop();
 
-        verify(session, never()).getAudioPath(any(), any());
+        verify(session, never()).getDevice();
         verify(aecService).feedReference(any(), any(), any(), anyLong());
         try (Stream<Path> files = Files.list(tempDir)) {
             assertThat(files).isEmpty();
@@ -190,7 +196,8 @@ class OpusRecorderTest {
         List<Instant> recorded = new ArrayList<>();
         try {
             for (int i = 0; i < 200; i++) {
-                Instant createdAt = Instant.ofEpochMilli(1_700_001_000_000L + i);
+                // 录音按秒命名，每条消息错开一秒
+                Instant createdAt = Instant.ofEpochMilli(1_700_001_000_000L + i * 1000L);
                 recorder.setAssistantMessageCreatedAt(createdAt);
                 recorded.add(createdAt);
                 Thread.sleep(1);
@@ -215,7 +222,8 @@ class OpusRecorderTest {
     }
 
     private Path audioPath(Instant createdAt) {
-        return tempDir.resolve(createdAt.toEpochMilli() + ".ogg");
+        return runtimePathConfig.resolveStorageKey(
+                runtimePathConfig.recordingKey("dev-1", 1, MessageBO.SENDER_ASSISTANT, createdAt));
     }
 
     /** 按写入顺序读回每个音频包的 granule position */

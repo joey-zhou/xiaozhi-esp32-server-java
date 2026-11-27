@@ -10,20 +10,15 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AudioUtils {
-    /** 由 {@link com.xiaozhi.common.config.RuntimePathConfig} 在启动时通过 {@link #configurePaths} 初始化 */
-    public static String AUDIO_PATH;
-
     public static final int AUDIO_RETENTION_DAYS = 30;
     public static final int FRAME_SIZE = 960;
     public static final int SAMPLE_RATE = 16000; // 采样率
@@ -70,13 +65,6 @@ public class AudioUtils {
         }
     }
 
-    public static String saveAsWav(byte[] audio) {
-        String uuid = UUID.randomUUID().toString().replace("-", "");
-        String fileName = uuid + ".wav";
-        Path path = Path.of(AUDIO_PATH , fileName);
-        saveAsWav(path, audio);
-        return path.toString();
-    }
     /**
      * 将原始音频数据保存为WAV文件
      *
@@ -120,90 +108,6 @@ public class AudioUtils {
             }
         } catch (IOException e) {
             log.error("写入WAV文件时发生错误", e);
-        }
-    }
-
-    /**
-     * 合并多个音频文件为一个WAV文件
-     * 支持合并的格式： wav, mp3, pcm
-     *
-     * @param path 输出的WAV文件路径
-     * @param audioPaths 要合并的音频文件路径列表
-     */
-    public static void mergeAudioFiles(Path path, List<String> audioPaths) {
-        if (audioPaths.size() == 1) {
-            // 单文件直接移动，避免不必要的读取和重新编码
-            try {
-                var sourcePath = Paths.get(audioPaths.getFirst());
-                if (!sourcePath.isAbsolute()) {
-                    sourcePath = Paths.get(AUDIO_PATH, audioPaths.getFirst());
-                }
-                Files.createDirectories(path.getParent());
-                Files.move(sourcePath, path, StandardCopyOption.REPLACE_EXISTING);
-                return;
-            } catch (Exception e) {
-                log.warn("文件移动失败，回退到合并逻辑: {}", e.getMessage());
-            }
-        }
-//        var uuid = UUID.randomUUID().toString().replace("-", "");
-//        var outputFileName = uuid + ".wav";
-//        var outputPath = Paths.get(AUDIO_PATH, outputFileName).toString();
-
-        try {
-            // 确保音频目录存在
-            Files.createDirectories(path.getParent());
-            // 计算所有PCM数据的总大小
-            var totalPcmSize = 0L;
-            var audioChunks = new ArrayList<byte[]>();
-            for (var audioPath : audioPaths) {
-                var fullPath = audioPath.startsWith(AUDIO_PATH) ? audioPath : AUDIO_PATH + audioPath;
-                byte[] pcmData;
-
-                pcmData = readAsPcm(fullPath);
-                
-                totalPcmSize += pcmData.length;
-                audioChunks.add(pcmData);
-            }
-
-            // 创建输出WAV文件
-            try (FileOutputStream fos = new FileOutputStream(path.toFile());
-                 DataOutputStream dos = new DataOutputStream(fos)) {
-
-                // 写入WAV文件头
-                int bitsPerSample = 16; // 16位采样
-
-                // RIFF头
-                dos.writeBytes("RIFF");
-                dos.writeInt(Integer.reverseBytes(36 + (int) totalPcmSize)); // 文件长度
-                dos.writeBytes("WAVE");
-
-                // fmt子块
-                dos.writeBytes("fmt ");
-                dos.writeInt(Integer.reverseBytes(16)); // 子块大小
-                dos.writeShort(Short.reverseBytes((short) 1)); // 音频格式 (1 = PCM)
-                dos.writeShort(Short.reverseBytes((short) CHANNELS)); // 通道数
-                dos.writeInt(Integer.reverseBytes(SAMPLE_RATE)); // 采样率
-                dos.writeInt(Integer.reverseBytes(SAMPLE_RATE * CHANNELS * bitsPerSample / 8)); // 字节率
-                dos.writeShort(Short.reverseBytes((short) (CHANNELS * bitsPerSample / 8))); // 块对齐
-                dos.writeShort(Short.reverseBytes((short) bitsPerSample)); // 每个样本的位数
-
-                // data子块
-                dos.writeBytes("data");
-                dos.writeInt(Integer.reverseBytes((int) totalPcmSize)); // 数据大小
-
-                // 依次写入每个文件的PCM数据
-                for (var pcmData : audioChunks) {
-                    dos.write(pcmData);
-                }
-            }
-            // 因为会采用音频缓存，所以不需要删除已经合并了的文件。
-            // for (var audioPath : audioPaths) {
-            //     var fullPath = audioPath.startsWith(AUDIO_PATH) ? audioPath : AUDIO_PATH + audioPath;
-            //     Files.deleteIfExists(Paths.get(fullPath));
-            // }
-
-        } catch (Exception e) {
-            log.error("合并音频文件时发生错误", e);
         }
     }
 

@@ -43,8 +43,11 @@ public class TencentTtsService implements TtsService {
     // SpeechClient应用全局创建一个即可,生命周期可和整个应用保持一致
     private static final SpeechClient speechClient = new SpeechClient(DEFAULT_TTS_REQ_URL);
 
+    private final String outputPath;
+
     public TencentTtsService(ConfigBO config, String voiceName, Double pitch, Double speed, String outputPath) {
         this.options = XiaozhiTtsOptions.builder().voiceName(voiceName).pitch(pitch).speed(speed).build();
+        this.outputPath = outputPath;
         this.appId = config.getAppId();
         this.secretId = config.getApiKey();
         this.secretKey = config.getApiSecret();
@@ -171,10 +174,9 @@ public class TencentTtsService implements TtsService {
                     return null;
                 }
 
-                // 转换为WAV并保存
-                String filePath = AudioUtils.saveAsWav(pcmData);
-
-                return Path.of(filePath);
+                Path output = Path.of(outputPath, getAudioFileName());
+                AudioUtils.saveAsWav(output, pcmData);
+                return output;
 
             } catch (Exception e) {
                 attempts++;

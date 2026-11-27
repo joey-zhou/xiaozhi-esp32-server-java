@@ -25,4 +25,7 @@ public interface RoleService {
     // ===================== 写操作（待迁移到 RoleAppService） =====================
 
     Integer copyDefaultRole(Integer sourceUserId, Integer targetUserId);
+
+    /** 头像以 prefix 开头的记录数，换对象存储前数存量用 */
+    long countStoredPathsWithPrefix(String prefix);
 }

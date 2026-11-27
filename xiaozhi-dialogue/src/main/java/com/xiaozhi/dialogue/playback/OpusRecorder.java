@@ -1,5 +1,7 @@
 package com.xiaozhi.dialogue.playback;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
+import com.xiaozhi.common.model.bo.DeviceBO;
 import com.xiaozhi.communication.common.ChatSession;
 import com.xiaozhi.dialogue.audio.AecService;
 import com.xiaozhi.ai.llm.memory.Conversation;
@@ -40,8 +42,9 @@ public class OpusRecorder {
     private final MessageService messageService;
     private final AecService aecService;
     private final StorageServiceFactory storageServiceFactory;
+    private final RuntimePathConfig runtimePathConfig;
 
-    private Path audioPath;
+    private String audioKey;
     private OpusFile opusFile;
     private Instant opusFileCreatedAt;
     // Opus granule position 累加器（48kHz 采样单位）。末页 granule 决定解码器输出样本数（end-trim），
@@ -53,11 +56,13 @@ public class OpusRecorder {
 
     private Instant assistantMessageCreatedAt;
 
-    public OpusRecorder(ChatSession session, MessageService messageService, AecService aecService, StorageServiceFactory storageServiceFactory) {
+    public OpusRecorder(ChatSession session, MessageService messageService, AecService aecService,
+                        StorageServiceFactory storageServiceFactory, RuntimePathConfig runtimePathConfig) {
         this.session = session;
         this.messageService = messageService;
         this.aecService = aecService;
         this.storageServiceFactory = storageServiceFactory;
+        this.runtimePathConfig = runtimePathConfig;
     }
 
     public synchronized Instant getAssistantMessageCreatedAt() {
@@ -128,10 +133,13 @@ public class OpusRecorder {
     private void openOpusFile() {
         opusFileCreatedAt = assistantMessageCreatedAt;
         granulePosition = 0;
-        audioPath = session.getAudioPath(MessageBO.SENDER_ASSISTANT, opusFileCreatedAt);
+        DeviceBO device = session.getDevice();
+        audioKey = runtimePathConfig.recordingKey(device.getDeviceId(), device.getRoleId(),
+                MessageBO.SENDER_ASSISTANT, opusFileCreatedAt);
         try {
-            Files.createDirectories(audioPath.getParent());
-            FileOutputStream fos = new FileOutputStream(audioPath.toFile());
+            Path file = runtimePathConfig.resolveStorageKey(audioKey);
+            Files.createDirectories(file.getParent());
+            FileOutputStream fos = new FileOutputStream(file.toFile());
             OpusInfo oi = new OpusInfo();
             oi.setSampleRate(AudioUtils.SAMPLE_RATE);
             oi.setNumChannels(AudioUtils.CHANNELS);
@@ -149,12 +157,12 @@ public class OpusRecorder {
 
     /**
      * 关闭文件同步做，时长回读、上传与写库排进会话落库队列。
-     * 后者必须让开 tts stop 的下发路径，且不能读 audioPath/opusFileCreatedAt 字段（下一轮会覆盖）。
+     * 后者必须让开 tts stop 的下发路径，且不能读 audioKey/opusFileCreatedAt 字段（下一轮会覆盖）。
      * 文件在锁内摘下、锁外关闭：摘下之后播放线程已碰不到它，落盘不必挡住发帧。
      */
     public void closeOpusFile() {
         OpusFile file;
-        Path closedPath;
+        String closedKey;
         Instant createdAt;
         synchronized (this) {
             if (opusFile == null) {
@@ -162,34 +170,35 @@ public class OpusRecorder {
             }
             file = opusFile;
             opusFile = null;
-            closedPath = audioPath;
+            closedKey = audioKey;
             createdAt = opusFileCreatedAt;
             closedCreatedAt = createdAt;
         }
         Persona persona = session.getPersona();
         try {
             file.close();
-            log.info("Opus音频文件已生成: {}", closedPath);
+            log.info("Opus音频文件已生成: {}", closedKey);
         } catch (Exception e) {
-            log.error("无法关闭Opus音频文件: {}", closedPath, e);
+            log.error("无法关闭Opus音频文件: {}", closedKey, e);
             return;
         }
-        if (persona == null || createdAt == null || closedPath == null) {
+        if (persona == null || createdAt == null || closedKey == null) {
             return;
         }
         Conversation conversation = persona.getConversation();
         SerialTaskRegistry.submit(conversation.getSessionId(),
-                () -> updateMessage(conversation, closedPath, createdAt));
+                () -> updateMessage(conversation, closedKey, createdAt));
     }
 
-    private void updateMessage(Conversation conversation, Path closedPath, Instant createdAt) {
-        BigDecimal duration = BigDecimal.valueOf(AudioUtils.getAudioDuration(closedPath));
+    private void updateMessage(Conversation conversation, String key, Instant createdAt) {
+        Path file = runtimePathConfig.resolveStorageKey(key);
+        BigDecimal duration = BigDecimal.valueOf(AudioUtils.getAudioDuration(file));
 
-        String storedPath = closedPath.toString();
+        String storedPath = key;
         try {
-            storedPath = storageServiceFactory.getStorageService().upload(closedPath, closedPath.toString());
+            storedPath = storageServiceFactory.getStorageService().upload(file, key);
         } catch (Exception e) {
-            log.warn("上传AI回复音频失败，保留本地路径: {}", closedPath, e);
+            log.warn("上传AI回复音频失败，保留本地路径: {}", key, e);
         }
 
         messageService.updateAssistantAudio(

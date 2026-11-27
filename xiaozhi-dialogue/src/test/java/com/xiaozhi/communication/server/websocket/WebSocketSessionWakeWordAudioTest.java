@@ -1,15 +1,11 @@
 package com.xiaozhi.communication.server.websocket;
 
-import com.xiaozhi.common.model.bo.DeviceBO;
-import com.xiaozhi.common.model.bo.MessageBO;
-import com.xiaozhi.utils.AudioUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,30 +54,5 @@ class WebSocketSessionWakeWordAudioTest {
         }
 
         assertThat(session.drainWakeWordAudio()).hasSize(100);
-    }
-
-    @Test
-    void wakeWordAudioIsSavedAsWavLikeUserAudio() {
-        DeviceBO device = new DeviceBO();
-        device.setDeviceId("94:a9:90:2b:dd:18");
-        device.setRoleId(1);
-        session.setDevice(device);
-        Instant instant = Instant.parse("2026-09-02T12:00:00Z");
-        // AUDIO_PATH 由 Spring 配置注入，单测里手动给值
-        String originalAudioPath = AudioUtils.AUDIO_PATH;
-        AudioUtils.AUDIO_PATH = "audio/";
-        try {
-            String wakeWordPath = session.getAudioPath("wakeword", instant).toString();
-
-            assertThat(wakeWordPath).endsWith("-wakeword.wav");
-            // MAC 地址里的冒号不能进路径
-            assertThat(wakeWordPath).contains("94-a9-90-2b-dd-18");
-            // assistant 仍是 opus 流直接落盘
-            assertThat(session.getAudioPath(MessageBO.SENDER_ASSISTANT, instant).toString())
-                    .endsWith("-assistant.ogg");
-            assertThat(session.getAudioPath(MessageBO.SENDER_USER, instant).toString()).endsWith("-user.wav");
-        } finally {
-            AudioUtils.AUDIO_PATH = originalAudioPath;
-        }
     }
 }

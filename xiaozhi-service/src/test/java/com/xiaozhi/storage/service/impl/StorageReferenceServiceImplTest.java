@@ -1,8 +1,10 @@
 package com.xiaozhi.storage.service.impl;
 
 import com.xiaozhi.message.service.MessageService;
+import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.storage.service.StorageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
+import com.xiaozhi.user.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,6 +34,12 @@ class StorageReferenceServiceImplTest {
     @Mock
     private MessageService messageService;
 
+    @Mock
+    private UserService userService;
+
+    @Mock
+    private RoleService roleService;
+
     @InjectMocks
     private StorageReferenceServiceImpl storageReferenceService;
 
@@ -45,13 +53,17 @@ class StorageReferenceServiceImplTest {
     }
 
     @Test
-    void cloudStoragePrefixIsCounted() {
+    void cloudStoragePrefixIsCountedAcrossEveryTableThatStoresFiles() {
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
         when(storageService.urlPrefix()).thenReturn(CLOUD_PREFIX);
         when(messageService.countStoredPathsWithPrefix(CLOUD_PREFIX)).thenReturn(1200L);
+        when(userService.countStoredPathsWithPrefix(CLOUD_PREFIX)).thenReturn(20_000L);
+        when(roleService.countStoredPathsWithPrefix(CLOUD_PREFIX)).thenReturn(40_000L);
 
-        assertThat(storageReferenceService.countOnCurrentStorage()).isEqualTo(1200L);
+        assertThat(storageReferenceService.countOnCurrentStorage()).isEqualTo(61_200L);
         verify(messageService).countStoredPathsWithPrefix(CLOUD_PREFIX);
+        verify(userService).countStoredPathsWithPrefix(CLOUD_PREFIX);
+        verify(roleService).countStoredPathsWithPrefix(CLOUD_PREFIX);
     }
 
     /** 当前配置坏到建不出客户端时不能反过来拦住用户，否则连改回可用配置都做不到 */

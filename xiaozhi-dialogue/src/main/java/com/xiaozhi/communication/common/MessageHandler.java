@@ -1,5 +1,6 @@
 package com.xiaozhi.communication.common;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.communication.WebChatDevice;
 import com.xiaozhi.communication.domain.*;
 import com.xiaozhi.communication.domain.mcp.device.initialize.DeviceMcpPayload;
@@ -28,7 +29,6 @@ import com.xiaozhi.enums.ListenState;
 import com.xiaozhi.dialogue.event.AbortReason;
 import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
-import com.xiaozhi.utils.AudioUtils;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
@@ -97,6 +97,9 @@ public class MessageHandler {
 
     @Resource
     private StorageServiceFactory storageServiceFactory;
+
+    @Resource
+    private RuntimePathConfig runtimePathConfig;
 
     /** 验证码语音的存储目录，落在音频目录下单独一层，便于与对话录音区分 */
     private static final String VERIFY_CODE_AUDIO_DIR = "verifycode/";
@@ -319,7 +322,7 @@ public class MessageHandler {
                         // 这条记录由 server 进程读来下发前端、由本进程读来重播，
                         // 两边工作目录未必相同，必须交给存储服务，入库的是存储返回的路径
                         String storedPath = storageServiceFactory.getStorageService()
-                                .upload(audioFile, AudioUtils.AUDIO_PATH + VERIFY_CODE_AUDIO_DIR + audioName);
+                                .upload(audioFile, runtimePathConfig.getAudioDir() + VERIFY_CODE_AUDIO_DIR + audioName);
                         deviceService.updateCodeAudioPath(deviceId, sessionId, codeResult.getCode(), storedPath);
                     } catch (Exception e) {
                         // 存不进共享存储就不落库，留空让下次重新合成，好过记下一个别处读不到的路径

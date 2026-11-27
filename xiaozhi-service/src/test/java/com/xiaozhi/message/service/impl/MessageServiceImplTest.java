@@ -16,15 +16,14 @@ import com.xiaozhi.storage.service.StorageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.support.MybatisPlusTestHelper;
 import com.xiaozhi.utils.AudioUtils;
+import com.xiaozhi.utils.DateUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -32,6 +31,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -42,7 +42,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -78,19 +77,9 @@ class MessageServiceImplTest {
     @InjectMocks
     private MessageServiceImpl messageService;
 
-    // AudioUtils.AUDIO_PATH 只由 RuntimePathConfig 的 @PostConstruct 初始化，
-    // 纯 Mockito 单测里这条 Spring 生命周期不会跑，需要手动布置并在用例结束后还原，
-    // 避免污染同一 JVM 里其它测试类读到的静态值
-    private String originalAudioPath;
-
-    @BeforeEach
-    void captureAudioPath() {
-        originalAudioPath = AudioUtils.AUDIO_PATH;
-    }
-
     @AfterEach
-    void restoreAudioPath() {
-        AudioUtils.AUDIO_PATH = originalAudioPath;
+    void resetClock() {
+        DateUtils.reset();
     }
 
     @Test
@@ -253,17 +242,15 @@ class MessageServiceImplTest {
         when(messageConvert.toBO(messageDO)).thenReturn(messageBO);
         when(messageMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(0);
 
-        try (MockedStatic<AudioUtils> audioUtils = mockStatic(AudioUtils.class)) {
-            assertThatThrownBy(() -> messageService.delete(1L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("删除消息失败");
+        assertThatThrownBy(() -> messageService.delete(1L))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("删除消息失败");
 
-            audioUtils.verify(() -> AudioUtils.deleteFile(anyString()), never());
-        }
+        verify(storageServiceFactory, never()).removeFrom(anyString());
     }
 
     @Test
-    void deleteRemovesAudioFileAfterUpdateSucceeds() {
+    void deleteRemovesAudioFromItsStorageAfterUpdateSucceeds() {
         MessageDO messageDO = new MessageDO();
         messageDO.setMessageId(1L);
         MessageBO messageBO = new MessageBO();
@@ -274,11 +261,9 @@ class MessageServiceImplTest {
         when(messageConvert.toBO(messageDO)).thenReturn(messageBO);
         when(messageMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1);
 
-        try (MockedStatic<AudioUtils> audioUtils = mockStatic(AudioUtils.class)) {
-            messageService.delete(1L);
+        messageService.delete(1L);
 
-            audioUtils.verify(() -> AudioUtils.deleteFile("audio/2026-01-01/a.opus"));
-        }
+        verify(storageServiceFactory).removeFrom("audio/2026-01-01/a.opus");
     }
 
     @Test
@@ -528,8 +513,9 @@ class MessageServiceImplTest {
 
     @Test
     void deleteByDeviceIdMarksMessagesDeletedAndPublishesClearedEvent() {
-        AudioUtils.AUDIO_PATH = "audio/";
         when(messageMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(3);
+        when(runtimePathConfig.recordingDirKey(eq("AA:BB:CC"), any(LocalDate.class)))
+            .thenAnswer(invocation -> "audio/" + invocation.getArgument(1) + "/AA-BB-CC");
         when(runtimePathConfig.resolveStorageKey(anyString()))
             .thenReturn(Path.of("build/tmp/p3-557-does-not-exist"));
 
@@ -542,9 +528,12 @@ class MessageServiceImplTest {
         verify(messageMapper).update(isNull(), updateCaptor.capture());
         assertThat(updateCaptor.getValue().getTargetSql()).contains("deviceId = ?").contains("state = ?");
 
-        // 保留期内每天一个目录（含今天）；deviceId 里的冒号要换成短横线才是合法路径片段
+        // 保留期内每天一个目录（含今天），目录键由 RuntimePathConfig 统一给出；deviceId 里的冒号换成短横线
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
         verify(runtimePathConfig, times(AudioUtils.AUDIO_RETENTION_DAYS + 1)).resolveStorageKey(keyCaptor.capture());
+        assertThat(keyCaptor.getAllValues()).first().isEqualTo("audio/" + DateUtils.today() + "/AA-BB-CC");
+        assertThat(keyCaptor.getAllValues()).last()
+            .isEqualTo("audio/" + DateUtils.today().minusDays(AudioUtils.AUDIO_RETENTION_DAYS) + "/AA-BB-CC");
         assertThat(keyCaptor.getAllValues()).allSatisfy(key ->
             assertThat(key).contains("AA-BB-CC").doesNotContain(":"));
 

@@ -1,8 +1,10 @@
 package com.xiaozhi.storage.service.impl;
 
 import com.xiaozhi.message.service.MessageService;
+import com.xiaozhi.role.service.RoleService;
 import com.xiaozhi.storage.service.StorageReferenceService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
+import com.xiaozhi.user.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,12 @@ public class StorageReferenceServiceImpl implements StorageReferenceService {
 
     @Resource
     private MessageService messageService;
+
+    @Resource
+    private UserService userService;
+
+    @Resource
+    private RoleService roleService;
 
     @Override
     public long countOnCurrentStorage() {
@@ -33,6 +41,8 @@ public class StorageReferenceServiceImpl implements StorageReferenceService {
         if (prefix == null || prefix.isEmpty()) {
             return 0;
         }
-        return messageService.countStoredPathsWithPrefix(prefix);
+        return messageService.countStoredPathsWithPrefix(prefix)
+            + userService.countStoredPathsWithPrefix(prefix)
+            + roleService.countStoredPathsWithPrefix(prefix);
     }
 }

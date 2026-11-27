@@ -140,13 +140,6 @@ public class HuiBenPlayer  {
      */
     private Path downloadFile(String fileUrl, String fileName) {
         try {
-            // 确保音频目录存在
-            Path audioDir = Path.of(AudioUtils.AUDIO_PATH);
-            Files.createDirectories(audioDir);
-
-            // 将文件保存到音频目录
-            Path outputPath = audioDir.resolve(fileName);
-
             // 使用OkHttp3下载文件
             Request request = new Request.Builder()
                     .url(fileUrl)
@@ -159,10 +152,10 @@ public class HuiBenPlayer  {
                     return null;
                 }
 
-                // 将响应体写入文件
+                // 播放时整段读入内存，读完即删
+                Path outputPath = Files.createTempFile("xiaozhi-media-", "-" + fileName);
                 Files.write(outputPath, response.body().bytes());
 
-                //return outputPath.toAbsolutePath().toString();
                 return outputPath;
             }
         } catch (Exception e) {

@@ -1,5 +1,6 @@
 package com.xiaozhi.dialogue;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.common.SerialTaskRegistry;
 import com.xiaozhi.communication.common.ChatSession;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
@@ -44,6 +46,7 @@ class DialogueServiceUserAudioTest {
     private static final Duration AWAIT_TIMEOUT = Duration.ofSeconds(3);
     /** 16kHz 单声道 16bit 下正好 0.1 秒 */
     private static final int PCM_BYTES = 3200;
+    private static final String KEY = "audio/user.wav";
 
     @TempDir
     Path audioDir;
@@ -60,6 +63,9 @@ class DialogueServiceUserAudioTest {
     @Mock
     private FaultNotifier faultNotifier;
 
+    @Spy
+    private RuntimePathConfig runtimePathConfig = new RuntimePathConfig();
+
     @InjectMocks
     private DialogueService dialogueService;
 
@@ -69,6 +75,7 @@ class DialogueServiceUserAudioTest {
     void setUp() {
         lenient().when(springSession.getId()).thenReturn(SESSION_ID);
         session = new WebSocketSession(springSession);
+        runtimePathConfig.setDataDir(audioDir.toString());
     }
 
     @Test
@@ -78,8 +85,8 @@ class DialogueServiceUserAudioTest {
         when(storageService.upload(any(Path.class), anyString()))
                 .thenReturn("https://oss.example.com/audio/user.wav");
 
-        Path wav = audioDir.resolve("user.wav");
-        UserSpeechAudio audio = new UserSpeechAudio(wav);
+        Path wav = audioDir.resolve(KEY);
+        UserSpeechAudio audio = new UserSpeechAudio(KEY);
         dialogueService.saveUserAudio(session, audio);
 
         // PCM 必须在调用线程取走：下一轮 SPEECH_START 会清空 VAD 缓冲
@@ -90,18 +97,19 @@ class DialogueServiceUserAudioTest {
         assertThat(audio.duration()).isCloseTo(0.1, within(1e-6));
     }
 
-    /** 上传失败退回本地路径，路径不能丢 */
+    /** 上传失败退回存储键，路径不能丢 */
     @Test
     void keepsLocalPathWhenUploadFails() throws Exception {
         when(vadService.getPcmData(SESSION_ID)).thenReturn(List.of(new byte[PCM_BYTES]));
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
         when(storageService.upload(any(Path.class), anyString())).thenThrow(new IOException("对象存储不可用"));
 
-        Path wav = audioDir.resolve("user.wav");
-        UserSpeechAudio audio = new UserSpeechAudio(wav);
+        Path wav = audioDir.resolve(KEY);
+        UserSpeechAudio audio = new UserSpeechAudio(KEY);
         dialogueService.saveUserAudio(session, audio);
 
-        assertThat(audio.awaitStoredPath(AWAIT_TIMEOUT)).isEqualTo(wav.toString());
+        assertThat(audio.awaitStoredPath(AWAIT_TIMEOUT)).isEqualTo(KEY);
+        verify(storageService).upload(wav, KEY);
     }
 
     /** 本轮没有音频也要回填，否则声纹注册这类等结果的调用方会一直等到超时 */
@@ -109,8 +117,8 @@ class DialogueServiceUserAudioTest {
     void completesEvenWithoutAudio() {
         when(vadService.getPcmData(SESSION_ID)).thenReturn(List.of());
 
-        Path wav = audioDir.resolve("user.wav");
-        UserSpeechAudio audio = new UserSpeechAudio(wav);
+        Path wav = audioDir.resolve(KEY);
+        UserSpeechAudio audio = new UserSpeechAudio(KEY);
         dialogueService.saveUserAudio(session, audio);
 
         assertThat(audio.awaitStoredPath(AWAIT_TIMEOUT)).isNull();
@@ -127,7 +135,7 @@ class DialogueServiceUserAudioTest {
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
         when(storageService.upload(any(Path.class), anyString())).thenReturn("audio/user.wav");
 
-        UserSpeechAudio audio = new UserSpeechAudio(audioDir.resolve("user.wav"));
+        UserSpeechAudio audio = new UserSpeechAudio(KEY);
         dialogueService.saveUserAudio(session, audio);
 
         // 模拟 DialogueListener.onDialogueTurn：同一个串行键上后入队的落库任务

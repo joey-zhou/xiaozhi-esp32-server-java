@@ -5,14 +5,12 @@ import com.xiaozhi.communication.domain.AudioParams;
 import com.xiaozhi.communication.domain.iot.IotDescriptor;
 import com.xiaozhi.communication.server.websocket.BinaryProtocolCodec;
 import com.xiaozhi.common.model.bo.DeviceBO;
-import com.xiaozhi.common.model.bo.MessageBO;
 import com.xiaozhi.ai.tool.ToolsSessionHolder;
 import com.xiaozhi.dialogue.llm.tool.mcp.device.DeviceMcpHolder;
 import com.xiaozhi.dialogue.runtime.DialogueContext;
 import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
-import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.dialogue.runtime.SpeechTurn;
 import com.xiaozhi.dialogue.runtime.UserSpeechAudio;
@@ -23,11 +21,7 @@ import lombok.Getter;
 import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Sinks;
 
-import java.nio.file.Path;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -245,31 +239,6 @@ public abstract class ChatSession {
             wakeWordAudio.clear();
             return frames;
         }
-    }
-
-    /**
-     * 音频文件约定路径为：audio/{date}/{device-id}/{role-id}/{timestamp}-{who}.wav|ogg
-     * 按日期分目录，便于批量清理过期数据（直接删整个日期目录）
-     *
-     * @param who
-     * @param instant
-     * @return
-     */
-    public Path getAudioPath(String who, Instant instant) {
-
-        instant = instant.truncatedTo(ChronoUnit.SECONDS);
-
-        LocalDateTime localDateTime = DateUtils.toDateTime(instant);
-        String date = localDateTime.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        String datetime = localDateTime.format(DateTimeFormatter.ISO_DATE_TIME).replace(":", "");
-        DeviceBO device = this.getDevice();
-        // 判断设备ID是否有不适合路径的特殊字符，它很可能是mac地址需要转换。
-        String deviceId = device.getDeviceId().replace(":", "-");
-        String roleId = device.getRoleId().toString();
-        // assistant 是 TTS 的 opus 流直接落盘，其余是上行音频解码后的 PCM
-        String extension = MessageBO.SENDER_ASSISTANT.equals(who) ? "ogg" : "wav";
-        String filename = "%s-%s.%s".formatted(datetime, who, extension);
-        return Path.of(AudioUtils.AUDIO_PATH, date, deviceId, roleId, filename);
     }
 
     /**

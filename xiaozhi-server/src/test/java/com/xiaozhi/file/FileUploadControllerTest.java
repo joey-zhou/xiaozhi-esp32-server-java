@@ -66,7 +66,7 @@ class FileUploadControllerTest extends ControllerTestSupport {
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
         when(storageService.upload(any(), anyString(), anyString())).thenReturn("uploads/image/avatar.png");
         when(storageService.getProvider()).thenReturn("local");
-        when(storageService.getAccessUrl("uploads/image/avatar.png"))
+        when(storageServiceFactory.accessUrlOf("uploads/image/avatar.png"))
             .thenReturn("uploads/image/avatar.png?exp=1&sig=abc");
         when(serverAddressProvider.getServerAddress()).thenReturn("https://server.test");
 

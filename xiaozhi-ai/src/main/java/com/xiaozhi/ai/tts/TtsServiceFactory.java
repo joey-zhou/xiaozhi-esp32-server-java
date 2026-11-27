@@ -3,7 +3,6 @@ package com.xiaozhi.ai.tts;
 import com.xiaozhi.event.AiConfigChangedEvent;
 import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.common.port.ProviderTokenClient;
-import com.xiaozhi.utils.AudioUtils;
 import com.xiaozhi.ai.tts.providers.*;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.RoleBO;
@@ -119,7 +118,7 @@ public class TtsServiceFactory {
      */
     public TtsService createApiService(ConfigBO config, String voiceName, Double pitch, Double speed) {
         // Make sure output dir exists
-        String outputPath = AudioUtils.AUDIO_PATH;
+        String outputPath = runtimePathConfig.resolveAudioDir().toString();
         ensureOutputPath(outputPath);
 
         TtsService ttsService = switch (config.getProvider()) {

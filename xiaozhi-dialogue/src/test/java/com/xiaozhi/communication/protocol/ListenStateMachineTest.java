@@ -16,17 +16,12 @@ import com.xiaozhi.dialogue.runtime.PersonaListener;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.message.service.MessageService;
-import com.xiaozhi.utils.AudioUtils;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -70,10 +65,6 @@ class ListenStateMachineTest {
     private static final String REPLY_ONE = "第一段回复";
     private static final String REPLY_TWO = "第二段回复";
 
-    @TempDir
-    static Path audioDir;
-
-    private static String originalAudioPath;
 
     private ProtocolTestHarness harness;
     /** Persona 打断收尾时提交的轮次，用来观察 onInterrupted 是否被调到 */
@@ -82,18 +73,6 @@ class ListenStateMachineTest {
     private volatile String scriptedReply = REPLY_ONE;
     private volatile byte scriptedRound = ROUND_ONE;
     private volatile int scriptedFrameCount = 6;
-
-    @BeforeAll
-    static void redirectAudioDir() {
-        // STT 出结果后会把本轮音频落盘，AUDIO_PATH 由启动配置注入，测试里必须自己指过去
-        originalAudioPath = AudioUtils.AUDIO_PATH;
-        AudioUtils.AUDIO_PATH = audioDir.toString();
-    }
-
-    @AfterAll
-    static void restoreAudioDir() {
-        AudioUtils.AUDIO_PATH = originalAudioPath;
-    }
 
     @BeforeEach
     void setUp() {
@@ -352,7 +331,7 @@ class ListenStateMachineTest {
         if (player == null) {
             player = new ScheduledPlayer(session, harness.messageSender());
             player.setOpusRecorder(new OpusRecorder(session, mock(MessageService.class),
-                    harness.aec(), harness.storageServiceFactory()));
+                    harness.aec(), harness.storageServiceFactory(), harness.runtimePathConfig()));
             session.setPlayer(player);
         }
         DeviceBO device = session.getDevice();

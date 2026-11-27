@@ -27,11 +27,9 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -97,7 +95,7 @@ public class MessageServiceImpl implements MessageService {
             throw new IllegalStateException("删除消息失败");
         }
         if (StringUtils.hasText(existing.getAudioPath())) {
-            AfterCommit.run(() -> AudioUtils.deleteFile(existing.getAudioPath()));
+            AfterCommit.run(() -> storageServiceFactory.removeFrom(existing.getAudioPath()));
         }
     }
 
@@ -122,16 +120,13 @@ public class MessageServiceImpl implements MessageService {
     }
 
     /**
-     * 删除该设备在保留期内每一天的音频目录。
+     * 删除该设备在保留期内每一天的本地录音目录。
      */
     private void deleteAudioDirectories(String deviceId) {
-        String audioDeviceId = deviceId.replace(":", "-");
         LocalDate today = DateUtils.today();
         for (int i = 0; i <= AudioUtils.AUDIO_RETENTION_DAYS; i++) {
-            String date = today.minusDays(i).format(DateTimeFormatter.ISO_LOCAL_DATE);
-            Path deviceDir = runtimePathConfig.resolveStorageKey(
-                    Path.of(AudioUtils.AUDIO_PATH, date, audioDeviceId).toString());
-            AudioUtils.deleteDirectory(deviceDir);
+            String dirKey = runtimePathConfig.recordingDirKey(deviceId, today.minusDays(i));
+            AudioUtils.deleteDirectory(runtimePathConfig.resolveStorageKey(dirKey));
         }
     }
 

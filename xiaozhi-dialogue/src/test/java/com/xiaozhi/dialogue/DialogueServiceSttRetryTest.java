@@ -1,5 +1,7 @@
 package com.xiaozhi.dialogue;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
+import com.xiaozhi.dialogue.runtime.UserSpeechAudio;
 import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.ai.stt.SttResult;
@@ -13,7 +15,6 @@ import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.storage.service.StorageServiceFactory;
-import com.xiaozhi.utils.AudioUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import reactor.core.publisher.Flux;
@@ -77,6 +79,9 @@ class DialogueServiceSttRetryTest {
     @Mock
     private FaultNotifier faultNotifier;
 
+    @Spy
+    private RuntimePathConfig runtimePathConfig = new RuntimePathConfig();
+
     @InjectMocks
     private DialogueService dialogueService;
 
@@ -84,16 +89,13 @@ class DialogueServiceSttRetryTest {
     private Path tempDir;
 
     private WebSocketSession session;
-    private String originalAudioPath;
     private final AtomicInteger sttCalls = new AtomicInteger();
     /** 第二次识别拿到的音频，用来核对重放的是不是整句 */
     private final AtomicReference<List<byte[]>> replayedFrames = new AtomicReference<>();
 
     @BeforeEach
     void setUp() {
-        // AUDIO_PATH 是全局静态字段，生产期由配置注入，测试改完必须还原，否则污染同 JVM 的其他测试
-        originalAudioPath = AudioUtils.AUDIO_PATH;
-        AudioUtils.AUDIO_PATH = tempDir.resolve("audio").toString() + "/";
+        runtimePathConfig.setDataDir(tempDir.toString());
         lenient().when(springSession.getId()).thenReturn(SESSION_ID);
         session = spy(new WebSocketSession(springSession));
         session.setDevice(boundDevice());
@@ -104,9 +106,13 @@ class DialogueServiceSttRetryTest {
         lenient().when(persona.getPlayer()).thenReturn(player);
     }
 
+    /** 用户音频异步落盘，等它写完再让 @TempDir 删目录 */
     @AfterEach
-    void tearDown() {
-        AudioUtils.AUDIO_PATH = originalAudioPath;
+    void awaitUserAudio() {
+        UserSpeechAudio audio = session.getUserSpeechAudio();
+        if (audio != null) {
+            audio.awaitStoredPath(AWAIT_TIMEOUT);
+        }
     }
 
     @Test

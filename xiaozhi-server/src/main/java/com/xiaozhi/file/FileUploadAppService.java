@@ -57,10 +57,10 @@ public class FileUploadAppService {
         resp.setHash(FileHashUtil.calculateSha256(file));
         if (stored.startsWith("http://") || stored.startsWith("https://")) {
             // 云存储私有桶下裸地址访问不了，给带签名的临时地址供即时预览
-            resp.setUrl(storageService.getAccessUrl(stored));
+            resp.setUrl(storageServiceFactory.accessUrlOf(stored));
         } else {
             // url 供即时预览，受保护目录要带签名；relativePath 是入库用的裸路径
-            resp.setUrl(serverAddressProvider.getServerAddress() + "/" + storageService.getAccessUrl(stored));
+            resp.setUrl(serverAddressProvider.getServerAddress() + "/" + storageServiceFactory.accessUrlOf(stored));
             resp.setRelativePath(stored);
         }
         return resp;

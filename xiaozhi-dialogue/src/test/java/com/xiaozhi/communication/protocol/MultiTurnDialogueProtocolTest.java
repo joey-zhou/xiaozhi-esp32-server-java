@@ -13,11 +13,9 @@ import com.xiaozhi.dialogue.runtime.PersonaListener;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.dialogue.event.TtsPlaybackCompletedEvent;
-import com.xiaozhi.utils.AudioUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
@@ -30,7 +28,6 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -65,10 +62,6 @@ class MultiTurnDialogueProtocolTest {
     private static final int FRAMES_PER_SENTENCE = 3;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    @TempDir
-    Path audioDir;
-
-    private String originalAudioPath;
     private ProtocolTestHarness harness;
     private FakeDevice device;
     private ChatSession session;
@@ -80,10 +73,6 @@ class MultiTurnDialogueProtocolTest {
 
     @BeforeEach
     void setUp() {
-        // 用户音频落盘走 AudioUtils.AUDIO_PATH，未设置时 Path.of(null,...) 会让整轮对话在 STT 线程里静默失败
-        originalAudioPath = AudioUtils.AUDIO_PATH;
-        AudioUtils.AUDIO_PATH = audioDir.toString();
-
         harness = ProtocolTestHarness.create();
         chatModel = mock(ChatModel.class);
         personaListener = mock(PersonaListener.class);
@@ -106,7 +95,6 @@ class MultiTurnDialogueProtocolTest {
             synthesizer.releasePlayback();
         }
         harness.shutdown();
-        AudioUtils.AUDIO_PATH = originalAudioPath;
     }
 
     @Test

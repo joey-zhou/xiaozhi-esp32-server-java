@@ -1,5 +1,7 @@
 package com.xiaozhi.dialogue;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
+import com.xiaozhi.dialogue.runtime.UserSpeechAudio;
 import com.xiaozhi.dialogue.runtime.FaultNotifier;
 import com.xiaozhi.ai.llm.service.IntentService;
 import com.xiaozhi.ai.stt.SttResult;
@@ -12,7 +14,6 @@ import com.xiaozhi.dialogue.playback.Player;
 import com.xiaozhi.dialogue.runtime.Persona;
 import com.xiaozhi.enums.ListenMode;
 import com.xiaozhi.storage.service.StorageServiceFactory;
-import com.xiaozhi.utils.AudioUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.context.ApplicationEventPublisher;
@@ -82,6 +84,9 @@ class DialogueServiceSegmentRotationTest {
     @Mock
     private FaultNotifier faultNotifier;
 
+    @Spy
+    private RuntimePathConfig runtimePathConfig = new RuntimePathConfig();
+
     @InjectMocks
     private DialogueService dialogueService;
 
@@ -89,15 +94,13 @@ class DialogueServiceSegmentRotationTest {
     private Path tempDir;
 
     private WebSocketSession session;
-    private String originalAudioPath;
     private final AtomicInteger sttCalls = new AtomicInteger();
     /** 每次 stream 收到的音频 */
     private final List<List<byte[]>> receivedAudio = new CopyOnWriteArrayList<>();
 
     @BeforeEach
     void setUp() {
-        originalAudioPath = AudioUtils.AUDIO_PATH;
-        AudioUtils.AUDIO_PATH = tempDir.resolve("audio").toString() + "/";
+        runtimePathConfig.setDataDir(tempDir.toString());
         lenient().when(springSession.getId()).thenReturn(SESSION_ID);
         session = new WebSocketSession(springSession);
         session.setDevice(boundDevice());
@@ -109,9 +112,13 @@ class DialogueServiceSegmentRotationTest {
         lenient().when(vadService.getPcmData(SESSION_ID)).thenReturn(List.of(frame()));
     }
 
+    /** 用户音频异步落盘，等它写完再让 @TempDir 删目录 */
     @AfterEach
-    void tearDown() {
-        AudioUtils.AUDIO_PATH = originalAudioPath;
+    void awaitUserAudio() {
+        UserSpeechAudio audio = session.getUserSpeechAudio();
+        if (audio != null) {
+            audio.awaitStoredPath(AWAIT_TIMEOUT);
+        }
     }
 
     @Test

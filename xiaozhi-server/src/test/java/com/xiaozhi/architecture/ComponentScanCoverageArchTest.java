@@ -54,6 +54,7 @@ class ComponentScanCoverageArchTest {
      * 而 xiaozhi-service 整个模块都在它的 runtime classpath 上，所以这些包里的 bean 对
      * dialogueRuntimeClasses 可见、却不该被扫到。都是纯 HTTP 管理后台功能，dialogue 只处理
      * 设备 WebSocket，不需要：用户登录鉴权、RBAC、操作日志审计、消息模板管理、资源归属校验。
+     * com.xiaozhi.user 不在例外里：com.xiaozhi.storage 里的 StorageReferenceServiceImpl 依赖它，dialogue 扫 storage 时一并装配。
      * com.xiaozhi.music 只在管理端上传音乐，dialogue 只读它的播放列表文件名常量。
      * TransactionConfig（com.xiaozhi.service）只是给 @Transactional 显式指定主事务管理器，
      * Spring Boot 单数据源下的自动配置已经兜底，不配也能跑。
@@ -72,7 +73,6 @@ class ComponentScanCoverageArchTest {
             "com.xiaozhi.security",
             "com.xiaozhi.service",
             "com.xiaozhi.template",
-            "com.xiaozhi.user",
             "com.xiaozhi.userauth"
         )
     );

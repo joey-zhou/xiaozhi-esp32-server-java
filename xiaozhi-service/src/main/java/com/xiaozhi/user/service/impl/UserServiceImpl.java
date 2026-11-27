@@ -214,4 +214,12 @@ public class UserServiceImpl implements UserService {
             throw new IllegalStateException("该手机号、邮箱或用户名已被注册");
         }
     }
+
+    @Override
+    public long countStoredPathsWithPrefix(String prefix) {
+        if (!StringUtils.hasText(prefix)) {
+            return 0;
+        }
+        return userMapper.selectCount(new LambdaQueryWrapper<UserDO>().likeRight(UserDO::getAvatar, prefix));
+    }
 }

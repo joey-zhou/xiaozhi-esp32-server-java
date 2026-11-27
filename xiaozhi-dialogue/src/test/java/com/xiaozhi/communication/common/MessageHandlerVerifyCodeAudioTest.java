@@ -1,5 +1,6 @@
 package com.xiaozhi.communication.common;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.model.bo.DeviceBO;
@@ -10,7 +11,6 @@ import com.xiaozhi.device.service.DeviceService;
 import com.xiaozhi.storage.service.StorageService;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.utils.AudioUtils;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -71,19 +71,15 @@ class MessageHandlerVerifyCodeAudioTest {
     private org.springframework.web.socket.WebSocketSession springSession;
 
     private MessageHandler messageHandler;
-    private String originalAudioPath;
 
     @BeforeEach
     void setUp() {
-        // AUDIO_PATH 是全局静态字段，生产期由配置注入，测试改完必须还原，否则污染同 JVM 的其他测试
-        originalAudioPath = AudioUtils.AUDIO_PATH;
-        AudioUtils.AUDIO_PATH = tempDir.resolve("audio").toString() + "/";
-
         messageHandler = new MessageHandler();
         ReflectionTestUtils.setField(messageHandler, "sessionManager", sessionManager);
         ReflectionTestUtils.setField(messageHandler, "deviceService", deviceService);
         ReflectionTestUtils.setField(messageHandler, "ttsFactory", ttsFactory);
         ReflectionTestUtils.setField(messageHandler, "storageServiceFactory", storageServiceFactory);
+        ReflectionTestUtils.setField(messageHandler, "runtimePathConfig", new RuntimePathConfig());
         ReflectionTestUtils.setField(messageHandler, "messageService", messageService);
 
         lenient().when(springSession.getId()).thenReturn(SESSION_ID);
@@ -92,11 +88,6 @@ class MessageHandlerVerifyCodeAudioTest {
         lenient().when(sessionManager.getSession(SESSION_ID)).thenReturn(session);
         lenient().when(ttsFactory.getDefaultTtsService()).thenReturn(ttsService);
         lenient().when(storageServiceFactory.getStorageService()).thenReturn(storageService);
-    }
-
-    @AfterEach
-    void tearDown() {
-        AudioUtils.AUDIO_PATH = originalAudioPath;
     }
 
     @Test
@@ -113,7 +104,7 @@ class MessageHandlerVerifyCodeAudioTest {
                 .updateCodeAudioPath(DEVICE_ID, SESSION_ID, CODE, STORED_URL);
         ArgumentCaptor<String> objectKey = ArgumentCaptor.forClass(String.class);
         verify(storageService).upload(eq(synthesized), objectKey.capture());
-        assertThat(objectKey.getValue()).isEqualTo(AudioUtils.AUDIO_PATH + "verifycode/" + AUDIO_FILE_NAME);
+        assertThat(objectKey.getValue()).isEqualTo("audio/verifycode/" + AUDIO_FILE_NAME);
 
         // 本次合成的字节在上传前已读出，不再回头下载一遍
         verify(storageServiceFactory, never()).downloadFrom(anyString());
@@ -176,7 +167,7 @@ class MessageHandlerVerifyCodeAudioTest {
 
     /** TTS 落在音频目录下的合成结果，180ms 静音，播放器按 60ms 分块 */
     private Path synthesizedAudio() {
-        Path path = Path.of(AudioUtils.AUDIO_PATH, AUDIO_FILE_NAME);
+        Path path = tempDir.resolve("audio").resolve(AUDIO_FILE_NAME);
         AudioUtils.saveAsWav(path, new byte[3840 * 3]);
         return path;
     }
