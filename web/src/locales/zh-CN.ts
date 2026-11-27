@@ -565,6 +565,8 @@ export default {
       llmRuncrateApiUrl: 'Runcrate API 接口地址',
       llmWorldRouterApiKey: '在 https://www.worldrouter.ai/dashboard/api-keys 申请',
       llmWorldRouterApiUrl: 'WorldRouter API 接口地址',
+      llmLLMTRApiKey: '在 https://llmtr.com/dashboard/keys 申请',
+      llmLLMTRApiUrl: 'LLMTR API 接口地址',
       llmSILICONFLOWApiKey: '在 https://cloud.siliconflow.cn/account/ak 申请',
       llmStepFunApiKey: '在 StepFun 平台申请',
       llmStepFunApiUrl: 'StepFun API 接口地址',

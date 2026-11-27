@@ -683,6 +683,28 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           help: 'config.help.llmWorldRouterApiUrl'
         }
       ],
+      // LLMTR
+      'LLMTR': [
+        {
+          name: 'apiKey',
+          label: 'API Key',
+          required: true,
+          inputType: 'password',
+          placeholder: 'sk-...',
+          span: 12,
+          help: 'config.help.llmLLMTRApiKey'
+        },
+        {
+          name: 'apiUrl',
+          label: 'API URL',
+          required: true,
+          inputType: 'text',
+          placeholder: 'https://llmtr.com/v1',
+          span: 12,
+          suffix: '/chat/completions',
+          help: 'config.help.llmLLMTRApiUrl'
+        }
+      ],
       // Replicate
       'Replicate': [
         {

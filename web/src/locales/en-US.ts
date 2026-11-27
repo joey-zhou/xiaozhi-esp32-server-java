@@ -565,6 +565,8 @@ export default {
       llmRuncrateApiUrl: 'Runcrate API endpoint',
       llmWorldRouterApiKey: 'Apply at https://www.worldrouter.ai/dashboard/api-keys',
       llmWorldRouterApiUrl: 'WorldRouter API endpoint',
+      llmLLMTRApiKey: 'Apply at https://llmtr.com/dashboard/keys',
+      llmLLMTRApiUrl: 'LLMTR API endpoint',
       llmSILICONFLOWApiKey: 'Apply at https://cloud.siliconflow.cn/account/ak',
       llmStepFunApiKey: 'Apply on the StepFun platform',
       llmStepFunApiUrl: 'StepFun API endpoint',

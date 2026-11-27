@@ -3903,6 +3903,43 @@
             ]
         },
         {
+            "name": "LLMTR",
+            "logo": "",
+            "tags": "LLM,IMAGE2TEXT",
+            "status": "1",
+            "url": "https://llmtr.com/v1",
+            "llm": [
+                {
+                    "llm_name": "qwen/qwen3.8-flash",
+                    "tags": "LLM,CHAT,IMAGE2TEXT,1M",
+                    "max_tokens": 1000000,
+                    "model_type": "chat",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "qwen/qwen3.8-max",
+                    "tags": "LLM,CHAT,IMAGE2TEXT,1M",
+                    "max_tokens": 1000000,
+                    "model_type": "chat",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "mistral/devstral-medium-latest",
+                    "tags": "LLM,CHAT,IMAGE2TEXT,128K",
+                    "max_tokens": 128000,
+                    "model_type": "chat",
+                    "is_tools": true
+                },
+                {
+                    "llm_name": "qwen/qwen3.8-27b-free",
+                    "tags": "LLM,CHAT,IMAGE2TEXT,128K",
+                    "max_tokens": 131042,
+                    "model_type": "chat",
+                    "is_tools": true
+                }
+            ]
+        },
+        {
             "name": "Replicate",
             "logo": "",
             "tags": "LLM,TEXT EMBEDDING",
