@@ -2,6 +2,7 @@ package com.xiaozhi.verifycode.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.verifycode.convert.VerifyCodeConvert;
@@ -160,7 +161,7 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
         verifyCode.setCode(code);
         verifyCode.setCreateTime(DateUtils.now());
         if (verifyCodeMapper.insert(verifyCode) <= 0) {
-            throw new IllegalStateException("生成验证码失败");
+            throw new OperationFailedException("生成验证码失败");
         }
         return code;
     }

@@ -95,10 +95,10 @@ class VerifyCodeAppServiceTest {
     }
 
     @Test
-    void sendEmailCaptchaRejectsInvalidEmailFormatWithoutGeneratingCode() {
-        assertThatThrownBy(() -> verifyCodeAppService.sendEmailCaptcha(emailReq("not-an-email", "register")))
+    void sendEmailCaptchaRequiresAnEmailWithoutGeneratingCode() {
+        assertThatThrownBy(() -> verifyCodeAppService.sendEmailCaptcha(telReq("13800138000", "register")))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("邮箱格式不正确");
+            .hasMessage("邮箱不能为空");
 
         verify(verifyCodeService, never()).generateForAccount(anyString());
         verifyNoInteractions(smtpEmailSender);
@@ -155,10 +155,10 @@ class VerifyCodeAppServiceTest {
     }
 
     @Test
-    void sendSmsCaptchaRejectsInvalidTelFormatWithoutGeneratingCode() {
-        assertThatThrownBy(() -> verifyCodeAppService.sendSmsCaptcha(telReq("12345", "register")))
+    void sendSmsCaptchaRequiresATelWithoutGeneratingCode() {
+        assertThatThrownBy(() -> verifyCodeAppService.sendSmsCaptcha(emailReq("a@b.com", "register")))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("手机号格式不正确");
+            .hasMessage("手机号不能为空");
 
         verify(verifyCodeService, never()).generateForAccount(anyString());
         verifyNoInteractions(aliyunSmsSender);

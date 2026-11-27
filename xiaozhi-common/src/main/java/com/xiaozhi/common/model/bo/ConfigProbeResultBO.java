@@ -1,6 +1,6 @@
 package com.xiaozhi.common.model.bo;
 
-/** 配置试拨的结论：成功与否 + 给前端看的一句话说明。不耦合 web 层的 ApiResponse，由 Controller 负责包装。 */
+/** 配置试拨的结论：成功与否 + 给前端看的一句话说明 */
 public record ConfigProbeResultBO(boolean success, String message) {
 
     public static ConfigProbeResultBO success(String message) {

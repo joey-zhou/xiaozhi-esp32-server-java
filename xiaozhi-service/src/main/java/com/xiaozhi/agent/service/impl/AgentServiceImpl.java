@@ -3,6 +3,7 @@ package com.xiaozhi.agent.service.impl;
 import com.xiaozhi.agent.AgentProviders;
 import com.xiaozhi.agent.convert.AgentConvert;
 import com.xiaozhi.agent.service.AgentService;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.AgentBO;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.PlatformAgentBO;
@@ -213,7 +214,7 @@ public class AgentServiceImpl implements AgentService {
             if (e.getCause() instanceof RuntimeException runtime) {
                 throw runtime;
             }
-            throw new IllegalStateException("同步智能体失败", e.getCause());
+            throw new OperationFailedException("同步智能体失败", e.getCause());
         }
     }
 
@@ -330,7 +331,7 @@ public class AgentServiceImpl implements AgentService {
             token = tokenClient.getToken(credential);
         } catch (RuntimeException e) {
             log.error("获取Coze Token失败", e);
-            throw new RuntimeException("无法获取Coze平台授权码，请检查您的平台配置是否正确", e);
+            throw new OperationFailedException("无法获取Coze平台授权码，请检查您的平台配置是否正确", e);
         }
 
         List<PlatformAgentBO> bots;

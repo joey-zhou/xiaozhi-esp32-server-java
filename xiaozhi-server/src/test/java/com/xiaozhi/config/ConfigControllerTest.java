@@ -1,7 +1,7 @@
 package com.xiaozhi.config;
 
 import com.xiaozhi.common.exception.ResourceNotFoundException;
-import com.xiaozhi.common.model.bo.ConfigProbeResultBO;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.req.ConfigCreateReq;
 import com.xiaozhi.common.model.req.ConfigPageReq;
 import com.xiaozhi.common.model.req.ConfigTestReq;
@@ -116,7 +116,7 @@ class ConfigControllerTest extends ControllerTestSupport {
     @Test
     void testEndpointDelegatesToTestAppServiceWithCurrentUser() throws Exception {
         when(configTestAppService.test(any(ConfigTestReq.class), eq(7)))
-            .thenReturn(ConfigProbeResultBO.success("连接成功"));
+            .thenReturn("连接成功");
 
         try (var ignored = mockLoginUser(7)) {
             mockMvc.perform(post("/api/config/test")
@@ -135,13 +135,13 @@ class ConfigControllerTest extends ControllerTestSupport {
     @Test
     void testEndpointReturnsErrorResponseWhenProbeFails() throws Exception {
         when(configTestAppService.test(any(ConfigTestReq.class), eq(7)))
-            .thenReturn(ConfigProbeResultBO.failure("接口返回未授权（401），请检查密钥与账号权限"));
+            .thenThrow(new OperationFailedException("接口返回未授权（401），请检查密钥与账号权限"));
 
         try (var ignored = mockLoginUser(7)) {
             mockMvc.perform(post("/api/config/test")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(toJson(testReq())))
-                .andExpect(status().isOk())
+                .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value(ResultStatus.ERROR))
                 .andExpect(jsonPath("$.message").value("接口返回未授权（401），请检查密钥与账号权限"));
         }

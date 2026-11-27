@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.utils.RequestContextUtils;
 
@@ -56,8 +57,6 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     /** Redis key 前缀 */
     private static final String RATE_LIMIT_PREFIX = "rate_limit:";
-
-    private static final ObjectMapper RESPONSE_MAPPER = new ObjectMapper();
 
     /** 请求体里解析出的账号，挂在请求属性上传给拦截器 */
     static final String ACCOUNT_ATTRIBUTE = "xiaozhi.rateLimit.account";
@@ -118,9 +117,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             if (isExceeded(uri, subject)) {
                 log.warn("请求频率超限 - 主体: {}, IP: {}, 端点: {}, 上限: {}/{}s",
                         subject.key(), clientIp, uri, subject.maxRequests(), WINDOW_SECONDS);
-                response.setStatus(429);
-                response.setContentType("application/json;charset=UTF-8");
-                response.getWriter().write(RESPONSE_MAPPER.writeValueAsString(ApiResponse.error(429, "请求过于频繁，请稍后再试")));
+                ApiResponse.write(response, ResultStatus.TOO_MANY_REQUESTS, "请求过于频繁，请稍后再试");
                 return false;
             }
         }
@@ -277,9 +274,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
             byte[] body = request.getInputStream().readNBytes(MAX_BODY_BYTES + 1);
             if (body.length > MAX_BODY_BYTES) {
-                response.setStatus(413);
-                response.setContentType("application/json;charset=UTF-8");
-                response.getWriter().write(BODY_MAPPER.writeValueAsString(ApiResponse.error(413, "请求体过大")));
+                ApiResponse.write(response, ResultStatus.PAYLOAD_TOO_LARGE, "请求体过大");
                 return;
             }
 

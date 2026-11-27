@@ -8,6 +8,7 @@ import com.xiaozhi.verifycode.sender.SmtpEmailSender;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import lombok.extern.slf4j.Slf4j;
 /**
@@ -36,22 +37,22 @@ public class VerifyCodeAppService {
     /**
      * 发送邮箱验证码
      * <p>
-     * 格式校验放在生成验证码之前，避免为非法地址生成验证码。找回密码不暴露账号是否存在：
-     * 账号不存在也照常返回、什么都不发；存在的放到后台发，发送耗时与失败提示都不会让两种情况看起来不一样。
+     * 找回密码不暴露账号是否存在：账号不存在也照常返回、什么都不发；存在的放到后台发，
+     * 发送耗时与失败提示都不会让两种情况看起来不一样。
      */
     public void sendEmailCaptcha(UserSendCaptchaReq req) {
         String email = req.getEmail();
-        if (!isValidEmail(email)) {
-            throw new IllegalArgumentException("邮箱格式不正确");
+        if (!StringUtils.hasText(email)) {
+            throw new IllegalArgumentException("邮箱不能为空");
         }
         if (FORGET.equals(req.getType())) {
             if (userService.getByEmail(email) != null) {
-                String code = newCode(email);
+                String code = verifyCodeService.generateForAccount(email);
                 Thread.startVirtualThread(() -> quietly(() -> deliverEmail(email, code)));
             }
             return;
         }
-        deliverEmail(email, newCode(email));
+        deliverEmail(email, verifyCodeService.generateForAccount(email));
     }
 
     private void deliverEmail(String email, String code) {
@@ -75,21 +76,21 @@ public class VerifyCodeAppService {
     /**
      * 发送短信验证码
      * <p>
-     * 格式校验放在生成验证码之前，避免为非法号码生成验证码。找回密码的处理同 {@link #sendEmailCaptcha}。
+     * 找回密码的处理同 {@link #sendEmailCaptcha}。
      */
     public void sendSmsCaptcha(UserSendCaptchaReq req) {
         String tel = req.getTel();
-        if (!isValidPhoneNumber(tel)) {
-            throw new IllegalArgumentException("手机号格式不正确");
+        if (!StringUtils.hasText(tel)) {
+            throw new IllegalArgumentException("手机号不能为空");
         }
         if (FORGET.equals(req.getType())) {
             if (userService.getByTel(tel) != null) {
-                String code = newCode(tel);
+                String code = verifyCodeService.generateForAccount(tel);
                 Thread.startVirtualThread(() -> quietly(() -> deliverSms(tel, code)));
             }
             return;
         }
-        deliverSms(tel, newCode(tel));
+        deliverSms(tel, verifyCodeService.generateForAccount(tel));
     }
 
     private void deliverSms(String tel, String code) {
@@ -108,16 +109,6 @@ public class VerifyCodeAppService {
         }
     }
 
-    private String newCode(String account) {
-        String code = verifyCodeService.generateForAccount(account);
-        // 验证码格式不对也不能把验证码原文打进日志
-        if (!isValidCode(code)) {
-            log.warn("验证码格式不正确");
-            throw new OperationFailedException("验证码格式不正确");
-        }
-        return code;
-    }
-
     /** 后台发送的失败只记日志：回给调用方就等于告诉他这个账号存在 */
     private static void quietly(Runnable delivery) {
         try {
@@ -125,18 +116,6 @@ public class VerifyCodeAppService {
         } catch (RuntimeException e) {
             log.warn("找回密码验证码后台发送失败: {}", e.getMessage());
         }
-    }
-
-    private boolean isValidEmail(String email) {
-        return email != null && email.matches("^[^@]+@[^@]+\\.[^@]+$");
-    }
-
-    private boolean isValidPhoneNumber(String phoneNumber) {
-        return phoneNumber != null && phoneNumber.matches("^1\\d{10}$");
-    }
-
-    private boolean isValidCode(String code) {
-        return code != null && code.matches("^[0-9A-Za-z]{4,6}$");
     }
 
     /**

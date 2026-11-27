@@ -1,8 +1,10 @@
 package com.xiaozhi.user;
 
+import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.authrole.convert.AuthRoleConvert;
 import com.xiaozhi.authrole.service.AuthRoleService;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
 import com.xiaozhi.common.model.bo.UserAuthBO;
@@ -219,7 +221,7 @@ public class UserAppService {
         Map<String, String> info = wxLoginService.getWxLoginInfo(code);
         String openId = info.get("openid");
         if (!StringUtils.hasText(openId)) {
-            throw new IllegalStateException("获取微信openid失败");
+            throw new OperationFailedException("获取微信openid失败");
         }
         WechatLogin result = self.loginByWechat(openId, info.get("unionid"), JsonUtil.toJson(info));
         return signIn(result.user(), result.newUser(), clientIp);
@@ -231,7 +233,7 @@ public class UserAppService {
         StpUtil.login(user.getUserId(), TOKEN_EXPIRE_SECONDS);
         LoginResp resp = buildLoginResp(user.getUserId(), StpUtil.getTokenValue(), newUser);
         if (resp == null) {
-            throw new IllegalStateException("登录成功但用户信息加载失败");
+            throw new OperationFailedException("登录成功但用户信息加载失败");
         }
         return resp;
     }
@@ -361,6 +363,15 @@ public class UserAppService {
         update.setUserId(userId);
         update.setState(state);
         return userConvert.toResp(userService.update(update));
+    }
+
+    /** 当前登录信息，账号已不存在按未登录处理 */
+    public LoginResp currentLogin(Integer userId) {
+        LoginResp resp = buildLoginResp(userId, StpUtil.getTokenValue(), false);
+        if (resp == null) {
+            throw new NotLoginException("用户不存在", StpUtil.getLoginType(), NotLoginException.INVALID_TOKEN);
+        }
+        return resp;
     }
 
     public LoginResp buildLoginResp(Integer userId, String token, boolean isNewUser) {

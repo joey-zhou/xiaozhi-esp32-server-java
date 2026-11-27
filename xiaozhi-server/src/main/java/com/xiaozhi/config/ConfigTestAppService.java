@@ -1,6 +1,7 @@
 package com.xiaozhi.config;
 
 import com.xiaozhi.ai.probe.ConfigProbe;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.ConfigProbeResultBO;
 import com.xiaozhi.common.model.req.ConfigTestReq;
@@ -29,22 +30,25 @@ public class ConfigTestAppService {
     private ConfigProbe configProbe;
 
     /**
-     * 测试配置：使用表单当前值（可能未保存）直接发起一次真实调用，把结果翻译成给前端看的结论。
+     * 测试配置：使用表单当前值（可能未保存）直接发起一次真实调用，成功返回给前端看的结论，失败抛出。
      * <p>配置类型以表单提交的值为准，不查库判断——配置可能正在改、还没保存，用库里旧值判类型会文不对题。
      * <p>库里保存的密钥只能配库里保存的端点使用。本人的配置允许用表单值覆盖端点，
      * 共享配置一律按库里那条原样测试，表单里的端点与密钥都不生效。
      */
-    public ConfigProbeResultBO test(ConfigTestReq req, Integer userId) {
+    public String test(ConfigTestReq req, Integer userId) {
         String configType = req.getConfigType();
         if (!"llm".equals(configType) && !"stt".equals(configType)) {
-            return ConfigProbeResultBO.failure("暂不支持测试该类型配置");
+            throw new IllegalArgumentException("暂不支持测试该类型配置");
         }
         ConfigBO form = configConvert.toBO(req).setUserId(userId);
         AiConfig saved = form.getConfigId() == null
                 ? null
                 : configRepository.findById(form.getConfigId()).orElse(null);
-        ConfigBO bo = resolveConfigUnderTest(saved, form, userId);
-        return configProbe.probe(bo);
+        ConfigProbeResultBO result = configProbe.probe(resolveConfigUnderTest(saved, form, userId));
+        if (!result.success()) {
+            throw new OperationFailedException(result.message());
+        }
+        return result.message();
     }
 
     /**

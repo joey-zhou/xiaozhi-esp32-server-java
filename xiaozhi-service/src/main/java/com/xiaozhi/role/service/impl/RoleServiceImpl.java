@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.role.domain.Role;
 import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.config.CacheNames;
@@ -123,10 +124,10 @@ public class RoleServiceImpl implements RoleService {
         copiedRole.setUserId(targetUserId);
         copiedRole.setIsDefault("1");
         if (roleMapper.insert(copiedRole) <= 0) {
-            throw new IllegalStateException("复制默认角色失败");
+            throw new OperationFailedException("复制默认角色失败");
         }
         if (copiedRole.getRoleId() == null) {
-            throw new IllegalStateException("复制默认角色失败");
+            throw new OperationFailedException("复制默认角色失败");
         }
         return copiedRole.getRoleId();
     }

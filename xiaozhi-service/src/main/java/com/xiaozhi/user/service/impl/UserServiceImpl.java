@@ -1,5 +1,6 @@
 package com.xiaozhi.user.service.impl;
 
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.utils.DateUtils;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -136,12 +137,12 @@ public class UserServiceImpl implements UserService {
             userDO.setAuthRoleId(DEFAULT_AUTH_ROLE_ID);
         }
         if (userMapper.insert(userDO) <= 0) {
-            throw new IllegalStateException("创建用户失败");
+            throw new OperationFailedException("创建用户失败");
         }
 
         UserBO result = userConvert.toBO(userMapper.selectById(userDO.getUserId()));
         if (result == null) {
-            throw new IllegalStateException("创建用户失败");
+            throw new OperationFailedException("创建用户失败");
         }
         return result;
     }
@@ -178,7 +179,7 @@ public class UserServiceImpl implements UserService {
 
         userConvert.updateDO(user, existing);
         if (userMapper.updateById(existing) <= 0) {
-            throw new IllegalStateException("更新用户失败");
+            throw new OperationFailedException("更新用户失败");
         }
         // 不用 @CacheEvict：缓存是事务感知的，注解那次淘汰要等提交后才生效，
         // 同一个事务里写完紧接着 getBO 会读到旧值，接口返回给前端的就是改动前的资料

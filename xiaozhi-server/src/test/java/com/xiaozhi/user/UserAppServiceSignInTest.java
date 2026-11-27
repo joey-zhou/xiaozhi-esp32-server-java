@@ -1,6 +1,8 @@
 package com.xiaozhi.user;
 
+import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.stp.StpUtil;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.UserBO;
 import com.xiaozhi.common.model.resp.LoginResp;
 import com.xiaozhi.common.model.resp.UserResp;
@@ -129,7 +131,8 @@ class UserAppServiceSignInTest {
         when(wxLoginService.getWxLoginInfo("code")).thenReturn(Map.of());
 
         assertThatThrownBy(() -> userAppService.signInByWechat("code", "10.0.0.7"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(OperationFailedException.class)
+                .hasMessage("获取微信openid失败");
     }
 
     @Test
@@ -148,6 +151,18 @@ class UserAppServiceSignInTest {
             userAppService.changeState(1, 2, UserBO.STATE_DISABLED);
 
             stp.verify(() -> StpUtil.logout(2));
+        }
+    }
+
+    @Test
+    void aDeletedAccountCountsAsNotLoggedIn() {
+        doReturn(null).when(userAppService).buildLoginResp(eq(5), eq("tk"), eq(false));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getTokenValue).thenReturn("tk");
+            stp.when(StpUtil::getLoginType).thenReturn("login");
+
+            assertThatThrownBy(() -> userAppService.currentLogin(5)).isInstanceOf(NotLoginException.class);
         }
     }
 }

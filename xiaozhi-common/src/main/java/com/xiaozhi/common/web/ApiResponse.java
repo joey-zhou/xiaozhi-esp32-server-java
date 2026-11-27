@@ -1,6 +1,10 @@
 package com.xiaozhi.common.web;
 
+import com.xiaozhi.utils.JsonUtil;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.io.IOException;
 
 /**
  * 统一响应结果
@@ -89,6 +93,13 @@ public class ApiResponse<T> {
 
     public static <T> ApiResponse<T> error(int code, String msg, T data) {
         return new ApiResponse<>(code, msg, data);
+    }
+
+    /** MVC 之外（过滤器、拦截器）写错误响应，业务码与 HTTP 状态相同 */
+    public static void write(HttpServletResponse response, int status, String message) throws IOException {
+        response.setStatus(status);
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write(JsonUtil.toJson(error(status, message)));
     }
 
     // -------------------- getters --------------------

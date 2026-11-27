@@ -6,7 +6,6 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaMode;
 import com.xiaozhi.common.annotation.AuditLog;
 import com.xiaozhi.common.annotation.CheckOwner;
-import com.xiaozhi.common.model.bo.ConfigProbeResultBO;
 import com.xiaozhi.common.model.req.ConfigCreateReq;
 import com.xiaozhi.common.model.req.ConfigPageReq;
 import com.xiaozhi.common.model.req.ConfigTestReq;
@@ -105,8 +104,7 @@ public class ConfigController extends BaseController {
     @CheckOwner(resource = "config", id = "#req.configId")
     @Operation(summary = "测试配置", description = "使用当前表单参数测试模型配置是否可用")
     public ApiResponse<Void> test(@Valid @RequestBody ConfigTestReq req) {
-        ConfigProbeResultBO result = configTestAppService.test(req, CurrentUser.id());
-        return result.success() ? ApiResponse.success(result.message()) : ApiResponse.error(result.message());
+        return ApiResponse.success(configTestAppService.test(req, CurrentUser.id()));
     }
 
     /**

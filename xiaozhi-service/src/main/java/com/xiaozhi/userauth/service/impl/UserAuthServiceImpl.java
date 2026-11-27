@@ -2,6 +2,7 @@ package com.xiaozhi.userauth.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.xiaozhi.common.annotation.MonitoredOperation;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.UserAuthBO;
 import com.xiaozhi.userauth.convert.UserAuthConvert;
@@ -57,11 +58,11 @@ public class UserAuthServiceImpl implements UserAuthService {
         UserAuthDO d = userAuthConvert.toDO(userAuth);
         d.setId(null);
         if (userAuthMapper.insert(d) <= 0) {
-            throw new IllegalStateException("创建用户授权失败");
+            throw new OperationFailedException("创建用户授权失败");
         }
         UserAuthDO result = userAuthMapper.selectById(d.getId());
         if (result == null) {
-            throw new IllegalStateException("创建用户授权失败");
+            throw new OperationFailedException("创建用户授权失败");
         }
         return userAuthConvert.toBO(result);
     }
@@ -76,7 +77,7 @@ public class UserAuthServiceImpl implements UserAuthService {
             throw new ResourceNotFoundException("用户授权不存在");
         }
         if (userAuthMapper.updateById(userAuthConvert.toDO(userAuth)) <= 0) {
-            throw new IllegalStateException("更新用户授权失败");
+            throw new OperationFailedException("更新用户授权失败");
         }
     }
 
@@ -90,7 +91,7 @@ public class UserAuthServiceImpl implements UserAuthService {
             throw new ResourceNotFoundException("用户授权不存在");
         }
         if (userAuthMapper.deleteById(id) <= 0) {
-            throw new IllegalStateException("删除用户授权失败");
+            throw new OperationFailedException("删除用户授权失败");
         }
     }
 

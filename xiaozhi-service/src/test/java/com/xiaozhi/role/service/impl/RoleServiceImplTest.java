@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaozhi.common.CacheHelper;
 import com.xiaozhi.common.config.CacheNames;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.RoleBO;
 import com.xiaozhi.role.convert.RoleConvert;
@@ -163,7 +164,7 @@ class RoleServiceImplTest {
         when(roleMapper.insert(copiedRole)).thenReturn(0);
 
         assertThatThrownBy(() -> roleService.copyDefaultRole(10, 20))
-            .isInstanceOf(IllegalStateException.class)
+            .isInstanceOf(OperationFailedException.class)
             .hasMessage("复制默认角色失败");
     }
 
@@ -186,7 +187,7 @@ class RoleServiceImplTest {
         when(roleMapper.insert(copiedRole)).thenReturn(1);
 
         assertThatThrownBy(() -> roleService.copyDefaultRole(10, 20))
-            .isInstanceOf(IllegalStateException.class)
+            .isInstanceOf(OperationFailedException.class)
             .hasMessage("复制默认角色失败");
     }
 

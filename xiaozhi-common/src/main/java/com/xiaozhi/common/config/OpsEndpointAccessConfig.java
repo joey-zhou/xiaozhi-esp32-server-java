@@ -1,6 +1,8 @@
 package com.xiaozhi.common.config;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.xiaozhi.common.web.ApiResponse;
+import com.xiaozhi.common.web.ResultStatus;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,9 +54,7 @@ public class OpsEndpointAccessConfig {
                 filterChain.doFilter(request, response);
                 return;
             }
-            response.setStatus(401);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\":401,\"message\":\"未授权访问\"}");
+            ApiResponse.write(response, ResultStatus.UNAUTHORIZED, "未授权访问");
         }
 
         /** 未登录属正常情况，不能让取登录态的异常冒到调用方 */

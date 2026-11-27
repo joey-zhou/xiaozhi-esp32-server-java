@@ -1,5 +1,6 @@
 package com.xiaozhi.user.service.impl;
 
+import com.xiaozhi.common.exception.OperationFailedException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -50,7 +51,7 @@ class WxLoginServiceImplTest {
             .andRespond(withSuccess("not-json", MediaType.TEXT_PLAIN));
 
         assertThatThrownBy(() -> wxLoginService.getWxLoginInfo("code-1"))
-            .isInstanceOf(RuntimeException.class)
+            .isInstanceOf(OperationFailedException.class)
             .hasMessage("解析微信登录响应失败");
 
         server.verify();

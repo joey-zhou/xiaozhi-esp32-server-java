@@ -1,6 +1,7 @@
 package com.xiaozhi.config;
 
 import com.xiaozhi.ai.probe.ConfigProbe;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.model.bo.ConfigProbeResultBO;
 import com.xiaozhi.common.model.req.ConfigTestReq;
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -122,22 +124,29 @@ class ConfigTestAppServiceTest {
     // 试拨以前端提交内容为准，包括配置类型：即使库里保存的是 llm，表单类型不支持就直接失败、不查库
     @Test
     void unsupportedFormConfigTypeFailsWithoutQueryingRepositoryEvenIfSavedTypeIsLlm() {
-        ConfigProbeResultBO response = configTestAppService.test(request("tts"), CURRENT_USER_ID);
-
-        assertThat(response.success()).isFalse();
-        assertThat(response.message()).isEqualTo("暂不支持测试该类型配置");
+        assertThatThrownBy(() -> configTestAppService.test(request("tts"), CURRENT_USER_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("暂不支持测试该类型配置");
         verifyNoInteractions(configConvert, configRepository, configProbe);
     }
 
     @Test
-    void probeResultIsReturnedAsIs() {
+    void aFailedProbeIsThrownWithItsReason() {
         when(configConvert.toBO(any(ConfigTestReq.class))).thenReturn(sttConfig().setConfigId(null));
-        ConfigProbeResultBO expected = ConfigProbeResultBO.failure("接口返回未授权（401），请检查密钥与账号权限");
-        when(configProbe.probe(any(ConfigBO.class))).thenReturn(expected);
+        when(configProbe.probe(any(ConfigBO.class)))
+                .thenReturn(ConfigProbeResultBO.failure("接口返回未授权（401），请检查密钥与账号权限"));
 
-        ConfigProbeResultBO response = configTestAppService.test(request("stt"), CURRENT_USER_ID);
+        assertThatThrownBy(() -> configTestAppService.test(request("stt"), CURRENT_USER_ID))
+                .isInstanceOf(OperationFailedException.class)
+                .hasMessage("接口返回未授权（401），请检查密钥与账号权限");
+    }
 
-        assertThat(response).isSameAs(expected);
+    @Test
+    void aSuccessfulProbeReturnsItsMessage() {
+        when(configConvert.toBO(any(ConfigTestReq.class))).thenReturn(sttConfig().setConfigId(null));
+        when(configProbe.probe(any(ConfigBO.class))).thenReturn(ConfigProbeResultBO.success("连接成功"));
+
+        assertThat(configTestAppService.test(request("stt"), CURRENT_USER_ID)).isEqualTo("连接成功");
     }
 
     private ConfigBO probedConfig() {

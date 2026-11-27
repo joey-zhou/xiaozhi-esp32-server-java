@@ -1,6 +1,7 @@
 package com.xiaozhi.user.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.user.service.WxLoginService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -64,7 +65,7 @@ public class WxLoginServiceImpl implements WxLoginService {
                 }
             }
         } catch (Exception e) {
-            throw new RuntimeException("解析微信登录响应失败", e);
+            throw new OperationFailedException("解析微信登录响应失败", e);
         }
         
         return result;

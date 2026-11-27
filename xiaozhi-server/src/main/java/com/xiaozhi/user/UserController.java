@@ -51,12 +51,7 @@ public class UserController extends BaseController {
     @GetMapping("/check-token")
     @Operation(summary = "检查Token有效性", description = "验证当前Token是否有效，有效则返回用户信息")
     public ApiResponse<LoginResp> checkToken() {
-        Integer userId = CurrentUser.id();
-        LoginResp response = userAppService.buildLoginResp(userId, StpUtil.getTokenValue(), false);
-        if (response == null) {
-            return ApiResponse.unauthorized("用户不存在");
-        }
-        return ApiResponse.success(response);
+        return ApiResponse.success(userAppService.currentLogin(CurrentUser.id()));
     }
 
     @PostMapping("/logout")

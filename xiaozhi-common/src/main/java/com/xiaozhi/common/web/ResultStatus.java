@@ -72,9 +72,19 @@ public class ResultStatus {
     public static final int CONFLICT = 409;
 
     /**
+     * 请求体过大
+     */
+    public static final int PAYLOAD_TOO_LARGE = 413;
+
+    /**
      * 不支持的数据，媒体类型
      */
     public static final int UNSUPPORTED_TYPE = 415;
+
+    /**
+     * 请求过于频繁
+     */
+    public static final int TOO_MANY_REQUESTS = 429;
 
     /**
      * 操作有不可逆后果，前端二次确认后带确认参数重发即可继续。

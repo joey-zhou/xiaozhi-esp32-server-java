@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.storage.service.StorageServiceFactory;
 import com.xiaozhi.support.MybatisPlusTestHelper;
@@ -301,7 +302,7 @@ class VerifyCodeServiceImplTest {
 
         // 落库没成功还把码发出去，用户拿着一个库里查不到的码，怎么填都错
         assertThatThrownBy(() -> verifyCodeService.generateForAccount("a@b.com"))
-            .isInstanceOf(IllegalStateException.class)
+            .isInstanceOf(OperationFailedException.class)
             .hasMessage("生成验证码失败");
     }
 

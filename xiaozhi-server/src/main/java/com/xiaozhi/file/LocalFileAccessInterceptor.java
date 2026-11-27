@@ -1,6 +1,8 @@
 package com.xiaozhi.file;
 
+import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.LocalFileUrlPolicy;
+import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.utils.RequestContextUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,9 +41,7 @@ public class LocalFileAccessInterceptor implements HandlerInterceptor {
             return true;
         }
         log.warn("文件访问签名无效，已拒绝: {}", path);
-        response.setStatus(403);
-        response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write("{\"code\":403,\"message\":\"访问地址无效或已过期\"}");
+        ApiResponse.write(response, ResultStatus.FORBIDDEN, "访问地址无效或已过期");
         return false;
     }
 
