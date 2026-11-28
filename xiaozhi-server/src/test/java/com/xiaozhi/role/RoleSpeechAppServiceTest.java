@@ -1,5 +1,6 @@
 package com.xiaozhi.role;
 
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.ai.tts.TtsService;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.common.exception.OperationFailedException;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.file.Path;
@@ -39,6 +41,9 @@ class RoleSpeechAppServiceTest {
     @Mock
     private StorageService storageService;
 
+    @Spy
+    private RuntimePathConfig runtimePathConfig = new RuntimePathConfig();
+
     @InjectMocks
     private RoleSpeechAppService roleSpeechAppService;
 
@@ -51,13 +56,14 @@ class RoleSpeechAppServiceTest {
         return req;
     }
 
+    /** 合成文件落在 data-dir 下的绝对路径，存储键仍是相对的 */
     @Test
     void theDefaultProviderNeedsNoConfig() throws Exception {
-        Path audio = Path.of("audio/a.mp3");
+        Path synthesized = runtimePathConfig.resolveAudioDir().resolve("a.mp3");
         when(ttsServiceFactory.getTtsService(isNull(), anyString(), any(), any())).thenReturn(ttsService);
-        when(ttsService.textToSpeech("你好")).thenReturn(audio);
+        when(ttsService.textToSpeech("你好")).thenReturn(synthesized);
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
-        when(storageService.upload(audio, audio.toString())).thenReturn("audio/a.mp3");
+        when(storageService.upload(synthesized, "audio/a.mp3")).thenReturn("audio/a.mp3");
 
         assertThat(roleSpeechAppService.preview(req(TtsServiceFactory.DEFAULT_PROVIDER, null)).getAudioUrl())
                 .isEqualTo("audio/a.mp3");

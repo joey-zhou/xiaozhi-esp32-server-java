@@ -3,6 +3,7 @@ package com.xiaozhi.role;
 import com.xiaozhi.ai.stt.SttServiceFactory;
 import com.xiaozhi.ai.tts.SherpaVoiceProbe;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
+import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.model.bo.ConfigBO;
@@ -32,6 +33,8 @@ public class RoleSpeechAppService {
     private TtsServiceFactory ttsServiceFactory;
     @Resource
     private StorageServiceFactory storageServiceFactory;
+    @Resource
+    private RuntimePathConfig runtimePathConfig;
     @Resource
     private SttServiceFactory sttServiceFactory;
     @Resource
@@ -75,7 +78,8 @@ public class RoleSpeechAppService {
         }
         try {
             // 本地返回相对路径，云存储返回完整 URL；出参由响应切面统一签名
-            return new TestVoiceResp(storageServiceFactory.getStorageService().upload(audio, audio.toString()));
+            String key = runtimePathConfig.getAudioDir() + audio.getFileName();
+            return new TestVoiceResp(storageServiceFactory.getStorageService().upload(audio, key));
         } catch (Exception e) {
             throw new OperationFailedException("测试语音合成失败", e);
         }
