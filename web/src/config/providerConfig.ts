@@ -40,6 +40,28 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           help: 'config.help.llmOpenAIApiKey'
         }
       ],
+      // 通用 OpenAI 兼容接口（任意第三方聚合/中转平台或自建网关）
+      'OpenAI-API-Compatible': [
+        {
+          name: 'apiKey',
+          label: 'API Key',
+          required: true,
+          inputType: 'password',
+          placeholder: 'sk-...',
+          span: 12,
+          help: 'config.help.llmOpenAICompatibleApiKey'
+        },
+        {
+          name: 'apiUrl',
+          label: 'API URL',
+          required: true,
+          inputType: 'text',
+          placeholder: 'https://api.example.com/v1',
+          span: 12,
+          suffix: '/chat/completions',
+          help: 'config.help.llmOpenAICompatibleApiUrl'
+        }
+      ],
       // 阿里云系列
       'Tongyi-Qianwen': [
         {
@@ -419,28 +441,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           help: 'config.help.llmNVIDIAApiUrl'
         }
       ],
-      // 01.AI
-      '01.AI': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llm01AIApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.01.ai/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llm01AIApiUrl'
-        }
-      ],
       // Anthropic
       'Anthropic': [
         {
@@ -495,28 +495,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'your-api-key',
           span: 12,
           help: 'config.help.llmGiteeAIApiKey'
-        }
-      ],
-      // DeepInfra
-      'DeepInfra': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llmDeepInfraApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.deepinfra.com/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llmDeepInfraApiUrl'
         }
       ],
       'LocalAI': [
@@ -617,182 +595,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           help: 'config.help.llmCohereApiUrl'
         }
       ],
-      // TogetherAI
-      'TogetherAI': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llmTogetherAIApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.together.xyz/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llmTogetherAIApiUrl'
-        }
-      ],
-      // Runcrate
-      'Runcrate': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'rc_live_...',
-          span: 12,
-          help: 'config.help.llmRuncrateApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.runcrate.ai/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llmRuncrateApiUrl'
-        }
-      ],
-      // WorldRouter
-      'WorldRouter': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'sk-worldrouter-...',
-          span: 12,
-          help: 'config.help.llmWorldRouterApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://inference-api.worldrouter.ai/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llmWorldRouterApiUrl'
-        }
-      ],
-      // Replicate
-      'Replicate': [
-        {
-          name: 'apiKey',
-          label: 'API Token',
-          required: true,
-          inputType: 'password',
-          placeholder: 'r8_...',
-          span: 12,
-          help: 'config.help.llmReplicateApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.replicate.com/v1',
-          span: 12,
-          suffix: '/predictions',
-          help: 'config.help.llmReplicateApiUrl'
-        }
-      ],
-      // 302.AI
-      '302.AI': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llm302AIApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.302.ai/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llm302AIApiUrl'
-        }
-      ],
-      // Fish Audio
-      'Fish Audio': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llmFishAudioApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.fish.audio/v1',
-          span: 12,
-          suffix: '/tts',
-          help: 'config.help.llmFishAudioApiUrl'
-        }
-      ],
-      // PPIO
-      'PPIO': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llmPPIOApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.ppio.cloud/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llmPPIOApiUrl'
-        }
-      ],
-      // NovitaAI
-      'NovitaAI': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llmNovitaAIApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.novita.ai/v3',
-          span: 12,
-          suffix: '/openai/chat/completions',
-          help: 'config.help.llmNovitaAIApiUrl'
-        }
-      ],
       // GPUStack
       'GPUStack': [
         {
@@ -813,103 +615,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           span: 12,
           suffix: '/chat/completions',
           help: 'config.help.llmGPUStackApiUrl'
-        }
-      ],
-      // Upstage
-      'Upstage': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llmUpstageApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.upstage.ai/v1/solar',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llmUpstageApiUrl'
-        }
-      ],
-      // LeptonAI
-      'LeptonAI': [
-        {
-          name: 'apiKey',
-          label: 'API Token',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-token',
-          span: 12,
-          help: 'config.help.llmLeptonAIApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.lepton.ai/api/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llmLeptonAIApiUrl'
-        }
-      ],
-      // PerfXCloud
-      'PerfXCloud': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llmPerfXCloudApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://cloud.perfxlab.cn/api/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llmPerfXCloudApiUrl'
-        }
-      ],
-      // Google Cloud
-      'Google Cloud': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llmGoogleCloudApiKey'
-        },
-        {
-          name: 'projectId',
-          label: 'Project ID',
-          required: true,
-          inputType: 'text',
-          placeholder: 'your-project-id',
-          span: 12,
-          help: 'config.help.llmGoogleCloudProjectId'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://generativelanguage.googleapis.com/v1',
-          span: 12,
-          suffix: '/models',
-          help: 'config.help.llmGoogleCloudApiUrl'
         }
       ],
       // Bedrock (AWS)
@@ -940,50 +645,6 @@ export const configTypeMap: Record<string, ConfigTypeInfo> = {
           placeholder: 'us-east-1',
           span: 12,
           help: 'config.help.llmBedrockRegion'
-        }
-      ],
-      // CometAPI
-      'CometAPI': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llmCometAPIApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.comet.com/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llmCometAPIApiUrl'
-        }
-      ],
-      // DeerAPI
-      'DeerAPI': [
-        {
-          name: 'apiKey',
-          label: 'API Key',
-          required: true,
-          inputType: 'password',
-          placeholder: 'your-api-key',
-          span: 12,
-          help: 'config.help.llmDeerAPIApiKey'
-        },
-        {
-          name: 'apiUrl',
-          label: 'API URL',
-          required: true,
-          inputType: 'text',
-          placeholder: 'https://api.deerapi.com/v1',
-          span: 12,
-          suffix: '/chat/completions',
-          help: 'config.help.llmDeerAPIApiUrl'
         }
       ]
     }
