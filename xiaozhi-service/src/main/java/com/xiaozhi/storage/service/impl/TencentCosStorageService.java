@@ -12,7 +12,6 @@ import com.qcloud.cos.region.Region;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.storage.service.StorageService;
 import com.xiaozhi.utils.DateUtils;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -61,17 +60,13 @@ public class TencentCosStorageService implements StorageService {
     }
 
     @Override
-
-    public String upload(MultipartFile file, String relativePath, String fileName) throws IOException {
+    public String upload(InputStream content, long size, String relativePath, String fileName) throws IOException {
         String key = pathPrefix + relativePath + "/" + fileName;
         try {
             ObjectMetadata metadata = new ObjectMetadata();
-            metadata.setContentLength(file.getSize());
-            String contentType = file.getContentType();
-            if (contentType != null && !contentType.isEmpty()) {
-                metadata.setContentType(contentType);
-            }
-            cosClient.putObject(new PutObjectRequest(bucketName, key, file.getInputStream(), metadata));
+            metadata.setContentLength(size);
+            metadata.setContentType(StorageContentTypes.resolve(fileName));
+            cosClient.putObject(new PutObjectRequest(bucketName, key, content, metadata));
             return urlPrefix + key;
         } catch (Exception e) {
             throw new IOException("上传到腾讯云 COS 失败: " + e.getMessage(), e);

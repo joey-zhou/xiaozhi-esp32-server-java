@@ -17,7 +17,7 @@ import com.xiaozhi.common.model.resp.LocalSttResp;
 import com.xiaozhi.common.model.resp.SherpaVoiceResp;
 import com.xiaozhi.common.model.resp.TestVoiceResp;
 import com.xiaozhi.common.web.ApiResponse;
-import com.xiaozhi.security.CurrentUser;
+import com.xiaozhi.common.web.CurrentUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

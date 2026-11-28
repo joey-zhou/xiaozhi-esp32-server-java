@@ -1,8 +1,7 @@
 package com.xiaozhi.storage.service;
 
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Path;
 
 /**
@@ -15,15 +14,14 @@ import java.nio.file.Path;
 public interface StorageService {
 
     /**
-     * 上传文件（Web 端）
+     * 上传内容（如通用上传、聊天附件），流由调用方关闭；类型按文件名的扩展名定，不信客户端自报
      *
-     * @param file         上传的文件
      * @param relativePath 相对路径（如 "avatar/2026/02/28"）
      * @param fileName     文件名（如 "xxxx.png"）
      * @return 访问路径（本地返回相对路径，云端返回完整 URL）
      * @throws IOException 上传失败
      */
-    String upload(MultipartFile file, String relativePath, String fileName) throws IOException;
+    String upload(InputStream content, long size, String relativePath, String fileName) throws IOException;
 
     /**
      * 上传本地文件（内部使用，如音频缓存）。

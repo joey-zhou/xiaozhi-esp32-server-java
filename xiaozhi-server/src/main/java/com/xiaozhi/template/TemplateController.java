@@ -13,7 +13,7 @@ import com.xiaozhi.common.model.resp.TemplateResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.template.convert.TemplateConvert;
 import com.xiaozhi.template.service.TemplateService;
-import com.xiaozhi.security.CurrentUser;
+import com.xiaozhi.common.web.CurrentUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

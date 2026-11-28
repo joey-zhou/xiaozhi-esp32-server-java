@@ -16,7 +16,7 @@ import com.xiaozhi.common.annotation.Sensitive;
 import com.xiaozhi.common.model.bo.OperationLogBO;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.operationlog.service.OperationLogService;
-import com.xiaozhi.security.CurrentUser;
+import com.xiaozhi.common.web.CurrentUser;
 import com.xiaozhi.utils.DateUtils;
 import com.xiaozhi.utils.JsonUtil;
 import lombok.extern.slf4j.Slf4j;

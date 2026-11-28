@@ -9,9 +9,12 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.xiaozhi.ai.tts.TtsServiceFactory;
+import com.xiaozhi.storage.service.StorageServiceFactory;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -58,6 +61,10 @@ class ModuleBoundaryArchTest {
     private static final ImportOption ONLY_SERVICE_MODULE =
         location -> location.contains("/xiaozhi-service/target/");
 
+    /** 同上，用它的规则须先过 {@link #serviceAndAiModulesAreActuallyScanned}。 */
+    private static final ImportOption ONLY_SERVICE_AND_AI_MODULES = location ->
+        location.contains("/xiaozhi-service/target/") || location.contains("/xiaozhi-ai/target/");
+
     private static final String[] PACKAGES_ALLOWED_DOMAIN = {
         "com.xiaozhi.config..", "com.xiaozhi.device..", "com.xiaozhi.role.."
     };
@@ -99,6 +106,7 @@ class ModuleBoundaryArchTest {
     private static JavaClasses serverClasses;
     private static JavaClasses serviceClasses;
     private static JavaClasses modulesBelowServiceClasses;
+    private static JavaClasses serviceAndAiClasses;
 
     @BeforeAll
     static void importClasses() {
@@ -113,10 +121,32 @@ class ModuleBoundaryArchTest {
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .withImportOption(ONLY_SERVICE_MODULE)
             .importPackages("com.xiaozhi");
+        serviceAndAiClasses = new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+            .withImportOption(ONLY_SERVICE_AND_AI_MODULES)
+            .importPackages("com.xiaozhi");
         modulesBelowServiceClasses = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .withImportOption(ONLY_MODULES_BELOW_SERVICE)
             .importPackages("com.xiaozhi");
+    }
+
+    /** web 类型止于 server，service 与 ai 不碰 servlet、上传文件、SSE、Sa-Token 登录态 */
+    @Test
+    void webTypesStopAtServer() {
+        ArchRule rule = noClasses()
+            .should().dependOnClassesThat()
+            .resideInAnyPackage("jakarta.servlet..", "org.springframework.web.multipart..", "cn.dev33.satoken.stp..")
+            .orShould().dependOnClassesThat().haveFullyQualifiedName(SseEmitter.class.getName())
+            .because("上传拆包、SSE 桥接、取登录态放 server，往下只传字节、流、userId");
+
+        rule.check(serviceAndAiClasses);
+    }
+
+    @Test
+    void serviceAndAiModulesAreActuallyScanned() {
+        assertThat(serviceAndAiClasses.contain(StorageServiceFactory.class)).as("没扫到 service").isTrue();
+        assertThat(serviceAndAiClasses.contain(TtsServiceFactory.class)).as("没扫到 ai").isTrue();
     }
 
     @Test

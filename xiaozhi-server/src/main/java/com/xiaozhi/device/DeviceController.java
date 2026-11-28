@@ -31,7 +31,7 @@ import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import com.xiaozhi.utils.JsonUtil;
-import com.xiaozhi.security.CurrentUser;
+import com.xiaozhi.common.web.CurrentUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

@@ -6,7 +6,6 @@ import jakarta.annotation.Resource;
 import com.xiaozhi.storage.service.StorageService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -40,8 +39,7 @@ public class LocalStorageService implements StorageService {
     }
 
     @Override
-
-    public String upload(MultipartFile file, String relativePath, String fileName) throws IOException {
+    public String upload(InputStream content, long size, String relativePath, String fileName) throws IOException {
         String key = baseDir;
         if (!relativePath.isEmpty()) {
             key = key + File.separator + relativePath;
@@ -57,9 +55,8 @@ public class LocalStorageService implements StorageService {
         }
 
         File destFile = new File(directory, fileName);
-        try (FileOutputStream fos = new FileOutputStream(destFile);
-            InputStream inputStream = file.getInputStream()) {
-            inputStream.transferTo(fos);
+        try (FileOutputStream fos = new FileOutputStream(destFile)) {
+            content.transferTo(fos);
         }
 
         // 返回相对路径（统一使用正斜杠，便于 URL 访问）

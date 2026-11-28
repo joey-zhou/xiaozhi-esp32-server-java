@@ -15,9 +15,11 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.InputStream;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
@@ -64,7 +66,7 @@ class FileUploadControllerTest extends ControllerTestSupport {
     void uploadFileReturnsFullUrlForRelativeStoragePath() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", PNG);
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
-        when(storageService.upload(any(), anyString(), anyString())).thenReturn("uploads/image/avatar.png");
+        when(storageService.upload(any(InputStream.class), anyLong(), anyString(), anyString())).thenReturn("uploads/image/avatar.png");
         when(storageService.getProvider()).thenReturn("local");
         when(storageServiceFactory.accessUrlOf("uploads/image/avatar.png"))
             .thenReturn("uploads/image/avatar.png?exp=1&sig=abc");
@@ -79,7 +81,7 @@ class FileUploadControllerTest extends ControllerTestSupport {
 
         ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> nameCaptor = ArgumentCaptor.forClass(String.class);
-        verify(storageService).upload(any(), pathCaptor.capture(), nameCaptor.capture());
+        verify(storageService).upload(any(InputStream.class), anyLong(), pathCaptor.capture(), nameCaptor.capture());
         // 目录按 类型/yyyy/MM/dd 分层，不照抄生产代码里的 LocalDate.now() 表达式，避免跨午夜误判
         assertThat(pathCaptor.getValue()).matches("image/\\d{4}/\\d{2}/\\d{2}");
         // 落盘文件名换成去掉横线的 UUID，只保留原扩展名
@@ -121,7 +123,7 @@ class FileUploadControllerTest extends ControllerTestSupport {
     void uploadFileWrapsStorageIOException() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", PNG);
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
-        when(storageService.upload(any(), anyString(), anyString())).thenThrow(new IOException("disk full"));
+        when(storageService.upload(any(InputStream.class), anyLong(), anyString(), anyString())).thenThrow(new IOException("disk full"));
 
         mockMvc.perform(multipart("/api/file/upload").file(file).param("type", "image"))
             .andExpect(status().isInternalServerError())

@@ -2,6 +2,7 @@ package com.xiaozhi.verifycode.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.xiaozhi.common.AfterCommit;
 import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.utils.DateUtils;
@@ -123,19 +124,21 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
     }
 
     /**
-     * 删验证码音频文件。
+     * 删验证码音频文件，调用方在事务里时提交后再删。
      * <p>
      * 调用方是设备绑定成功与删除设备两条路径，删文件失败不该让它们失败——
      * 存储抖动时最坏只是留一个孤儿文件，而抛出去会让新设备直接绑不上。
      */
     private void removeAudios(List<String> audioPaths) {
-        for (String audioPath : audioPaths) {
-            try {
-                storageServiceFactory.removeFrom(audioPath);
-            } catch (Exception e) {
-                log.warn("删除验证码音频失败，文件将残留: {}", audioPath, e);
+        AfterCommit.run(() -> {
+            for (String audioPath : audioPaths) {
+                try {
+                    storageServiceFactory.removeFrom(audioPath);
+                } catch (Exception e) {
+                    log.warn("删除验证码音频失败，文件将残留: {}", audioPath, e);
+                }
             }
-        }
+        });
     }
 
     @Override

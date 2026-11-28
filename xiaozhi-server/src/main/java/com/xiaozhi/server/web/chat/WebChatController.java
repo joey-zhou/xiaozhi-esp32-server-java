@@ -10,7 +10,7 @@ import com.xiaozhi.common.model.resp.ChatSessionClosedResp;
 import com.xiaozhi.common.model.resp.ChatSessionOpenedResp;
 import com.xiaozhi.common.model.resp.ChatTokenResp;
 import com.xiaozhi.server.web.chat.convert.WebChatConvert;
-import com.xiaozhi.security.CurrentUser;
+import com.xiaozhi.common.web.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;

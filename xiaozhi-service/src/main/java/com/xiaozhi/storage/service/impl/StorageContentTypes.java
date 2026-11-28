@@ -15,11 +15,31 @@ import java.util.Locale;
  */
 final class StorageContentTypes {
 
+    private static final String OCTET_STREAM = "application/octet-stream";
+
     private StorageContentTypes() {
     }
 
     static String resolve(Path path) {
-        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        String known = byExtension(path.getFileName().toString());
+        if (known != null) {
+            return known;
+        }
+        try {
+            String probed = Files.probeContentType(path);
+            return probed != null ? probed : OCTET_STREAM;
+        } catch (Exception e) {
+            return OCTET_STREAM;
+        }
+    }
+
+    static String resolve(String fileName) {
+        String known = byExtension(fileName);
+        return known != null ? known : OCTET_STREAM;
+    }
+
+    private static String byExtension(String fileName) {
+        String name = fileName.toLowerCase(Locale.ROOT);
         int dot = name.lastIndexOf('.');
         String ext = dot >= 0 ? name.substring(dot + 1) : "";
         switch (ext) {
@@ -45,13 +65,14 @@ final class StorageContentTypes {
                 return "image/gif";
             case "webp":
                 return "image/webp";
+            case "bmp":
+                return "image/bmp";
+            case "pdf":
+                return "application/pdf";
+            case "mp4":
+                return "video/mp4";
             default:
-                try {
-                    String probed = Files.probeContentType(path);
-                    return probed != null ? probed : "application/octet-stream";
-                } catch (Exception e) {
-                    return "application/octet-stream";
-                }
+                return null;
         }
     }
 }

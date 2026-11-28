@@ -3,7 +3,7 @@ package com.xiaozhi.communication.server.websocket;
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.communication.WebChatDevice;
 import com.xiaozhi.communication.auth.DeviceAuthService;
-import com.xiaozhi.security.CurrentUser;
+import com.xiaozhi.common.web.CurrentUser;
 import com.xiaozhi.utils.CommonUtils;
 import jakarta.annotation.Resource;
 import org.springframework.http.HttpStatus;

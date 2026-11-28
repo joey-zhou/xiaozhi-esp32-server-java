@@ -2,7 +2,6 @@ package com.xiaozhi.storage.service.impl;
 
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.storage.service.StorageService;
-import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -78,15 +77,13 @@ public class S3StorageService implements StorageService {
     }
 
     @Override
-    public String upload(MultipartFile file, String relativePath, String fileName) throws IOException {
+    public String upload(InputStream content, long size, String relativePath, String fileName) throws IOException {
         String key = relativePath + "/" + fileName;
         try {
-            PutObjectRequest.Builder req = PutObjectRequest.builder().bucket(bucketName).key(key);
-            String contentType = file.getContentType();
-            if (contentType != null && !contentType.isEmpty()) {
-                req.contentType(contentType);
-            }
-            s3Client.putObject(req.build(), RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+            PutObjectRequest req = PutObjectRequest.builder().bucket(bucketName).key(key)
+                    .contentType(StorageContentTypes.resolve(fileName))
+                    .build();
+            s3Client.putObject(req, RequestBody.fromInputStream(content, size));
             return urlPrefix + key;
         } catch (Exception e) {
             throw new IOException("上传到 S3 失败: " + e.getMessage(), e);

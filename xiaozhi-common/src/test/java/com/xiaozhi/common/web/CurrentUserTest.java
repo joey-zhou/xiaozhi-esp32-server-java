@@ -1,4 +1,4 @@
-package com.xiaozhi.security;
+package com.xiaozhi.common.web;
 
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.stp.StpUtil;

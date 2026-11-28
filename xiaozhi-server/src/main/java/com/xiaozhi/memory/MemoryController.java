@@ -11,7 +11,7 @@ import com.xiaozhi.common.model.resp.SummaryResp;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.summary.convert.SummaryConvert;
 import com.xiaozhi.summary.service.SummaryService;
-import com.xiaozhi.security.CurrentUser;
+import com.xiaozhi.common.web.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;

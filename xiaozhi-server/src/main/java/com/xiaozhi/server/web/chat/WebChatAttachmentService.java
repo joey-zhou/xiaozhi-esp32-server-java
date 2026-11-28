@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
@@ -79,17 +80,19 @@ public class WebChatAttachmentService {
      * @throws IllegalArgumentException 不是合规的图片
      */
     public Pending hold(Integer userId, MultipartFile file) {
-        String mimeType;
+        byte[] content;
         try {
-            mimeType = imageUploadPolicy.mimeTypeOf(file.getBytes());
+            content = file.getBytes();
         } catch (IOException e) {
             throw new IllegalArgumentException("图片读取失败", e);
         }
+        String mimeType = imageUploadPolicy.mimeTypeOf(content);
         String relativePath = "chat/" + DateUtils.today().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         String fileName = UUID.randomUUID().toString().replace("-", "") + extensionOf(mimeType);
         String path;
         try {
-            path = storageServiceFactory.getStorageService().upload(file, relativePath, fileName);
+            path = storageServiceFactory.getStorageService().upload(new ByteArrayInputStream(content), content.length,
+                    relativePath, fileName);
         } catch (IOException e) {
             throw new OperationFailedException("图片上传失败，请稍后重试", e);
         }

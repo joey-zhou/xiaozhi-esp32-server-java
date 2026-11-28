@@ -11,7 +11,7 @@ import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.message.convert.MessageConvert;
 import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.server.web.BaseController;
-import com.xiaozhi.security.CurrentUser;
+import com.xiaozhi.common.web.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;

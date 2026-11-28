@@ -7,7 +7,6 @@ import com.aliyun.oss.model.ObjectMetadata;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.storage.service.StorageService;
 import com.xiaozhi.utils.DateUtils;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,17 +45,13 @@ public class AliyunOssStorageService implements StorageService {
     }
 
     @Override
-
-    public String upload(MultipartFile file, String relativePath, String fileName) throws IOException {
+    public String upload(InputStream content, long size, String relativePath, String fileName) throws IOException {
         String key = relativePath + "/" + fileName;
         try {
             ObjectMetadata metadata = new ObjectMetadata();
-            metadata.setContentLength(file.getSize());
-            String contentType = file.getContentType();
-            if (contentType != null && !contentType.isEmpty()) {
-                metadata.setContentType(contentType);
-            }
-            ossClient.putObject(bucketName, key, file.getInputStream(), metadata);
+            metadata.setContentLength(size);
+            metadata.setContentType(StorageContentTypes.resolve(fileName));
+            ossClient.putObject(bucketName, key, content, metadata);
             return urlPrefix + key;
         } catch (Exception e) {
             throw new IOException("上传到阿里云 OSS 失败: " + e.getMessage(), e);

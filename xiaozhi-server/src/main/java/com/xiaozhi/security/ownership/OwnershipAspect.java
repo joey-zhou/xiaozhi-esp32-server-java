@@ -2,7 +2,7 @@ package com.xiaozhi.security.ownership;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.xiaozhi.common.annotation.CheckOwner;
-import com.xiaozhi.security.CurrentUser;
+import com.xiaozhi.common.web.CurrentUser;
 import com.xiaozhi.user.service.UserService;
 import jakarta.annotation.Resource;
 import org.aspectj.lang.JoinPoint;

@@ -3,6 +3,7 @@ package com.xiaozhi.security;
 import cn.dev33.satoken.stp.StpInterface;
 import com.xiaozhi.authrole.service.AuthRoleService;
 import com.xiaozhi.common.model.bo.UserBO;
+import com.xiaozhi.common.web.CurrentUser;
 import com.xiaozhi.permission.service.PermissionService;
 import com.xiaozhi.user.service.UserService;
 import jakarta.annotation.Resource;

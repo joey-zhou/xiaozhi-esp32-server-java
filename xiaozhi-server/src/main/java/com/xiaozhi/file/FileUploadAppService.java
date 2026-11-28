@@ -44,8 +44,14 @@ public class FileUploadAppService {
         String fileName = UUID.randomUUID().toString().replace("-", "") + UploadPolicy.extensionOf(originalFilename);
         StorageService storageService = storageServiceFactory.getStorageService();
         String stored;
+        String hash;
         try {
-            stored = storageService.upload(file, relativePath, fileName);
+            try (InputStream content = file.getInputStream()) {
+                stored = storageService.upload(content, file.getSize(), relativePath, fileName);
+            }
+            try (InputStream content = file.getInputStream()) {
+                hash = FileHashUtil.sha256(content);
+            }
         } catch (IOException e) {
             throw new OperationFailedException("文件上传失败，请稍后重试", e);
         }
@@ -54,7 +60,7 @@ public class FileUploadAppService {
         FileUploadResp resp = new FileUploadResp();
         resp.setFileName(originalFilename);
         resp.setNewFileName(fileName);
-        resp.setHash(FileHashUtil.calculateSha256(file));
+        resp.setHash(hash);
         if (stored.startsWith("http://") || stored.startsWith("https://")) {
             // 云存储私有桶下裸地址访问不了，给带签名的临时地址供即时预览
             resp.setUrl(storageServiceFactory.accessUrlOf(stored));

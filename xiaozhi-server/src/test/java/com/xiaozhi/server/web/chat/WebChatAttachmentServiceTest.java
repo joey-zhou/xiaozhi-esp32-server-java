@@ -13,6 +13,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
+import java.io.InputStream;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -22,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -45,15 +47,15 @@ class WebChatAttachmentServiceTest {
         ReflectionTestUtils.setField(attachments, "storageServiceFactory", storageServiceFactory);
         ReflectionTestUtils.setField(attachments, "imageUploadPolicy", new ImageUploadPolicy());
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
-        when(storageService.upload(any(MultipartFile.class), anyString(), anyString()))
-                .thenAnswer(invocation -> "uploads/" + invocation.getArgument(1) + "/" + invocation.getArgument(2));
+        when(storageService.upload(any(InputStream.class), anyLong(), anyString(), anyString()))
+                .thenAnswer(invocation -> "uploads/" + invocation.getArgument(2) + "/" + invocation.getArgument(3));
     }
 
     @Test
     void anImageIsStoredAndHeldForItsOwner() throws IOException {
         WebChatAttachmentService.Pending held = attachments.hold(9, image("花.png", "png"));
 
-        verify(storageService).upload(any(MultipartFile.class), startsWith("chat/"), anyString());
+        verify(storageService).upload(any(InputStream.class), anyLong(), startsWith("chat/"), anyString());
         assertThat(held.kind()).isEqualTo(MessageAttachmentBO.KIND_IMAGE);
         assertThat(held.name()).isEqualTo("花.png");
         assertThat(held.mimeType()).isEqualTo("image/png");
