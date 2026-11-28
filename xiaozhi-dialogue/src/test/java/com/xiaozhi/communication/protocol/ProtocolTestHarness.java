@@ -5,7 +5,7 @@ import com.xiaozhi.common.config.RuntimePathConfig;
 import com.xiaozhi.ai.llm.factory.ChatModelFactory;
 import com.xiaozhi.ai.llm.memory.Conversation;
 import com.xiaozhi.ai.llm.service.AddresseeClassifier;
-import com.xiaozhi.ai.llm.service.IntentService;
+import com.xiaozhi.dialogue.runtime.IntentService;
 import com.xiaozhi.ai.tool.ToolsGlobalRegistry;
 import com.xiaozhi.ai.tts.TtsServiceFactory;
 import com.xiaozhi.dialogue.runtime.FaultNotifier;
@@ -111,9 +111,9 @@ class ProtocolTestHarness {
     /** 协议测试不出网问模型，插话一律按「在对设备说」处理，打断语义与接入判定前保持一致 */
     private final AddresseeClassifier addresseeClassifier = new AddresseeClassifier() {
         @Override
-        public boolean directedAtDevice(ChatModel chatModel, List<Message> history,
-                                        List<String> spokenSentences, String utterance) {
-            return true;
+        public Verdict judge(ChatModel chatModel, List<Message> history,
+                             List<String> spokenSentences, String utterance) {
+            return Verdict.DIRECTED;
         }
     };
     private final InstanceIdHolder instanceIdHolder = new InstanceIdHolder(INSTANCE_ID, "8092");

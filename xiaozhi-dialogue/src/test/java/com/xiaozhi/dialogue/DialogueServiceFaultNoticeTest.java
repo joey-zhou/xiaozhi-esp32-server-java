@@ -1,7 +1,7 @@
 package com.xiaozhi.dialogue;
 
 import com.xiaozhi.common.config.RuntimePathConfig;
-import com.xiaozhi.ai.llm.service.IntentService;
+import com.xiaozhi.dialogue.runtime.IntentService;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.DeviceBO;

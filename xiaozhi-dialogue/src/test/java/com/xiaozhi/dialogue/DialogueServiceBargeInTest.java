@@ -6,7 +6,8 @@ import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.enums.DeviceState;
 import com.xiaozhi.dialogue.event.ChatAbortedEvent;
 import com.xiaozhi.ai.llm.service.AddresseeClassifier;
-import com.xiaozhi.ai.llm.service.IntentService;
+import com.xiaozhi.ai.llm.service.AddresseeClassifier.Verdict;
+import com.xiaozhi.dialogue.runtime.IntentService;
 import com.xiaozhi.communication.message.MessageSender;
 import com.xiaozhi.communication.server.websocket.WebSocketSession;
 import com.xiaozhi.dialogue.audio.AecService;
@@ -88,7 +89,7 @@ class DialogueServiceBargeInTest {
 
         assertThat(proceed).isFalse();
         verify(player).resume();
-        verify(addresseeClassifier, never()).directedAtDevice(any(), any(), any(), any());
+        verify(addresseeClassifier, never()).judge(any(), any(), any(), any());
         verify(persona, never()).markInterrupted();
         verify(persona, never()).interrupt();
         verify(player, never()).abort();
@@ -97,7 +98,7 @@ class DialogueServiceBargeInTest {
     @Test
     void affirmativeAnsweringQuestionIsRealSpeech() {
         when(player.spokenSentences()).thenReturn(List.of("要我现在设闹钟吗？"));
-        when(addresseeClassifier.directedAtDevice(any(), any(), any(), eq("好的"))).thenReturn(true);
+        when(addresseeClassifier.judge(any(), any(), any(), eq("好的"))).thenReturn(Verdict.DIRECTED);
 
         boolean proceed = dialogueService.resolveBargeIn(session, persona, "好的");
 
@@ -116,7 +117,7 @@ class DialogueServiceBargeInTest {
         assertThat(proceed).isFalse();
         verify(player).resume();
         verify(intentService, never()).isBackchannel(any());
-        verify(addresseeClassifier, never()).directedAtDevice(any(), any(), any(), any());
+        verify(addresseeClassifier, never()).judge(any(), any(), any(), any());
         verify(persona, never()).markInterrupted();
     }
 
@@ -126,14 +127,14 @@ class DialogueServiceBargeInTest {
 
         assertThat(proceed).isFalse();
         verify(player).resume();
-        verify(addresseeClassifier, never()).directedAtDevice(any(), any(), any(), any());
+        verify(addresseeClassifier, never()).judge(any(), any(), any(), any());
         verify(persona, never()).markInterrupted();
     }
 
     @Test
     void realSpeechConfirmsInterrupt() {
         when(intentService.isBackchannel("换一个")).thenReturn(false);
-        when(addresseeClassifier.directedAtDevice(any(), any(), any(), eq("换一个"))).thenReturn(true);
+        when(addresseeClassifier.judge(any(), any(), any(), eq("换一个"))).thenReturn(Verdict.DIRECTED);
 
         boolean proceed = dialogueService.resolveBargeIn(session, persona, "换一个");
 
@@ -147,7 +148,7 @@ class DialogueServiceBargeInTest {
     /** 直调打断，收尾后发一个事实事件 */
     @Test
     void confirmedInterruptIsPublishedAsAbortEvent() {
-        when(addresseeClassifier.directedAtDevice(any(), any(), any(), eq("换一个"))).thenReturn(true);
+        when(addresseeClassifier.judge(any(), any(), any(), eq("换一个"))).thenReturn(Verdict.DIRECTED);
 
         dialogueService.resolveBargeIn(session, persona, "换一个");
 
@@ -186,8 +187,7 @@ class DialogueServiceBargeInTest {
     @Test
     void utteranceAimedAtSomeoneElseResumesInsteadOfInterrupting() {
         when(intentService.isBackchannel("对，他这个逻辑有问题")).thenReturn(false);
-        when(addresseeClassifier.directedAtDevice(any(), any(), any(), eq("对，他这个逻辑有问题")))
-                .thenReturn(false);
+        when(addresseeClassifier.judge(any(), any(), any(), eq("对，他这个逻辑有问题"))).thenReturn(Verdict.NOT_DIRECTED);
 
         boolean proceed = dialogueService.resolveBargeIn(session, persona, "对，他这个逻辑有问题");
 

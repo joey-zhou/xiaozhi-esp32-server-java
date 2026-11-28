@@ -8,6 +8,7 @@ import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.ConversationBO;
+import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.message.convert.MessageConvert;
 import com.xiaozhi.message.dal.mysql.dataobject.ConversationDO;
 import com.xiaozhi.message.dal.mysql.mapper.ConversationMapper;
@@ -25,6 +26,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class ConversationServiceImpl implements ConversationService {
 
@@ -92,6 +96,15 @@ public class ConversationServiceImpl implements ConversationService {
         conversationMapper.update(null, new LambdaUpdateWrapper<ConversationDO>()
             .eq(ConversationDO::getSessionId, sessionId)
             .set(ConversationDO::getUpdateTime, DateUtils.now()));
+    }
+
+    @Override
+    public void saveSummary(SummaryBO summary) {
+        if (summary.getSessionId() != null && get(summary.getSessionId()) == null) {
+            log.info("会话已删除，丢弃其摘要: sessionId={}", summary.getSessionId());
+            return;
+        }
+        summaryService.save(summary);
     }
 
     @Override

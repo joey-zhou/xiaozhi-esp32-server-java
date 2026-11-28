@@ -2,6 +2,7 @@ package com.xiaozhi.message.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.common.exception.ResourceNotFoundException;
 import com.xiaozhi.common.exception.UnauthorizedException;
 import com.xiaozhi.common.model.PageResult;
@@ -176,5 +177,34 @@ class ConversationServiceImplTest {
         assertThatThrownBy(() -> service.rename(8, "s-1", "周末计划"))
             .isInstanceOf(UnauthorizedException.class);
         verify(conversationMapper, never()).update(any(), any());
+    }
+
+    /** 压缩线程调模型的这几秒里用户可能已经把会话删了，落库前要确认会话还在 */
+    @Test
+    void summaryOfADeletedWebConversationIsDropped() {
+        service.saveSummary(new SummaryBO().setDeviceId("web:9").setRoleId(1).setSessionId("s-1").setSummary("摘要"));
+
+        verify(summaryService, never()).save(any());
+    }
+
+    @Test
+    void summaryOfAnExistingWebConversationIsSaved() {
+        when(conversationMapper.selectById("s-1")).thenReturn(conversation("s-1"));
+        SummaryBO summary = new SummaryBO().setDeviceId("web:9").setRoleId(1).setSessionId("s-1").setSummary("摘要");
+
+        service.saveSummary(summary);
+
+        verify(summaryService).save(summary);
+    }
+
+    /** 设备端摘要不挂会话，不查会话表 */
+    @Test
+    void deviceSummaryIsSavedWithoutConsultingTheConversationTable() {
+        SummaryBO summary = new SummaryBO().setDeviceId("device-1").setRoleId(1).setSummary("摘要");
+
+        service.saveSummary(summary);
+
+        verify(summaryService).save(summary);
+        verifyNoInteractions(conversationMapper);
     }
 }

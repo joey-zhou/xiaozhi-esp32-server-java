@@ -1,5 +1,7 @@
 package com.xiaozhi.ai.llm.service;
 
+import com.xiaozhi.ai.llm.service.AddresseeClassifier.Verdict;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -23,36 +25,37 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * 设备说话时插进来的整句交给模型判定：说不是对设备说的才续播，其余一律按打断。
- * 超时、报错、读不出结果都必须倒向打断——漏掉真指令要用户重说一遍，比多接一句话难受。
- */
+/** 设备说话时插进来的整句交给模型判定；超时、报错、读不出结果都给 UNKNOWN，由对话侧决定怎么处置 */
 class AddresseeClassifierTest {
 
     private final ChatModel chatModel = mock(ChatModel.class);
-    private final AddresseeClassifier classifier = new AddresseeClassifier();
+    private AddresseeClassifier classifier;
+
+    @BeforeEach
+    void setUp() {
+        classifier = new AddresseeClassifier();
+    }
 
     private static ChatResponse reply(String text) {
         return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
     }
 
-    private boolean classify(String utterance) {
-        return classifier.directedAtDevice(chatModel, List.of(), List.of("从前有座山。"), utterance);
+    private Verdict classify(String utterance) {
+        return classifier.judge(chatModel, List.of(), List.of("从前有座山。"), utterance);
     }
-
 
     @Test
     void notDirectedUtteranceResumes() {
         when(chatModel.call(any(Prompt.class))).thenReturn(reply("{\"directed\": false}"));
 
-        assertThat(classify("对，他这个逻辑有问题")).isFalse();
+        assertThat(classify("对，他这个逻辑有问题")).isEqualTo(Verdict.NOT_DIRECTED);
     }
 
     @Test
     void directedUtteranceInterrupts() {
         when(chatModel.call(any(Prompt.class))).thenReturn(reply("{\"directed\": true}"));
 
-        assertThat(classify("换一个故事")).isTrue();
+        assertThat(classify("换一个故事")).isEqualTo(Verdict.DIRECTED);
     }
 
     @Test
@@ -60,25 +63,25 @@ class AddresseeClassifierTest {
         when(chatModel.call(any(Prompt.class)))
                 .thenReturn(reply("```json\n{\"directed\": false}\n```"));
 
-        assertThat(classify("你先别管他")).isFalse();
+        assertThat(classify("你先别管他")).isEqualTo(Verdict.NOT_DIRECTED);
     }
 
     @Test
-    void missingFieldFallsBackToInterrupt() {
+    void missingFieldIsUnknown() {
         when(chatModel.call(any(Prompt.class))).thenReturn(reply("{\"verdict\": \"no\"}"));
 
-        assertThat(classify("随便说点什么")).isTrue();
+        assertThat(classify("随便说点什么")).isEqualTo(Verdict.UNKNOWN);
     }
 
     @Test
-    void modelErrorFallsBackToInterrupt() {
+    void modelErrorIsUnknown() {
         when(chatModel.call(any(Prompt.class))).thenThrow(new IllegalStateException("上游 500"));
 
-        assertThat(classify("随便说点什么")).isTrue();
+        assertThat(classify("随便说点什么")).isEqualTo(Verdict.UNKNOWN);
     }
 
     @Test
-    void slowModelFallsBackToInterruptWithoutBlockingPastTheBudget() {
+    void slowModelIsUnknownWithoutBlockingPastTheBudget() {
         long timeout = (long) ReflectionTestUtils.getField(AddresseeClassifier.class, "VERDICT_TIMEOUT_MS");
         when(chatModel.call(any(Prompt.class))).thenAnswer(invocation -> {
             Thread.sleep(timeout * 4);
@@ -86,17 +89,17 @@ class AddresseeClassifierTest {
         });
 
         long startedAt = System.currentTimeMillis();
-        boolean directed = classify("随便说点什么");
+        Verdict verdict = classify("随便说点什么");
         long elapsed = System.currentTimeMillis() - startedAt;
 
-        assertThat(directed).isTrue();
+        assertThat(verdict).isEqualTo(Verdict.UNKNOWN);
         assertThat(elapsed).isLessThan(timeout * 3);
     }
 
     @Test
     void noModelOrEmptyTextSkipsTheCall() {
-        assertThat(classifier.directedAtDevice(null, List.of(), List.of(), "有话说")).isTrue();
-        assertThat(classifier.directedAtDevice(chatModel, List.of(), List.of(), " ")).isTrue();
+        assertThat(classifier.judge(null, List.of(), List.of(), "有话说")).isEqualTo(Verdict.UNKNOWN);
+        assertThat(classifier.judge(chatModel, List.of(), List.of(), " ")).isEqualTo(Verdict.UNKNOWN);
     }
 
     @Test
@@ -109,7 +112,7 @@ class AddresseeClassifierTest {
             history.add(new AssistantMessage("助手第" + i + "句"));
         }
 
-        classifier.directedAtDevice(chatModel, history, List.of("从前有座山。"), "换一个故事");
+        classifier.judge(chatModel, history, List.of("从前有座山。"), "换一个故事");
 
         ArgumentCaptor<Prompt> prompt = ArgumentCaptor.forClass(Prompt.class);
         verify(chatModel).call(prompt.capture());
@@ -133,14 +136,14 @@ class AddresseeClassifierTest {
     void sloppyButRecoverableOutputsStillCount(String output) {
         when(chatModel.call(any(Prompt.class))).thenReturn(reply(output));
 
-        assertThat(classify("对，他这个逻辑有问题")).isFalse();
+        assertThat(classify("对，他这个逻辑有问题")).isEqualTo(Verdict.NOT_DIRECTED);
     }
 
-    // 连 JSON 对象都没有的输出救不回来，按打断处理
+    // 连 JSON 对象都没有的输出救不回来
     @Test
-    void bareLiteralFallsBackToInterrupt() {
+    void bareLiteralIsUnknown() {
         when(chatModel.call(any(Prompt.class))).thenReturn(reply("false"));
 
-        assertThat(classify("对，他这个逻辑有问题")).isTrue();
+        assertThat(classify("对，他这个逻辑有问题")).isEqualTo(Verdict.UNKNOWN);
     }
 }

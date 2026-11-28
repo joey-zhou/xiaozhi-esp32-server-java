@@ -1,5 +1,6 @@
 package com.xiaozhi.message.service;
 
+import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.common.model.PageResult;
 import com.xiaozhi.common.model.bo.ConversationBO;
 
@@ -27,6 +28,9 @@ public interface ConversationService {
 
     /** 刷新最后对话时间 */
     void touch(String sessionId);
+
+    /** 存摘要；挂在已删除会话上的丢弃，不留列表里看不到、也删不掉的摘要 */
+    void saveSummary(SummaryBO summary);
 
     /** 归属按 {@link #checkAccess} 判定 */
     void rename(Integer userId, String sessionId, String title);

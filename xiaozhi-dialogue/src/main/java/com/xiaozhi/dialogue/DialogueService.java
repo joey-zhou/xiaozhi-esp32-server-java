@@ -10,7 +10,7 @@ import com.xiaozhi.dialogue.audio.VadService;
 import com.xiaozhi.dialogue.llm.factory.PersonaFactory;
 import com.xiaozhi.ai.llm.memory.MessageTimeMetadata;
 import com.xiaozhi.ai.llm.service.AddresseeClassifier;
-import com.xiaozhi.ai.llm.service.IntentService;
+import com.xiaozhi.dialogue.runtime.IntentService;
 import com.xiaozhi.ai.stt.SttResult;
 import com.xiaozhi.ai.stt.SttService;
 import com.xiaozhi.common.model.bo.MessageMetadataBO;
@@ -253,8 +253,10 @@ public class DialogueService{
             }
             return false;
         }
-        if (!addresseeClassifier.directedAtDevice(persona.getChatModel(), persona.conversationMessages(),
-                player != null ? player.spokenSentences() : List.of(), text)) {
+        AddresseeClassifier.Verdict verdict = addresseeClassifier.judge(persona.getChatModel(),
+                persona.conversationMessages(), player != null ? player.spokenSentences() : List.of(), text);
+        // 判不出来按打断：漏掉真指令要用户重说一遍，比多接一句话难受
+        if (verdict == AddresseeClassifier.Verdict.NOT_DIRECTED) {
             log.info("插话不是在对设备说，续播 - SessionId: {}, text: {}", session.getSessionId(), text);
             if (player != null) {
                 player.resume();

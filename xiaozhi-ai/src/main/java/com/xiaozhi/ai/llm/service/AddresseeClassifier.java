@@ -28,16 +28,14 @@ import java.util.concurrent.TimeoutException;
 
 import lombok.extern.slf4j.Slf4j;
 /**
- * 设备正在说话时用户插进来一句，判定这句是不是在对设备说：不是则续播，是则确认打断。
- * <p>
- * 用角色当前配置的模型单独请求一次，不挂工具，只回一个布尔。判不出来一律按打断处理——
- * 漏掉真指令要用户重说一遍，比多接一句话难受得多。
+ * 设备正在说话时用户插进来一句，判定这句是不是在对设备说。
+ * 用角色当前配置的模型单独请求一次，不挂工具；判不出来如何处置由调用方决定。
  */
 @Slf4j
 @Service
 public class AddresseeClassifier {
 
-    /** 判定耗时上限，必须远小于播放暂停的保护上限，超时按打断处理 */
+    /** 判定耗时上限，必须远小于播放暂停的保护上限 */
     private static final long VERDICT_TIMEOUT_MS = 1500;
 
     /** 带给模型的历史消息条数，取会话尾部的用户与助手消息 */
@@ -46,14 +44,18 @@ public class AddresseeClassifier {
     private static final Set<MessageType> DIALOGUE_TYPES = Set.of(MessageType.USER, MessageType.ASSISTANT);
 
     /** 转换器构造时要生成 JSON Schema，每次插话建一份太贵；解析前先经 LenientJson 补齐结构，再用放宽的解析器读 */
-    private static final BeanOutputConverter<Verdict> VERDICT_CONVERTER =
-            new BeanOutputConverter<>(Verdict.class, LenientJson.mapper(), LenientJson::object);
+    private static final BeanOutputConverter<Reply> REPLY_CONVERTER =
+            new BeanOutputConverter<>(Reply.class, LenientJson.mapper(), LenientJson::object);
 
     /** 模型调用是阻塞的，不能占用 ForkJoinPool.commonPool */
     private static final Executor CLASSIFY_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
 
+    public enum Verdict {
+        DIRECTED, NOT_DIRECTED, UNKNOWN
+    }
+
     /** 模型漏字段时 directed 为 null，不能用基本类型接 */
-    record Verdict(Boolean directed) {
+    record Reply(Boolean directed) {
     }
 
     private final PromptTemplate template = PromptTemplate.builder()
@@ -68,30 +70,29 @@ public class AddresseeClassifier {
      * @param history         会话消息，内部只取尾部若干条用户与助手消息
      * @param spokenSentences 设备本轮已经说出口的句子
      * @param utterance       插进来的整句
-     * @return true 表示确认打断，超时、出错、解析不出结果一律返回 true
+     * @return 超时、出错、解析不出结果返回 UNKNOWN
      */
-    public boolean directedAtDevice(ChatModel chatModel, List<Message> history,
-                                    List<String> spokenSentences, String utterance) {
+    public Verdict judge(ChatModel chatModel, List<Message> history, List<String> spokenSentences, String utterance) {
         if (chatModel == null || !StringUtils.hasText(utterance)) {
-            return true;
+            return Verdict.UNKNOWN;
         }
-        CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(
+        CompletableFuture<Verdict> future = CompletableFuture.supplyAsync(
                 () -> classify(chatModel, history, spokenSentences, utterance), CLASSIFY_EXECUTOR);
         try {
             return future.get(VERDICT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             future.cancel(false);
-            log.warn("插话判定超过 {}ms 未返回，按打断处理 - text: {}", VERDICT_TIMEOUT_MS, utterance);
+            log.warn("插话判定超过 {}ms 未返回 - text: {}", VERDICT_TIMEOUT_MS, utterance);
         } catch (ExecutionException e) {
-            log.warn("插话判定失败，按打断处理 - text: {}", utterance, e.getCause());
+            log.warn("插话判定失败 - text: {}", utterance, e.getCause());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.warn("等待插话判定被中断，按打断处理 - text: {}", utterance);
+            log.warn("等待插话判定被中断 - text: {}", utterance);
         }
-        return true;
+        return Verdict.UNKNOWN;
     }
 
-    private boolean classify(ChatModel chatModel, List<Message> history,
+    private Verdict classify(ChatModel chatModel, List<Message> history,
                              List<String> spokenSentences, String utterance) {
         String prompt = template.render(Map.of(
                 "history", MessageHistoryFormatter.format(recentDialogue(history)),
@@ -107,13 +108,12 @@ public class AddresseeClassifier {
             }
             return request.call().content();
         });
-        Verdict verdict = VERDICT_CONVERTER.convert(response);
-        if (verdict == null || verdict.directed() == null) {
-            log.warn("插话判定结果读不出 directed，按打断处理 - response: {}", response);
-            return true;
+        Reply reply = REPLY_CONVERTER.convert(response);
+        if (reply == null || reply.directed() == null) {
+            log.warn("插话判定结果读不出 directed - response: {}", response);
+            return Verdict.UNKNOWN;
         }
-        log.info("插话判定: directed={} - text: {}", verdict.directed(), utterance);
-        return verdict.directed();
+        return reply.directed() ? Verdict.DIRECTED : Verdict.NOT_DIRECTED;
     }
 
     /**

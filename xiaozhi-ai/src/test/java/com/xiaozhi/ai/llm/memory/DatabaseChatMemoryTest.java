@@ -1,6 +1,5 @@
 package com.xiaozhi.ai.llm.memory;
 
-import com.xiaozhi.common.model.bo.ConversationBO;
 import com.xiaozhi.common.model.bo.SummaryBO;
 import com.xiaozhi.message.service.ConversationService;
 import com.xiaozhi.message.service.MessageService;
@@ -11,16 +10,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
-/**
- * Web 会话的摘要挂在会话上：压缩线程调模型的这几秒里用户可能已经把会话删了，落库前要确认会话还在；
- * 设备端摘要不挂会话，不查会话表。
- */
+/** 摘要落库交给会话服务，会话已删除时丢弃的判断在那里 */
 @ExtendWith(MockitoExtension.class)
 class DatabaseChatMemoryTest {
 
@@ -35,31 +28,12 @@ class DatabaseChatMemoryTest {
     private DatabaseChatMemory chatMemory;
 
     @Test
-    void summaryOfADeletedWebConversationIsDropped() {
-        when(conversationService.get("s-1")).thenReturn(null);
-
-        chatMemory.save(new SummaryBO().setDeviceId("web:9").setRoleId(1).setSessionId("s-1").setSummary("摘要"));
-
-        verify(summaryService, never()).save(any());
-    }
-
-    @Test
-    void summaryOfAnExistingWebConversationIsSaved() {
-        when(conversationService.get("s-1")).thenReturn(new ConversationBO());
+    void summariesGoThroughTheConversationService() {
         SummaryBO summary = new SummaryBO().setDeviceId("web:9").setRoleId(1).setSessionId("s-1").setSummary("摘要");
 
         chatMemory.save(summary);
 
-        verify(summaryService).save(summary);
-    }
-
-    @Test
-    void deviceSummaryIsSavedWithoutConsultingTheConversationTable() {
-        SummaryBO summary = new SummaryBO().setDeviceId("device-1").setRoleId(1).setSummary("摘要");
-
-        chatMemory.save(summary);
-
-        verify(summaryService).save(summary);
-        verifyNoInteractions(conversationService);
+        verify(conversationService).saveSummary(summary);
+        verifyNoInteractions(summaryService);
     }
 }

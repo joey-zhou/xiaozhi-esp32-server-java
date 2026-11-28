@@ -1,4 +1,4 @@
-package com.xiaozhi.ai.llm.service;
+package com.xiaozhi.dialogue.runtime;
 
 import java.util.Set;
 

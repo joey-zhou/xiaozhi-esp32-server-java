@@ -45,17 +45,9 @@ public class DatabaseChatMemory implements ChatMemory {
         this.conversationService = conversationService;
     }
 
-    /**
-     * Web 会话的摘要挂在会话上：压缩线程调模型的这几秒里用户可能已经把会话删了，落库前再确认会话还在，
-     * 否则留下一条列表里看不到、也删不掉的摘要。
-     */
     @Override
     public void save(SummaryBO summary) {
-        if (summary.getSessionId() != null && conversationService.get(summary.getSessionId()) == null) {
-            log.info("会话已删除，丢弃其摘要: sessionId={}", summary.getSessionId());
-            return;
-        }
-        summaryService.save(summary);
+        conversationService.saveSummary(summary);
     }
 
     @Override
