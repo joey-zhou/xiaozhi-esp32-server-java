@@ -40,8 +40,8 @@ class OperationLogCleanupTaskTest {
         ReflectionTestUtils.setField(task, "operationLogService", operationLogService);
         ReflectionTestUtils.setField(task, "distributedLocks", new DistributedLocks(redissonClient));
         ReflectionTestUtils.setField(task, "retentionDays", 180);
-        when(redissonClient.getLock("lock:task:operation-log-cleanup")).thenReturn(lock);
-        when(lock.tryLock(0, TimeUnit.SECONDS)).thenReturn(false);
+        when(redissonClient.getLock("xiaozhi:lock:task:operation-log-cleanup")).thenReturn(lock);
+        when(lock.tryLock(0, TimeUnit.MILLISECONDS)).thenReturn(false);
 
         task.cleanupExpiredLogs();
 
@@ -54,8 +54,8 @@ class OperationLogCleanupTaskTest {
         ReflectionTestUtils.setField(task, "operationLogService", operationLogService);
         ReflectionTestUtils.setField(task, "distributedLocks", new DistributedLocks(redissonClient));
         ReflectionTestUtils.setField(task, "retentionDays", 90);
-        when(redissonClient.getLock("lock:task:operation-log-cleanup")).thenReturn(lock);
-        when(lock.tryLock(0, TimeUnit.SECONDS)).thenReturn(true);
+        when(redissonClient.getLock("xiaozhi:lock:task:operation-log-cleanup")).thenReturn(lock);
+        when(lock.tryLock(0, TimeUnit.MILLISECONDS)).thenReturn(true);
         when(lock.isHeldByCurrentThread()).thenReturn(true);
 
         task.cleanupExpiredLogs();

@@ -10,17 +10,17 @@ package com.xiaozhi.common.config;
  */
 public final class CacheNames {
 
-    public static final String DEVICE = "XiaoZhi:Device";
+    public static final String DEVICE = "xiaozhi:device";
 
-    public static final String PERMISSION = "XiaoZhi:Permission";
+    public static final String PERMISSION = "xiaozhi:permission";
 
-    public static final String USER = "XiaoZhi:User";
+    public static final String USER = "xiaozhi:user";
 
-    public static final String SYS_CONFIG = "XiaoZhi:SysConfig";
+    public static final String SYS_CONFIG = "xiaozhi:sys-config";
 
-    public static final String MCP_TOOL_EXCLUDE = "XiaoZhi:McpToolExclude";
+    public static final String MCP_TOOL_EXCLUDE = "xiaozhi:mcp-tool-exclude";
 
-    public static final String ROLE = "XiaoZhi:Role";
+    public static final String ROLE = "xiaozhi:role";
 
     private CacheNames() {
     }

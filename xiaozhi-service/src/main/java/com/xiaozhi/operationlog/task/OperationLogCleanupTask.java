@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 public class OperationLogCleanupTask {
 
     private static final int BATCH_SIZE = 500;
-    private static final String CLEANUP_LOCK = "lock:task:operation-log-cleanup";
+    private static final String CLEANUP_LOCK = "task:operation-log-cleanup";
 
     @Value("${xiaozhi.operation-log.retention-days:180}")
     private int retentionDays;

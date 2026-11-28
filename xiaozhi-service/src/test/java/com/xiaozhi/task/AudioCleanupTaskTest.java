@@ -98,8 +98,8 @@ class AudioCleanupTaskTest {
      */
     @Test
     void purgeExpiredMessageAudioSkipsEntirelyWhenLockIsHeldElsewhere() throws InterruptedException {
-        when(redissonClient.getLock("lock:task:message-audio-purge")).thenReturn(lock);
-        when(lock.tryLock(0, TimeUnit.SECONDS)).thenReturn(false);
+        when(redissonClient.getLock("xiaozhi:lock:task:message-audio-purge")).thenReturn(lock);
+        when(lock.tryLock(0, TimeUnit.MILLISECONDS)).thenReturn(false);
 
         task.purgeExpiredMessageAudio();
 
@@ -109,8 +109,8 @@ class AudioCleanupTaskTest {
 
     @Test
     void purgeExpiredMessageAudioUsesRetentionDaysAndReleasesLock() throws InterruptedException {
-        when(redissonClient.getLock("lock:task:message-audio-purge")).thenReturn(lock);
-        when(lock.tryLock(0, TimeUnit.SECONDS)).thenReturn(true);
+        when(redissonClient.getLock("xiaozhi:lock:task:message-audio-purge")).thenReturn(lock);
+        when(lock.tryLock(0, TimeUnit.MILLISECONDS)).thenReturn(true);
         when(lock.isHeldByCurrentThread()).thenReturn(true);
 
         task.purgeExpiredMessageAudio();

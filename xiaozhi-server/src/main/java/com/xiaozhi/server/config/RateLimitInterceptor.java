@@ -3,6 +3,7 @@ package com.xiaozhi.server.config;
 import cn.dev33.satoken.stp.StpUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xiaozhi.common.WindowCounterRegistry;
 import com.xiaozhi.common.web.ApiResponse;
 import com.xiaozhi.common.web.ResultStatus;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
@@ -16,8 +17,6 @@ import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -30,6 +29,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -56,13 +56,13 @@ import lombok.extern.slf4j.Slf4j;
 public class RateLimitInterceptor implements HandlerInterceptor {
 
     /** Redis key 前缀 */
-    private static final String RATE_LIMIT_PREFIX = "rate_limit:";
+    private static final String RATE_LIMIT_PREFIX = "xiaozhi:rate-limit:";
 
     /** 请求体里解析出的账号，挂在请求属性上传给拦截器 */
     static final String ACCOUNT_ATTRIBUTE = "xiaozhi.rateLimit.account";
 
     /** 时间窗口（秒） */
-    private static final int WINDOW_SECONDS = 60;
+    private static final Duration WINDOW = Duration.ofSeconds(60);
 
     /** 登录/注册端点：每分钟最多 10 次 */
     private static final int MAX_AUTH_REQUESTS = 10;
@@ -90,19 +90,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     private static final int MAX_OTA_POLL_IP_REQUESTS = 600;
 
-    /**
-     * 计数与设置过期必须在一次 Redis 调用里完成：分两步时进程在两步之间挂掉会留下永不过期的 key，
-     * 把该主体永久锁死。TTL 为负说明是历史遗留或异常丢失的过期时间，顺带补回。
-     */
-    private static final RedisScript<Long> INCREMENT_IN_WINDOW = RedisScript.of(
-            "local count = redis.call('INCR', KEYS[1]) "
-                    + "if count == 1 or redis.call('TTL', KEYS[1]) < 0 then "
-                    + "redis.call('EXPIRE', KEYS[1], ARGV[1]) end "
-                    + "return count",
-            Long.class);
-
     @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private WindowCounterRegistry windowCounterRegistry;
 
     @Resource
     private TrustedProxyPolicy trustedProxyPolicy;
@@ -116,7 +105,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         for (Subject subject : resolveSubjects(request, uri, clientIp)) {
             if (isExceeded(uri, subject)) {
                 log.warn("请求频率超限 - 主体: {}, IP: {}, 端点: {}, 上限: {}/{}s",
-                        subject.key(), clientIp, uri, subject.maxRequests(), WINDOW_SECONDS);
+                        subject.key(), clientIp, uri, subject.maxRequests(), WINDOW.toSeconds());
                 ApiResponse.write(response, ResultStatus.TOO_MANY_REQUESTS, "请求过于频繁，请稍后再试");
                 return false;
             }
@@ -218,9 +207,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private boolean isExceeded(String uri, Subject subject) {
         String redisKey = RATE_LIMIT_PREFIX + normalizeUri(uri) + ":" + subject.key();
         try {
-            Long count = stringRedisTemplate.execute(INCREMENT_IN_WINDOW, List.of(redisKey),
-                    String.valueOf(WINDOW_SECONDS));
-            return count != null && count > subject.maxRequests();
+            return windowCounterRegistry.increment(redisKey, WINDOW) > subject.maxRequests();
         } catch (Exception e) {
             // Redis 异常时放行，不影响正常使用
             log.error("限流检查异常，已放行: {}", e.getMessage());

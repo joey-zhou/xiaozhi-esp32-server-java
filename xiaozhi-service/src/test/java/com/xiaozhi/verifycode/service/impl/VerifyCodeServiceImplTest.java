@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.xiaozhi.common.WindowCounterRegistry;
 import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.storage.service.StorageServiceFactory;
@@ -20,7 +21,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.stubbing.Answer;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -64,10 +64,10 @@ class VerifyCodeServiceImplTest {
     private StringRedisTemplate stringRedisTemplate;
 
     @Mock
-    private ValueOperations<String, String> valueOperations;
+    private StorageServiceFactory storageServiceFactory;
 
     @Mock
-    private StorageServiceFactory storageServiceFactory;
+    private WindowCounterRegistry windowCounterRegistry;
 
     @InjectMocks
     private VerifyCodeServiceImpl verifyCodeService;
@@ -182,8 +182,7 @@ class VerifyCodeServiceImplTest {
     @Test
     void consumeByAccountDeletesMatchedCodeAndResetsAttempts() {
         LocalDateTime beforeCall = LocalDateTime.now();
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment(ATTEMPT_KEY)).thenReturn(1L);
+        when(windowCounterRegistry.increment(ATTEMPT_KEY, VALID_WINDOW)).thenReturn(1L);
         when(verifyCodeMapper.delete(any())).thenReturn(1);
 
         assertThat(verifyCodeService.consumeByAccount("a@b.com", "123456")).isTrue();
@@ -197,14 +196,12 @@ class VerifyCodeServiceImplTest {
         assertThat(captor.getValue().getParamNameValuePairs().values()).contains("a@b.com", "123456");
         assertThat(validSinceOf(captor.getValue()))
             .isBetween(beforeCall.minus(VALID_WINDOW), LocalDateTime.now().minus(VALID_WINDOW));
-        verify(stringRedisTemplate).expire(ATTEMPT_KEY, VALID_WINDOW);
         verify(stringRedisTemplate).delete(ATTEMPT_KEY);
     }
 
     @Test
     void consumeByAccountIsFalseWhenNothingDeleted() {
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment(ATTEMPT_KEY)).thenReturn(2L);
+        when(windowCounterRegistry.increment(ATTEMPT_KEY, VALID_WINDOW)).thenReturn(2L);
         when(verifyCodeMapper.delete(any())).thenReturn(0);
 
         assertThat(verifyCodeService.consumeByAccount("a@b.com", "123456")).isFalse();
@@ -215,8 +212,7 @@ class VerifyCodeServiceImplTest {
 
     @Test
     void consumeByAccountWipesRemainingCodesOnLastAllowedAttempt() {
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment(ATTEMPT_KEY)).thenReturn(5L);
+        when(windowCounterRegistry.increment(ATTEMPT_KEY, VALID_WINDOW)).thenReturn(5L);
         when(verifyCodeMapper.delete(any())).thenReturn(0);
 
         assertThat(verifyCodeService.consumeByAccount("a@b.com", "000000")).isFalse();
@@ -227,8 +223,7 @@ class VerifyCodeServiceImplTest {
 
     @Test
     void consumeByAccountStopsQueryingAfterAttemptsExhausted() {
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment(ATTEMPT_KEY)).thenReturn(6L);
+        when(windowCounterRegistry.increment(ATTEMPT_KEY, VALID_WINDOW)).thenReturn(6L);
 
         assertThat(verifyCodeService.consumeByAccount("a@b.com", "123456")).isFalse();
 

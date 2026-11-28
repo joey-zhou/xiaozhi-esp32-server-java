@@ -3,6 +3,7 @@ package com.xiaozhi.verifycode.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.xiaozhi.common.AfterCommit;
+import com.xiaozhi.common.WindowCounterRegistry;
 import com.xiaozhi.common.exception.OperationFailedException;
 import com.xiaozhi.common.model.bo.VerifyCodeBO;
 import com.xiaozhi.utils.DateUtils;
@@ -48,6 +49,9 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private WindowCounterRegistry windowCounterRegistry;
 
     @Resource
     private StorageServiceFactory storageServiceFactory;
@@ -176,11 +180,8 @@ public class VerifyCodeServiceImpl implements VerifyCodeService {
         }
 
         String attemptKey = attemptKey(account);
-        Long attempts = stringRedisTemplate.opsForValue().increment(attemptKey);
-        if (attempts != null && attempts == 1L) {
-            stringRedisTemplate.expire(attemptKey, ATTEMPT_WINDOW);
-        }
-        if (attempts == null || attempts > MAX_ATTEMPTS) {
+        long attempts = windowCounterRegistry.increment(attemptKey, ATTEMPT_WINDOW);
+        if (attempts > MAX_ATTEMPTS) {
             deleteByAccount(account);
             return false;
         }

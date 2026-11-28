@@ -1,12 +1,10 @@
 package com.xiaozhi.common;
 
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
 import org.springframework.cache.Cache;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.Resource;
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 import java.util.function.Supplier;
 
 import lombok.extern.slf4j.Slf4j;
@@ -20,8 +18,10 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class CacheHelper {
 
+    private static final Duration LOCK_WAIT = Duration.ofSeconds(3);
+
     @Resource
-    private RedissonClient redissonClient;
+    private DistributedLocks distributedLocks;
 
     /**
      * 带分布式锁的缓存查询
@@ -34,52 +34,18 @@ public class CacheHelper {
      * @return 数据
      */
     public <T> T getWithLock(String lockKey, Supplier<T> cacheGetter, Supplier<T> dbGetter) {
-        // 1. 先尝试从缓存获取
         T cached = cacheGetter.get();
         if (cached != null) {
             return cached;
         }
-
-        // 2. 缓存未命中,使用分布式锁
-        RLock lock = redissonClient.getLock("lock:" + lockKey);
-        boolean locked;
-        try {
-            // 尝试获取锁,最多等待3秒；不传租期，交给 Redisson 看门狗按持锁线程存活自动续期，
-            // 避免固定租期短于查库耗时（如 Hikari 连接池排队）导致锁提前失效
-            locked = lock.tryLock(3, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("获取锁被中断: {}", lockKey, e);
-            // 降级: 直接查询数据库
-            return dbGetter.get();
-        }
-
-        if (!locked) {
-            // 获取锁失败,直接查询数据库(降级策略)
+        // 等不到锁就直接查库降级；拿到锁后再看一次缓存，避免重复查库
+        return distributedLocks.callWithin("cache:" + lockKey, LOCK_WAIT, () -> {
+            T filled = cacheGetter.get();
+            return filled != null ? filled : dbGetter.get();
+        }, () -> {
             log.warn("获取锁超时,直接查询数据库: {}", lockKey);
             return dbGetter.get();
-        }
-
-        // 锁只包获取/释放本身，dbGetter 的异常原样上抛，不在这里当成锁异常吞掉再查一次
-        try {
-            // 3. 双重检查,避免重复查询数据库
-            cached = cacheGetter.get();
-            if (cached != null) {
-                log.debug("获取锁后从缓存命中: {}", lockKey);
-                return cached;
-            }
-
-            // 4. 查询数据库
-            log.debug("从数据库查询: {}", lockKey);
-            return dbGetter.get();
-        } finally {
-            try {
-                lock.unlock();
-            } catch (IllegalMonitorStateException e) {
-                // 业务耗时超过看门狗续期窗口导致锁已自动释放时会抛出，此时锁已不在自己手里，忽略即可
-                log.warn("释放锁时锁已失效: {}", lockKey);
-            }
-        }
+        });
     }
 
     /**

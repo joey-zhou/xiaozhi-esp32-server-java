@@ -1,6 +1,7 @@
 package com.xiaozhi.server.config;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.xiaozhi.common.WindowCounterRegistry;
 import com.xiaozhi.common.web.TrustedProxyPolicy;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +58,7 @@ class RateLimitInterceptorTest {
     @BeforeEach
     void setUp() {
         rateLimitInterceptor = new RateLimitInterceptor();
-        ReflectionTestUtils.setField(rateLimitInterceptor, "stringRedisTemplate", stringRedisTemplate);
+        ReflectionTestUtils.setField(rateLimitInterceptor, "windowCounterRegistry", new WindowCounterRegistry(stringRedisTemplate));
         ReflectionTestUtils.setField(rateLimitInterceptor, "trustedProxyPolicy", trustedProxyPolicy);
     }
 
@@ -71,7 +72,7 @@ class RateLimitInterceptorTest {
 
         assertThat(rateLimitInterceptor.preHandle(request, new MockHttpServletResponse(), HANDLER)).isTrue();
 
-        assertThat(counters).containsExactly(entry("rate_limit:/api/user/login:ip:10.0.0.7", 1L));
+        assertThat(counters).containsExactly(entry("xiaozhi:rate-limit:/api/user/login:ip:10.0.0.7", 1L));
     }
 
     @Test
@@ -118,7 +119,7 @@ class RateLimitInterceptorTest {
 
         assertThat(rateLimitInterceptor.preHandle(loginRequestOf("alice@example.com"),
             new MockHttpServletResponse(), HANDLER)).isFalse();
-        assertThat(counters.keySet()).anyMatch(key -> key.startsWith("rate_limit:/api/user/login:account:"));
+        assertThat(counters.keySet()).anyMatch(key -> key.startsWith("xiaozhi:rate-limit:/api/user/login:account:"));
         assertThat(counters.keySet()).noneMatch(key -> key.contains("alice@example.com"));
     }
 
@@ -133,7 +134,7 @@ class RateLimitInterceptorTest {
                 new MockHttpServletResponse(), HANDLER)).isTrue();
         }
 
-        assertThat(counters).containsExactly(entry("rate_limit:/api/device:user:7", 1L));
+        assertThat(counters).containsExactly(entry("xiaozhi:rate-limit:/api/device:user:7", 1L));
     }
 
     /** 设备列表与设备绑定共用一个路径，读方向不计数 */
@@ -158,8 +159,8 @@ class RateLimitInterceptorTest {
         assertThat(rateLimitInterceptor.preHandle(request, new MockHttpServletResponse(), HANDLER)).isTrue();
 
         assertThat(counters).containsOnly(
-            entry("rate_limit:/api/device/ota:device:esp32-01", 1L),
-            entry("rate_limit:/api/device/ota:ip:10.0.0.7", 1L));
+            entry("xiaozhi:rate-limit:/api/device/ota:device:esp32-01", 1L),
+            entry("xiaozhi:rate-limit:/api/device/ota:ip:10.0.0.7", 1L));
     }
 
     /** 编码、矩阵参数与尾斜杠写法不能各自算成一个新端点，否则换个写法就是一份新额度 */
@@ -173,7 +174,7 @@ class RateLimitInterceptorTest {
         rateLimitInterceptor.preHandle(postRequest("/api/user/login/"), new MockHttpServletResponse(), HANDLER);
         rateLimitInterceptor.preHandle(postRequest("/api/user/login//"), new MockHttpServletResponse(), HANDLER);
 
-        assertThat(counters).containsExactly(entry("rate_limit:/api/user/login:ip:10.0.0.7", 4L));
+        assertThat(counters).containsExactly(entry("xiaozhi:rate-limit:/api/user/login:ip:10.0.0.7", 4L));
     }
 
     @Test

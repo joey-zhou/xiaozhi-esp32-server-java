@@ -1,5 +1,6 @@
 package com.xiaozhi.ai.token;
 
+import com.xiaozhi.common.DistributedLocks;
 import com.xiaozhi.event.AiConfigChangedEvent;
 import com.xiaozhi.common.model.bo.ConfigBO;
 import com.xiaozhi.common.port.ProviderTokenClient;
@@ -12,7 +13,6 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -20,7 +20,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,16 +28,16 @@ import lombok.extern.slf4j.Slf4j;
 public class TokenService implements ProviderTokenClient {
 
     private static final String TOKEN_KEY_PREFIX = "xiaozhi:token:";
-    private static final String LOCK_KEY_PREFIX = "xiaozhi:token:lock:";
-    private static final Duration LOCK_TTL = Duration.ofSeconds(15);
+    private static final String LOCK_PREFIX = "token:";
+    /** 别的实例正在换 token 时最多等这么久 */
+    private static final Duration LOCK_WAIT = Duration.ofSeconds(4);
     private static final long REFRESH_AHEAD_MILLIS = Duration.ofHours(1).toMillis();
-    private static final int MAX_WAIT_RETRIES = 20;
-    private static final long WAIT_INTERVAL_MILLIS = 200L;
-
-    private static final DefaultRedisScript<Long> RELEASE_LOCK_SCRIPT = createReleaseLockScript();
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private DistributedLocks distributedLocks;
 
     private final List<TokenProvider> tokenProviders;
 
@@ -66,36 +65,28 @@ public class TokenService implements ProviderTokenClient {
     public String getToken(ConfigBO config) {
         validateConfig(config);
         TokenCache cached = getCachedToken(config);
-        if (cached != null && !cached.isExpired() && !cached.shouldRefresh(REFRESH_AHEAD_MILLIS)) {
+        if (cached != null && !cached.shouldRefresh(REFRESH_AHEAD_MILLIS)) {
             return cached.getToken();
         }
-
-        String lockKey = buildLockKey(config);
-        String lockValue = UUID.randomUUID().toString();
-        if (tryLock(lockKey, lockValue)) {
-            try {
-                TokenCache latest = getCachedToken(config);
-                if (latest != null && !latest.isExpired() && !latest.shouldRefresh(REFRESH_AHEAD_MILLIS)) {
-                    return latest.getToken();
-                }
-                TokenCache refreshed = resolveProvider(config.getProvider()).fetchToken(config);
-                validateToken(refreshed, config);
-                cacheToken(config, refreshed);
-                return refreshed.getToken();
-            } finally {
-                unlock(lockKey, lockValue);
+        // 手里的还没过期就不排队等别人刷新
+        Duration wait = cached != null ? Duration.ZERO : LOCK_WAIT;
+        return distributedLocks.callWithin(buildLockName(config), wait, () -> refresh(config), () -> {
+            if (cached != null) {
+                return cached.getToken();
             }
-        }
+            throw new IllegalStateException("获取Token失败，provider=" + config.getProvider() + ", configId=" + config.getConfigId());
+        });
+    }
 
-        if (cached != null && !cached.isExpired()) {
-            return cached.getToken();
+    private String refresh(ConfigBO config) {
+        TokenCache latest = getCachedToken(config);
+        if (latest != null && !latest.shouldRefresh(REFRESH_AHEAD_MILLIS)) {
+            return latest.getToken();
         }
-
-        TokenCache waited = waitForToken(config);
-        if (waited != null && !waited.isExpired()) {
-            return waited.getToken();
-        }
-        throw new IllegalStateException("获取Token失败，provider=" + config.getProvider() + ", configId=" + config.getConfigId());
+        TokenCache refreshed = resolveProvider(config.getProvider()).fetchToken(config);
+        validateToken(refreshed, config);
+        cacheToken(config, refreshed);
+        return refreshed.getToken();
     }
 
     /** token 按 provider:configId 存，配置可能刚把 provider 改掉，每个 provider 下的这份都删 */
@@ -149,37 +140,12 @@ public class TokenService implements ProviderTokenClient {
         stringRedisTemplate.opsForValue().set(buildTokenKey(config), json, Duration.ofMillis(ttlMillis));
     }
 
-    private boolean tryLock(String lockKey, String lockValue) {
-        Boolean success = stringRedisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, LOCK_TTL);
-        return Boolean.TRUE.equals(success);
-    }
-
-    private void unlock(String lockKey, String lockValue) {
-        stringRedisTemplate.execute(RELEASE_LOCK_SCRIPT, List.of(lockKey), lockValue);
-    }
-
-    private TokenCache waitForToken(ConfigBO config) {
-        for (int i = 0; i < MAX_WAIT_RETRIES; i++) {
-            try {
-                Thread.sleep(WAIT_INTERVAL_MILLIS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return null;
-            }
-            TokenCache tokenCache = getCachedToken(config);
-            if (tokenCache != null) {
-                return tokenCache;
-            }
-        }
-        return null;
-    }
-
     private String buildTokenKey(ConfigBO config) {
         return TOKEN_KEY_PREFIX + normalizeProvider(config.getProvider()) + ":" + normalizeConfigId(config.getConfigId());
     }
 
-    private String buildLockKey(ConfigBO config) {
-        return LOCK_KEY_PREFIX + normalizeProvider(config.getProvider()) + ":" + normalizeConfigId(config.getConfigId());
+    private String buildLockName(ConfigBO config) {
+        return LOCK_PREFIX + normalizeProvider(config.getProvider()) + ":" + normalizeConfigId(config.getConfigId());
     }
 
     private void validateConfig(ConfigBO config) {
@@ -206,12 +172,5 @@ public class TokenService implements ProviderTokenClient {
 
     private String normalizeConfigId(Integer configId) {
         return configId == null ? "default" : String.valueOf(configId);
-    }
-
-    private static DefaultRedisScript<Long> createReleaseLockScript() {
-        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
-        script.setResultType(Long.class);
-        script.setScriptText("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end");
-        return script;
     }
 }

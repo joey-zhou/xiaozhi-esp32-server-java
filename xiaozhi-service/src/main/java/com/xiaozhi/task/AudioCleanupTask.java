@@ -38,7 +38,7 @@ public class AudioCleanupTask {
     /** 分批删除，每批最多处理的记录数 */
     private static final int BATCH_SIZE = 500;
 
-    private static final String MESSAGE_AUDIO_LOCK = "lock:task:message-audio-purge";
+    private static final String MESSAGE_AUDIO_LOCK = "task:message-audio-purge";
 
     @Resource
     private RuntimePathConfig runtimePathConfig;

@@ -1,4 +1,4 @@
-package com.xiaozhi.task;
+package com.xiaozhi.verifycode.task;
 
 import com.xiaozhi.common.DistributedLocks;
 import com.xiaozhi.verifycode.service.VerifyCodeService;
@@ -20,7 +20,7 @@ public class VerifyCodeCleanupTask {
 
     private static final int RETENTION_MINUTES = 24 * 60;
     private static final int BATCH_SIZE = 500;
-    private static final String CLEANUP_LOCK = "lock:task:verifycode-cleanup";
+    private static final String CLEANUP_LOCK = "task:verifycode-cleanup";
 
     @Resource
     private VerifyCodeService verifyCodeService;
